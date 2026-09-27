@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/ast-grep/ast-grep/main/schemas/rust_rule.json
+
+id: execute-function-signature
+language: rust
+severity: error
+message: "`execute` has an invalid operation signature."
+note: >-
+  Use a free function without variadic parameters.
+rule:
+  all:
+    - kind: function_item
+    - has:
+        field: name
+        regex: '^execute$'
+    - any:
+        - all:
+            - kind: function_item
+            - has:
+                field: parameters
+                kind: parameters
+                has:
+                  kind: self_parameter
+        - all:
+            - kind: function_item
+            - has:
+                field: parameters
+                kind: parameters
+                has:
+                  kind: variadic_parameter

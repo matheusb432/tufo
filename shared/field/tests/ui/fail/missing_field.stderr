@@ -1,0 +1,7 @@
+error[E0609]: no field `missing` on type `Record`
+ --> tests/ui/fail/missing_field.rs:8:20
+  |
+8 |     let _ = field!(missing @ Record);
+  |                    ^^^^^^^ unknown field
+  |
+  = note: available field is: `value`

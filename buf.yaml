@@ -1,0 +1,6 @@
+version: v2
+modules:
+  - path: crates/tufo-wire/proto
+lint:
+  use:
+    - STANDARD

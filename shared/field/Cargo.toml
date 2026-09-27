@@ -1,0 +1,19 @@
+# Modified for Tufo in 2026: upgraded to Rust 2024 and the workspace lint policy.
+[package]
+name = "field"
+description = "Statically verified struct field names as strings."
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+authors = ["Indraneel Mahendrakumar"]
+repository = "https://github.com/Carnagion/field"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+keywords = ["macro", "field", "struct", "name"]
+categories = ["no-std", "rust-patterns"]
+
+[dev-dependencies]
+trybuild.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,5 @@
+[migration]
+path = "../tufo-infra/toasty"
+prefix_style = "Sequential"
+checksums = true
+statement_breakpoints = true

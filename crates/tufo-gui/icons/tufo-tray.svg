@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg:svg
+   width="32"
+   height="32"
+   viewBox="0 0 256 256"
+   version="1.1"
+   id="tufo-icon-tray"
+   sodipodi:docname="tufo-tray.svg"
+   inkscape:version="1.2.2 (b0a8486541, 2022-12-01)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <svg:defs>
+    <svg:mask
+       id="face-cutouts"
+       maskUnits="userSpaceOnUse"
+       maskContentUnits="userSpaceOnUse"
+       x="0"
+       y="0"
+       width="256"
+       height="256"
+       inkscape:label="Face cutouts">
+      <svg:rect
+         x="0"
+         y="0"
+         width="256"
+         height="256"
+         fill="#ffffff" />
+      <svg:path
+         id="eye-shadow-left"
+         inkscape:label="Left eye shadow"
+         fill="#000000"
+         d="M 21.14579,109.82947
+           C 25.83501,107.10252 34.41615,103.18339 50.14599,97.75689
+           C 87.57868,84.82101 105.38961,84.82101 113.28156,98.85315
+           C 121.17350,112.88530 111.93020,129.09626 90.51113,131.94654
+           C 70.42991,134.61868 46.78110,141.14143 26.06474,157.83201
+           C 21.55120,149.44561 18.11874,119.54508 21.14579,109.82947
+           Z" />
+      <svg:path
+         id="eye-shadow-right"
+         inkscape:label="Right eye shadow"
+         fill="#000000"
+         d="M 145.37637,97.97615
+           C 153.18723,83.75216 170.80898,83.75216 207.83626,96.86618
+           C 221.41743,101.67603 229.62019,105.32110 234.56617,108.00694
+           C 237.82295,117.47589 235.10671,148.50008 230.67425,157.00981
+           C 210.41736,140.67552 187.45774,134.20758 167.91706,131.53544
+           C 146.72773,128.64405 137.57902,112.20013 145.38988,97.97615
+           Z" />
+      <svg:path
+         id="nose"
+         inkscape:label="Nose"
+         fill="#000000"
+         d="M 127.86274,135.53680
+           C 134.43035,135.53680 139.74120,138.09931 139.74120,141.27846
+           C 139.74120,144.45762 134.41684,147.02013 127.86274,147.02013
+           C 121.30864,147.02013 115.98428,144.45762 115.98428,141.27846
+           C 115.98428,138.09931 121.30864,135.53680 127.86274,135.53680
+           Z" />
+      <svg:path
+         id="smile"
+         inkscape:label="Smile"
+         fill="#000000"
+         d="M 99,158
+           C 112.775,162.75 143.225,162.75 157,158
+           C 163.09,155.9 167.585,162.1 161.495,164.2
+           C 143.5875,170.375 112.4125,170.375 94.505,164.2
+           C 88.415,162.1 92.91,155.9 99,158
+           Z" />
+    </svg:mask>
+  </svg:defs>
+  <sodipodi:namedview
+     id="namedview16"
+     pagecolor="#505050"
+     bordercolor="#eeeeee"
+     borderopacity="1"
+     inkscape:showpageshadow="0"
+     inkscape:pageopacity="0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#505050"
+     showgrid="false"
+     inkscape:zoom="20"
+     inkscape:cx="16"
+     inkscape:cy="16"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="face" />
+  <svg:g
+     inkscape:groupmode="layer"
+     id="face"
+     inkscape:label="Face">
+    <svg:path
+       id="face-fur"
+       inkscape:label="Face fur"
+       fill="#95d5b2"
+       d="M 234.56617,108.00694
+           C 222.49852,72.94028 179.43066,47.00000 128.14652,47.00000
+           C 76.86239,47.00000 32.33506,73.84470 21.14579,109.82947
+           C 18.11874,119.54508 21.55120,149.44561 26.06474,157.83201
+           C 42.17296,187.80105 81.79485,209.00000 128.14652,209.00000
+           C 174.49819,209.00000 214.84982,187.40365 230.67425,157.00981
+           C 235.10671,148.50008 237.82295,117.47589 234.56617,108.00694
+           Z"
+       mask="url(#face-cutouts)" />
+    <svg:path
+       id="eye-left"
+       inkscape:label="Left eye"
+       fill="#95d5b2"
+       d="M 101.50000,110.00000
+           C 101.50000,117.73199 95.23199,124.00000 87.50000,124.00000
+           C 79.76801,124.00000 73.50000,117.73199 73.50000,110.00000
+           C 73.50000,102.26801 79.76801,96.00000 87.50000,96.00000
+           C 95.23199,96.00000 101.50000,102.26801 101.50000,110.00000
+           Z" />
+    <svg:path
+       id="eye-right"
+       inkscape:label="Right eye"
+       fill="#95d5b2"
+       d="M 182.50000,110.00000
+           C 182.50000,117.73199 176.23199,124.00000 168.50000,124.00000
+           C 160.76801,124.00000 154.50000,117.73199 154.50000,110.00000
+           C 154.50000,102.26801 160.76801,96.00000 168.50000,96.00000
+           C 176.23199,96.00000 182.50000,102.26801 182.50000,110.00000
+           Z" />
+  </svg:g>
+  <svg:g
+     inkscape:groupmode="layer"
+     id="outline"
+     inkscape:label="Outline"
+     sodipodi:insensitive="true">
+    <svg:ellipse
+       id="outline-oval"
+       inkscape:label="Oval outline"
+       cx="120.00305"
+       cy="89.142853"
+       rx="113.25718"
+       ry="83.249908"
+       transform="matrix(0.9999745,0.00714264,0,1,8,38)"
+       fill="none"
+       stroke="#95d5b2"
+       stroke-width="22" />
+  </svg:g>
+</svg:svg>

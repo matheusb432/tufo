@@ -1,0 +1,404 @@
+// The window: the backdrop, the sidebar, the page with the player docked under it, and the
+// overlays, with keyboard search.
+
+import { Motion, Theme } from "theme.slint";
+import {
+    Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
+    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
+    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
+} from "state.slint";
+import { Sidebar } from "sidebar.slint";
+import { ConnectingPage, GridPage, HomePage, PlaylistPage, SoundboardPage } from "pages.slint";
+import { Dock } from "dock.slint";
+import {
+    AddCollectionDialog, EditCollectionDialog, EditEntryDialog, SettingsDialog,
+} from "dialogs.slint";
+import { BackgroundGallery } from "gallery.slint";
+import { SearchPalette } from "search.slint";
+import { Icon } from "widgets.slint";
+
+export {
+    Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
+    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
+    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
+}
+
+export component AppWindow inherits Window {
+    title: @tr("" => "Tufo");
+    icon: @image-url("../icons/tufo.svg");
+    // Fits a 1280 × 800 screen at 125% scaling.
+    preferred-width: 1000px;
+    preferred-height: 700px;
+    min-width: Theme.rail-width + Theme.page-width-min;
+    min-height: 600px;
+    background: Theme.still-shade;
+    default-font-family: Theme.font;
+    // Keyboard shortcuts see every key first, wherever focus is inside the window.
+    forward-focus: shortcuts;
+    property <bool> settings-open;
+    property <bool> add-open;
+    property <CollectionKind> add-kind;
+    property <bool> edit-collection-open;
+    property <bool> edit-entry-open;
+    property <string> entry-id;
+    property <string> entry-title;
+    property <bool> entry-is-sound;
+    property <int> entry-fade-in-ms;
+    property <int> entry-fade-out-ms;
+    property <int> entry-icon;
+    property <bool> any-dialog: root.settings-open || root.add-open || root.edit-collection-open || root.edit-entry-open;
+    property <bool> sidebar-fits: root.width >= Theme.sidebar-width + Theme.page-width-min;
+    property <bool> sidebar-expanded: Session.drawer-pinned && root.sidebar-fits;
+    // Where the sidebar doesn't fit beside the page, expanding it lays it over the page until
+    // a page opens.
+    property <bool> sidebar-overlaid;
+    changed sidebar-fits => {
+        root.sidebar-overlaid = false;
+    }
+    property <length> page-x: root.sidebar-expanded ? Theme.sidebar-width : Theme.rail-width;
+    animate page-x {
+        duration: Motion.sidebar-slide;
+        easing: Motion.sidebar-slide-easing;
+    }
+    // The background gallery, over the Add or Edit dialog that opened it.
+    property <bool> gallery-open;
+    property <string> gallery-title;
+    property <length> still-glow-radius: max(root.width, root.height) * 1.15;
+    property <length> still-glow-x: root.width * 0.92;
+
+    // The picker that takes an image dropped on the window, if a dialog shows one.
+    public pure function background-drop-target() -> BackgroundTarget {
+        if root.add-open {
+            return BackgroundTarget.new-collection;
+        }
+        if root.edit-collection-open {
+            return BackgroundTarget.open-collection;
+        }
+        BackgroundTarget.none
+    }
+
+    function open-add(kind: CollectionKind) {
+        root.add-kind = kind;
+        root.add-open = true;
+    }
+
+    function toggle-sidebar() {
+        if root.sidebar-fits {
+            Session.drawer-pinned = !Session.drawer-pinned;
+            Actions.set-drawer-pinned(Session.drawer-pinned);
+        } else {
+            root.sidebar-overlaid = !root.sidebar-overlaid;
+        }
+    }
+
+    function open-palette() {
+        Search.palette-open = true;
+        Search.selected = 0;
+        Actions.palette-query-changed(Search.palette-query);
+    }
+
+    function open-gallery(title: string) {
+        root.gallery-title = title;
+        root.gallery-open = true;
+    }
+
+    function close-overlays() -> bool {
+        if root.sidebar-overlaid {
+            root.sidebar-overlaid = false;
+            return true;
+        }
+        if root.gallery-open {
+            root.gallery-open = false;
+            return true;
+        }
+        if Search.palette-open {
+            Search.palette-open = false;
+            shortcuts.focus();
+            return true;
+        }
+        if root.any-dialog {
+            root.settings-open = false;
+            root.add-open = false;
+            root.edit-collection-open = false;
+            root.edit-entry-open = false;
+            shortcuts.focus();
+            return true;
+        }
+        if Search.filter-open {
+            Search.filter-open = false;
+            Search.filter-text = "";
+            Actions.filter-changed("");
+            shortcuts.focus();
+            return true;
+        }
+        false
+    }
+
+    // The accents' clock, at 30 frames a second.
+    Timer {
+        interval: 33ms;
+        running: Clock.enabled && PlayerView.something-plays;
+        triggered => {
+            Clock.seconds += 0.033;
+        }
+    }
+
+    // The backdrop's still: light from beyond the top-right corner fading into shade.
+    Rectangle {
+        background: @radial-gradient(circle root.still-glow-radius at root.still-glow-x 0px, Theme.still-light 0%, Theme.still-canopy 38%, Theme.still-shade 100%);
+    }
+
+    shortcuts := FocusScope {
+        capture-key-pressed(event) => {
+            if event.modifiers.control && !event.modifiers.alt && (event.text == "f" || event.text == "F") {
+                if event.modifiers.shift {
+                    root.open-palette();
+                } else if !root.any-dialog && !Search.palette-open {
+                    Search.filter-open = !Search.filter-open;
+                    if !Search.filter-open {
+                        Search.filter-text = "";
+                        Actions.filter-changed("");
+                        shortcuts.focus();
+                    }
+                }
+                return accept;
+            }
+            if event.modifiers.control && !event.modifiers.alt && !event.modifiers.shift && (event.text == "b" || event.text == "B") {
+                if !root.any-dialog && !Search.palette-open {
+                    root.toggle-sidebar();
+                }
+                return accept;
+            }
+            if event.text == Key.Escape {
+                return root.close-overlays() ? accept : reject;
+            }
+            reject
+        }
+        main := Rectangle {
+            x: root.page-x;
+            width: parent.width - self.x;
+            VerticalLayout {
+                page-area := Rectangle {
+                    // Small enough that a collection's page trades its plate for a slim header.
+                    property <bool> compact: self.width < 680px || self.height < 520px;
+                    vertical-stretch: 1;
+                    clip: true;
+                    if !LibraryView.loaded: ConnectingPage { }
+                    if LibraryView.loaded && Navigation.page == Page.home: HomePage {
+                        add(kind) => {
+                            root.open-add(kind);
+                        }
+                    }
+                    if LibraryView.loaded && Navigation.page == Page.playlists: GridPage {
+                        kind: CollectionKind.playlist;
+                        add(kind) => {
+                            root.open-add(kind);
+                        }
+                    }
+                    if LibraryView.loaded && Navigation.page == Page.soundboards: GridPage {
+                        kind: CollectionKind.soundboard;
+                        add(kind) => {
+                            root.open-add(kind);
+                        }
+                    }
+                    if LibraryView.loaded && Navigation.page == Page.playlist: PlaylistPage {
+                        compact: page-area.compact;
+                        edit-collection => {
+                            root.edit-collection-open = true;
+                        }
+                        edit-entry(id, title) => {
+                            root.entry-id = id;
+                            root.entry-title = title;
+                            root.entry-is-sound = false;
+                            root.edit-entry-open = true;
+                        }
+                        add-files => {
+                            Actions.add-files(Navigation.collection-id);
+                        }
+                    }
+                    if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
+                        compact: page-area.compact;
+                        edit-collection => {
+                            root.edit-collection-open = true;
+                        }
+                        edit-sound(tile) => {
+                            root.entry-id = tile.id;
+                            root.entry-title = tile.title;
+                            root.entry-is-sound = true;
+                            root.entry-fade-in-ms = tile.fade-in-ms;
+                            root.entry-fade-out-ms = tile.fade-out-ms;
+                            root.entry-icon = tile.icon;
+                            root.edit-entry-open = true;
+                        }
+                        add-files => {
+                            Actions.add-files(Navigation.collection-id);
+                        }
+                    }
+                }
+
+                if LibraryView.loaded: HorizontalLayout {
+                    padding-left: 14px;
+                    padding-right: 14px;
+                    padding-bottom: 12px;
+                    Dock {
+                        wide: main.width >= 680px;
+                        collapsed: Session.player-collapsed;
+                        set-collapsed(collapsed) => {
+                            Session.player-collapsed = collapsed;
+                            Actions.set-player-collapsed(collapsed);
+                        }
+                    }
+                }
+            }
+
+            if Session.toast != "": Rectangle {
+                x: (parent.width - self.width) / 2;
+                y: 16px;
+                width: min(toast-text.preferred-width + 36px, parent.width - 32px);
+                height: toast-text.preferred-height + 24px;
+                border-radius: Theme.radius-row;
+                background: Session.toast-is-error ? #5a2a2a : Theme.raised;
+                border-width: 1px;
+                border-color: Session.toast-is-error ? Theme.error.with-alpha(0.4) : Theme.raised-edge;
+                // Swallows clicks, so they don't reach the page under the toast.
+                TouchArea { }
+                toast-text := Text {
+                    text: Session.toast;
+                    width: parent.width - 36px;
+                    wrap: word-wrap;
+                    horizontal-alignment: center;
+                    color: Theme.text;
+                    font-size: Theme.body-small;
+                    font-weight: 600;
+                }
+            }
+            if Session.drop-hover: Rectangle {
+                background: Theme.scrim;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 12px;
+                    Icon {
+                        width: 64px;
+                        height: 64px;
+                        source: @image-url("icons/folder.svg");
+                        tint: Theme.lit;
+                    }
+
+                    Text {
+                        text: Session.drop-label;
+                        font-size: Theme.heading;
+                        font-weight: 800;
+                        color: Theme.text;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            x: Theme.rail-width;
+            width: parent.width - self.x;
+            background: Theme.scrim;
+            opacity: root.sidebar-overlaid ? 1 : 0;
+            visible: self.opacity > 0;
+            animate opacity { duration: Motion.sidebar-slide; }
+            TouchArea {
+                clicked => {
+                    root.sidebar-overlaid = false;
+                }
+            }
+        }
+
+        Sidebar {
+            x: 0;
+            y: 0;
+            height: parent.height;
+            expanded: root.sidebar-expanded || root.sidebar-overlaid;
+            overlaid: root.sidebar-overlaid;
+            page-opened => {
+                root.sidebar-overlaid = false;
+            }
+            toggle => {
+                root.toggle-sidebar();
+            }
+            open-search => {
+                root.sidebar-overlaid = false;
+                root.open-palette();
+            }
+            open-settings => {
+                root.sidebar-overlaid = false;
+                root.settings-open = true;
+            }
+            add(kind) => {
+                root.sidebar-overlaid = false;
+                root.open-add(kind);
+            }
+        }
+
+        SearchPalette {
+            close => {
+                Search.palette-open = false;
+                shortcuts.focus();
+            }
+        }
+        if root.add-open: AddCollectionDialog {
+            kind: root.add-kind;
+            change-background(title) => {
+                root.open-gallery(title);
+            }
+            cancel => {
+                root.add-open = false;
+                root.gallery-open = false;
+                shortcuts.focus();
+            }
+        }
+        if root.edit-collection-open: EditCollectionDialog {
+            change-background(title) => {
+                root.open-gallery(title);
+            }
+            cancel => {
+                root.edit-collection-open = false;
+                root.gallery-open = false;
+                shortcuts.focus();
+            }
+        }
+        if root.gallery-open && root.add-open: BackgroundGallery {
+            target: BackgroundTarget.new-collection;
+            heading: root.gallery-title != "" ? @tr("" => "Background for {0}", root.gallery-title) : root.add-kind == CollectionKind.playlist ? @tr("" => "Background for the new playlist") : @tr("" => "Background for the new soundboard");
+            selected: Backgrounds.draft;
+            selected-label: Backgrounds.draft-label;
+            close => {
+                root.gallery-open = false;
+            }
+        }
+        if root.gallery-open && root.edit-collection-open: BackgroundGallery {
+            target: BackgroundTarget.open-collection;
+            collection-id: Navigation.collection-id;
+            heading: @tr("" => "Background for {0}", root.gallery-title != "" ? root.gallery-title : LibraryView.collection-title);
+            selected: LibraryView.collection-background;
+            selected-label: LibraryView.collection-background-label;
+            image-missing: Art.picture-missing(LibraryView.collection-background, Art.pictures-revision);
+            close => {
+                root.gallery-open = false;
+            }
+        }
+        if root.edit-entry-open: EditEntryDialog {
+            entry-id: root.entry-id;
+            entry-title: root.entry-title;
+            sound: root.entry-is-sound;
+            fade-in-ms: root.entry-fade-in-ms;
+            fade-out-ms: root.entry-fade-out-ms;
+            icon: root.entry-icon;
+            cancel => {
+                root.edit-entry-open = false;
+                shortcuts.focus();
+            }
+        }
+        if root.settings-open: SettingsDialog {
+            cancel => {
+                root.settings-open = false;
+                shortcuts.focus();
+            }
+        }
+    }
+}

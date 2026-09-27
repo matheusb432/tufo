@@ -1,0 +1,18 @@
+[package]
+name = "tufo-models"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+derive_more = { workspace = true }
+fastrand = { workspace = true }
+jiff = { workspace = true }
+nutype = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+toasty = { workspace = true, features = ["jiff"] }
+uuid = { workspace = true, features = ["serde"] }
+
+[lints]
+workspace = true

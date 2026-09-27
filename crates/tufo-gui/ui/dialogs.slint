@@ -1,0 +1,487 @@
+// The add and edit dialogs, and the settings dialog.
+
+import { Theme } from "theme.slint";
+import {
+    Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
+    Navigation, Session, SoundIcons,
+} from "state.slint";
+import { Button, ButtonKind, Icon, ScrollThumb, Slider, Switch, TextField, TextLink } from "widgets.slint";
+
+// A modal card over a dimmed window. Clicking the dimmed area cancels.
+export component DialogFrame inherits Rectangle {
+    in property <string> title;
+    callback cancel();
+    background: Theme.scrim;
+    TouchArea {
+        clicked => {
+            root.cancel();
+        }
+    }
+
+    Rectangle {
+        width: min(parent.width - 48px, 440px);
+        height: min(layout.preferred-height, root.height - 48px);
+        background: Theme.raised;
+        border-radius: Theme.radius-card;
+        border-width: 1px;
+        border-color: Theme.raised-edge;
+        clip: true;
+        // Swallows clicks so they don't reach the dimmed area.
+        TouchArea { }
+        scroll := Flickable {
+            mouse-drag-pan-enabled: false;
+            content-width: self.width;
+            content-height: layout.preferred-height;
+            layout := VerticalLayout {
+                padding: 24px;
+                spacing: 20px;
+                Text {
+                    text: root.title;
+                    font-family: Theme.display-font;
+                    font-size: Theme.heading;
+                    font-weight: Theme.display-weight;
+                    color: Theme.text;
+                }
+
+                @children
+            }
+        }
+        ScrollThumb {
+            x: parent.width - self.width - 2px;
+            y: 12px;
+            height: parent.height - 24px;
+            content-height: scroll.content-height;
+            content-y: scroll.content-y;
+            show: scroll.content-height > scroll.height;
+        }
+    }
+}
+
+component Actions-Row inherits HorizontalLayout {
+    alignment: end;
+    spacing: 8px;
+}
+
+// The collection's card as the grid will show it, with its title and background, over the
+// background's name and a way to change it.
+component BackgroundPreview inherits VerticalLayout {
+    // The collection whose gradient the card shows; empty shows Tufo's own.
+    in property <string> collection-id;
+    in property <string> title;
+    in property <CollectionBackground> background;
+    in property <BackgroundLabel> label;
+    callback change();
+    spacing: 10px;
+    card := Rectangle {
+        height: 160px;
+        border-radius: Theme.radius-card;
+        accessible-role: button;
+        accessible-label: @tr("" => "Change the background");
+        Image {
+            width: parent.width;
+            height: parent.height;
+            source: Art.card-background(root.collection-id, root.background, self.width, self.height, Theme.radius-card, Art.pictures-revision);
+            image-fit: fill;
+        }
+
+        Text {
+            x: 16px;
+            y: parent.height - self.height - 14px;
+            width: parent.width - 32px;
+            text: root.title;
+            font-size: Theme.subheading;
+            font-weight: 800;
+            color: Theme.text;
+            overflow: elide;
+        }
+
+        Rectangle {
+            border-radius: Theme.radius-card;
+            background: white;
+            opacity: card-touch.has-hover ? 0.05 : 0;
+            animate opacity { duration: 150ms; }
+        }
+
+        card-touch := TouchArea {
+            mouse-cursor: MouseCursor.pointer;
+            clicked => {
+                root.change();
+            }
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 12px;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.label.name;
+                color: Theme.text;
+                font-size: Theme.body-small;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.label.credit;
+                color: Theme.text-secondary;
+                font-size: Theme.caption;
+                overflow: elide;
+            }
+        }
+
+        Button {
+            text: @tr("" => "Change background");
+            clicked => {
+                root.change();
+            }
+        }
+    }
+}
+
+export component AddCollectionDialog inherits DialogFrame {
+    in property <CollectionKind> kind;
+    title: root.kind == CollectionKind.playlist ? @tr("" => "Add Playlist") : @tr("" => "Add Soundboard");
+    callback change-background(string);
+    init => {
+        Actions.start-new-collection();
+    }
+    name := TextField {
+        label: @tr("" => "Name");
+        accepted => {
+            if self.text != "" {
+                Actions.create-collection(root.kind, self.text);
+                root.cancel();
+            }
+        }
+        init => {
+            self.focus();
+        }
+    }
+
+    VerticalLayout {
+        spacing: 4px;
+        TextLink {
+            text: @tr("" => "Or follow a folder");
+            clicked => {
+                Actions.follow-folder(root.kind);
+                root.cancel();
+            }
+        }
+
+        Text {
+            text: @tr("" => "Tufo keeps its files in sync.");
+            color: Theme.text-secondary;
+            font-size: Theme.body-small;
+            horizontal-stretch: 1;
+        }
+    }
+
+    BackgroundPreview {
+        title: name.text;
+        background: Backgrounds.draft;
+        label: Backgrounds.draft-label;
+        change => {
+            root.change-background(name.text);
+        }
+    }
+
+    Actions-Row {
+        Button {
+            text: @tr("" => "Cancel");
+            kind: ButtonKind.quiet;
+            clicked => {
+                root.cancel();
+            }
+        }
+
+        Button {
+            text: @tr("" => "Add");
+            kind: ButtonKind.primary;
+            enabled: name.text != "";
+            clicked => {
+                Actions.create-collection(root.kind, name.text);
+                root.cancel();
+            }
+        }
+    }
+}
+
+export component EditCollectionDialog inherits DialogFrame {
+    title: @tr("" => "Edit");
+    callback change-background(string);
+    name := TextField {
+        label: @tr("" => "Name");
+        text: LibraryView.collection-title;
+        accepted => {
+            Actions.rename-collection(Navigation.collection-id, self.text);
+            root.cancel();
+        }
+    }
+
+    BackgroundPreview {
+        collection-id: Navigation.collection-id;
+        title: name.text;
+        background: LibraryView.collection-background;
+        label: LibraryView.collection-background-label;
+        change => {
+            root.change-background(name.text);
+        }
+    }
+
+    if Art.picture-missing(LibraryView.collection-background, Art.pictures-revision): Text {
+        text: @tr("" => "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another.");
+        color: Theme.error;
+        font-size: Theme.body-small;
+        wrap: word-wrap;
+    }
+
+    Actions-Row {
+        Button {
+            text: @tr("" => "Done");
+            kind: ButtonKind.primary;
+            clicked => {
+                if name.text != "" && name.text != LibraryView.collection-title {
+                    Actions.rename-collection(Navigation.collection-id, name.text);
+                }
+                root.cancel();
+            }
+        }
+    }
+}
+
+component SoundIconPicker inherits VerticalLayout {
+    in-out property <int> selected;
+    property <int> columns: 10;
+    property <length> cell: grid.width / root.columns;
+    spacing: 8px;
+    Text {
+        text: @tr("" => "Icon: {0}", SoundIcons.labels[root.selected]);
+        font-size: Theme.body-small;
+        font-weight: 700;
+        color: Theme.text-secondary;
+    }
+
+    grid := Rectangle {
+        height: Math.ceil(SoundIcons.images.length / root.columns) * root.cell;
+        for image[index] in SoundIcons.images: Rectangle {
+            x: Math.mod(index, root.columns) * root.cell;
+            y: Math.floor(index / root.columns) * root.cell;
+            width: root.cell;
+            height: root.cell;
+            border-radius: self.width / 2;
+            background: index == root.selected ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+            accessible-role: button;
+            accessible-label: SoundIcons.labels[index];
+            accessible-checked: index == root.selected;
+            accessible-action-default => { root.selected = index; }
+            Icon {
+                width: 20px;
+                height: 20px;
+                source: image;
+                tint: index == root.selected ? Theme.accent : Theme.text-secondary;
+            }
+
+            touch := TouchArea {
+                mouse-cursor: MouseCursor.pointer;
+                clicked => {
+                    root.selected = index;
+                }
+            }
+        }
+    }
+}
+
+// Edits a track's title, or a sound's title, icon, and fades.
+export component EditEntryDialog inherits DialogFrame {
+    in property <string> entry-id;
+    in property <string> entry-title;
+    in property <bool> sound;
+    in property <int> fade-in-ms;
+    in property <int> fade-out-ms;
+    // A position in `SoundIcons.images`.
+    in property <int> icon;
+    property <int> chosen-icon: root.icon;
+    title: root.sound ? @tr("" => "Edit Sound") : @tr("" => "Edit Track");
+    name := TextField {
+        label: @tr("" => "Name");
+        text: root.entry-title;
+    }
+
+    if root.sound: SoundIconPicker {
+        selected <=> root.chosen-icon;
+    }
+
+    HorizontalLayout {
+        spacing: 12px;
+        visible: root.sound;
+        height: root.sound ? 66px : 0px;
+        fade-in := TextField {
+            label: @tr("" => "Fade In (ms)");
+            text: root.fade-in-ms;
+        }
+
+        fade-out := TextField {
+            label: @tr("" => "Fade Out (ms)");
+            text: root.fade-out-ms;
+        }
+    }
+
+    Actions-Row {
+        Button {
+            text: @tr("" => "Cancel");
+            kind: ButtonKind.quiet;
+            clicked => {
+                root.cancel();
+            }
+        }
+
+        Button {
+            text: @tr("" => "Save");
+            kind: ButtonKind.primary;
+            enabled: name.text != "";
+            clicked => {
+                if root.sound {
+                    Actions.update-sound(root.entry-id, name.text, Math.round(fade-in.text.to-float()), Math.round(fade-out.text.to-float()), root.chosen-icon);
+                } else {
+                    Actions.rename-entry(root.entry-id, name.text);
+                }
+                root.cancel();
+            }
+        }
+    }
+}
+
+component SwitchSetting inherits HorizontalLayout {
+    in property <string> title;
+    in property <string> description;
+    in-out property <bool> checked;
+    spacing: 16px;
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: root.title;
+            font-size: Theme.body;
+            font-weight: 700;
+            color: Theme.text;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: root.description;
+            font-size: Theme.caption;
+            color: Theme.text-secondary;
+            wrap: word-wrap;
+        }
+    }
+
+    VerticalLayout {
+        alignment: center;
+        Switch {
+            label: root.title;
+            checked <=> root.checked;
+        }
+    }
+}
+
+export component SettingsDialog inherits DialogFrame {
+    property <float> crossfade: Session.crossfade-ms / 10000;
+    title: @tr("" => "Settings");
+    Text {
+        text: @tr("" => "Discord");
+        font-size: Theme.body;
+        font-weight: 700;
+        color: Theme.text;
+    }
+
+    token := TextField {
+        label: @tr("" => "Bot token");
+        password: true;
+        placeholder: Session.discord-configured ? @tr("" => "Saved; paste a new one to replace it") : @tr("" => "Paste your bot's token");
+    }
+
+    Text {
+        text: @tr("" => "Saving restarts Tufo so the bot logs in with the new token. The music stops.");
+        font-size: Theme.caption;
+        color: Theme.text-secondary;
+        wrap: word-wrap;
+    }
+
+    Text {
+        text: @tr("" => "Crossfade: {0} s", Math.round(root.crossfade * 100) / 10);
+        font-size: Theme.body;
+        font-weight: 700;
+        color: Theme.text;
+    }
+
+    Slider {
+        value: root.crossfade;
+        step: 0.05;
+        changed(value) => {
+            root.crossfade = value;
+        }
+    }
+
+    keep-playing-after-quit := SwitchSetting {
+        title: @tr("" => "Keep playing after quitting");
+        description: @tr("" => "The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed.");
+        checked: Session.keep-playing-after-quit;
+    }
+
+    start-at-login := SwitchSetting {
+        title: @tr("" => "Start at login");
+        description: @tr("" => "Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them.");
+        checked: Session.start-at-login;
+    }
+
+    HorizontalLayout {
+        spacing: 16px;
+        VerticalLayout {
+            spacing: 4px;
+            Text {
+                text: @tr("" => "Kenku FM");
+                font-size: Theme.body;
+                font-weight: 700;
+                color: Theme.text;
+            }
+
+            Text {
+                text: @tr("" => "Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything.");
+                font-size: Theme.caption;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Button {
+                text: @tr("" => "Import");
+                clicked => {
+                    Actions.import-kenku-library();
+                    root.cancel();
+                }
+            }
+        }
+    }
+
+    Actions-Row {
+        Button {
+            text: @tr("" => "Cancel");
+            kind: ButtonKind.quiet;
+            clicked => {
+                root.cancel();
+            }
+        }
+
+        Button {
+            text: token.text != "" ? @tr("" => "Save and restart") : @tr("" => "Save");
+            kind: ButtonKind.primary;
+            clicked => {
+                Actions.save-settings(token.text, Math.round(root.crossfade * 10000), keep-playing-after-quit.checked, start-at-login.checked);
+                root.cancel();
+            }
+        }
+    }
+}

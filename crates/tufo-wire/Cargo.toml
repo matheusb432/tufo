@@ -1,0 +1,26 @@
+[package]
+name = "tufo-wire"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[dependencies]
+jiff = { workspace = true }
+uuid = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tonic = { workspace = true }
+tonic-prost = { workspace = true }
+tufo-models = { workspace = true }
+
+[build-dependencies]
+anyhow = { workspace = true }
+prost = { workspace = true }
+prost-types = { workspace = true }
+tonic-prost-build = { workspace = true }
+
+[lints]
+workspace = true

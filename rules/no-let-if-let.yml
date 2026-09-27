@@ -1,0 +1,22 @@
+id: no-let-if-let
+language: rust
+severity: error
+message: "`let ... = if let Some(...) ... else ...`: rewrite the initializer as a `match`."
+note: |
+  Two `let`s and two `=`s on one binding bury which name is being bound; a `match` initializer
+  states the two arms symmetrically. The attached fix is a starting point, not a guaranteed
+  compile: when the scrutinee is used again afterwards, match on a reference (`match &expr`) so
+  the value is not moved.
+rule:
+  kind: let_declaration
+  pattern: |
+    let $$$PAT = if let Some($VAR) = $$$EXPR {
+        $$$THEN
+    } else {
+        $$$ELSE
+    };
+fix: |
+  let $$$PAT = match $$$EXPR {
+      Some($VAR) => { $$$THEN }
+      None => { $$$ELSE }
+  };

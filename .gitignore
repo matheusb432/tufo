@@ -1,0 +1,7 @@
+.artifacts/
+/secrets/
+*.env
+!*.env.example
+
+/target/
+/dist/

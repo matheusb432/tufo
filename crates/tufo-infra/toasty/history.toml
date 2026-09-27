@@ -1,0 +1,36 @@
+version = 1
+
+[[migrations]]
+id = 6996774422122567911
+name = "0000_initial_library.sql"
+snapshot_name = "0000_snapshot.toml"
+
+[[migrations]]
+id = 6820534556047273040
+name = "0001_player_settings.sql"
+snapshot_name = "0001_snapshot.toml"
+
+[[migrations]]
+id = 28150750231786858
+name = "0002_collection_background_presets.sql"
+snapshot_name = "0002_snapshot.toml"
+
+[[migrations]]
+id = 2150018866660923921
+name = "0003_sound_icons.sql"
+snapshot_name = "0003_snapshot.toml"
+
+[[migrations]]
+id = 8800528782888310241
+name = "0004_default_effects_seed.sql"
+snapshot_name = "0004_snapshot.toml"
+
+[[migrations]]
+id = 4776724176082988746
+name = "0005_saved_loops.sql"
+snapshot_name = "0005_snapshot.toml"
+
+[[migrations]]
+id = 4763991875893660866
+name = "0006_builtin_titles.sql"
+snapshot_name = "0006_snapshot.toml"

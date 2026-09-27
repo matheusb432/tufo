@@ -1,0 +1,365 @@
+version = 1
+
+[schema]
+
+[[schema.tables]]
+id = 0
+name = "player_settings"
+primary_key = { columns = [{ table = 0, index = 0 }], index = { table = 0, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 0 }
+name = "id"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 1 }
+name = "volume"
+ty = "F32"
+storage_ty = { Float = 4 }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 2 }
+name = "muted"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 0, index = 3 }
+name = "shuffle"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 0, index = 4 }
+name = "repeat"
+ty = "String"
+storage_ty = { Enum = { name = "repeat_mode", variants = [{ name = "off" }, { name = "playlist" }, { name = "track" }] } }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 5 }
+name = "crossfade"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.indices]]
+id = { table = 0, index = 0 }
+name = "index_player_settings_by_id"
+on = 0
+columns = [{ column = { table = 0, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 1
+name = "collection_entries"
+primary_key = { columns = [{ table = 1, index = 0 }], index = { table = 1, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 1 }
+name = "collection_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 2 }
+name = "audio_file_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 3 }
+name = "added_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 4 }
+name = "looping"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 5 }
+name = "volume"
+ty = "F32"
+storage_ty = { Float = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 6 }
+name = "fade_in"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 7 }
+name = "fade_out"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.indices]]
+id = { table = 1, index = 0 }
+name = "index_collection_entries_by_id"
+on = 1
+columns = [{ column = { table = 1, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 1, index = 1 }
+name = "index_collection_entries_by_collection_id"
+on = 1
+columns = [{ column = { table = 1, index = 1 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables.indices]]
+id = { table = 1, index = 2 }
+name = "index_collection_entries_by_audio_file_id"
+on = 1
+columns = [{ column = { table = 1, index = 2 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables]]
+id = 2
+name = "collections"
+primary_key = { columns = [{ table = 2, index = 0 }], index = { table = 2, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 2, index = 1 }
+name = "kind"
+ty = "String"
+storage_ty = { Enum = { name = "collection_kind", variants = [{ name = "playlist" }, { name = "soundboard" }] } }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 2 }
+name = "title"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 2, index = 3 }
+name = "background_preset"
+ty = "String"
+storage_ty = { Enum = { name = "background_preset", variants = [{ name = "autumn" }, { name = "battle" }, { name = "castle" }, { name = "cathedral" }, { name = "coast" }, { name = "desert" }, { name = "dragon" }, { name = "fire" }, { name = "forest" }, { name = "haunted" }, { name = "mountain" }, { name = "night" }, { name = "sky" }, { name = "skulls" }, { name = "storm" }, { name = "tavern" }, { name = "town" }, { name = "underworld" }, { name = "volcano" }, { name = "winter" }] } }
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 4 }
+name = "background_image"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 5 }
+name = "order_key"
+ty = "String"
+storage_ty = { Enum = { name = "entry_order_key", variants = [{ name = "title" }, { name = "duration" }, { name = "date_added" }] } }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 6 }
+name = "order_descending"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 2, index = 7 }
+name = "library_folder_id"
+ty = "Bytes"
+storage_ty = "Blob"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 8 }
+name = "folder_path"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 9 }
+name = "folder_identity"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 10 }
+name = "folder_missing_since"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 11 }
+name = "hidden_at"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 2, index = 12 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 2, index = 0 }
+name = "index_collections_by_id"
+on = 2
+columns = [{ column = { table = 2, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 2, index = 1 }
+name = "index_collections_by_library_folder_id"
+on = 2
+columns = [{ column = { table = 2, index = 7 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables]]
+id = 3
+name = "library_folders"
+primary_key = { columns = [{ table = 3, index = 0 }], index = { table = 3, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 3, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 3, index = 1 }
+name = "kind"
+ty = "String"
+storage_ty = { Enum = { name = "collection_kind", variants = [{ name = "playlist" }, { name = "soundboard" }] } }
+
+[[schema.tables.columns]]
+id = { table = 3, index = 2 }
+name = "folder_path"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 3, index = 3 }
+name = "folder_identity"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 3, index = 4 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 3, index = 0 }
+name = "index_library_folders_by_id"
+on = 3
+columns = [{ column = { table = 3, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 4
+name = "audio_files"
+primary_key = { columns = [{ table = 4, index = 0 }], index = { table = 4, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 1 }
+name = "file_path"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 2 }
+name = "file_identity"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 3 }
+name = "size_bytes"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 4 }
+name = "modified_ns"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 5 }
+name = "fingerprint"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 6 }
+name = "duration_ms"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 7 }
+name = "title"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 8 }
+name = "missing_since"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 4, index = 9 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 4, index = 0 }
+name = "index_audio_files_by_id"
+on = 4
+columns = [{ column = { table = 4, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 4, index = 1 }
+name = "index_audio_files_by_file_path"
+on = 4
+columns = [{ column = { table = 4, index = 1 }, op = "Eq", scope = "Partition" }]
+unique = true
+
+[[schema.tables.indices]]
+id = { table = 4, index = 2 }
+name = "index_audio_files_by_file_identity"
+on = 4
+columns = [{ column = { table = 4, index = 2 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables.indices]]
+id = { table = 4, index = 3 }
+name = "index_audio_files_by_fingerprint"
+on = 4
+columns = [{ column = { table = 4, index = 5 }, op = "Eq", scope = "Partition" }]

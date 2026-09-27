@@ -1,0 +1,279 @@
+// State the host pushes into the window, and the actions the window asks the host to run.
+
+export enum Page { home, playlists, playlist, soundboards, soundboard }
+
+export enum CollectionKind { playlist, soundboard }
+
+export enum OutputRowKind { local, guild, channel }
+
+export enum VoiceBadge { none, joining, dropped }
+
+// Which collection's background a picker changes. `none` means no dialog shows a picker.
+export enum BackgroundTarget { none, new-collection, open-collection }
+
+// What a collection shows behind it: a preset, an image file, or, with neither, its gradient.
+export struct CollectionBackground {
+    // A preset's position in the host's list, or -1.
+    preset: int,
+    // An image file's path, or empty.
+    image-path: string,
+}
+
+// A background's name, and the line under it: a painting's artist and year, or an image's
+// folder.
+export struct BackgroundLabel {
+    name: string,
+    credit: string,
+}
+
+export struct BackgroundPresetTile {
+    // The preset's position in the host's list, which `CollectionBackground.preset` names.
+    preset: int,
+    label: BackgroundLabel,
+}
+
+export struct BackgroundGroup {
+    name: string,
+    presets: [BackgroundPresetTile],
+}
+
+export struct CollectionCard {
+    id: string,
+    title: string,
+    // How many tracks or sounds it holds, as a sentence fragment.
+    count-label: string,
+    background: CollectionBackground,
+    // A playlist whose music is playing now, or a soundboard with a sound playing.
+    playing: bool,
+    missing: bool,
+}
+
+// A collection as the sidebar lists it.
+export struct NavItem {
+    id: string,
+    title: string,
+    playing: bool,
+    missing: bool,
+}
+
+export struct TrackRow {
+    id: string,
+    title: string,
+    duration: string,
+    missing: bool,
+    // The queue's current track, playing or paused.
+    current: bool,
+    playing: bool,
+}
+
+export struct SoundTile {
+    id: string,
+    title: string,
+    // A position in `SoundIcons.images`.
+    icon: int,
+    looping: bool,
+    volume: float,
+    fade-in-ms: int,
+    fade-out-ms: int,
+    playing: bool,
+    // How far a playing sound is through its file, from 0 to 1.
+    progress: float,
+    missing: bool,
+}
+
+export struct OutputRow {
+    kind: OutputRowKind,
+    label: string,
+    // A guild's first letter, shown in place of its icon.
+    initial: string,
+    selected: bool,
+    // The output's position in the host's list; -1 for guild headers.
+    index: int,
+}
+
+export struct CurrentOutput {
+    kind: OutputRowKind,
+    label: string,
+    guild-name: string,
+    guild-initial: string,
+}
+
+export struct SoundChip {
+    id: string,
+    title: string,
+    progress: float,
+    looping: bool,
+}
+
+export struct SearchResult {
+    // "Music", "Sounds", or "Collections"; results arrive grouped.
+    section: string,
+    title: string,
+    subtitle: string,
+}
+
+export global Session {
+    in property <bool> connected;
+    in property <string> connection-text: @tr("" => "Connecting to tufo-server…");
+    in property <[OutputRow]> outputs;
+    in property <bool> discord-configured;
+    in property <string> voice-status;
+    in property <VoiceBadge> voice-badge;
+    in property <CurrentOutput> current-output;
+    in-out property <bool> drawer-pinned: true;
+    in-out property <bool> player-collapsed;
+    // A short message at the bottom of the window; empty hides it.
+    in property <string> toast;
+    in property <bool> toast-is-error;
+    // Files are being dragged over a page that accepts them.
+    in property <bool> drop-hover;
+    in property <string> drop-label;
+    in property <int> crossfade-ms: 2000;
+    // Quitting Tufo leaves tufo-server running, and Tufo never starts it.
+    in property <bool> keep-playing-after-quit;
+    in property <bool> start-at-login;
+}
+
+export global Navigation {
+    in-out property <Page> page: Page.home;
+    in-out property <string> collection-id;
+}
+
+export global LibraryView {
+    // The library has arrived from the server at least once.
+    in property <bool> loaded;
+    in property <[CollectionCard]> playlists;
+    in property <[CollectionCard]> soundboards;
+    in property <int> playlist-count;
+    in property <int> soundboard-count;
+    // Every collection, unfiltered, for the sidebar.
+    in property <[NavItem]> nav-playlists;
+    in property <[NavItem]> nav-soundboards;
+    in property <string> collection-title;
+    // Its size, such as "10 tracks, 36 minutes".
+    in property <string> collection-summary;
+    in property <CollectionBackground> collection-background;
+    in property <BackgroundLabel> collection-background-label;
+    in property <bool> collection-linked;
+    in property <string> collection-folder;
+    in property <bool> collection-missing;
+    in property <int> order-key;
+    in property <bool> order-descending;
+    in property <[TrackRow]> tracks;
+    in property <[SoundTile]> sounds;
+}
+
+export global PlayerView {
+    in property <bool> has-music;
+    in property <string> title;
+    in property <string> collection-id;
+    in property <string> collection-title;
+    in property <CollectionBackground> collection-background;
+    in property <bool> playing;
+    in property <float> progress;
+    in property <string> elapsed: "0:00";
+    in property <string> remaining: "-0:00";
+    in property <float> volume: 1.0;
+    in property <bool> muted;
+    in property <bool> shuffle;
+    // 0 off, 1 playlist, 2 track.
+    in property <int> repeat: 1;
+    in property <[SoundChip]> sounds;
+    in property <bool> sounds-paused;
+    out property <bool> something-plays: (self.has-music && self.playing) || (self.sounds.length > 0 && !self.sounds-paused);
+}
+
+// Ctrl+F filters the open page; Ctrl+Shift+F searches everything.
+export global Search {
+    in-out property <bool> filter-open;
+    in-out property <string> filter-text;
+    in-out property <bool> palette-open;
+    in-out property <string> palette-query;
+    in property <[SearchResult]> results;
+    in-out property <int> selected;
+}
+
+// The background gallery, and the background the Add dialog creates its collection with.
+export global Backgrounds {
+    in property <[BackgroundGroup]> groups;
+    in property <CollectionBackground> draft;
+    in property <BackgroundLabel> draft-label;
+}
+
+// In the host's `SoundIcon` order.
+export global SoundIcons {
+    in property <[image]> images;
+    in property <[string]> labels;
+}
+
+// Pictures the host draws off the UI thread, sized and rounded for where they show, since the
+// software renderer can't round gradients or images.
+export global Art {
+    // Rises whenever the worker delivers a picture, or pictures that failed may decode now.
+    in property <int> pictures-revision;
+    // A collection's background with rounded corners, at the given size: its preset or image,
+    // otherwise the gradient derived from its id, or Tufo's own gradient for an empty id. The last
+    // arguments are the corners' radius and `pictures-revision`, which the host ignores; passing
+    // it draws the picture again when it rises.
+    pure callback painting(string, CollectionBackground, length, length, length, int) -> image;
+    // The same, shaded along its foot for a title over it, as a collection's card shows it.
+    pure callback card-background(string, CollectionBackground, length, length, length, int) -> image;
+    // Whether the background's image file can't be opened, so its gradient shows instead.
+    pure callback picture-missing(CollectionBackground, int) -> bool;
+}
+
+// Time for the accents on whatever plays, in seconds. It advances only while it's enabled and
+// something plays; otherwise the accents hold still and draw nothing new.
+export global Clock {
+    in-out property <float> seconds;
+    // The window has focus.
+    in property <bool> enabled;
+}
+
+export global Actions {
+    callback open-page(Page, string);
+    callback filter-changed(string);
+    callback palette-query-changed(string);
+    callback palette-activate(int);
+
+    callback create-collection(CollectionKind, string);
+    callback follow-folder(CollectionKind);
+    callback rename-collection(string, string);
+    // The Add dialog opened; the host picks the draft's preset.
+    callback start-new-collection();
+    callback pick-background(BackgroundTarget, CollectionBackground);
+    callback choose-background-file(BackgroundTarget);
+    callback delete-collection(string);
+    callback set-order(int, bool);
+    callback add-files(string);
+
+    callback play-collection(string);
+    callback play-track(string);
+    callback rename-entry(string, string);
+    callback delete-entry(string);
+
+    callback toggle-sound(string);
+    callback set-sound-looping(string, bool);
+    callback set-sound-volume(string, float);
+    // The entry, its title, its fades in milliseconds, and its icon's position in `SoundIcons`.
+    callback update-sound(string, string, int, int, int);
+    callback stop-sound(string);
+    callback toggle-sounds-paused();
+
+    callback toggle-play-pause();
+    callback next-track();
+    callback previous-track();
+    callback seek(float);
+    callback set-volume(float);
+    callback toggle-mute();
+    callback toggle-shuffle();
+    callback cycle-repeat();
+
+    callback select-output(int);
+    callback set-drawer-pinned(bool);
+    callback set-player-collapsed(bool);
+    callback refresh-outputs();
+    // The token, the crossfade in milliseconds, keep playing after quitting, and start at login.
+    callback save-settings(string, int, bool, bool);
+    callback import-kenku-library();
+}

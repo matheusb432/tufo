@@ -1,0 +1,39 @@
+[package]
+name = "tufo-server"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+directories = { workspace = true }
+prost-types = { workspace = true }
+tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = ["router", "transport"] }
+tonic-health = { workspace = true }
+tonic-reflection = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tufo-application = { workspace = true }
+tufo-infra = { workspace = true }
+tufo-local-transport = { workspace = true }
+tufo-models = { workspace = true }
+tufo-wire = { workspace = true }
+uuid = { workspace = true }
+
+[target.'cfg(all(target_os = "linux", target_env = "gnu"))'.dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tufo-infra = { workspace = true, features = ["test-support"] }
+tufo-wire = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tufo-client = { workspace = true }
+
+[lints]
+workspace = true

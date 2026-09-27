@@ -1,0 +1,21 @@
+[package]
+name = "tufo-client"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+thiserror = { workspace = true }
+tonic = { workspace = true, features = ["transport"] }
+tonic-health = { workspace = true }
+tufo-local-transport = { workspace = true }
+tufo-models = { workspace = true }
+tufo-wire = { workspace = true }
+
+[dev-dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "time"] }
+
+[lints]
+workspace = true

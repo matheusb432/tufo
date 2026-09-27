@@ -1,0 +1,156 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/tufo-application",
+    "crates/tufo-cli",
+    "crates/tufo-client",
+    "crates/tufo-gui",
+    "crates/tufo-infra",
+    "crates/tufo-local-transport",
+    "crates/tufo-migrator",
+    "crates/tufo-models",
+    "crates/tufo-server",
+    "crates/tufo-wire",
+    "shared/field",
+    "xtask",
+]
+exclude = ["shared/toasty-driver-sqlite"]
+
+[workspace.package]
+edition = "2024"
+publish = false
+
+[workspace.dependencies]
+# Shared utilities.
+field = { path = "shared/field" }
+
+# Internal crates.
+tufo-application = { path = "crates/tufo-application" }
+tufo-client = { path = "crates/tufo-client" }
+tufo-gui = { path = "crates/tufo-gui" }
+tufo-infra = { path = "crates/tufo-infra" }
+tufo-local-transport = { path = "crates/tufo-local-transport" }
+tufo-models = { path = "crates/tufo-models" }
+tufo-server = { path = "crates/tufo-server" }
+tufo-wire = { path = "crates/tufo-wire" }
+
+# Core Rust dependencies.
+anyhow = "1.0.104"
+async-trait = "0.1.92"
+blake3 = "1.8.7"
+bytes = "1.12.1"
+cargo_metadata = "0.23.1"
+clap = { version = "4.6.6", features = ["derive", "env"] }
+clap-cargo = "0.18.3"
+derive_more = { version = "2.1.1", features = ["constructor", "display", "from", "into"] }
+directories = "6.0.0"
+fastrand = "2.5.0"
+file-id = "0.2.3"
+futures = { version = "0.3.34", default-features = false, features = ["std"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["alloc"] }
+hyper-util = { version = "0.1.21", default-features = false }
+jiff = "0.2.37"
+libc = "0.2.189"
+notify = "8.2.0"
+nutype = { version = "0.7.0", features = ["derive_unchecked"] }
+nucleo-matcher = "0.3.1"
+percent-encoding = "2.3.2"
+prost = "0.14.4"
+prost-types = "0.14.4"
+# xtask renders the app icon's SVG into the Windows icon; the icon needs no text or images.
+resvg = { version = "0.48.1", default-features = false }
+rfd = { version = "0.17.2", default-features = false, features = ["xdg-portal"] }
+rusqlite = { version = "0.40.2", default-features = false }
+rusty-leveldb = "4.0.1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+tempfile = "3.27.0"
+thiserror = "2.0.20"
+tokio = "1.53.1"
+tokio-stream = "0.1.19"
+toml = "1.1.6"
+toasty = { version = "0.10.0", default-features = false }
+toasty-cli = "0.10.0"
+toasty-core = "0.10.0"
+toasty-driver-sqlite = "0.10.0"
+tonic = { version = "0.14.6", default-features = false, features = ["codegen"] }
+tonic-health = "0.14.6"
+tonic-prost = "0.14.6"
+tonic-prost-build = "0.14.6"
+tonic-reflection = "0.14.6"
+tower = { version = "0.5.3", default-features = false }
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt"] }
+trybuild = "1.0.120"
+uuid = { version = "1.25.0", features = ["v4", "v7"] }
+windows-sys = "0.61.2"
+
+# Audio engine and Discord voice.
+audio_thread_priority = "0.35.1"
+cpal = "0.18.2"
+# tufo-infra adds `cpal-realtime-dbus` on Linux, where rtkit grants real-time priority over D-Bus.
+kira = { version = "0.12.4", default-features = false, features = ["cpal"] }
+rtrb = "0.4.0"
+rubato = "5.0.0"
+songbird = { version = "0.6.0", default-features = false, features = ["driver", "gateway", "rustls", "tws", "twilight"] }
+symphonia = { version = "0.6.1", default-features = false, features = ["aac", "flac", "isomp4", "mp3", "ogg", "pcm", "vorbis", "wav"] }
+# Decodes Opus files, which symphonia demuxes but can't decode, with the libopus songbird encodes with.
+opus2 = "0.4.0"
+# songbird decodes its inputs with symphonia 0.5 and registers only the codecs enabled on it. Tufo
+# feeds songbird raw f32 PCM, which needs the PCM codec.
+symphonia-for-songbird = { package = "symphonia", version = "0.5.5", default-features = false, features = ["pcm"] }
+twilight-gateway = "0.17.1"
+twilight-http = "0.17.1"
+twilight-model = "0.17.1"
+
+# GUI.
+# The software renderer draws Tufo's window in about 30 MB of RSS. GPU renderers load the graphics
+# driver, which cost about 190 MB with NVIDIA's.
+slint = { version = "1.18.1", default-features = false, features = ["accessibility", "backend-winit", "compat-1-2", "renderer-software", "std", "unstable-winit-030"] }
+slint-build = "1.18.1"
+# Bounds the GUI's decoded background images by their size in bytes.
+clru = "0.6.3"
+# Decodes background images: the WebP presets and the JPEG or PNG files collections point at.
+image = { version = "0.25.10", default-features = false, features = ["jpeg", "png", "webp"] }
+# Embeds the Windows icon into tufo-gui.exe.
+embed-resource = "3.0.11"
+# The tray icon on Linux: a StatusNotifierItem over D-Bus, which needs no GTK.
+ksni = { version = "0.3.6", default-features = false, features = ["async-io", "blocking"] }
+# File drops on a native Wayland window, over winit's own libwayland connection, until Slint
+# moves to winit 0.31.
+wayland-backend = { version = "0.3.17", features = ["client_system"] }
+wayland-client = "0.31.15"
+# The tray icon on Windows, in the notification area.
+tray-icon = { version = "0.25.1", default-features = false }
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -2 }
+pedantic = { level = "warn", priority = -2 }
+correctness = { level = "deny", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+dbg_macro = "warn"
+disallowed_methods = "deny"
+collection_is_never_read = "warn"
+missing_errors_doc = "allow"
+struct_field_names = "allow"
+
+[profile.dev.package."*"]
+debug = false
+
+# Unoptimized, the GUI takes over half a second to decode each background painting.
+[profile.dev.package.image]
+opt-level = 3
+
+[profile.dev.package.image-webp]
+opt-level = 3
+
+[profile.dev.package.zune-jpeg]
+opt-level = 3
+
+[patch.crates-io]
+toasty-driver-sqlite = { path = "shared/toasty-driver-sqlite" }

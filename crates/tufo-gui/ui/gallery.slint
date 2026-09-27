@@ -1,0 +1,271 @@
+// The background gallery: the preset paintings hung on a wall by the kind of scene they set, the
+// chosen one framed in gilt, with the collection's own gradient and image files after them.
+
+import { Theme } from "theme.slint";
+import {
+    Actions, Art, BackgroundLabel, BackgroundTarget, Backgrounds, CollectionBackground,
+} from "state.slint";
+import { Icon, IconButton, ScrollThumb } from "widgets.slint";
+
+// The space around a painting inside its frame.
+global GalleryMetrics {
+    out property <length> frame-gap: 5px;
+    out property <length> placard-height: 44px;
+    out property <length> column-gap: 20px;
+    out property <length> row-gap: 20px;
+    out property <length> tile-width-min: 200px;
+}
+
+// One place on the wall: a painting in its frame over its placard.
+component GalleryTile inherits Rectangle {
+    in property <int> index;
+    in property <int> columns;
+    in property <length> painting-height;
+    in property <BackgroundLabel> label;
+    in property <bool> selected;
+    in property <bool> credit-is-error;
+    // The painting inside the frame; the tile shows its children instead when it has none.
+    in property <bool> has-painting: true;
+    in property <string> collection-id;
+    in property <CollectionBackground> choice;
+    callback clicked();
+    x: Math.mod(root.index, root.columns) * (self.width + GalleryMetrics.column-gap);
+    y: floor(root.index / root.columns) * (self.height + GalleryMetrics.row-gap);
+    height: root.painting-height + GalleryMetrics.placard-height;
+    accessible-role: button;
+    accessible-label: root.label.name;
+    accessible-description: root.label.credit;
+    frame := Rectangle {
+        y: 0;
+        height: root.painting-height;
+        border-radius: Theme.radius-small;
+        border-width: root.selected ? 3px : touch.has-hover ? 1px : 0px;
+        border-color: root.selected ? Theme.gallery-chosen : Theme.placard-muted;
+        if root.has-painting: Image {
+            x: GalleryMetrics.frame-gap;
+            y: GalleryMetrics.frame-gap;
+            width: parent.width - 2 * GalleryMetrics.frame-gap;
+            height: parent.height - 2 * GalleryMetrics.frame-gap;
+            source: Art.painting(root.collection-id, root.choice, self.width, self.height, 3px, Art.pictures-revision);
+            image-fit: fill;
+        }
+        @children
+    }
+
+    VerticalLayout {
+        y: root.painting-height + 8px;
+        height: GalleryMetrics.placard-height - 8px;
+        spacing: 2px;
+        Text {
+            text: root.label.name;
+            color: root.selected ? Theme.gallery-chosen : Theme.placard;
+            font-size: Theme.body-small;
+            font-weight: 500;
+            overflow: elide;
+        }
+
+        Text {
+            text: root.label.credit;
+            color: root.credit-is-error ? Theme.error : Theme.placard-muted;
+            font-size: Theme.caption;
+            overflow: elide;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A heading over a group of tiles on the wall.
+component WallSection inherits VerticalLayout {
+    in property <string> title;
+    in property <int> tile-count;
+    in property <int> columns;
+    in property <length> tile-height;
+    spacing: 14px;
+    Text {
+        text: root.title;
+        color: Theme.placard;
+        font-size: Theme.subheading;
+        font-weight: 400;
+    }
+
+    Rectangle {
+        height: ceil(root.tile-count / root.columns) * (root.tile-height + GalleryMetrics.row-gap) - GalleryMetrics.row-gap;
+        @children
+    }
+}
+
+export component BackgroundGallery inherits Rectangle {
+    in property <BackgroundTarget> target;
+    // The collection whose gradient the gradient tile shows; empty shows Tufo's own.
+    in property <string> collection-id;
+    in property <string> heading;
+    in property <CollectionBackground> selected;
+    in property <BackgroundLabel> selected-label;
+    in property <bool> image-missing;
+    callback close();
+    property <bool> has-image: root.selected.image-path != "";
+    property <length> content-width: wall.width - 56px - 12px;
+    property <int> columns: max(2, floor((root.content-width + GalleryMetrics.column-gap) / (GalleryMetrics.tile-width-min + GalleryMetrics.column-gap)));
+    property <length> tile-width: (root.content-width - (root.columns - 1) * GalleryMetrics.column-gap) / root.columns;
+    property <length> painting-height: root.tile-width * 2 / 3;
+    property <length> tile-height: root.painting-height + GalleryMetrics.placard-height;
+    background: Theme.scrim;
+    function choose(choice: CollectionBackground) {
+        Actions.pick-background(root.target, choice);
+        root.close();
+    }
+
+    TouchArea {
+        clicked => {
+            root.close();
+        }
+    }
+
+    wall := Rectangle {
+        x: 24px;
+        y: 24px;
+        width: parent.width - 48px;
+        height: parent.height - 48px;
+        background: Theme.gallery-wall;
+        border-radius: Theme.radius-card;
+        // Swallows clicks so they don't reach the dimmed area.
+        TouchArea { }
+        VerticalLayout {
+            HorizontalLayout {
+                padding-left: 28px;
+                padding-right: 16px;
+                padding-top: 16px;
+                padding-bottom: 8px;
+                spacing: 16px;
+                Text {
+                    text: root.heading;
+                    color: Theme.placard;
+                    font-family: Theme.display-font;
+                    font-weight: Theme.display-weight;
+                    font-size: Theme.heading;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-stretch: 1;
+                }
+
+                IconButton {
+                    icon: @image-url("icons/x.svg");
+                    tooltip: @tr("" => "Close");
+                    clicked => {
+                        root.close();
+                    }
+                }
+            }
+
+            hover := TouchArea {
+                vertical-stretch: 1;
+                flick := Flickable {
+                    mouse-drag-pan-enabled: false;
+                    content-height: sections.preferred-height;
+                    sections := VerticalLayout {
+                        padding-left: 28px;
+                        padding-right: 28px + 12px;
+                        padding-top: 8px;
+                        padding-bottom: 32px;
+                        spacing: 32px;
+                        for group in Backgrounds.groups: WallSection {
+                            title: group.name;
+                            tile-count: group.presets.length;
+                            columns: root.columns;
+                            tile-height: root.tile-height;
+                            for tile[position] in group.presets: GalleryTile {
+                                index: position;
+                                columns: root.columns;
+                                width: root.tile-width;
+                                painting-height: root.painting-height;
+                                label: tile.label;
+                                selected: !root.has-image && root.selected.preset == tile.preset;
+                                clicked => {
+                                    root.choose({ preset: tile.preset, image-path: "" });
+                                }
+                                choice: { preset: tile.preset, image-path: "" };
+                            }
+                        }
+
+                        WallSection {
+                            title: @tr("" => "Your own");
+                            tile-count: root.has-image ? 3 : 2;
+                            columns: root.columns;
+                            tile-height: root.tile-height;
+                            GalleryTile {
+                                index: 0;
+                                columns: root.columns;
+                                width: root.tile-width;
+                                painting-height: root.painting-height;
+                                label: { name: @tr("" => "Gradient"), credit: @tr("" => "Colors drawn from the collection") };
+                                selected: !root.has-image && root.selected.preset < 0;
+                                clicked => {
+                                    root.choose({ preset: -1, image-path: "" });
+                                }
+                                collection-id: root.collection-id;
+                                choice: { preset: -1, image-path: "" };
+                            }
+
+                            if root.has-image: GalleryTile {
+                                index: 1;
+                                columns: root.columns;
+                                width: root.tile-width;
+                                painting-height: root.painting-height;
+                                label: root.image-missing ? { name: root.selected-label.name, credit: @tr("" => "Tufo can't open this file") } : root.selected-label;
+                                credit-is-error: root.image-missing;
+                                selected: true;
+                                clicked => {
+                                    root.close();
+                                }
+                                collection-id: root.collection-id;
+                                choice: root.selected;
+                            }
+
+                            GalleryTile {
+                                index: root.has-image ? 2 : 1;
+                                columns: root.columns;
+                                width: root.tile-width;
+                                painting-height: root.painting-height;
+                                label: { name: @tr("" => "Choose an image file"), credit: @tr("" => "Or drop one on this window") };
+                                has-painting: false;
+                                clicked => {
+                                    Actions.choose-background-file(root.target);
+                                    root.close();
+                                }
+                                Rectangle {
+                                    x: GalleryMetrics.frame-gap;
+                                    y: GalleryMetrics.frame-gap;
+                                    width: root.tile-width - 2 * GalleryMetrics.frame-gap;
+                                    height: root.painting-height - 2 * GalleryMetrics.frame-gap;
+                                    border-radius: 3px;
+                                    border-width: 1px;
+                                    border-color: Theme.placard-muted.with-alpha(0.5);
+                                    Icon {
+                                        width: 32px;
+                                        height: 32px;
+                                        source: @image-url("icons/image-plus.svg");
+                                        tint: Theme.placard-muted;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ScrollThumb {
+                    x: parent.width - self.width - 6px;
+                    height: parent.height;
+                    content-height: flick.content-height;
+                    content-y: flick.content-y;
+                    show: hover.has-hover;
+                }
+            }
+        }
+    }
+}

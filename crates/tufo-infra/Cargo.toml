@@ -1,0 +1,58 @@
+[package]
+name = "tufo-infra"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[features]
+test-support = []
+
+[dependencies]
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+audio_thread_priority = { workspace = true }
+blake3 = { workspace = true }
+cpal = { workspace = true }
+directories = { workspace = true }
+file-id = { workspace = true }
+jiff = { workspace = true }
+notify = { workspace = true }
+opus2 = { workspace = true }
+percent-encoding = { workspace = true }
+kira = { workspace = true }
+rtrb = { workspace = true }
+rubato = { workspace = true }
+rusqlite = { workspace = true }
+rusty-leveldb = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+songbird = { workspace = true }
+symphonia = { workspace = true }
+symphonia-for-songbird = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+toasty = { workspace = true, features = ["migration", "sqlite"] }
+toasty-core = { workspace = true }
+toasty-driver-sqlite = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tufo-application = { workspace = true }
+tufo-models = { workspace = true }
+tufo-wire = { workspace = true }
+tokio = { workspace = true, features = ["rt", "sync", "time"] }
+twilight-gateway = { workspace = true }
+twilight-http = { workspace = true }
+twilight-model = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+kira = { workspace = true, features = ["cpal-realtime-dbus"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_SystemServices", "Win32_System_Threading"] }
+
+[dev-dependencies]
+uuid = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+
+[lints]
+workspace = true

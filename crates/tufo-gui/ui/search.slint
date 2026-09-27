@@ -1,0 +1,161 @@
+// The Ctrl+Shift+F palette: search every track, sound, and collection, then Enter to play.
+
+import { Theme } from "theme.slint";
+import { Actions, Search, SearchResult } from "state.slint";
+import { Icon, TextField } from "widgets.slint";
+
+component ResultRow inherits Rectangle {
+    in property <SearchResult> result;
+    in property <bool> selected;
+    callback activated();
+    height: 48px;
+    border-radius: Theme.radius-row;
+    background: root.selected ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        spacing: 12px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            source: root.result.section == @tr("" => "Sounds") ? @image-url("icons/volume-2.svg") : root.result.section == @tr("" => "Music") ? @image-url("icons/music.svg") : @image-url("icons/folder.svg");
+            tint: root.selected ? Theme.accent : Theme.text-secondary;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.result.title;
+                overflow: elide;
+                color: root.selected ? Theme.accent : Theme.text;
+                font-size: Theme.body;
+            }
+
+            if root.result.subtitle != "": Text {
+                text: root.result.subtitle;
+                overflow: elide;
+                color: Theme.text-secondary;
+                font-size: Theme.caption;
+            }
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.activated();
+        }
+    }
+}
+
+// Stays in the window while closed, so it can take focus the moment it opens.
+export component SearchPalette inherits Rectangle {
+    callback close();
+    property <bool> open: Search.palette-open;
+    changed open => {
+        if self.open {
+            query.focus();
+        }
+    }
+    visible: root.open;
+    background: Theme.scrim;
+    TouchArea {
+        clicked => {
+            root.close();
+        }
+    }
+
+    keys := FocusScope {
+        capture-key-pressed(event) => {
+            if event.text == Key.Escape {
+                root.close();
+                return accept;
+            }
+            if event.text == Key.DownArrow {
+                Search.selected = min(Search.selected + 1, Search.results.length - 1);
+                return accept;
+            }
+            if event.text == Key.UpArrow {
+                Search.selected = max(Search.selected - 1, 0);
+                return accept;
+            }
+            if event.text == Key.Return {
+                if Search.results.length > 0 {
+                    Actions.palette-activate(Search.selected);
+                    root.close();
+                }
+                return accept;
+            }
+            reject
+        }
+        Rectangle {
+            x: (root.width - self.width) / 2;
+            y: root.height * 0.12;
+            width: min(root.width - 48px, 600px);
+            height: min(layout.preferred-height, root.height * 0.76);
+            background: Theme.raised;
+            border-radius: Theme.radius-card;
+            border-width: 1px;
+            border-color: Theme.raised-edge;
+            clip: true;
+            TouchArea { }
+            layout := VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+                query := TextField {
+                    label: @tr("" => "Search everything");
+                    placeholder: @tr("" => "Tracks, sounds, playlists, soundboards");
+                    text: Search.palette-query;
+                    edited(text) => {
+                        Search.palette-query = text;
+                        Search.selected = 0;
+                        Actions.palette-query-changed(text);
+                    }
+                }
+
+                if Search.palette-query != "" && Search.results.length == 0: Text {
+                    text: @tr("" => "Nothing matches.");
+                    color: Theme.text-secondary;
+                    horizontal-alignment: center;
+                }
+                results := Flickable {
+                    mouse-drag-pan-enabled: false;
+                    content-height: rows.preferred-height;
+                    height: min(rows.preferred-height, 480px);
+                    // Keeps the selected row in view as the arrows move it.
+                    content-y: min(0px, max(-Search.selected * 50px + self.height - 100px, self.height - self.content-height));
+                    rows := VerticalLayout {
+                        spacing: 2px;
+                        for result[index] in Search.results: VerticalLayout {
+                            if index == 0 || Search.results[index - 1].section != result.section: Text {
+                                text: result.section;
+                                font-size: Theme.caption;
+                                font-weight: 500;
+                                color: Theme.text-secondary;
+                                height: 28px;
+                                vertical-alignment: bottom;
+                            }
+                            ResultRow {
+                                result: result;
+                                selected: index == Search.selected;
+                                activated => {
+                                    Actions.palette-activate(index);
+                                    root.close();
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    text: @tr("" => "↑↓ to choose · Enter to play · Esc to close");
+                    font-size: Theme.caption;
+                    color: Theme.text-faint;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

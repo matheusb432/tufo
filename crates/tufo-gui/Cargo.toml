@@ -1,0 +1,53 @@
+[package]
+name = "tufo-gui"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clru = { workspace = true }
+directories = { workspace = true }
+fastrand = { workspace = true }
+gettext = "0.4.0"
+image = { workspace = true }
+nucleo-matcher = { workspace = true }
+rfd = { workspace = true }
+serde = { workspace = true }
+slint = { workspace = true }
+sys-locale = "0.3.2"
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["process", "rt-multi-thread", "sync", "time"] }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tufo-application = { workspace = true }
+tufo-client = { workspace = true }
+tufo-local-transport = { workspace = true }
+tufo-models = { workspace = true }
+uuid = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = { workspace = true }
+wayland-backend = { workspace = true }
+wayland-client = { workspace = true }
+ksni = { workspace = true }
+resvg = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+tray-icon = { workspace = true }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }
+
+[dev-dependencies]
+tonic = { workspace = true }
+jiff = { workspace = true }
+tempfile = { workspace = true }
+
+[build-dependencies]
+embed-resource = { workspace = true }
+slint-build = { workspace = true }
+rspolib = "0.1.2"
+
+[lints]
+workspace = true

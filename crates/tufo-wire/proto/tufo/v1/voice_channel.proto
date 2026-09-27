@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package tufo.v1;
+
+// The Discord voice channels playback can be routed to.
+service VoiceChannelService {
+  // Lists the voice channels the bot can see, ordered by guild id and then channel id.
+  rpc ListVoiceChannels(ListVoiceChannelsRequest) returns (ListVoiceChannelsResponse);
+}
+
+message ListVoiceChannelsRequest {
+  // Maximum channels to return: 0 selects 100, and values above 500 are capped at 500.
+  uint32 page_size = 1;
+  // The previous response's next_page_token, or empty for the first page.
+  string page_token = 2;
+}
+
+message ListVoiceChannelsResponse {
+  repeated VoiceChannel voice_channels = 1;
+  // Pass as page_token to continue; empty on the last page.
+  string next_page_token = 2;
+}
+
+message VoiceChannel {
+  fixed64 guild_id = 1;
+  fixed64 channel_id = 2;
+  string guild_name = 3;
+  string channel_name = 4;
+  // The channel's sorting position inside its guild's channel list.
+  int32 position = 5;
+}

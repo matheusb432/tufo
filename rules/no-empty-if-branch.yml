@@ -1,0 +1,13 @@
+id: no-empty-if-branch
+language: rust
+severity: error
+message: "Empty `if`/`else if` branch: delete the branch or fill in the intended behavior."
+note: |
+  An empty branch is either leftover scaffolding or a missing arm, and both mislead the reader
+  about what the condition decides. Clippy's `needless_if` only catches a bare `if cond {}` with no
+  `else`; this rule also covers an empty branch inside an `if`/`else if` chain.
+rule:
+  kind: if_expression
+  has:
+    kind: block
+    pattern: "{}"

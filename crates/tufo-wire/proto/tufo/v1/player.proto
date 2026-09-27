@@ -1,0 +1,244 @@
+syntax = "proto3";
+
+package tufo.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// Plays one music queue and any number of sound effects on the server's one active output.
+service PlayerService {
+  // Streams the player state, then each change. Positions are samples: add the time since
+  // position_sampled_at while the music plays. A slow reader skips to the latest state. The
+  // stream ends when the server shuts down.
+  rpc WatchPlayer(WatchPlayerRequest) returns (stream WatchPlayerResponse);
+  // Replaces the music with a playlist's tracks, in the playlist's order, starting at one of
+  // them. Missing files are skipped.
+  rpc PlayCollection(PlayCollectionRequest) returns (PlayCollectionResponse);
+  // Pauses the music. FAILED_PRECONDITION when nothing plays.
+  rpc PauseMusic(PauseMusicRequest) returns (PauseMusicResponse);
+  // Resumes paused music. FAILED_PRECONDITION when nothing plays.
+  rpc ResumeMusic(ResumeMusicRequest) returns (ResumeMusicResponse);
+  // Fades the music out and drops its queue. Stopping silence succeeds.
+  rpc StopMusic(StopMusicRequest) returns (StopMusicResponse);
+  // Crossfades to the queue's next track.
+  rpc SkipToNextTrack(SkipToNextTrackRequest) returns (SkipToNextTrackResponse);
+  // Goes back a track, or restarts the current one after its first 5 s.
+  rpc SkipToPreviousTrack(SkipToPreviousTrackRequest) returns (SkipToPreviousTrackResponse);
+  // Moves the current track to a position.
+  rpc SeekMusic(SeekMusicRequest) returns (SeekMusicResponse);
+  // Changes the settings present in the request and leaves the others.
+  rpc UpdatePlayerSettings(UpdatePlayerSettingsRequest) returns (UpdatePlayerSettingsResponse);
+  // Fires one soundboard entry over the music, restarting it when it already plays.
+  rpc PlaySound(PlaySoundRequest) returns (PlaySoundResponse);
+  // Fades a playing sound out. Stopping a silent entry succeeds.
+  rpc StopSound(StopSoundRequest) returns (StopSoundResponse);
+  // Holds every playing sound where it is, leaving the music alone. Pausing silence succeeds.
+  rpc PauseSounds(PauseSoundsRequest) returns (PauseSoundsResponse);
+  // Continues the paused sounds. PlaySound also resumes them.
+  rpc ResumeSounds(ResumeSoundsRequest) returns (ResumeSoundsResponse);
+  // Plays the looping sounds left playing on the local device, unless they were left paused.
+  rpc ResumeSavedLoops(ResumeSavedLoopsRequest) returns (ResumeSavedLoopsResponse);
+  // Routes all audio to the local device or one Discord voice channel, carrying the music at its
+  // position and the looping sounds over. Selecting the active output does nothing.
+  rpc SelectOutput(SelectOutputRequest) returns (SelectOutputResponse);
+  // Fades out the music and every sound, then closes the audio device and leaves any voice
+  // channel until something plays again. Tufo calls it when it quits and leaves the server running.
+  rpc StandBy(StandByRequest) returns (StandByResponse);
+  // Playback health totals since the server started.
+  rpc GetPlayerDiagnostics(GetPlayerDiagnosticsRequest) returns (GetPlayerDiagnosticsResponse);
+}
+
+message WatchPlayerRequest {}
+
+message WatchPlayerResponse {
+  PlayerState state = 1;
+}
+
+message PlayerState {
+  Output output = 1;
+  VoiceConnection voice = 2;
+  // Absent while no music plays.
+  optional MusicState music = 3;
+  float volume = 4;
+  bool muted = 5;
+  bool shuffle = 6;
+  RepeatMode repeat = 7;
+  google.protobuf.Duration crossfade = 8;
+  repeated ActiveSound sounds = 9;
+  bool sounds_paused = 10;
+}
+
+message MusicState {
+  string collection_id = 1;
+  string collection_entry_id = 2;
+  string title = 3;
+  google.protobuf.Duration position = 4;
+  google.protobuf.Timestamp position_sampled_at = 5;
+  // Absent when the track's length is unknown.
+  optional google.protobuf.Duration duration = 6;
+  bool paused = 7;
+  // The track's absolute path.
+  string path = 8;
+}
+
+message ActiveSound {
+  string collection_entry_id = 1;
+  google.protobuf.Timestamp started_at = 2;
+  google.protobuf.Duration duration = 3;
+  bool looping = 4;
+}
+
+enum RepeatMode {
+  REPEAT_MODE_UNSPECIFIED = 0;
+  REPEAT_MODE_OFF = 1;
+  REPEAT_MODE_PLAYLIST = 2;
+  REPEAT_MODE_TRACK = 3;
+}
+
+// The state of the bot's voice connection.
+message VoiceConnection {
+  oneof state {
+    VoiceNotConfigured not_configured = 1;
+    VoiceDisconnected disconnected = 2;
+    VoiceConnecting connecting = 3;
+    VoiceConnected connected = 4;
+    VoiceReconnecting reconnecting = 5;
+  }
+}
+
+message VoiceNotConfigured {}
+
+message VoiceDisconnected {
+  optional string reason = 1;
+}
+
+message VoiceConnecting {}
+
+message VoiceConnected {}
+
+message VoiceReconnecting {
+  uint32 attempt = 1;
+}
+
+// Where the server sends audio.
+message Output {
+  oneof target {
+    LocalOutput local = 1;
+    DiscordVoiceOutput discord_voice = 2;
+  }
+}
+
+// The server machine's default audio device.
+message LocalOutput {}
+
+// One Discord voice channel, joined by the server's bot.
+message DiscordVoiceOutput {
+  fixed64 guild_id = 1;
+  fixed64 channel_id = 2;
+}
+
+message PlayCollectionRequest {
+  string collection_id = 1;
+  // The entry to start from; the collection's first playable entry when absent.
+  optional string start_collection_entry_id = 2;
+}
+
+message PlayCollectionResponse {}
+
+message PauseMusicRequest {}
+
+message PauseMusicResponse {}
+
+message ResumeMusicRequest {}
+
+message ResumeMusicResponse {}
+
+message StopMusicRequest {}
+
+message StopMusicResponse {}
+
+message SkipToNextTrackRequest {}
+
+message SkipToNextTrackResponse {}
+
+message SkipToPreviousTrackRequest {}
+
+message SkipToPreviousTrackResponse {}
+
+message SeekMusicRequest {
+  google.protobuf.Duration position = 1;
+}
+
+message SeekMusicResponse {}
+
+message UpdatePlayerSettingsRequest {
+  // A linear gain from 0 to 1.
+  optional float volume = 1;
+  optional bool muted = 2;
+  optional bool shuffle = 3;
+  optional RepeatMode repeat = 4;
+  // At most 10 s; 0 plays gaplessly.
+  optional google.protobuf.Duration crossfade = 5;
+}
+
+message UpdatePlayerSettingsResponse {}
+
+message PlaySoundRequest {
+  string collection_entry_id = 1;
+}
+
+message PlaySoundResponse {}
+
+message StopSoundRequest {
+  string collection_entry_id = 1;
+}
+
+message StopSoundResponse {}
+
+message PauseSoundsRequest {}
+
+message PauseSoundsResponse {}
+
+message ResumeSoundsRequest {}
+
+message ResumeSoundsResponse {}
+
+message ResumeSavedLoopsRequest {}
+
+message ResumeSavedLoopsResponse {}
+
+message SelectOutputRequest {
+  Output output = 1;
+}
+
+message SelectOutputResponse {}
+
+message StandByRequest {}
+
+message StandByResponse {}
+
+message GetPlayerDiagnosticsRequest {}
+
+message GetPlayerDiagnosticsResponse {
+  PlayerDiagnostics diagnostics = 1;
+}
+
+message PlayerDiagnostics {
+  // Frames of silence music playback inserted because a decoder fell behind.
+  uint64 music_underrun_frames = 1;
+  // Absent without Discord.
+  optional VoicePacing voice_pacing = 2;
+}
+
+// How late songbird ran its 20 ms voice ticks.
+message VoicePacing {
+  uint64 ticks = 1;
+  // Ticks more than 5 ms late.
+  uint64 late_ticks = 2;
+  // Ticks more than 20 ms late.
+  uint64 very_late_ticks = 3;
+  google.protobuf.Duration lateness_p50 = 4;
+  google.protobuf.Duration lateness_p99 = 5;
+  google.protobuf.Duration lateness_p999 = 6;
+  google.protobuf.Duration lateness_max = 7;
+}

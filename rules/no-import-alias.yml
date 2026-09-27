@@ -1,0 +1,15 @@
+id: no-import-alias
+language: rust
+severity: error
+message: "Import alias `as` is banned: rename the item at its source."
+note: |
+  An alias that reads better than the original means the original is misnamed, fix it there.
+  An alias needed to dodge a name clash means the use site should qualify through the parent
+  module instead. `as _`, which imports a trait without binding a name, is allowed.
+rule:
+  all:
+    - kind: use_as_clause
+    - not:
+        has:
+          field: alias
+          regex: "^_$"

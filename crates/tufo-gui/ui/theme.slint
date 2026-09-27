@@ -1,0 +1,88 @@
+// A rainforest in late afternoon: everything rests in green shade, and only what plays catches the
+// low sun.
+
+import "../fonts/Nunito.ttf";
+
+export global Theme {
+    // The sun on whatever plays, and the primary action.
+    out property <color> lit: #f4b860;
+    out property <color> lit-bright: #ffd89a;
+    out property <color> lit-deep: #df8a3e;
+    // Text and icons on the sun.
+    out property <color> on-lit: #231404;
+    // The logo's mint, for what is selected or switched on.
+    out property <color> accent: #95d5b2;
+    out property <color> text: #f5eedc;
+    out property <color> text-secondary: #c3ccb8;
+    out property <color> text-faint: #8fa392;
+    out property <color> text-disabled: rgba(245, 238, 220, 0.38);
+    out property <color> error: #f2a39b;
+    out property <color> warning: #f4b860;
+    out property <color> online: #8fd89a;
+    out property <color> offline: #ef8a80;
+
+    // The backdrop's still: light from beyond the top-right corner fading into shade.
+    out property <color> still-light: #43502c;
+    out property <color> still-canopy: #173d27;
+    out property <color> still-shade: #0b1e15;
+    out property <brush> sidebar: @linear-gradient(180deg, rgba(9, 27, 19, 0.82) 0%, rgba(8, 24, 17, 0.92) 100%);
+    // The sidebar over the page, where the page mustn't show through.
+    out property <color> sidebar-overlaid: #09190f;
+    out property <color> sidebar-edge: rgba(245, 238, 220, 0.05);
+    // Tiles and rows float over the backdrop.
+    out property <color> panel: rgba(17, 42, 30, 0.86);
+    out property <color> panel-hover: rgba(22, 52, 37, 0.9);
+    out property <color> panel-edge: rgba(245, 238, 220, 0.05);
+    out property <color> dock: rgba(12, 33, 23, 0.95);
+    // Menus, popovers, dialogs, and toasts.
+    out property <color> raised: #10281d;
+    out property <color> raised-edge: rgba(245, 238, 220, 0.08);
+    out property <color> field: rgba(245, 238, 220, 0.06);
+    out property <color> button: rgba(245, 238, 220, 0.09);
+    out property <color> hover: rgba(245, 238, 220, 0.07);
+    out property <color> selected: rgba(149, 213, 178, 0.13);
+    out property <color> divider: rgba(245, 238, 220, 0.1);
+    out property <color> scrim: rgba(3, 12, 8, 0.6);
+    out property <color> disc: rgba(149, 213, 178, 0.09);
+    out property <color> track: rgba(245, 238, 220, 0.14);
+    // The round badges over a card's painting.
+    out property <color> badge: rgba(7, 21, 14, 0.72);
+    out property <color> badge-hover: rgba(7, 21, 14, 0.88);
+    out property <color> current-row: rgba(244, 184, 96, 0.12);
+
+    // The background gallery hangs its paintings on a wall, ringing the chosen one in sunlight.
+    out property <color> gallery-wall: #0e2419;
+    out property <color> gallery-chosen: #f4b860;
+    out property <color> placard: #efe7d3;
+    out property <color> placard-muted: #b5aa90;
+
+    out property <length> radius-card: 20px;
+    out property <length> radius-tile: 22px;
+    out property <length> radius-plate: 22px;
+    out property <length> radius-panel: 18px;
+    out property <length> radius-row: 12px;
+    out property <length> radius-small: 8px;
+    out property <length> sidebar-width: 232px;
+    out property <length> rail-width: 64px;
+    out property <length> page-width-min: 560px;
+
+    out property <string> font: "Nunito";
+    out property <string> display-font: "Nunito";
+    out property <int> display-weight: 800;
+    out property <length> title: 34px;
+    out property <length> heading: 22px;
+    out property <length> subheading: 18px;
+    out property <length> body: 15px;
+    out property <length> body-small: 14px;
+    out property <length> caption: 12.5px;
+}
+
+export global Motion {
+    out property <duration> sidebar-slide: 220ms;
+    out property <easing> sidebar-slide-easing: cubic-bezier(0.2, 0, 0, 1);
+    out property <duration> sidebar-fade-out: 80ms;
+    out property <duration> sidebar-fade-in: 120ms;
+    out property <duration> sidebar-fade-in-delay: 100ms;
+    out property <duration> hover: 150ms;
+    out property <duration> logo-blink: 350ms;
+}

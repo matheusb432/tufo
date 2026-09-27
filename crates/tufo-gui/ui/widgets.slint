@@ -1,0 +1,446 @@
+// Small controls.
+
+import { Motion, Theme } from "theme.slint";
+import { Clock } from "state.slint";
+
+export component Icon inherits Image {
+    in property <brush> tint: Theme.text;
+    colorize: root.tint;
+    image-fit: contain;
+    width: 24px;
+    height: 24px;
+}
+
+// The logo, asleep while nothing plays and awake while something does.
+export component Logo inherits Rectangle {
+    in property <bool> asleep;
+    width: 38px;
+    height: 38px;
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: @image-url("../icons/tufo-small.svg");
+    }
+
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: @image-url("../icons/tufo-small-asleep.svg");
+        opacity: root.asleep ? 1 : 0;
+        animate opacity { duration: Motion.logo-blink; }
+    }
+}
+
+// Three bars that bounce to the host's clock while something plays.
+export component Equalizer inherits Rectangle {
+    in property <bool> active: true;
+    in property <brush> bar-color: Theme.lit;
+    width: 13px;
+    height: 12px;
+    for bar in 3: Rectangle {
+        property <float> speed: bar == 0 ? 5.7 : bar == 1 ? 7.6 : 4.6;
+        property <float> bounce: 0.5 + 0.5 * Math.sin((Clock.seconds * self.speed + bar * 1.9) * 1rad);
+        x: bar * 5px;
+        width: 3px;
+        height: root.height * (root.active ? 0.3 + 0.7 * self.bounce : bar == 1 ? 0.8 : 0.5);
+        y: root.height - self.height;
+        border-radius: 1px;
+        background: root.bar-color;
+    }
+}
+
+export component TooltipBubble inherits Rectangle {
+    in property <string> text;
+    in property <string> detail;
+    background: Theme.raised;
+    border-radius: Theme.radius-small;
+    border-width: 1px;
+    border-color: Theme.raised-edge;
+    max-width: 280px;
+    VerticalLayout {
+        padding-top: 6px;
+        padding-bottom: 6px;
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 2px;
+        Text {
+            text: root.text;
+            color: Theme.text;
+            font-size: Theme.caption;
+            font-weight: 600;
+            wrap: word-wrap;
+        }
+
+        if root.detail != "": Text {
+            text: root.detail;
+            color: Theme.text-secondary;
+            font-size: Theme.caption;
+            wrap: word-wrap;
+        }
+    }
+}
+
+// A round icon button with a hover halo.
+export component IconButton inherits Rectangle {
+    in property <image> icon;
+    in property <length> size: 40px;
+    in property <length> icon-size: 22px;
+    in property <brush> tint: Theme.text-secondary;
+    in property <brush> hover-tint: Theme.text;
+    in property <bool> enabled: true;
+    in property <string> tooltip;
+    in property <bool> tooltip-enabled: true;
+    out property <bool> has-hover: touch.has-hover;
+    callback clicked();
+    property <bool> tooltip-dismissed;
+    width: root.size;
+    height: root.size;
+    border-radius: root.size / 2;
+    background: touch.has-hover && root.enabled ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: root.tooltip;
+    accessible-action-default => { root.clicked(); }
+    Icon {
+        source: root.icon;
+        width: root.icon-size;
+        height: root.icon-size;
+        tint: !root.enabled ? Theme.text-disabled : touch.has-hover ? root.hover-tint : root.tint;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.tooltip-dismissed = true;
+            }
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                root.tooltip-dismissed = false;
+            }
+        }
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    if root.tooltip != "" && root.tooltip-enabled && !root.tooltip-dismissed: Tooltip {
+        TooltipBubble {
+            text: root.tooltip;
+        }
+    }
+}
+
+export component TextLink inherits Text {
+    callback clicked();
+    color: touch.has-hover ? Theme.text : Theme.text-secondary;
+    font-size: Theme.body-small;
+    font-weight: 700;
+    accessible-role: button;
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+export enum ButtonKind { primary, secondary, quiet }
+
+// A pill with a label and an optional icon: the sunlit primary action, a translucent secondary
+// one, or a quiet one that shows only its label.
+export component Button inherits Rectangle {
+    in property <string> text;
+    in property <image> icon;
+    in property <ButtonKind> kind: ButtonKind.secondary;
+    in property <bool> enabled: true;
+    callback clicked();
+    property <bool> hovered: touch.has-hover && root.enabled;
+    property <brush> ink: !root.enabled ? Theme.text-disabled : root.kind == ButtonKind.primary ? Theme.on-lit : root.kind == ButtonKind.quiet && !root.hovered ? Theme.text-secondary : Theme.text;
+    min-width: max(64px, layout.preferred-width);
+    height: 38px;
+    border-radius: self.height / 2;
+    background: !root.enabled ? Theme.field : root.kind == ButtonKind.primary ? (root.hovered ? Theme.lit-bright : Theme.lit) : root.kind == ButtonKind.secondary ? (root.hovered ? Theme.track : Theme.button) : (root.hovered ? Theme.hover : transparent);
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-enabled: root.enabled;
+    accessible-action-default => { root.clicked(); }
+    layout := HorizontalLayout {
+        padding-left: root.kind == ButtonKind.quiet ? 10px : 16px;
+        padding-right: root.kind == ButtonKind.quiet ? 12px : 18px;
+        spacing: 8px;
+        alignment: center;
+        if root.icon.width > 0: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: root.icon;
+            tint: root.ink;
+        }
+        Text {
+            text: root.text;
+            font-size: Theme.body-small;
+            font-weight: root.kind == ButtonKind.quiet ? 600 : 800;
+            color: root.ink;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A filled text field with its label above.
+export component TextField inherits VerticalLayout {
+    in property <string> label;
+    in property <string> placeholder;
+    in-out property <string> text <=> input.text;
+    in property <bool> password;
+    callback accepted();
+    callback edited(string);
+    forward-focus: input;
+    spacing: 6px;
+    if root.label != "": Text {
+        text: root.label;
+        font-size: Theme.caption;
+        font-weight: 700;
+        color: input.has-focus ? Theme.accent : Theme.text-secondary;
+    }
+    Rectangle {
+        height: 44px;
+        border-radius: Theme.radius-row;
+        background: Theme.field;
+        border-width: input.has-focus ? 2px : 1px;
+        border-color: input.has-focus ? Theme.accent : touch.has-hover ? Theme.track : Theme.divider;
+        touch := TouchArea {
+            mouse-cursor: MouseCursor.text;
+            clicked => {
+                input.focus();
+            }
+        }
+
+        input := TextInput {
+            x: 14px;
+            width: parent.width - 28px;
+            height: parent.height;
+            vertical-alignment: center;
+            font-size: Theme.body;
+            color: Theme.text;
+            selection-background-color: Theme.accent.with-alpha(0.35);
+            input-type: root.password ? InputType.password : InputType.text;
+            single-line: true;
+            accepted => {
+                root.accepted();
+            }
+            edited => {
+                root.edited(self.text);
+            }
+        }
+
+        if input.text == "" && root.placeholder != "": Text {
+            x: 14px;
+            width: parent.width - 28px;
+            text: root.placeholder;
+            color: Theme.text-faint;
+            font-size: Theme.body;
+            vertical-alignment: center;
+            height: parent.height;
+            overflow: elide;
+        }
+    }
+}
+
+// A thin track, its filled part, and a round thumb that shows on hover. It never writes `value`,
+// which would break the binding that feeds it. From a press until `value` changes after the
+// release, it shows the dragged value instead, for at most `hold-max` after the release.
+export component Slider inherits Rectangle {
+    in property <float> value;
+    // Snaps dragged values to multiples of this step when positive.
+    in property <float> step;
+    in property <brush> fill: Theme.text-secondary;
+    in property <brush> track: Theme.track;
+    in property <length> track-height: 4px;
+    in property <bool> show-thumb: true;
+    // Fires on the press and while dragging.
+    callback changed(float);
+    callback released(float);
+    // The value it shows: the dragged one while held, otherwise `value`.
+    out property <float> shown-value: root.holding ? root.dragged-value : root.value;
+    out property <bool> hovered: touch.has-hover || touch.pressed;
+    property <duration> hold-max: 1s;
+    property <float> dragged-value;
+    property <bool> holding;
+    height: 20px;
+    min-width: 60px;
+    accessible-role: slider;
+    accessible-value: round(root.shown-value * 100);
+    changed value => {
+        if !touch.pressed {
+            root.holding = false;
+        }
+    }
+
+    function drag-to(x: length) {
+        let fraction = clamp(x / root.width, 0, 1);
+        root.dragged-value = root.step > 0 ? clamp(round(fraction / root.step) * root.step, 0, 1) : fraction;
+        root.holding = true;
+        root.changed(root.dragged-value);
+    }
+
+    Timer {
+        interval: root.hold-max;
+        running: root.holding && !touch.pressed;
+        triggered => {
+            root.holding = false;
+        }
+    }
+
+    Rectangle {
+        y: (parent.height - root.track-height) / 2;
+        height: root.track-height;
+        border-radius: root.track-height / 2;
+        background: root.track;
+    }
+
+    Rectangle {
+        x: 0;
+        y: (parent.height - root.track-height) / 2;
+        width: parent.width * clamp(root.shown-value, 0, 1);
+        height: root.track-height;
+        border-radius: root.track-height / 2;
+        background: root.fill;
+    }
+
+    if root.show-thumb: Rectangle {
+        x: parent.width * clamp(root.shown-value, 0, 1) - self.width / 2;
+        y: (parent.height - self.height) / 2;
+        width: touch.pressed ? 16px : 12px;
+        height: self.width;
+        border-radius: self.width / 2;
+        background: root.fill;
+        opacity: touch.has-hover || touch.pressed ? 1 : 0;
+        animate opacity, width { duration: 120ms; }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                root.drag-to(self.mouse-x);
+            } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                root.released(root.dragged-value);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.drag-to(self.mouse-x);
+            }
+        }
+    }
+}
+
+// A track and a round thumb that slides to the checked side.
+export component Switch inherits Rectangle {
+    in-out property <bool> checked;
+    in property <string> label;
+    width: 40px;
+    height: 24px;
+    accessible-role: switch;
+    accessible-label: root.label;
+    accessible-checkable: true;
+    accessible-checked: root.checked;
+    accessible-action-default => { root.checked = !root.checked; }
+    Rectangle {
+        border-radius: self.height / 2;
+        background: root.checked ? Theme.accent.with-alpha(0.45) : Theme.track;
+        animate background { duration: Motion.hover; }
+    }
+
+    Rectangle {
+        x: root.checked ? parent.width - self.width - 3px : 3px;
+        width: 18px;
+        height: 18px;
+        border-radius: 9px;
+        background: root.checked ? Theme.accent : Theme.text-secondary;
+        animate x, background { duration: Motion.hover; }
+    }
+
+    TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.checked = !root.checked;
+        }
+    }
+}
+
+// A thin scrollbar thumb for a Flickable, placed by its parent at the Flickable's right edge. It
+// shows only while the pointer is over the page.
+export component ScrollThumb inherits Rectangle {
+    in property <length> content-height;
+    in property <length> content-y;
+    in property <bool> show;
+    width: 10px;
+    visible: self.content-height > self.height;
+    Rectangle {
+        property <length> thumb-height: max(32px, root.height * root.height / max(root.content-height, 1px));
+        y: (root.height - self.thumb-height) * clamp(-root.content-y / max(root.content-height - root.height, 1px), 0, 1);
+        width: 6px;
+        height: self.thumb-height;
+        border-radius: 3px;
+        background: Theme.text-faint;
+        opacity: root.show ? 0.8 : 0;
+        animate opacity { duration: 200ms; }
+    }
+}
+
+// A menu of text actions, opened from a ⋮ button.
+export component MenuItem inherits Rectangle {
+    in property <string> text;
+    in property <bool> destructive;
+    callback activated();
+    height: 38px;
+    border-radius: Theme.radius-small;
+    background: touch.has-hover ? Theme.hover : transparent;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.activated(); }
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 16px;
+        Text {
+            text: root.text;
+            vertical-alignment: center;
+            font-size: Theme.body-small;
+            font-weight: 600;
+            color: root.destructive ? Theme.error : Theme.text;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.activated();
+        }
+    }
+}
+
+export component MenuSurface inherits Rectangle {
+    background: Theme.raised;
+    border-radius: Theme.radius-row + 2px;
+    border-width: 1px;
+    border-color: Theme.raised-edge;
+    min-width: 160px;
+    VerticalLayout {
+        padding: 6px;
+        @children
+    }
+}

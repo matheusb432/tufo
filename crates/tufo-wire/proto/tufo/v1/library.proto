@@ -1,0 +1,352 @@
+syntax = "proto3";
+
+package tufo.v1;
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// The playlists and soundboards, and the audio files they point at. Tufo never copies, moves,
+// or writes audio files.
+service LibraryService {
+  // Streams the whole library, then the whole library again after each change. A slow reader
+  // skips to the latest snapshot. The stream ends when the server shuts down.
+  rpc WatchLibrary(WatchLibraryRequest) returns (stream WatchLibraryResponse);
+  // Imports folders and audio files dropped on the playlists or soundboards grid. Each folder
+  // becomes a followed library folder, and each folder under it that holds audio becomes a
+  // linked collection. Loose audio files become one manual collection. The library snapshot
+  // shows the result once this returns.
+  rpc ImportPaths(ImportPathsRequest) returns (ImportPathsResponse);
+  // Adds every audio file among the paths, and under the folders among them, to one manual
+  // collection. Linked collections refuse with FAILED_PRECONDITION.
+  rpc AddFilesToCollection(AddFilesToCollectionRequest) returns (AddFilesToCollectionResponse);
+  // Creates an empty manual collection.
+  rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
+  // Changes the fields present in the request and leaves the others.
+  rpc UpdateCollection(UpdateCollectionRequest) returns (UpdateCollectionResponse);
+  // Deletes a collection. A deleted linked collection stops following its folder until that
+  // folder is imported again.
+  rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
+  // Changes the fields present in the request and leaves the others.
+  rpc UpdateCollectionEntry(UpdateCollectionEntryRequest) returns (UpdateCollectionEntryResponse);
+  // Deletes an entry from a manual collection. Linked collections refuse with
+  // FAILED_PRECONDITION, since their folder decides their entries.
+  rpc DeleteCollectionEntry(DeleteCollectionEntryRequest) returns (DeleteCollectionEntryResponse);
+  // Rescans every library folder now instead of waiting for the watcher.
+  rpc RescanLibrary(RescanLibraryRequest) returns (RescanLibraryResponse);
+  // Imports Kenku FM's collections and music settings, and its Discord bot token when the
+  // server has none, skipping collections the library already shows. NOT_FOUND means the
+  // folder holds no Kenku FM library; FAILED_PRECONDITION means it can't be read.
+  rpc ImportKenkuLibrary(ImportKenkuLibraryRequest) returns (ImportKenkuLibraryResponse);
+}
+
+message WatchLibraryRequest {}
+
+message WatchLibraryResponse {
+  LibrarySnapshot snapshot = 1;
+}
+
+message LibrarySnapshot {
+  // Increases with every change.
+  uint64 revision = 1;
+  // Playlists, then soundboards, each by title.
+  repeated Collection collections = 2;
+}
+
+message Collection {
+  // A canonical UUID.
+  string id = 1;
+  CollectionKind kind = 2;
+  string title = 3;
+  Background background = 4;
+  EntryOrder order = 5;
+  oneof source {
+    ManualSource manual = 6;
+    LinkedSource linked = 7;
+  }
+  // In the collection's order.
+  repeated CollectionEntry entries = 8;
+  optional BuiltinTitle builtin_title = 9;
+}
+
+enum CollectionKind {
+  COLLECTION_KIND_UNSPECIFIED = 0;
+  COLLECTION_KIND_PLAYLIST = 1;
+  COLLECTION_KIND_SOUNDBOARD = 2;
+}
+
+message Background {
+  oneof kind {
+    // A gradient derived from the collection's id.
+    GradientBackground gradient = 1;
+    // An absolute path to an image file.
+    string image_path = 2;
+    // A painting that ships with Tufo.
+    BackgroundPreset preset = 3;
+  }
+}
+
+message GradientBackground {}
+
+enum BackgroundPreset {
+  BACKGROUND_PRESET_UNSPECIFIED = 0;
+  BACKGROUND_PRESET_AUTUMN = 1;
+  BACKGROUND_PRESET_BATTLE = 2;
+  BACKGROUND_PRESET_CASTLE = 3;
+  BACKGROUND_PRESET_CATHEDRAL = 4;
+  BACKGROUND_PRESET_COAST = 5;
+  BACKGROUND_PRESET_DESERT = 6;
+  BACKGROUND_PRESET_DRAGON = 7;
+  BACKGROUND_PRESET_FIRE = 8;
+  BACKGROUND_PRESET_FOREST = 9;
+  BACKGROUND_PRESET_HAUNTED = 10;
+  BACKGROUND_PRESET_MOUNTAIN = 11;
+  BACKGROUND_PRESET_NIGHT = 12;
+  BACKGROUND_PRESET_SKY = 13;
+  BACKGROUND_PRESET_SKULLS = 14;
+  BACKGROUND_PRESET_STORM = 15;
+  BACKGROUND_PRESET_TAVERN = 16;
+  BACKGROUND_PRESET_TOWN = 17;
+  BACKGROUND_PRESET_UNDERWORLD = 18;
+  BACKGROUND_PRESET_VOLCANO = 19;
+  BACKGROUND_PRESET_WINTER = 20;
+}
+
+message EntryOrder {
+  EntryOrderKey key = 1;
+  bool descending = 2;
+}
+
+enum EntryOrderKey {
+  ENTRY_ORDER_KEY_UNSPECIFIED = 0;
+  ENTRY_ORDER_KEY_TITLE = 1;
+  ENTRY_ORDER_KEY_DURATION = 2;
+  // When the file was added to Tufo.
+  ENTRY_ORDER_KEY_DATE_ADDED = 3;
+}
+
+// Entries added by hand.
+message ManualSource {}
+
+// The audio files one folder holds directly.
+message LinkedSource {
+  string folder_path = 1;
+  // Whether Tufo last looked for the folder and didn't find it.
+  bool missing = 2;
+}
+
+message CollectionEntry {
+  // A canonical UUID.
+  string id = 1;
+  // A canonical UUID, shared by every entry of the same file.
+  string audio_file_id = 2;
+  string title = 3;
+  // The file's absolute path.
+  string path = 4;
+  google.protobuf.Duration duration = 5;
+  // When the file was added to Tufo.
+  google.protobuf.Timestamp added_at = 6;
+  // Whether Tufo last looked for the file and didn't find it.
+  bool missing = 7;
+  SoundSettings sound = 8;
+  SoundIcon icon = 9;
+  optional BuiltinTitle builtin_title = 10;
+}
+
+// How an entry plays as a sound effect.
+message SoundSettings {
+  bool looping = 1;
+  // A linear gain from 0 (silence) to 1 (the file's own level).
+  float volume = 2;
+  // At most one minute.
+  google.protobuf.Duration fade_in = 3;
+  // At most one minute.
+  google.protobuf.Duration fade_out = 4;
+}
+
+// A Lucide icon for a sound's tile.
+enum SoundIcon {
+  SOUND_ICON_UNSPECIFIED = 0;
+  SOUND_ICON_AUDIO_LINES = 1;
+  SOUND_ICON_ANCHOR = 2;
+  SOUND_ICON_AXE = 3;
+  SOUND_ICON_BEER = 4;
+  SOUND_ICON_BELL = 5;
+  SOUND_ICON_BIRD = 6;
+  SOUND_ICON_BOMB = 7;
+  SOUND_ICON_BONE = 8;
+  SOUND_ICON_BOW_ARROW = 9;
+  SOUND_ICON_BUG = 10;
+  SOUND_ICON_BUILDING = 11;
+  SOUND_ICON_CASTLE = 12;
+  SOUND_ICON_CAT = 13;
+  SOUND_ICON_CHURCH = 14;
+  SOUND_ICON_CLOCK = 15;
+  SOUND_ICON_CLOUD_FOG = 16;
+  SOUND_ICON_CLOUD_LIGHTNING = 17;
+  SOUND_ICON_CLOUD_RAIN = 18;
+  SOUND_ICON_CLOUD_SNOW = 19;
+  SOUND_ICON_COFFEE = 20;
+  SOUND_ICON_COINS = 21;
+  SOUND_ICON_CROWN = 22;
+  SOUND_ICON_DICES = 23;
+  SOUND_ICON_DOG = 24;
+  SOUND_ICON_DOOR_OPEN = 25;
+  SOUND_ICON_DROPLETS = 26;
+  SOUND_ICON_DRUM = 27;
+  SOUND_ICON_FAN = 28;
+  SOUND_ICON_FISH = 29;
+  SOUND_ICON_FLAME = 30;
+  SOUND_ICON_FLAME_KINDLING = 31;
+  SOUND_ICON_FLASK_CONICAL = 32;
+  SOUND_ICON_FOOTPRINTS = 33;
+  SOUND_ICON_GHOST = 34;
+  SOUND_ICON_GUITAR = 35;
+  SOUND_ICON_HAMMER = 36;
+  SOUND_ICON_HEART_PULSE = 37;
+  SOUND_ICON_HOURGLASS = 38;
+  SOUND_ICON_HOUSE = 39;
+  SOUND_ICON_KEY = 40;
+  SOUND_ICON_LANDMARK = 41;
+  SOUND_ICON_MOON = 42;
+  SOUND_ICON_MOON_STAR = 43;
+  SOUND_ICON_MOUNTAIN = 44;
+  SOUND_ICON_MOUNTAIN_SNOW = 45;
+  SOUND_ICON_MUSIC = 46;
+  SOUND_ICON_PAW_PRINT = 47;
+  SOUND_ICON_PIANO = 48;
+  SOUND_ICON_PICKAXE = 49;
+  SOUND_ICON_RABBIT = 50;
+  SOUND_ICON_RAT = 51;
+  SOUND_ICON_SCROLL = 52;
+  SOUND_ICON_SHIELD = 53;
+  SOUND_ICON_SHIP = 54;
+  SOUND_ICON_SIREN = 55;
+  SOUND_ICON_SKULL = 56;
+  SOUND_ICON_SNOWFLAKE = 57;
+  SOUND_ICON_SPARKLES = 58;
+  SOUND_ICON_SQUIRREL = 59;
+  SOUND_ICON_SUN = 60;
+  SOUND_ICON_SWORDS = 61;
+  SOUND_ICON_TENT = 62;
+  SOUND_ICON_TORNADO = 63;
+  SOUND_ICON_TRAIN_FRONT = 64;
+  SOUND_ICON_TREES = 65;
+  SOUND_ICON_VENETIAN_MASK = 66;
+  SOUND_ICON_WAND_SPARKLES = 67;
+  SOUND_ICON_WAVES = 68;
+  SOUND_ICON_WIND = 69;
+  SOUND_ICON_ZAP = 70;
+}
+
+message ImportPathsRequest {
+  CollectionKind kind = 1;
+  // Absolute paths of folders or audio files.
+  repeated string paths = 2;
+}
+
+message ImportPathsResponse {
+  ImportReport report = 1;
+}
+
+// What an import changed, for the message the GUI shows.
+message ImportReport {
+  uint32 collections_created = 1;
+  uint32 files_added = 2;
+  // Audio files Tufo couldn't read, left out.
+  repeated string unreadable_paths = 3;
+  // Dropped paths that are neither folders nor audio files.
+  repeated string ignored_paths = 4;
+}
+
+message AddFilesToCollectionRequest {
+  string collection_id = 1;
+  // Absolute paths of folders or audio files.
+  repeated string paths = 2;
+}
+
+message AddFilesToCollectionResponse {
+  ImportReport report = 1;
+}
+
+message CreateCollectionRequest {
+  CollectionKind kind = 1;
+  string title = 2;
+  Background background = 3;
+}
+
+message CreateCollectionResponse {
+  string collection_id = 1;
+}
+
+message UpdateCollectionRequest {
+  string collection_id = 1;
+  optional string title = 2;
+  optional Background background = 3;
+  optional EntryOrder order = 4;
+}
+
+message UpdateCollectionResponse {}
+
+message DeleteCollectionRequest {
+  string collection_id = 1;
+}
+
+message DeleteCollectionResponse {}
+
+message UpdateCollectionEntryRequest {
+  string collection_entry_id = 1;
+  // Retitles the audio file everywhere it appears.
+  optional string title = 2;
+  optional SoundSettings sound = 3;
+  optional SoundIcon icon = 4;
+}
+
+message UpdateCollectionEntryResponse {}
+
+message DeleteCollectionEntryRequest {
+  string collection_entry_id = 1;
+}
+
+message DeleteCollectionEntryResponse {}
+
+message RescanLibraryRequest {}
+
+message RescanLibraryResponse {}
+
+message ImportKenkuLibraryRequest {
+  // Absolute; absent means Kenku FM's default folder on the server's system.
+  optional string kenku_folder_path = 1;
+}
+
+message ImportKenkuLibraryResponse {
+  KenkuImportReport report = 1;
+}
+
+// What importing Kenku FM's library changed, for the message the GUI shows.
+message KenkuImportReport {
+  uint32 collections_imported = 1;
+  uint32 files_imported = 2;
+  // Titles the library already showed.
+  repeated string skipped_collection_titles = 3;
+  // Audio files that couldn't be found or read.
+  repeated string unreadable_paths = 4;
+  // Web addresses, which can't play.
+  repeated string unsupported_sources = 5;
+  // The bot logs in with it after the server restarts.
+  bool discord_bot_token_imported = 6;
+}
+
+// A generated display title. The English title remains available to non-GUI clients.
+enum BuiltinTitle {
+  BUILTIN_TITLE_UNSPECIFIED = 0;
+  BUILTIN_TITLE_EFFECTS = 1;
+  BUILTIN_TITLE_IMPORTED = 2;
+  BUILTIN_TITLE_RAIN = 3;
+  BUILTIN_TITLE_STORM = 4;
+  BUILTIN_TITLE_WIND = 5;
+  BUILTIN_TITLE_WAVES = 6;
+  BUILTIN_TITLE_STREAM = 7;
+  BUILTIN_TITLE_BIRDS = 8;
+  BUILTIN_TITLE_SUMMER_NIGHT = 9;
+  BUILTIN_TITLE_FIREPLACE = 10;
+}

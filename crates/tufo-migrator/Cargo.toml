@@ -1,0 +1,17 @@
+[package]
+name = "tufo-migrator"
+version = "0.1.0"
+description = "Authors Tufo's SQLite migrations from its Toasty models"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+thiserror = { workspace = true }
+toasty-cli = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt"] }
+tufo-infra = { workspace = true }
+
+[lints]
+workspace = true

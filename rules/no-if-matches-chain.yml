@@ -1,0 +1,24 @@
+id: no-if-matches-chain
+language: rust
+severity: error
+message: "`if matches!` chained with `else if matches!`: rewrite the chain as one `match`."
+note: |
+  Successive `matches!` branches re-test patterns one condition at a time. A single `match` states
+  the dispatch on the scrutinee once, keeps the arms symmetric, and lets the compiler check the
+  arms for exhaustiveness and overlap. A lone `if matches!(...)` stays allowed: with no chain there
+  is nothing a `match` would express better.
+rule:
+  matches: if-matches
+  not:
+    inside:
+      kind: else_clause
+  has:
+    kind: else_clause
+    has:
+      matches: if-matches
+utils:
+  if-matches:
+    kind: if_expression
+    has:
+      field: condition
+      pattern: "matches!"

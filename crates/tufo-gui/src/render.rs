@@ -1,0 +1,453 @@
+//! Writes view models into the window's globals on the UI thread.
+
+use std::time::Duration;
+
+use slint::{ComponentHandle as _, Model as _, ModelRc, SharedString, Timer, TimerMode, VecModel};
+use tufo_client::library::{Background, ImportReport};
+use tufo_models::library::SoundIcon;
+
+use crate::{
+    backgrounds,
+    i18n::{tr, tr_args, tr_count},
+    presentation::{
+        self, CardView, CurrentOutputView, DrawerView, LibraryPageView, NavItemView, OutputRowView,
+        PageKind, PlayerBarView,
+    },
+    search::PaletteResult,
+    settings::{DesktopSettings, QuitBehavior},
+    sound_icons,
+    ui::{
+        AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
+        CollectionBackground, CollectionCard, CurrentOutput, LibraryView, NavItem, Navigation,
+        OutputRow, OutputRowKind, Page, PlayerView, Search, SearchResult, Session, SoundChip,
+        SoundIcons, SoundTile, TrackRow, VoiceBadge,
+    },
+};
+
+const TOAST_DURATION: Duration = Duration::from_secs(4);
+const ERROR_TOAST_DURATION: Duration = Duration::from_secs(8);
+
+thread_local! {
+    static TOAST_TIMER: Timer = Timer::default();
+}
+
+fn model<T: Clone + 'static>(items: Vec<T>) -> ModelRc<T> {
+    ModelRc::new(VecModel::from(items))
+}
+
+fn card(card: &CardView) -> CollectionCard {
+    CollectionCard {
+        id: card.id.to_string().into(),
+        title: card.title.as_str().into(),
+        count_label: card.count_label.as_str().into(),
+        background: collection_background(&card.background),
+        playing: card.playing,
+        missing: card.missing,
+    }
+}
+
+fn nav_item(item: &NavItemView) -> NavItem {
+    NavItem {
+        id: item.id.to_string().into(),
+        title: item.title.as_str().into(),
+        playing: item.playing,
+        missing: item.missing,
+    }
+}
+
+fn collection_background(background: &Background) -> CollectionBackground {
+    let (preset, image_path) = presentation::background_fields(background);
+    CollectionBackground {
+        preset,
+        image_path: image_path.into(),
+    }
+}
+
+/// Lists the preset paintings in the background gallery's groups.
+pub(crate) fn background_groups(window: &AppWindow) {
+    let groups = presentation::PRESET_GROUPS
+        .iter()
+        .map(|(name, presets)| BackgroundGroup {
+            name: SharedString::from(tr(name)),
+            presets: model(
+                presets
+                    .iter()
+                    .map(|preset| BackgroundPresetTile {
+                        preset: i32::try_from(preset.index()).unwrap_or(-1),
+                        label: background_label(&Background::Preset(*preset)),
+                    })
+                    .collect(),
+            ),
+        })
+        .collect();
+    window.global::<Backgrounds>().set_groups(model(groups));
+}
+
+pub(crate) fn sound_icons(window: &AppWindow) {
+    let icons = window.global::<SoundIcons>();
+    icons.set_images(model(sound_icons::images()));
+    icons.set_labels(model(
+        SoundIcon::ALL
+            .iter()
+            .map(|&icon| SharedString::from(sound_icons::label(icon)))
+            .collect(),
+    ));
+}
+
+/// Shows the background the Add dialog creates its collection with.
+pub(crate) fn background_draft(window: &slint::Weak<AppWindow>, draft: &Background) {
+    let (background, label) = (collection_background(draft), background_label(draft));
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let backgrounds = window.global::<Backgrounds>();
+        backgrounds.set_draft(background);
+        backgrounds.set_draft_label(label);
+    });
+}
+
+fn background_label(background: &Background) -> BackgroundLabel {
+    let label = presentation::background_label(background);
+    BackgroundLabel {
+        name: label.name.into(),
+        credit: label.credit.into(),
+    }
+}
+
+/// Tries the pictures that failed to decode again after the library changed, drawing again
+/// the cards that showed their gradient instead.
+pub(crate) fn retry_missing_backgrounds(window: &slint::Weak<AppWindow>) {
+    let _ = window.upgrade_in_event_loop(|window| {
+        if backgrounds::retry_missing_pictures() {
+            let art = window.global::<Art>();
+            art.set_pictures_revision(art.get_pictures_revision().wrapping_add(1));
+        }
+    });
+}
+
+pub(crate) fn library(
+    window: &slint::Weak<AppWindow>,
+    view: LibraryPageView,
+    navigation: presentation::Navigation,
+) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let library = window.global::<LibraryView>();
+        library.set_loaded(true);
+        library.set_playlists(model(view.playlists.iter().map(card).collect()));
+        library.set_soundboards(model(view.soundboards.iter().map(card).collect()));
+        show_rows(
+            &library.get_nav_playlists(),
+            view.nav_playlists.iter().map(nav_item).collect(),
+            |items| library.set_nav_playlists(items),
+        );
+        show_rows(
+            &library.get_nav_soundboards(),
+            view.nav_soundboards.iter().map(nav_item).collect(),
+            |items| library.set_nav_soundboards(items),
+        );
+        library.set_playlist_count(i32::try_from(view.playlist_count).unwrap_or(i32::MAX));
+        library.set_soundboard_count(i32::try_from(view.soundboard_count).unwrap_or(i32::MAX));
+        let page = match navigation.page {
+            PageKind::Home => Page::Home,
+            PageKind::Playlists => Page::Playlists,
+            PageKind::Playlist => Page::Playlist,
+            PageKind::Soundboards => Page::Soundboards,
+            PageKind::Soundboard => Page::Soundboard,
+        };
+        let pages = window.global::<Navigation>();
+        pages.set_collection_id(
+            navigation
+                .collection_id
+                .map(|id| id.to_string())
+                .unwrap_or_default()
+                .into(),
+        );
+        // A collection that disappeared sends its page back to the grid.
+        let page = match (page, &view.collection) {
+            (Page::Playlist, None) => Page::Playlists,
+            (Page::Soundboard, None) => Page::Soundboards,
+            (page, _) => page,
+        };
+        pages.set_page(page);
+        let Some(collection) = view.collection else {
+            return;
+        };
+        library.set_collection_title(collection.title.into());
+        library.set_collection_summary(collection.summary.into());
+        library.set_collection_background(collection_background(&collection.background));
+        library.set_collection_background_label(background_label(&collection.background));
+        library.set_collection_linked(collection.linked_folder.is_some());
+        library.set_collection_folder(collection.linked_folder.unwrap_or_default().into());
+        library.set_collection_missing(collection.missing);
+        library.set_order_key(collection.order_key);
+        library.set_order_descending(collection.order_descending);
+        library.set_tracks(model(
+            collection
+                .tracks
+                .into_iter()
+                .map(|track| TrackRow {
+                    id: track.id.to_string().into(),
+                    title: track.title.into(),
+                    duration: track.duration.into(),
+                    missing: track.missing,
+                    current: track.current,
+                    playing: track.playing,
+                })
+                .collect(),
+        ));
+        let tiles = collection
+            .sounds
+            .into_iter()
+            .map(|sound| SoundTile {
+                id: sound.id.to_string().into(),
+                title: sound.title.into(),
+                icon: i32::try_from(sound.icon.index()).unwrap_or(0),
+                looping: sound.looping,
+                volume: sound.volume,
+                fade_in_ms: i32::try_from(sound.fade_in_ms).unwrap_or(i32::MAX),
+                fade_out_ms: i32::try_from(sound.fade_out_ms).unwrap_or(i32::MAX),
+                playing: sound.playing,
+                progress: sound.progress,
+                missing: sound.missing,
+            })
+            .collect();
+        show_rows(&library.get_sounds(), tiles, |tiles| {
+            library.set_sounds(tiles);
+        });
+    });
+}
+
+pub(crate) fn player(
+    window: &slint::Weak<AppWindow>,
+    bar: PlayerBarView,
+    drawer: DrawerView,
+    crossfade: Duration,
+) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        player_progress(&window, &bar);
+        let view = window.global::<PlayerView>();
+        view.set_has_music(bar.has_music);
+        view.set_title(bar.title.into());
+        view.set_collection_id(
+            bar.collection_id
+                .map(|id| id.to_string())
+                .unwrap_or_default()
+                .into(),
+        );
+        view.set_collection_title(bar.collection_title.into());
+        view.set_collection_background(collection_background(&bar.collection_background));
+        view.set_playing(bar.playing);
+        view.set_volume(bar.volume);
+        view.set_muted(bar.muted);
+        view.set_shuffle(bar.shuffle);
+        view.set_repeat(bar.repeat);
+        view.set_sounds_paused(bar.sounds_paused);
+        let session = window.global::<Session>();
+        session.set_outputs(model(drawer.rows.into_iter().map(output_row).collect()));
+        session.set_current_output(current_output(drawer.current_output));
+        session.set_voice_status(drawer.voice_status.into());
+        session.set_voice_badge(voice_badge(drawer.voice_badge));
+        session.set_discord_configured(drawer.discord_configured);
+        session.set_crossfade_ms(i32::try_from(crossfade.as_millis()).unwrap_or(i32::MAX));
+    });
+}
+
+/// Updates only what moves with time: the clock, the seek bar, the sound chips, and the rings
+/// around the open soundboard's playing sounds.
+pub(crate) fn player_progress(window: &AppWindow, bar: &PlayerBarView) {
+    let view = window.global::<PlayerView>();
+    view.set_progress(bar.progress);
+    view.set_elapsed(bar.elapsed.as_str().into());
+    view.set_remaining(bar.remaining.as_str().into());
+    let chips = bar
+        .sounds
+        .iter()
+        .map(|sound| SoundChip {
+            id: sound.id.to_string().into(),
+            title: sound.title.as_str().into(),
+            progress: sound.progress,
+            looping: sound.looping,
+        })
+        .collect::<Vec<_>>();
+    show_rows(&view.get_sounds(), chips, |chips| view.set_sounds(chips));
+    let tiles = window.global::<LibraryView>().get_sounds();
+    for (index, mut tile) in tiles.iter().enumerate() {
+        let Some(sound) = bar
+            .sounds
+            .iter()
+            .find(|sound| tile.playing && tile.id == sound.id.to_string().as_str())
+        else {
+            continue;
+        };
+        if (tile.progress - sound.progress).abs() > f32::EPSILON {
+            tile.progress = sound.progress;
+            tiles.set_row_data(index, tile);
+        }
+    }
+}
+
+/// Updates rows in place: a new model rebuilds them, dropping hovers, presses, and drags.
+fn show_rows<T: Clone + PartialEq + 'static>(
+    shown: &ModelRc<T>,
+    rows: Vec<T>,
+    replace: impl FnOnce(ModelRc<T>),
+) {
+    match shown.as_any().downcast_ref::<VecModel<T>>() {
+        Some(shown) if shown.row_count() == rows.len() => {
+            for (index, row) in rows.into_iter().enumerate() {
+                if shown.row_data(index).as_ref() != Some(&row) {
+                    shown.set_row_data(index, row);
+                }
+            }
+        }
+        Some(shown) => shown.set_vec(rows),
+        None => replace(model(rows)),
+    }
+}
+
+fn output_row_kind(kind: presentation::OutputRowKind) -> OutputRowKind {
+    match kind {
+        presentation::OutputRowKind::Local => OutputRowKind::Local,
+        presentation::OutputRowKind::Guild => OutputRowKind::Guild,
+        presentation::OutputRowKind::Channel => OutputRowKind::Channel,
+    }
+}
+
+fn output_row(row: OutputRowView) -> OutputRow {
+    OutputRow {
+        kind: output_row_kind(row.kind),
+        label: row.label.into(),
+        initial: row.initial.into(),
+        selected: row.selected,
+        index: row
+            .index
+            .and_then(|index| i32::try_from(index).ok())
+            .unwrap_or(-1),
+    }
+}
+
+fn current_output(output: CurrentOutputView) -> CurrentOutput {
+    CurrentOutput {
+        kind: output_row_kind(output.kind),
+        label: output.label.into(),
+        guild_name: output.guild_name.into(),
+        guild_initial: output.guild_initial.into(),
+    }
+}
+
+fn voice_badge(badge: presentation::VoiceBadge) -> VoiceBadge {
+    match badge {
+        presentation::VoiceBadge::None => VoiceBadge::None,
+        presentation::VoiceBadge::Joining => VoiceBadge::Joining,
+        presentation::VoiceBadge::Dropped => VoiceBadge::Dropped,
+    }
+}
+
+pub(crate) fn palette(window: &slint::Weak<AppWindow>, results: &[PaletteResult]) {
+    let results = results
+        .iter()
+        .map(|result| SearchResult {
+            section: result.section.into(),
+            title: result.title.as_str().into(),
+            subtitle: result.subtitle.as_str().into(),
+        })
+        .collect::<Vec<_>>();
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let search = window.global::<Search>();
+        let last = i32::try_from(results.len()).unwrap_or(i32::MAX) - 1;
+        search.set_selected(search.get_selected().clamp(0, last.max(0)));
+        search.set_results(model(results));
+    });
+}
+
+pub(crate) fn clear_filter(window: &slint::Weak<AppWindow>) {
+    let _ = window.upgrade_in_event_loop(|window| {
+        let search = window.global::<Search>();
+        search.set_filter_open(false);
+        search.set_filter_text(SharedString::new());
+    });
+}
+
+pub(crate) fn connection(window: &slint::Weak<AppWindow>, connected: bool, text: String) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let session = window.global::<Session>();
+        session.set_connected(connected);
+        session.set_connection_text(text.into());
+    });
+}
+
+pub(crate) fn desktop_settings(window: &slint::Weak<AppWindow>, settings: DesktopSettings) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        window
+            .global::<Session>()
+            .set_keep_playing_after_quit(settings.quit_behavior == QuitBehavior::KeepPlaying);
+    });
+}
+
+pub(crate) fn start_at_login(window: &slint::Weak<AppWindow>, enabled: bool) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        window.global::<Session>().set_start_at_login(enabled);
+    });
+}
+
+pub(crate) fn drop_target(window: &slint::Weak<AppWindow>, hovering: bool, label: String) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let session = window.global::<Session>();
+        session.set_drop_hover(hovering);
+        session.set_drop_label(label.into());
+    });
+}
+
+/// Shows a message for a few seconds; errors stay longer.
+pub(crate) fn toast(window: &slint::Weak<AppWindow>, text: String, is_error: bool) {
+    let window = window.clone();
+    let _ = window.clone().upgrade_in_event_loop(move |handle| {
+        let session = handle.global::<Session>();
+        session.set_toast(text.into());
+        session.set_toast_is_error(is_error);
+        let duration = if is_error {
+            ERROR_TOAST_DURATION
+        } else {
+            TOAST_DURATION
+        };
+        TOAST_TIMER.with(|timer| {
+            timer.start(TimerMode::SingleShot, duration, move || {
+                clear_toast(&window);
+            });
+        });
+    });
+}
+
+fn clear_toast(window: &slint::Weak<AppWindow>) {
+    if let Some(window) = window.upgrade() {
+        window.global::<Session>().set_toast(SharedString::new());
+    }
+}
+
+/// What an import or addition changed, with complete pluralized sentences.
+pub(crate) fn report_text(report: &ImportReport) -> String {
+    let mut sentences = vec![match (report.collections_created, report.files_added) {
+        (0, 0) => tr("Nothing new to add.").to_owned(),
+        (0, files) => tr_count("Added {n} file.", "Added {n} files.", files),
+        (collections, files) => tr_args(
+            "Added {0} with {1}.",
+            &[
+                &tr_count("{n} collection", "{n} collections", collections),
+                &tr_count("{n} file", "{n} files", files),
+            ],
+        ),
+    }];
+    if !report.unreadable_files.is_empty() {
+        sentences.push(tr_count(
+            "{n} file could not be read.",
+            "{n} files could not be read.",
+            report.unreadable_files.len(),
+        ));
+    }
+    if !report.ignored_paths.is_empty() {
+        sentences.push(tr_count(
+            "Skipped {n} item that is not audio or a folder.",
+            "Skipped {n} items that are not audio or folders.",
+            report.ignored_paths.len(),
+        ));
+    }
+    sentences.join(" ")
+}

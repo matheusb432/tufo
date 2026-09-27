@@ -1,0 +1,25 @@
+[settings]
+auto_install = false
+lockfile = true
+
+[tools]
+rust = { version = "stable", profile = "minimal", components = ["clippy", "rustfmt"], targets = ["x86_64-pc-windows-msvc"] }
+just = "1.56.0"
+rumdl = "0.2.41"
+ast-grep = "0.44.1"
+buf = "1.72.0"
+protoc = "35.1"
+"cargo-binstall" = "1.21.1"
+"cargo:cargo-nextest" = { version = "0.9.143", depends = ["rust", "cargo-binstall"] }
+"cargo:slint-viewer" = { version = "1.18.1", depends = ["rust", "cargo-binstall"] }
+# Cross-build the Windows executables for the installer; cargo-xwin builds Opus with CMake and Ninja.
+"cargo:cargo-xwin" = { version = "0.22.0", depends = ["rust", "cargo-binstall"] }
+ninja = "1.13.2"
+
+# Compiles the Windows installer.
+[bootstrap.packages]
+"apt:nsis" = "latest"
+
+[tasks.bootstrap]
+description = "Set up Tufo development tools"
+run = "just setup"

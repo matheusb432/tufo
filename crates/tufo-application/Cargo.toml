@@ -1,0 +1,22 @@
+[package]
+name = "tufo-application"
+version = "0.1.0"
+edition.workspace = true
+publish.workspace = true
+
+[dependencies]
+anyhow = { workspace = true }
+fastrand = { workspace = true }
+futures-util = { workspace = true }
+jiff = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+toasty = { workspace = true }
+toasty-core = { workspace = true }
+tufo-models = { workspace = true }
+tufo-wire = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt", "sync", "time"] }
+
+[lints]
+workspace = true

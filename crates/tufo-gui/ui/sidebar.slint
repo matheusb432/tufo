@@ -1,0 +1,697 @@
+// The sidebar: the logo, search, the pages, every collection, the output, and the connection.
+// It collapses to a rail of icons.
+
+import { Motion, Theme } from "theme.slint";
+import {
+    Actions, CollectionKind, CurrentOutput, LibraryView, NavItem, Navigation, OutputRow,
+    OutputRowKind, Page, PlayerView, Session, VoiceBadge,
+} from "state.slint";
+import { Equalizer, Icon, IconButton, Logo, MenuSurface, TextLink, TooltipBubble } from "widgets.slint";
+
+component NavRow inherits Rectangle {
+    in property <image> icon;
+    in property <string> text;
+    in property <bool> active;
+    in property <bool> can-add;
+    in property <string> add-label;
+    callback clicked();
+    callback add();
+    height: 36px;
+    border-radius: Theme.radius-row;
+    background: root.active ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 4px;
+        spacing: 11px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: root.icon;
+            tint: root.active ? Theme.accent : Theme.text-secondary;
+        }
+
+        Text {
+            text: root.text;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            font-size: Theme.body;
+            font-weight: 700;
+            color: root.active ? Theme.text : Theme.text-secondary;
+        }
+
+        if root.can-add: IconButton {
+            y: (parent.height - self.height) / 2;
+            size: 28px;
+            icon-size: 16px;
+            icon: @image-url("icons/plus.svg");
+            tint: Theme.text-faint;
+            tooltip: root.add-label;
+            clicked => {
+                root.add();
+            }
+        }
+    }
+}
+
+component CollectionLink inherits Rectangle {
+    in property <NavItem> item;
+    in property <bool> active;
+    callback clicked();
+    height: 30px;
+    border-radius: Theme.radius-row;
+    background: root.active ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: root.item.title;
+    accessible-action-default => { root.clicked(); }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 39px;
+        padding-right: 10px;
+        spacing: 8px;
+        Text {
+            text: root.item.title;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+            font-size: Theme.body-small;
+            color: root.item.missing ? Theme.text-faint : root.active || touch.has-hover ? Theme.text : Theme.text-secondary;
+        }
+
+        if root.item.playing: Equalizer {
+            y: (parent.height - self.height) / 2;
+        }
+    }
+}
+
+component OutputItem inherits Rectangle {
+    in property <OutputRow> output;
+    callback picked();
+    property <bool> guild: root.output.kind == OutputRowKind.guild;
+    height: root.guild ? 32px : 38px;
+    border-radius: Theme.radius-small;
+    background: root.guild ? transparent : root.output.selected ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 10px;
+        if root.guild: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            border-radius: 10px;
+            background: Theme.field;
+            Text {
+                text: root.output.initial;
+                font-size: 11px;
+                font-weight: 700;
+                color: Theme.text-secondary;
+            }
+        }
+        if !root.guild: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: root.output.kind == OutputRowKind.local ? @image-url("icons/monitor.svg") : @image-url("icons/volume-2.svg");
+            tint: root.output.selected ? Theme.accent : Theme.text-faint;
+        }
+        Text {
+            text: root.output.label;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+            font-size: root.guild ? Theme.caption : Theme.body-small;
+            font-weight: root.guild ? 700 : 600;
+            color: root.guild ? Theme.text-faint : Theme.text;
+        }
+
+        if root.output.selected: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: @image-url("icons/check.svg");
+            tint: Theme.accent;
+        }
+    }
+
+    touch := TouchArea {
+        enabled: !root.guild;
+        mouse-cursor: root.guild ? MouseCursor.default : MouseCursor.pointer;
+        clicked => {
+            Actions.select-output(root.output.index);
+            root.picked();
+        }
+    }
+}
+
+// Where the audio goes: this computer, or a Discord voice channel.
+component OutputPicker inherits MenuSurface {
+    callback picked();
+    callback open-settings();
+    width: 272px;
+    HorizontalLayout {
+        padding-left: 10px;
+        height: 38px;
+        Text {
+            text: @tr("" => "Play into");
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            font-size: Theme.body-small;
+            font-weight: 800;
+            color: Theme.text-secondary;
+        }
+
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            size: 32px;
+            icon-size: 18px;
+            icon: @image-url("icons/refresh-cw.svg");
+            tooltip: @tr("" => "Refresh the voice channels");
+            enabled: Session.connected && Session.discord-configured;
+            clicked => {
+                Actions.refresh-outputs();
+            }
+        }
+    }
+
+    for row in Session.outputs: OutputItem {
+        output: row;
+        picked => {
+            root.picked();
+        }
+    }
+    if !Session.discord-configured: HorizontalLayout {
+        padding: 10px;
+        TextLink {
+            text: @tr("" => "Connect Discord for more outputs");
+            font-size: Theme.caption;
+            clicked => {
+                root.open-settings();
+            }
+        }
+    }
+    if Session.voice-status != "": Text {
+        text: Session.voice-status;
+        font-size: Theme.caption;
+        color: Theme.text-faint;
+        wrap: word-wrap;
+    }
+}
+
+// The output the audio goes to now, which opens the picker.
+component OutputButton inherits Rectangle {
+    in property <bool> compact;
+    in property <bool> tooltip-enabled: true;
+    callback clicked();
+    property <CurrentOutput> output: Session.current-output;
+    property <bool> channel: root.output.kind == OutputRowKind.channel;
+    property <string> title: root.output.guild-name != "" ? @tr("" => "{0} in {1}", root.output.label, root.output.guild-name) : root.output.label;
+    property <bool> tooltip-dismissed;
+    height: root.compact ? 44px : 52px;
+    border-radius: Theme.radius-row;
+    background: touch.has-hover ? Theme.hover : Theme.field;
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: @tr("" => "Output: {0}", root.title);
+    accessible-action-default => { root.clicked(); }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.tooltip-dismissed = true;
+            }
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                root.tooltip-dismissed = false;
+            }
+        }
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    if root.compact: Icon {
+        width: 20px;
+        height: 20px;
+        source: root.channel ? @image-url("icons/volume-2.svg") : @image-url("icons/monitor.svg");
+        tint: Theme.accent;
+    }
+    if !root.compact: HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 10px;
+        spacing: 10px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            source: root.channel ? @image-url("icons/volume-2.svg") : @image-url("icons/monitor.svg");
+            tint: Theme.accent;
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.output.label;
+                overflow: elide;
+                font-size: Theme.body-small;
+                font-weight: 700;
+                color: Theme.text;
+            }
+
+            if root.output.guild-name != "": Text {
+                text: root.output.guild-name;
+                overflow: elide;
+                font-size: 11.5px;
+                color: Theme.text-faint;
+            }
+        }
+
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            source: @image-url("icons/chevron-down.svg");
+            tint: Theme.text-faint;
+        }
+    }
+    if Session.voice-badge != VoiceBadge.none: Rectangle {
+        x: root.compact ? parent.width - 13px : 26px;
+        y: root.compact ? 6px : 10px;
+        width: 9px;
+        height: 9px;
+        border-radius: 4.5px;
+        border-width: 2px;
+        border-color: Theme.raised;
+        background: Session.voice-badge == VoiceBadge.joining ? Theme.warning : Theme.error;
+    }
+    if root.compact && root.title != "" && root.tooltip-enabled && !root.tooltip-dismissed: Tooltip {
+        TooltipBubble {
+            text: root.title;
+            detail: root.channel ? Session.voice-status : "";
+        }
+    }
+}
+
+component SidebarForm inherits Rectangle {
+    in property <bool> shown;
+    opacity: root.shown ? 1 : 0;
+    visible: self.opacity > 0;
+    animate opacity {
+        duration: root.shown ? Motion.sidebar-fade-in : Motion.sidebar-fade-out;
+        delay: root.shown ? Motion.sidebar-fade-in-delay : 0ms;
+    }
+}
+
+component FullSidebar inherits SidebarForm {
+    callback open-page(Page, string);
+    callback collapse();
+    callback open-search();
+    callback open-settings();
+    callback open-outputs();
+    callback add(CollectionKind);
+    property <Page> page: Navigation.page;
+    width: Theme.sidebar-width;
+    VerticalLayout {
+        HorizontalLayout {
+            height: 62px;
+            padding-right: 10px;
+            alignment: end;
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: @image-url("icons/panel-left-close.svg");
+                tooltip: @tr("" => "Collapse (Ctrl+B)");
+                tooltip-enabled: root.shown;
+                clicked => {
+                    root.collapse();
+                }
+            }
+        }
+
+        HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            padding-bottom: 12px;
+            search := Rectangle {
+                height: 36px;
+                border-radius: Theme.radius-row;
+                background: search-touch.has-hover ? Theme.hover : Theme.field;
+                accessible-role: button;
+                accessible-label: @tr("" => "Search everything");
+                accessible-action-default => { root.open-search(); }
+                search-touch := TouchArea {
+                    mouse-cursor: MouseCursor.pointer;
+                    clicked => {
+                        root.open-search();
+                    }
+                }
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    spacing: 9px;
+                    Icon {
+                        y: (parent.height - self.height) / 2;
+                        width: 16px;
+                        height: 16px;
+                        source: @image-url("icons/search.svg");
+                        tint: Theme.text-faint;
+                    }
+
+                    Text {
+                        text: @tr("" => "Search");
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        font-size: Theme.body-small;
+                        color: Theme.text-faint;
+                    }
+
+                    Text {
+                        text: "Ctrl+Shift+F";
+                        vertical-alignment: center;
+                        font-size: 11px;
+                        color: Theme.text-faint;
+                    }
+                }
+            }
+        }
+
+        Flickable {
+            mouse-drag-pan-enabled: false;
+            vertical-stretch: 1;
+            content-height: nav.preferred-height;
+            nav := VerticalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-bottom: 8px;
+                spacing: 2px;
+                alignment: start;
+                NavRow {
+                    icon: @image-url("icons/house.svg");
+                    text: @tr("" => "Home");
+                    active: root.page == Page.home;
+                    clicked => {
+                        root.open-page(Page.home, "");
+                    }
+                }
+
+                NavRow {
+                    icon: @image-url("icons/list-music.svg");
+                    text: @tr("" => "Playlists");
+                    active: root.page == Page.playlists;
+                    can-add: Session.connected;
+                    add-label: @tr("" => "Add Playlist");
+                    clicked => {
+                        root.open-page(Page.playlists, "");
+                    }
+                    add => {
+                        root.add(CollectionKind.playlist);
+                    }
+                }
+
+                for item in LibraryView.nav-playlists: CollectionLink {
+                    item: item;
+                    active: root.page == Page.playlist && Navigation.collection-id == item.id;
+                    clicked => {
+                        root.open-page(Page.playlist, item.id);
+                    }
+                }
+                Rectangle {
+                    height: 6px;
+                }
+
+                NavRow {
+                    icon: @image-url("icons/layout-grid.svg");
+                    text: @tr("" => "Soundboards");
+                    active: root.page == Page.soundboards;
+                    can-add: Session.connected;
+                    add-label: @tr("" => "Add Soundboard");
+                    clicked => {
+                        root.open-page(Page.soundboards, "");
+                    }
+                    add => {
+                        root.add(CollectionKind.soundboard);
+                    }
+                }
+
+                for item in LibraryView.nav-soundboards: CollectionLink {
+                    item: item;
+                    active: root.page == Page.soundboard && Navigation.collection-id == item.id;
+                    clicked => {
+                        root.open-page(Page.soundboard, item.id);
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+            spacing: 6px;
+            OutputButton {
+                tooltip-enabled: root.shown;
+                clicked => {
+                    root.open-outputs();
+                }
+            }
+
+            HorizontalLayout {
+                padding-left: 6px;
+                spacing: 8px;
+                Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: Session.connected ? Theme.online : Theme.warning;
+                }
+
+                Text {
+                    text: Session.connection-text;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                    font-size: Theme.caption;
+                    color: Theme.text-faint;
+                }
+
+                IconButton {
+                    size: 32px;
+                    icon-size: 18px;
+                    icon: @image-url("icons/settings.svg");
+                    tooltip: @tr("" => "Settings");
+                    tooltip-enabled: root.shown;
+                    clicked => {
+                        root.open-settings();
+                    }
+                }
+            }
+        }
+    }
+}
+
+component RailButton inherits IconButton {
+    in property <bool> active;
+    size: 42px;
+    border-radius: Theme.radius-row;
+    background: root.active ? Theme.selected : root.has-hover ? Theme.hover : transparent;
+    tint: root.active ? Theme.accent : Theme.text-secondary;
+}
+
+component Rail inherits SidebarForm {
+    callback open-page(Page, string);
+    callback expand();
+    callback open-search();
+    callback open-settings();
+    callback open-outputs();
+    property <Page> page: Navigation.page;
+    width: Theme.rail-width;
+    VerticalLayout {
+        padding-top: 62px;
+        padding-bottom: 10px;
+        spacing: 6px;
+        alignment: start;
+        for button[index] in [
+            { icon: @image-url("icons/panel-left-open.svg"), label: @tr("" => "Expand (Ctrl+B)") },
+            { icon: @image-url("icons/search.svg"), label: @tr("" => "Search everything (Ctrl+Shift+F)") },
+            { icon: @image-url("icons/house.svg"), label: @tr("" => "Home") },
+            { icon: @image-url("icons/list-music.svg"), label: @tr("" => "Playlists") },
+            { icon: @image-url("icons/layout-grid.svg"), label: @tr("" => "Soundboards") },
+        ]: HorizontalLayout {
+            alignment: center;
+            RailButton {
+                icon: button.icon;
+                tooltip: button.label;
+                tooltip-enabled: root.shown;
+                active: index == 2 ? root.page == Page.home : index == 3 ? root.page == Page.playlists || root.page == Page.playlist : index == 4 ? root.page == Page.soundboards || root.page == Page.soundboard : false;
+                clicked => {
+                    if index == 0 {
+                        root.expand();
+                    } else if index == 1 {
+                        root.open-search();
+                    } else if index == 2 {
+                        root.open-page(Page.home, "");
+                    } else if index == 3 {
+                        root.open-page(Page.playlists, "");
+                    } else {
+                        root.open-page(Page.soundboards, "");
+                    }
+                }
+            }
+        }
+    }
+
+    VerticalLayout {
+        y: parent.height - self.height;
+        height: self.preferred-height;
+        padding-bottom: 12px;
+        spacing: 8px;
+        HorizontalLayout {
+            alignment: center;
+            OutputButton {
+                compact: true;
+                width: 44px;
+                tooltip-enabled: root.shown;
+                clicked => {
+                    root.open-outputs();
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            IconButton {
+                icon: @image-url("icons/settings.svg");
+                tooltip: @tr("" => "Settings");
+                tooltip-enabled: root.shown;
+                clicked => {
+                    root.open-settings();
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: Session.connected ? Theme.online : Theme.warning;
+            }
+        }
+    }
+}
+
+export component Sidebar inherits Rectangle {
+    in property <bool> expanded;
+    // Lies over the page rather than beside it.
+    in property <bool> overlaid;
+    callback page-opened();
+    callback toggle();
+    callback open-search();
+    callback open-settings();
+    callback add(CollectionKind);
+    width: root.expanded ? Theme.sidebar-width : Theme.rail-width;
+    animate width {
+        duration: Motion.sidebar-slide;
+        easing: Motion.sidebar-slide-easing;
+    }
+    background: root.overlaid ? Theme.sidebar-overlaid : Theme.sidebar;
+    clip: true;
+
+    Logo {
+        x: 13px;
+        y: 12px;
+        asleep: !PlayerView.something-plays;
+        accessible-role: image;
+        accessible-label: PlayerView.something-plays ? @tr("" => "Awake while something plays") : @tr("" => "Asleep while nothing plays");
+    }
+
+    FullSidebar {
+        x: 0;
+        shown: root.expanded;
+        open-page(page, id) => {
+            Actions.open-page(page, id);
+            root.page-opened();
+        }
+        collapse => {
+            root.toggle();
+        }
+        open-search => {
+            root.open-search();
+        }
+        open-settings => {
+            root.open-settings();
+        }
+        open-outputs => {
+            outputs.show();
+        }
+        add(kind) => {
+            root.add(kind);
+        }
+    }
+
+    Rail {
+        x: 0;
+        shown: !root.expanded;
+        open-page(page, id) => {
+            Actions.open-page(page, id);
+            root.page-opened();
+        }
+        expand => {
+            root.toggle();
+        }
+        open-search => {
+            root.open-search();
+        }
+        open-settings => {
+            root.open-settings();
+        }
+        open-outputs => {
+            outputs.show();
+        }
+    }
+
+    Rectangle {
+        x: root.width - 1px;
+        width: 1px;
+        background: Theme.sidebar-edge;
+    }
+
+    outputs := PopupWindow {
+        x: root.expanded ? 10px : Theme.rail-width + 8px;
+        y: root.height - picker.preferred-height - (root.expanded ? 104px : 12px);
+        width: picker.width;
+        picker := OutputPicker {
+            picked => {
+                outputs.close();
+            }
+            open-settings => {
+                outputs.close();
+                root.open-settings();
+            }
+        }
+    }
+}

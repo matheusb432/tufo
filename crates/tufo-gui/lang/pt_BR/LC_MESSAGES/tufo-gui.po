@@ -1,0 +1,1320 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: tufo-gui 0.1\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: src/controller.rs:444
+msgid "A name needs at least one character."
+msgstr "O nome precisa ter pelo menos um caractere."
+
+#: ui/dialogs.slint:200
+msgid "Add"
+msgstr "Adicionar"
+
+#: ui/dialogs.slint:145 ui/pages.slint:353 ui/sidebar.slint:423
+msgid "Add Playlist"
+msgstr "Adicionar playlist"
+
+#: ui/dialogs.slint:145 ui/pages.slint:353 ui/sidebar.slint:448
+msgid "Add Soundboard"
+msgstr "Adicionar painel de sons"
+
+#: src/presentation.rs:1063
+msgid "Add a Discord bot token in Settings first."
+msgstr "Adicione um token de bot do Discord nas Configurações primeiro."
+
+#: ui/pages.slint:230
+msgid "Add a playlist"
+msgstr "Adicionar uma playlist"
+
+#: ui/pages.slint:230
+msgid "Add a soundboard"
+msgstr "Adicionar um painel de sons"
+
+#: ui/pages.slint:446
+msgid "Add files…"
+msgstr "Adicionar arquivos…"
+
+#: src/render.rs:430
+msgid "Added {0} with {1}."
+msgstr "Adição concluída: {0} com {1}."
+
+#: src/render.rs:429
+msgid "Added {n} file."
+msgid_plural "Added {n} files."
+msgstr[0] "{n} arquivo adicionado."
+msgstr[1] "{n} arquivos adicionados."
+
+#: src/sound_icons.rs
+msgid "Alarm"
+msgstr "Alarme"
+
+#: src/presentation.rs:481
+msgid "Albert Bierstadt, 1863"
+msgstr "Albert Bierstadt, 1863"
+
+#: src/sound_icons.rs
+msgid "Alchemy"
+msgstr "Alquimia"
+
+#: src/presentation.rs:480
+msgid "Arnold Böcklin, 1880"
+msgstr "Arnold Böcklin, 1880"
+
+#: src/sound_icons.rs
+msgid "Arrows"
+msgstr "Flechas"
+
+#: ui/sidebar.slint:629
+msgid "Asleep while nothing plays"
+msgstr "Dormindo enquanto nada toca"
+
+#: src/controller.rs:588
+msgid "Audio"
+msgstr "Áudio"
+
+#: src/presentation.rs:445
+msgid "Autumn"
+msgstr "Outono"
+
+#: ui/sidebar.slint:629
+msgid "Awake while something plays"
+msgstr "Acordado enquanto algo toca"
+
+#: src/sound_icons.rs
+msgid "Axe"
+msgstr "Machado"
+
+#: ui/pages.slint:478
+msgid "Back to Playlists"
+msgstr "Voltar às playlists"
+
+#: ui/pages.slint:478
+msgid "Back to Soundboards"
+msgstr "Voltar aos painéis de sons"
+
+#: ui/app.slint:367
+msgid "Background for the new playlist"
+msgstr "Fundo da nova playlist"
+
+#: ui/app.slint:367
+msgid "Background for the new soundboard"
+msgstr "Fundo do novo painel de sons"
+
+#: ui/app.slint:367 ui/app.slint:377
+msgid "Background for {0}"
+msgstr "Fundo de {0}"
+
+#: src/presentation.rs:446
+msgid "Battle"
+msgstr "Batalha"
+
+#: src/sound_icons.rs
+msgid "Beast"
+msgstr "Fera"
+
+#: src/sound_icons.rs
+msgid "Bell"
+msgstr "Sino"
+
+#: src/presentation.rs:487
+msgid "Bernardo Bellotto, about 1761"
+msgstr "Bernardo Bellotto, por volta de 1761"
+
+#: src/presentation.rs:951
+msgid "Birds"
+msgstr "Pássaros"
+
+#: src/sound_icons.rs
+msgid "Bones"
+msgstr "Ossos"
+
+#: ui/dialogs.slint:399
+msgid "Bot token"
+msgstr "Token do bot"
+
+#: ui/dialogs.slint:450
+msgid "Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything."
+msgstr "Importa playlists, painéis de sons e configurações de música do Kenku FM, além do token do bot se o Tufo não tiver um. Feche o Kenku FM antes para que ele salve tudo."
+
+#: src/sound_icons.rs
+msgid "Camp"
+msgstr "Acampamento"
+
+#: ui/pages.slint:564
+msgid "Can't find {0}"
+msgstr "Não foi possível encontrar {0}"
+
+#: ui/dialogs.slint:192 ui/dialogs.slint:333 ui/dialogs.slint:471
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: src/controller.rs:144
+msgid "Cannot reach tufo-server. Check the server log."
+msgstr "Não foi possível conectar ao tufo-server. Consulte o log do servidor."
+
+#: src/presentation.rs:447
+msgid "Castle"
+msgstr "Castelo"
+
+#: src/sound_icons.rs
+msgid "Cat"
+msgstr "Gato"
+
+#: src/presentation.rs:448
+msgid "Cathedral"
+msgstr "Catedral"
+
+#: ui/dialogs.slint:135
+msgid "Change background"
+msgstr "Alterar fundo"
+
+#: ui/dialogs.slint:79
+msgid "Change the background"
+msgstr "Alterar o fundo"
+
+#: src/presentation.rs:472
+msgid "Charles de Steuben, 1830s"
+msgstr "Charles de Steuben, década de 1830"
+
+#: src/controller.rs:1107
+msgid "Choose Kenku FM's data folder"
+msgstr "Escolha a pasta de dados do Kenku FM"
+
+#: src/controller.rs:528
+msgid "Choose a background image"
+msgstr "Escolha uma imagem de fundo"
+
+#: ui/gallery.slint:235
+msgid "Choose an image file"
+msgstr "Escolher uma imagem"
+
+#: src/controller.rs:587
+msgid "Choose audio files"
+msgstr "Escolha arquivos de áudio"
+
+#: src/controller.rs:464
+msgid "Choose folders for Tufo to follow"
+msgstr "Escolha pastas para o Tufo acompanhar"
+
+#: src/sound_icons.rs
+msgid "Church"
+msgstr "Igreja"
+
+#: src/sound_icons.rs
+msgid "City"
+msgstr "Cidade"
+
+#: src/presentation.rs:482
+msgid "Claude-Joseph Vernet, 1772"
+msgstr "Claude-Joseph Vernet, 1772"
+
+#: src/sound_icons.rs
+msgid "Clock"
+msgstr "Relógio"
+
+#: ui/gallery.slint:159
+msgid "Close"
+msgstr "Fechar"
+
+#: src/presentation.rs:449
+msgid "Coast"
+msgstr "Litoral"
+
+#: src/sound_icons.rs
+msgid "Coffee shop"
+msgstr "Cafeteria"
+
+#: src/sound_icons.rs
+msgid "Coins"
+msgstr "Moedas"
+
+#: ui/sidebar.slint:343
+msgid "Collapse (Ctrl+B)"
+msgstr "Recolher (Ctrl+B)"
+
+#: ui/dock.slint:360
+msgid "Collapse the player"
+msgstr "Recolher o player"
+
+#: src/search.rs:74
+msgid "Collections"
+msgstr "Coleções"
+
+#: ui/gallery.slint:206 src/presentation.rs:544
+msgid "Colors drawn from the collection"
+msgstr "Cores da coleção"
+
+#: ui/sidebar.slint:205
+msgid "Connect Discord for more outputs"
+msgstr "Conectar ao Discord para ver mais saídas"
+
+#: src/controller.rs:219
+msgid "Connected to tufo-server"
+msgstr "Conectado ao tufo-server"
+
+#: ui/state.slint:117
+msgid "Connecting to tufo-server…"
+msgstr "Conectando ao tufo-server…"
+
+#: src/sound_icons.rs
+msgid "Court"
+msgstr "Corte"
+
+#: ui/dialogs.slint:412
+msgid "Crossfade: {0} s"
+msgstr "Transição entre faixas: {0} s"
+
+#: src/presentation.rs:486
+msgid "David Teniers the Younger, 1658"
+msgstr "David Teniers the Younger, 1658"
+
+#: src/sound_icons.rs
+msgid "Day"
+msgstr "Dia"
+
+#: ui/pages.slint:453
+msgid "Delete"
+msgstr "Excluir"
+
+#: src/presentation.rs:450
+msgid "Desert"
+msgstr "Deserto"
+
+#: src/sound_icons.rs
+msgid "Dice"
+msgstr "Dados"
+
+#: ui/dialogs.slint:392
+msgid "Discord"
+msgstr "Discord"
+
+#: src/presentation.rs:848
+msgid "Discord channel {0}"
+msgstr "Canal do Discord {0}"
+
+#: src/controller.rs:302
+msgid "Discord voice channels are still loading; press refresh."
+msgstr "Os canais de voz do Discord ainda estão carregando; clique em atualizar."
+
+#: src/sound_icons.rs
+msgid "Dog"
+msgstr "Cachorro"
+
+#: ui/dialogs.slint:242
+msgid "Done"
+msgstr "Concluir"
+
+#: src/sound_icons.rs
+msgid "Door"
+msgstr "Porta"
+
+#: src/presentation.rs:451
+msgid "Dragon"
+msgstr "Dragão"
+
+#: src/controller.rs:660
+msgid "Drop a JPEG or PNG image to use it."
+msgstr "Solte uma imagem JPEG ou PNG para usá-la."
+
+#: ui/pages.slint:364
+msgid "Drop a folder of music here: each folder in it that holds audio becomes a playlist."
+msgstr "Solte uma pasta de músicas aqui: cada pasta com áudio vira uma playlist."
+
+#: ui/pages.slint:364
+msgid "Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard."
+msgstr "Solte uma pasta de sons aqui: cada pasta com áudio vira um painel de sons."
+
+#: src/controller.rs:620
+msgid "Drop an image to show it behind the collection"
+msgstr "Solte uma imagem para usar como fundo da coleção"
+
+#: ui/pages.slint:753 ui/pages.slint:980
+msgid "Drop audio files here to add them."
+msgstr "Solte arquivos de áudio aqui para adicioná-los."
+
+#: ui/pages.slint:220
+msgid "Drop folders of music on Playlists, or add a playlist."
+msgstr "Solte pastas de músicas em Playlists ou adicione uma playlist."
+
+#: src/controller.rs:626
+msgid "Drop folders of music to follow them"
+msgstr "Solte pastas de músicas para acompanhá-las"
+
+#: ui/pages.slint:220
+msgid "Drop folders of sounds on Soundboards, or add a soundboard."
+msgstr "Solte pastas de sons em Painéis de sons ou adicione um painel."
+
+#: src/controller.rs:627
+msgid "Drop folders of sounds to follow them"
+msgstr "Solte pastas de sons para acompanhá-las"
+
+#: src/controller.rs:631
+msgid "Drop the files here…"
+msgstr "Solte os arquivos aqui…"
+
+#: src/sound_icons.rs
+msgid "Drums"
+msgstr "Tambores"
+
+#: ui/dialogs.slint:212 ui/pages.slint:438 ui/pages.slint:666 ui/pages.slint:904
+msgid "Edit"
+msgstr "Editar"
+
+#: ui/dialogs.slint:306
+msgid "Edit Sound"
+msgstr "Editar som"
+
+#: ui/dialogs.slint:306
+msgid "Edit Track"
+msgstr "Editar faixa"
+
+#: src/presentation.rs:944
+msgid "Effects"
+msgstr "Efeitos"
+
+#: ui/sidebar.slint:537
+msgid "Expand (Ctrl+B)"
+msgstr "Expandir (Ctrl+B)"
+
+#: ui/dock.slint:396
+msgid "Expand the player"
+msgstr "Expandir o player"
+
+#: src/sound_icons.rs
+msgid "Explosion"
+msgstr "Explosão"
+
+#: ui/dialogs.slint:321
+msgid "Fade In (ms)"
+msgstr "Entrada gradual (ms)"
+
+#: ui/dialogs.slint:326
+msgid "Fade Out (ms)"
+msgstr "Saída gradual (ms)"
+
+#: src/controller.rs:828
+msgid "Fades must be between 0 and 60,000 ms."
+msgstr "A duração da entrada e da saída deve estar entre 0 e 60.000 ms."
+
+#: src/sound_icons.rs
+msgid "Fan"
+msgstr "Ventilador"
+
+#: ui/pages.slint:819
+msgid "File missing"
+msgstr "Arquivo não encontrado"
+
+#: ui/pages.slint:175
+msgid "Filter this page"
+msgstr "Filtrar esta página"
+
+#: src/presentation.rs:452
+msgid "Fire"
+msgstr "Fogo"
+
+#: src/presentation.rs:953
+msgid "Fireplace"
+msgstr "Lareira"
+
+#: src/sound_icons.rs
+msgid "Fish"
+msgstr "Peixes"
+
+#: src/sound_icons.rs
+msgid "Fog"
+msgstr "Névoa"
+
+#: ui/pages.slint:70
+msgid "Folder missing"
+msgstr "Pasta não encontrada"
+
+#: ui/pages.slint:564
+msgid "Follows {0}"
+msgstr "Acompanha {0}"
+
+#: src/sound_icons.rs
+msgid "Footsteps"
+msgstr "Passos"
+
+#: src/presentation.rs:453
+msgid "Forest"
+msgstr "Floresta"
+
+#: src/sound_icons.rs
+msgid "Forge"
+msgstr "Forja"
+
+#: src/presentation.rs:483
+msgid "Frederic Edwin Church, 1860"
+msgstr "Frederic Edwin Church, 1860"
+
+#: src/presentation.rs:473
+msgid "Frederik Sødring, 1838"
+msgstr "Frederik Sødring, 1838"
+
+#: src/sound_icons.rs
+msgid "Frost"
+msgstr "Geada"
+
+#: src/sound_icons.rs
+msgid "Ghost"
+msgstr "Fantasma"
+
+#: ui/gallery.slint:206 src/presentation.rs:543
+msgid "Gradient"
+msgstr "Degradê"
+
+#: src/sound_icons.rs
+msgid "Guitar"
+msgstr "Guitarra"
+
+#: src/sound_icons.rs
+msgid "Harbor"
+msgstr "Porto"
+
+#: src/presentation.rs:454
+msgid "Haunted"
+msgstr "Assombrado"
+
+#: src/sound_icons.rs
+msgid "Heartbeat"
+msgstr "Batimentos cardíacos"
+
+#: src/presentation.rs:490
+msgid "Hendrick Avercamp, about 1608"
+msgstr "Hendrick Avercamp, por volta de 1608"
+
+#: ui/sidebar.slint:411 ui/sidebar.slint:539
+msgid "Home"
+msgstr "Início"
+
+#: src/sound_icons.rs
+msgid "Hourglass"
+msgstr "Ampulheta"
+
+#: src/sound_icons.rs
+msgid "House"
+msgstr "Casa"
+
+#: ui/dialogs.slint:260
+msgid "Icon: {0}"
+msgstr "Ícone: {0}"
+
+#: src/controller.rs:529
+msgid "Images"
+msgstr "Imagens"
+
+#: ui/dialogs.slint:460
+msgid "Import"
+msgstr "Importar"
+
+#: ui/pages.slint:240
+msgid "Import my Kenku FM library"
+msgstr "Importar minha biblioteca do Kenku FM"
+
+#: src/presentation.rs:945
+msgid "Imported"
+msgstr "Importados"
+
+#: src/presentation.rs:1089
+msgid "Imported {0} with {1} from Kenku FM."
+msgstr "Importação do Kenku FM: {0} com {1}."
+
+#: src/controller.rs:1070 src/controller.rs:1083
+msgid "Importing Kenku FM's library…"
+msgstr "Importando a biblioteca do Kenku FM…"
+
+#: src/sound_icons.rs
+msgid "Insects"
+msgstr "Insetos"
+
+#: src/presentation.rs:478
+msgid "J. M. W. Turner, 1835"
+msgstr "J. M. W. Turner, 1835"
+
+#: src/presentation.rs:479
+msgid "Jacob van Ruisdael, about 1655"
+msgstr "Jacob van Ruisdael, por volta de 1655"
+
+#: src/presentation.rs:471
+msgid "Jasper Francis Cropsey, 1860"
+msgstr "Jasper Francis Cropsey, 1860"
+
+#: src/presentation.rs:476
+msgid "Jean-Léon Gérôme, 1880s"
+msgstr "Jean-Léon Gérôme, década de 1880"
+
+#: src/presentation.rs:474
+msgid "John Constable, about 1825"
+msgstr "John Constable, por volta de 1825"
+
+#: src/presentation.rs:488
+msgid "John Martin, 1841"
+msgstr "John Martin, 1841"
+
+#: src/presentation.rs:896
+msgid "Joining the voice channel…"
+msgstr "Entrando no canal de voz…"
+
+#: ui/dialogs.slint:427
+msgid "Keep playing after quitting"
+msgstr "Continuar tocando ao sair"
+
+#: ui/dialogs.slint:443
+msgid "Kenku FM"
+msgstr "Kenku FM"
+
+#: src/presentation.rs:1126
+msgid "Kenku FM's library is empty."
+msgstr "A biblioteca do Kenku FM está vazia."
+
+#: src/presentation.rs:1033
+msgid "Kenku FM’s library is invalid. Quit Kenku FM and try again."
+msgstr "A biblioteca do Kenku FM é inválida. Feche o Kenku FM e tente novamente."
+
+#: src/sound_icons.rs
+msgid "Key"
+msgstr "Chave"
+
+#: src/presentation.rs:1116
+msgid "Left out {n} web address Tufo cannot play."
+msgid_plural "Left out {n} web addresses Tufo cannot play."
+msgstr[0] "{n} endereço da web não foi importado porque o Tufo não pode reproduzi-lo."
+msgstr[1] "{n} endereços da web não foram importados porque o Tufo não pode reproduzi-los."
+
+#: src/sound_icons.rs
+msgid "Lightning"
+msgstr "Raio"
+
+#: ui/pages.slint:386
+msgid "Longest first"
+msgstr "Maior duração"
+
+#: ui/pages.slint:896
+msgid "Loop"
+msgstr "Repetir"
+
+#: ui/dock.slint:41
+msgid "Loop {0}"
+msgstr "Repetir {0}"
+
+#: src/controller.rs:249
+msgid "Lost tufo-server; reconnecting…"
+msgstr "Conexão com tufo-server perdida; reconectando…"
+
+#: src/presentation.rs:485
+msgid "Ludolf Bakhuysen, about 1695"
+msgstr "Ludolf Bakhuysen, por volta de 1695"
+
+#: src/sound_icons.rs
+msgid "Magic"
+msgstr "Magia"
+
+#: src/sound_icons.rs
+msgid "Masquerade"
+msgstr "Baile de máscaras"
+
+#: src/sound_icons.rs
+msgid "Mine"
+msgstr "Mina"
+
+#: ui/pages.slint:636
+msgid "Missing"
+msgstr "Não encontrado"
+
+#: ui/pages.slint:427 ui/pages.slint:653 ui/pages.slint:884
+msgid "More"
+msgstr "Mais"
+
+#: src/presentation.rs:455
+msgid "Mountain"
+msgstr "Montanha"
+
+#: ui/search.slint:22 src/search.rs:91
+msgid "Music"
+msgstr "Músicas"
+
+#: ui/dock.slint:271
+msgid "Mute"
+msgstr "Silenciar"
+
+#: ui/dialogs.slint:151 ui/dialogs.slint:215 ui/dialogs.slint:308
+msgid "Name"
+msgstr "Nome"
+
+#: ui/pages.slint:383
+msgid "Name A→Z"
+msgstr "Nome A→Z"
+
+#: ui/pages.slint:384
+msgid "Name Z→A"
+msgstr "Nome Z→A"
+
+#: ui/pages.slint:388
+msgid "Newest first"
+msgstr "Mais recentes"
+
+#: ui/dock.slint:179
+msgid "Next"
+msgstr "Próxima"
+
+#: src/presentation.rs:456
+msgid "Night"
+msgstr "Noite"
+
+#: src/controller.rs:1111
+msgid "No Kenku FM library imported."
+msgstr "Nenhuma biblioteca do Kenku FM foi importada."
+
+#: src/presentation.rs:1027
+msgid "No Kenku FM library was found in that folder."
+msgstr "Nenhuma biblioteca do Kenku FM foi encontrada nesta pasta."
+
+#: src/presentation.rs:1055
+msgid "No music is playing."
+msgstr "Nenhuma música está tocando."
+
+#: ui/pages.slint:980
+msgid "No sound matches the filter."
+msgstr "Nenhum som corresponde ao filtro."
+
+#: ui/pages.slint:753
+msgid "No track matches the filter."
+msgstr "Nenhuma faixa corresponde ao filtro."
+
+#: ui/pages.slint:364
+msgid "Nothing matches the filter."
+msgstr "Nenhum resultado para este filtro."
+
+#: ui/search.slint:119
+msgid "Nothing matches."
+msgstr "Nenhum resultado."
+
+#: src/render.rs:428
+msgid "Nothing new to add."
+msgstr "Nada novo para adicionar."
+
+#: ui/dock.slint:96
+msgid "Nothing playing"
+msgstr "Nada tocando"
+
+#: ui/pages.slint:387
+msgid "Oldest first"
+msgstr "Mais antigas"
+
+#: src/controller.rs:632
+msgid "Open Playlists or Soundboards to drop folders"
+msgstr "Abra Playlists ou Painéis de sons para soltar pastas"
+
+#: src/controller.rs:684
+msgid "Open Playlists or Soundboards to drop folders there."
+msgstr "Abra Playlists ou Painéis de sons para soltar pastas lá."
+
+#: src/tray/linux.rs:71 src/tray/windows.rs:33
+msgid "Open Tufo"
+msgstr "Abrir Tufo"
+
+#: ui/gallery.slint:235
+msgid "Or drop one on this window"
+msgstr "Ou solte uma nesta janela"
+
+#: ui/dialogs.slint:166
+msgid "Or follow a folder"
+msgstr "Ou acompanhe uma pasta"
+
+#: ui/sidebar.slint:234
+msgid "Output: {0}"
+msgstr "Saída: {0}"
+
+#: src/presentation.rs:477
+msgid "Paolo Uccello, about 1470"
+msgstr "Paolo Uccello, por volta de 1470"
+
+#: src/presentation.rs:1077
+msgid "Paste a Discord bot token before saving."
+msgstr "Cole um token de bot do Discord antes de salvar."
+
+#: ui/dialogs.slint:401
+msgid "Paste your bot's token"
+msgstr "Cole o token do seu bot"
+
+#: ui/dock.slint:121 ui/pages.slint:94 ui/pages.slint:615 ui/pages.slint:706 ui/pages.slint:731 src/tray.rs:57
+msgid "Pause"
+msgstr "Pausar"
+
+#: src/tray.rs:64 src/tray.rs:65
+msgid "Pause Sounds"
+msgstr "Pausar sons"
+
+#: ui/dock.slint:144
+msgid "Pause sounds"
+msgstr "Pausar sons"
+
+#: src/sound_icons.rs
+msgid "Peak"
+msgstr "Pico"
+
+#: src/presentation.rs
+msgid "Perils"
+msgstr "Perigos"
+
+#: src/sound_icons.rs
+msgid "Piano"
+msgstr "Piano"
+
+#: src/presentation.rs:489
+msgid "Pierre-Jacques Volaire, 1771"
+msgstr "Pierre-Jacques Volaire, 1771"
+
+#: src/presentation.rs:484
+msgid "Pieter Claesz, 1628"
+msgstr "Pieter Claesz, 1628"
+
+#: src/presentation.rs
+msgid "Places"
+msgstr "Lugares"
+
+#: ui/dock.slint:121 ui/pages.slint:94 ui/pages.slint:615 ui/pages.slint:706 ui/pages.slint:731 src/tray.rs:56 src/tray.rs:58
+msgid "Play"
+msgstr "Reproduzir"
+
+#: ui/sidebar.slint:175
+msgid "Play into"
+msgstr "Tocar em"
+
+#: src/search.rs:67
+msgid "Playlist"
+msgstr "Playlist"
+
+#: ui/pages.slint:298 ui/pages.slint:347 ui/sidebar.slint:420 ui/sidebar.slint:540
+msgid "Playlists"
+msgstr "Playlists"
+
+#: ui/dock.slint:167
+msgid "Previous"
+msgstr "Anterior"
+
+#: src/tray/linux.rs:83 src/tray/windows.rs:49
+msgid "Quit Tufo"
+msgstr "Sair do Tufo"
+
+#: src/sound_icons.rs
+msgid "Rabbit"
+msgstr "Coelho"
+
+#: src/presentation.rs:946
+msgid "Rain"
+msgstr "Chuva"
+
+#: src/sound_icons.rs
+msgid "Rats"
+msgstr "Ratos"
+
+#: src/controller.rs:1215
+msgid "Reading the audio files…"
+msgstr "Lendo os arquivos de áudio…"
+
+#: ui/sidebar.slint:188
+msgid "Refresh the voice channels"
+msgstr "Atualizar canais de voz"
+
+#: ui/pages.slint:674 ui/pages.slint:912
+msgid "Remove"
+msgstr "Remover"
+
+#: ui/dock.slint:191
+msgid "Repeat the playlist"
+msgstr "Repetir a playlist"
+
+#: ui/dock.slint:191
+msgid "Repeat the track"
+msgstr "Repetir a faixa"
+
+#: src/presentation.rs:1123
+msgid "Restarting so the bot logs in with Kenku FM's token."
+msgstr "Reiniciando para conectar o bot com o token do Kenku FM."
+
+#: src/tray.rs:66
+msgid "Resume Sounds"
+msgstr "Retomar sons"
+
+#: ui/dock.slint:144
+msgid "Resume sounds"
+msgstr "Retomar sons"
+
+#: ui/dialogs.slint:341 ui/dialogs.slint:479
+msgid "Save"
+msgstr "Salvar"
+
+#: ui/dialogs.slint:479
+msgid "Save and restart"
+msgstr "Salvar e reiniciar"
+
+#: ui/dialogs.slint:401
+msgid "Saved; paste a new one to replace it"
+msgstr "Salvo; cole outro para substituí-lo"
+
+#: ui/dialogs.slint:405
+msgid "Saving restarts Tufo so the bot logs in with the new token. The music stops."
+msgstr "Ao salvar, o Tufo reinicia para conectar o bot com o novo token. A música para."
+
+#: src/sound_icons.rs
+msgid "Scroll"
+msgstr "Pergaminho"
+
+#: ui/sidebar.slint:382
+msgid "Search"
+msgstr "Buscar"
+
+#: ui/search.slint:108 ui/sidebar.slint:360
+msgid "Search everything"
+msgstr "Buscar em tudo"
+
+#: ui/sidebar.slint:538
+msgid "Search everything (Ctrl+Shift+F)"
+msgstr "Buscar em tudo (Ctrl+Shift+F)"
+
+#: ui/pages.slint:266
+msgid "See all {0}"
+msgstr "Ver tudo ({0})"
+
+#: ui/dialogs.slint:390 ui/sidebar.slint:504 ui/sidebar.slint:587
+msgid "Settings"
+msgstr "Configurações"
+
+#: src/sound_icons.rs
+msgid "Shield"
+msgstr "Escudo"
+
+#: src/sound_icons.rs
+msgid "Ship"
+msgstr "Navio"
+
+#: ui/pages.slint:385
+msgid "Shortest first"
+msgstr "Menor duração"
+
+#: ui/dock.slint:158 ui/pages.slint:741
+msgid "Shuffle"
+msgstr "Ordem aleatória"
+
+#: ui/pages.slint:741
+msgid "Shuffling"
+msgstr "Em ordem aleatória"
+
+#: src/presentation.rs
+msgid "Skies and seasons"
+msgstr "Céus e estações"
+
+#: src/render.rs:446
+msgid "Skipped {n} item that is not audio or a folder."
+msgid_plural "Skipped {n} items that are not audio or folders."
+msgstr[0] "{n} item ignorado por não ser áudio nem pasta."
+msgstr[1] "{n} itens ignorados por não serem áudio nem pastas."
+
+#: src/sound_icons.rs
+msgid "Skull"
+msgstr "Crânio"
+
+#: src/presentation.rs:458
+msgid "Skulls"
+msgstr "Crânios"
+
+#: src/presentation.rs:457
+msgid "Sky"
+msgstr "Céu"
+
+#: src/sound_icons.rs
+msgid "Snow"
+msgstr "Neve"
+
+#: src/presentation.rs:976
+msgid "Some values are invalid. Check them and try again."
+msgstr "Alguns valores são inválidos. Confira e tente novamente."
+
+#: ui/pages.slint:404
+msgid "Sort: {0}"
+msgstr "Ordenar: {0}"
+
+#: src/presentation.rs:683
+msgid "Sound"
+msgstr "Som"
+
+#: src/search.rs:68
+msgid "Soundboard"
+msgstr "Painel de sons"
+
+#: ui/pages.slint:311 ui/pages.slint:347 ui/sidebar.slint:445 ui/sidebar.slint:541
+msgid "Soundboards"
+msgstr "Painéis de sons"
+
+#: ui/search.slint:22 src/search.rs:99
+msgid "Sounds"
+msgstr "Sons"
+
+#: src/sound_icons.rs
+msgid "Spell"
+msgstr "Feitiço"
+
+#: src/sound_icons.rs
+msgid "Squirrel"
+msgstr "Esquilo"
+
+#: ui/dialogs.slint:433
+msgid "Start at login"
+msgstr "Iniciar ao entrar no sistema"
+
+#: ui/pages.slint:1001
+msgid "Starting the audio server"
+msgstr "Iniciando o servidor de áudio"
+
+#: src/controller.rs:189 src/controller.rs:196
+msgid "Starting tufo-server…"
+msgstr "Iniciando tufo-server…"
+
+#: ui/pages.slint:896
+msgid "Stop Looping"
+msgstr "Parar de repetir"
+
+#: ui/pages.slint:453
+msgid "Stop following"
+msgstr "Parar de acompanhar"
+
+#: ui/dock.slint:41
+msgid "Stop looping {0}"
+msgstr "Parar de repetir {0}"
+
+#: ui/dock.slint:191
+msgid "Stop repeating"
+msgstr "Parar de repetir"
+
+#: ui/dock.slint:158
+msgid "Stop shuffling"
+msgstr "Desativar ordem aleatória"
+
+#: ui/dock.slint:61
+msgid "Stop {0}"
+msgstr "Parar {0}"
+
+#: src/presentation.rs:459 src/presentation.rs:947
+msgid "Storm"
+msgstr "Tempestade"
+
+#: src/presentation.rs:950
+msgid "Stream"
+msgstr "Riacho"
+
+#: src/presentation.rs:952
+msgid "Summer Night"
+msgstr "Noite de verão"
+
+#: src/sound_icons.rs
+msgid "Summer night"
+msgstr "Noite de verão"
+
+#: src/presentation.rs:460
+msgid "Tavern"
+msgstr "Taverna"
+
+#: src/sound_icons.rs
+msgid "Temple"
+msgstr "Templo"
+
+#: src/presentation.rs:1015
+msgid "That collection no longer exists."
+msgstr "Esta coleção não existe mais."
+
+#: src/controller.rs:542
+msgid "That image's path isn't usable."
+msgstr "O caminho desta imagem é inválido."
+
+#: src/presentation.rs:1058
+msgid "That position is past the end of the track."
+msgstr "Esta posição ultrapassa o fim da faixa."
+
+#: src/presentation.rs:1039
+msgid "That track is missing or cannot be played."
+msgstr "Esta faixa não foi encontrada ou não pode ser reproduzida."
+
+#: src/presentation.rs:1021
+msgid "That track or sound no longer exists."
+msgstr "Esta faixa ou som não existe mais."
+
+#: src/presentation.rs:1065
+msgid "That voice channel is no longer available. Refresh the channels."
+msgstr "Este canal de voz não está mais disponível. Atualize os canais."
+
+#: src/presentation.rs:1074
+msgid "The Discord bot is still connecting. Try again shortly."
+msgstr "O bot do Discord ainda está conectando. Tente novamente em instantes."
+
+#: src/presentation.rs:1043
+msgid "The audio file is missing. Restore it and try again."
+msgstr "O arquivo de áudio não foi encontrado. Restaure-o e tente novamente."
+
+#: src/presentation.rs:1052
+msgid "The audio output is unavailable. Choose another output."
+msgstr "A saída de áudio está indisponível. Escolha outra saída."
+
+#: ui/dialogs.slint:428
+msgid "The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed."
+msgstr "As músicas e os sons continuam tocando após sair do Tufo. Se desativado, o áudio para gradualmente e o tufo-server aguarda em segundo plano com o dispositivo de áudio fechado."
+
+#: src/presentation.rs:970
+msgid "The request took too long. Try again."
+msgstr "A solicitação demorou demais. Tente novamente."
+
+#: src/presentation.rs:971
+msgid "The request was cancelled."
+msgstr "A solicitação foi cancelada."
+
+#: src/presentation.rs:979
+msgid "The server is busy. Try again shortly."
+msgstr "O servidor está ocupado. Tente novamente em instantes."
+
+#: src/presentation.rs:969
+msgid "The server is unavailable. Tufo will reconnect shortly."
+msgstr "O servidor está indisponível. O Tufo vai reconectar em instantes."
+
+#: src/presentation.rs:1036
+msgid "There are no playable files in this collection."
+msgstr "Não há arquivos que possam ser reproduzidos nesta coleção."
+
+#: src/presentation.rs:795 src/presentation.rs:855
+msgid "This Computer"
+msgstr "Este computador"
+
+#: src/presentation.rs:1025
+msgid "This collection follows a folder. Change the files in that folder."
+msgstr "Esta coleção acompanha uma pasta. Altere os arquivos nessa pasta."
+
+#: src/controller.rs:678
+msgid "This collection follows its folder. Copy the files into that folder instead."
+msgstr "Esta coleção acompanha uma pasta. Copie os arquivos para essa pasta."
+
+#: src/controller.rs:629
+msgid "This collection follows its folder; add files there"
+msgstr "Esta coleção acompanha uma pasta; adicione os arquivos lá"
+
+#: ui/pages.slint:753 ui/pages.slint:980
+msgid "This folder holds no audio yet."
+msgstr "Esta pasta ainda não tem áudio."
+
+#: src/controller.rs:1143
+msgid "This system names no config directory for Tufo's settings."
+msgstr "O sistema não informou uma pasta para as configurações do Tufo."
+
+#: src/sound_icons.rs
+msgid "Tornado"
+msgstr "Tornado"
+
+#: src/presentation.rs:461
+msgid "Town"
+msgstr "Vila"
+
+#: ui/search.slint:109
+msgid "Tracks, sounds, playlists, soundboards"
+msgstr "Faixas, sons, playlists, painéis de sons"
+
+#: src/sound_icons.rs
+msgid "Train"
+msgstr "Trem"
+
+#: ui/app.slint:27
+msgid "Tufo"
+msgstr "Tufo"
+
+#: ui/gallery.slint:220
+msgid "Tufo can't open this file"
+msgstr "O Tufo não consegue abrir este arquivo"
+
+#: ui/dialogs.slint:234
+msgid "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another."
+msgstr "O Tufo não consegue mais abrir esta imagem e está exibindo o degradê. Altere o fundo para escolher outra."
+
+#: src/controller.rs:1116
+msgid "Tufo can't read that folder's path."
+msgstr "O Tufo não consegue ler o caminho desta pasta."
+
+#: src/presentation.rs:1049
+msgid "Tufo cannot play this audio format."
+msgstr "O Tufo não consegue reproduzir este formato de áudio."
+
+#: src/controller.rs:1130
+msgid "Tufo could not change starting at login. Check your system settings."
+msgstr "O Tufo não conseguiu alterar a inicialização ao entrar no sistema. Confira as configurações do sistema."
+
+#: src/presentation.rs:980
+msgid "Tufo could not complete the request. Check the server log."
+msgstr "O Tufo não conseguiu concluir a solicitação. Consulte o log do servidor."
+
+#: src/presentation.rs:1068
+msgid "Tufo could not join the voice channel. Check the bot’s permissions and try again."
+msgstr "O Tufo não conseguiu entrar no canal de voz. Confira as permissões do bot e tente novamente."
+
+#: src/presentation.rs:1071
+msgid "Tufo could not open the audio device. Check your system’s audio settings."
+msgstr "O Tufo não conseguiu abrir o dispositivo de áudio. Confira as configurações de áudio do sistema."
+
+#: src/presentation.rs:1030
+msgid "Tufo could not read Kenku FM’s library. Check the folder permissions."
+msgstr "O Tufo não conseguiu ler a biblioteca do Kenku FM. Confira as permissões da pasta."
+
+#: src/controller.rs:176
+msgid "Tufo could not read config.toml. Fix or remove it and restart Tufo."
+msgstr "O Tufo não conseguiu ler config.toml. Corrija ou remova o arquivo e reinicie o Tufo."
+
+#: src/presentation.rs:1079
+msgid "Tufo could not read or save the Discord bot token. Check the config folder permissions."
+msgstr "Não foi possível ler ou salvar o token do bot do Discord. Verifique as permissões da pasta de configuração."
+
+#: src/presentation.rs:1046
+msgid "Tufo could not read the audio file. Check its permissions."
+msgstr "O Tufo não conseguiu ler o arquivo de áudio. Confira as permissões dele."
+
+#: src/controller.rs:1157
+msgid "Tufo could not save config.toml. Check its contents and permissions."
+msgstr "O Tufo não conseguiu salvar config.toml. Confira o conteúdo e as permissões do arquivo."
+
+#: src/presentation.rs:1007
+msgid "Tufo could not save or read the library. Check the server log."
+msgstr "O Tufo não conseguiu salvar ou ler a biblioteca. Consulte o log do servidor."
+
+#: src/controller.rs:203
+msgid "Tufo could not start its server. Check that tufo-server is installed."
+msgstr "O Tufo não conseguiu iniciar o servidor. Confira se o tufo-server está instalado."
+
+#: src/presentation.rs:973
+msgid "Tufo does not have permission to complete this request."
+msgstr "O Tufo não tem permissão para concluir esta solicitação."
+
+#: ui/dialogs.slint:174
+msgid "Tufo keeps its files in sync."
+msgstr "O Tufo mantém os arquivos sincronizados."
+
+#: src/presentation.rs:960
+msgid "Tufo received an invalid response. Update the app and server together."
+msgstr "O Tufo recebeu uma resposta inválida. Atualize o aplicativo e o servidor juntos."
+
+#: ui/dialogs.slint:434
+msgid "Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them."
+msgstr "Ao entrar no sistema, o Tufo inicia na bandeja e retoma os sons em repetição que você deixou tocando, exceto os pausados."
+
+#: src/presentation.rs:462
+msgid "Underworld"
+msgstr "Submundo"
+
+#: ui/dock.slint:271
+msgid "Unmute"
+msgstr "Ativar som"
+
+#: src/presentation.rs:978
+msgid "Update the app and server together to use this feature."
+msgstr "Atualize o aplicativo e o servidor juntos para usar este recurso."
+
+#: src/presentation.rs:901
+msgid "Voice disconnected. Choose the channel to reconnect."
+msgstr "Voz desconectada. Escolha o canal para reconectar."
+
+#: src/presentation.rs:898
+msgid "Voice dropped; reconnecting (attempt {0})…"
+msgstr "A voz caiu; reconectando (tentativa {0})…"
+
+#: src/presentation.rs:463
+msgid "Volcano"
+msgstr "Vulcão"
+
+#: src/presentation.rs:949
+msgid "Waves"
+msgstr "Ondas"
+
+#: src/presentation.rs:475
+msgid "William Stanley Haseltine, 1869"
+msgstr "William Stanley Haseltine, 1869"
+
+#: src/presentation.rs:948
+msgid "Wind"
+msgstr "Vento"
+
+#: src/presentation.rs:464
+msgid "Winter"
+msgstr "Inverno"
+
+#: ui/gallery.slint:197
+msgid "Your own"
+msgstr "Personalizado"
+
+#: src/controller.rs:1067 src/controller.rs:1193 src/controller.rs:1211
+msgid "tufo-server is not connected."
+msgstr "Sem conexão com o tufo-server."
+
+#: ui/sidebar.slint:227
+msgid "{0} in {1}"
+msgstr "{0} em {1}"
+
+#: src/presentation.rs:324
+msgid "{0}, {1}"
+msgstr "{0}, {1}"
+
+#: src/presentation.rs:1092 src/render.rs:433
+msgid "{n} collection"
+msgid_plural "{n} collections"
+msgstr[0] "{n} coleção"
+msgstr[1] "{n} coleções"
+
+#: src/presentation.rs:1102
+msgid "{n} collection was already in Tufo."
+msgid_plural "{n} collections were already in Tufo."
+msgstr[0] "{n} coleção já estava no Tufo."
+msgstr[1] "{n} coleções já estavam no Tufo."
+
+#: src/presentation.rs:1097 src/render.rs:434
+msgid "{n} file"
+msgid_plural "{n} files"
+msgstr[0] "{n} arquivo"
+msgstr[1] "{n} arquivos"
+
+#: src/presentation.rs:1109
+msgid "{n} file could not be found or read."
+msgid_plural "{n} files could not be found or read."
+msgstr[0] "Não foi possível encontrar ou ler {n} arquivo."
+msgstr[1] "Não foi possível encontrar ou ler {n} arquivos."
+
+#: src/render.rs:439
+msgid "{n} file could not be read."
+msgid_plural "{n} files could not be read."
+msgstr[0] "Não foi possível ler {n} arquivo."
+msgstr[1] "Não foi possível ler {n} arquivos."
+
+#: src/presentation.rs:312
+msgid "{n} minute"
+msgid_plural "{n} minutes"
+msgstr[0] "{n} minuto"
+msgstr[1] "{n} minutos"
+
+#: src/presentation.rs:320
+msgid "{n} playing"
+msgid_plural "{n} playing"
+msgstr[0] "{n} tocando"
+msgstr[1] "{n} tocando"
+
+#: src/presentation.rs:284
+msgid "{n} sound"
+msgid_plural "{n} sounds"
+msgstr[0] "{n} som"
+msgstr[1] "{n} sons"
+
+#: src/presentation.rs:283
+msgid "{n} track"
+msgid_plural "{n} tracks"
+msgstr[0] "{n} faixa"
+msgstr[1] "{n} faixas"
+
+#: ui/search.slint:153
+msgid "↑↓ to choose · Enter to play · Esc to close"
+msgstr "↑↓ para escolher · Enter para tocar · Esc para fechar"

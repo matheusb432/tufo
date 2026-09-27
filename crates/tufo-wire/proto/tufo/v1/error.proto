@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package tufo.v1;
+
+// Encoded in grpc-status-details-bin. The owning application error defines the code.
+message ErrorDetails {
+  reserved 1;
+  reserved "reason";
+  string reason_code = 2;
+}

@@ -1,0 +1,1016 @@
+// Home, the playlist and soundboard grids, one playlist or soundboard, and the wait for the server.
+
+import { Motion, Theme } from "theme.slint";
+import {
+    Actions, Art, CollectionCard, CollectionKind, LibraryView, Navigation, Page, PlayerView,
+    Search, Session, SoundIcons, SoundTile, TrackRow,
+} from "state.slint";
+import {
+    Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem, MenuSurface, ScrollThumb, Slider,
+    TextLink,
+} from "widgets.slint";
+
+export global PageMetrics {
+    out property <length> gap: 18px;
+    out property <length> padding: 26px;
+    // A card's painting is 4 wide to 3.3 high.
+    out property <float> card-aspect: 3.3 / 4;
+}
+
+component CardView inherits Rectangle {
+    in property <CollectionCard> card;
+    in property <CollectionKind> kind;
+    border-radius: Theme.radius-card;
+    border-width: root.card.playing ? 2px : 0px;
+    border-color: Theme.lit;
+    accessible-role: button;
+    accessible-label: root.card.title;
+    accessible-description: root.card.count-label;
+    accessible-action-default => {
+        Actions.open-page(root.kind == CollectionKind.playlist ? Page.playlist : Page.soundboard, root.card.id);
+    }
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: Art.card-background(root.card.id, root.card.background, self.width, self.height, Theme.radius-card, Art.pictures-revision);
+        image-fit: fill;
+    }
+
+    Rectangle {
+        border-radius: Theme.radius-card;
+        background: white;
+        opacity: touch.has-hover ? 0.05 : 0;
+        animate opacity { duration: Motion.hover; }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            Actions.open-page(root.kind == CollectionKind.playlist ? Page.playlist : Page.soundboard, root.card.id);
+        }
+    }
+
+    VerticalLayout {
+        x: 14px;
+        width: parent.width - 28px;
+        padding-bottom: 12px;
+        alignment: end;
+        spacing: 2px;
+        Text {
+            text: root.card.title;
+            font-size: 16px;
+            font-weight: 800;
+            color: Theme.text;
+            wrap: word-wrap;
+            overflow: elide;
+            max-height: 44px;
+        }
+
+        Text {
+            text: root.card.missing ? @tr("" => "Folder missing") : root.card.count-label;
+            font-size: Theme.caption;
+            color: root.card.missing ? Theme.error : Theme.text-secondary;
+            overflow: elide;
+        }
+    }
+
+    if root.card.playing: Rectangle {
+        x: 12px;
+        y: 12px;
+        width: 27px;
+        height: 24px;
+        border-radius: 12px;
+        background: Theme.badge;
+        Equalizer { }
+    }
+    if root.kind == CollectionKind.playlist && (touch.has-hover || root.card.playing): Rectangle {
+        x: parent.width - self.width - 10px;
+        y: 10px;
+        width: 38px;
+        height: 38px;
+        border-radius: 19px;
+        background: root.card.playing ? (play-touch.has-hover ? Theme.lit-bright : Theme.lit) : play-touch.has-hover ? Theme.badge-hover : Theme.badge;
+        accessible-role: button;
+        accessible-label: root.card.playing ? @tr("" => "Pause") : @tr("" => "Play");
+        Icon {
+            width: 18px;
+            height: 18px;
+            source: root.card.playing ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+            tint: root.card.playing ? Theme.on-lit : Theme.text;
+        }
+
+        play-touch := TouchArea {
+            mouse-cursor: MouseCursor.pointer;
+            clicked => {
+                Actions.play-collection(root.card.id);
+            }
+        }
+    }
+}
+
+// Cards in 2, 3, or 4 columns by width.
+component CardGrid inherits Rectangle {
+    in property <[CollectionCard]> cards;
+    in property <CollectionKind> kind;
+    // Shows at most this many rows; -1 shows every card.
+    in property <int> rows-max: -1;
+    property <int> columns: root.width < 500px ? 2 : root.width < 680px ? 3 : 4;
+    property <int> count: root.rows-max < 0 ? root.cards.length : min(root.rows-max * root.columns, root.cards.length);
+    property <length> card-width: (root.width - (root.columns - 1) * PageMetrics.gap) / root.columns;
+    property <length> card-height: root.card-width * PageMetrics.card-aspect;
+    property <int> rows: Math.ceil(root.count / root.columns);
+    height: root.rows == 0 ? 0 : root.rows * root.card-height + (root.rows - 1) * PageMetrics.gap;
+    for card[index] in root.cards: CardView {
+        visible: index < root.count;
+        x: Math.mod(index, root.columns) * (root.card-width + PageMetrics.gap);
+        y: Math.floor(index / root.columns) * (root.card-height + PageMetrics.gap);
+        width: root.card-width;
+        height: root.card-height;
+        card: card;
+        kind: root.kind;
+    }
+}
+
+// The filter Ctrl+F opens on a page: a search pill that takes focus as it opens.
+component FilterField inherits Rectangle {
+    property <bool> open: Search.filter-open;
+    changed open => {
+        if self.open {
+            input.focus();
+        }
+    }
+    height: root.open ? 42px : 0px;
+    visible: root.open;
+    Rectangle {
+        width: min(parent.width, 460px);
+        x: 0;
+        border-radius: self.height / 2;
+        background: Theme.raised;
+        border-width: input.has-focus ? 2px : 1px;
+        border-color: input.has-focus ? Theme.accent : Theme.divider;
+        HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 10px;
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                source: @image-url("icons/search.svg");
+                tint: Theme.text-faint;
+            }
+
+            input := TextInput {
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                font-size: Theme.body;
+                color: Theme.text;
+                single-line: true;
+                text: Search.filter-text;
+                edited => {
+                    Search.filter-text = self.text;
+                    Actions.filter-changed(self.text);
+                }
+                if self.text == "": Text {
+                    text: @tr("" => "Filter this page");
+                    color: Theme.text-faint;
+                    font-size: Theme.body;
+                    vertical-alignment: center;
+                    height: parent.height;
+                }
+            }
+        }
+    }
+}
+
+// Scrolls a page's content, with a thumb that shows while the pointer is over it.
+component PageScroll inherits Rectangle {
+    in property <length> content-height;
+    hover := TouchArea {
+        flick := Flickable {
+            mouse-drag-pan-enabled: false;
+            content-height: max(root.content-height, root.height);
+            @children
+        }
+
+        ScrollThumb {
+            x: parent.width - self.width - 2px;
+            height: parent.height;
+            content-height: flick.content-height;
+            content-y: flick.content-y;
+            show: hover.has-hover;
+        }
+    }
+}
+
+component Heading inherits Text {
+    font-family: Theme.display-font;
+    font-size: Theme.heading;
+    font-weight: Theme.display-weight;
+    color: Theme.text;
+    vertical-alignment: center;
+}
+
+component EmptyShelf inherits VerticalLayout {
+    in property <CollectionKind> kind;
+    callback add();
+    spacing: 12px;
+    alignment: start;
+    Text {
+        text: root.kind == CollectionKind.playlist ? @tr("" => "Drop folders of music on Playlists, or add a playlist.") : @tr("" => "Drop folders of sounds on Soundboards, or add a soundboard.");
+        color: Theme.text-secondary;
+        font-size: Theme.body;
+        wrap: word-wrap;
+    }
+
+    HorizontalLayout {
+        alignment: start;
+        spacing: 10px;
+        Button {
+            text: root.kind == CollectionKind.playlist ? @tr("" => "Add a playlist") : @tr("" => "Add a soundboard");
+            icon: @image-url("icons/folder-plus.svg");
+            kind: ButtonKind.primary;
+            enabled: Session.connected;
+            clicked => {
+                root.add();
+            }
+        }
+
+        if root.kind == CollectionKind.playlist: Button {
+            text: @tr("" => "Import my Kenku FM library");
+            kind: ButtonKind.quiet;
+            enabled: Session.connected;
+            clicked => {
+                Actions.import-kenku-library();
+            }
+        }
+    }
+}
+
+component HomeShelf inherits VerticalLayout {
+    in property <string> title;
+    in property <[CollectionCard]> cards;
+    in property <int> total;
+    in property <CollectionKind> kind;
+    callback add();
+    callback see-all();
+    spacing: 14px;
+    HorizontalLayout {
+        spacing: 12px;
+        alignment: start;
+        Heading {
+            text: root.title;
+        }
+
+        if root.total > 0: TextLink {
+            text: @tr("" => "See all {0}", root.total);
+            vertical-alignment: center;
+            clicked => {
+                root.see-all();
+            }
+        }
+    }
+
+    if root.total == 0: EmptyShelf {
+        kind: root.kind;
+        add => {
+            root.add();
+        }
+    }
+    CardGrid {
+        cards: root.cards;
+        kind: root.kind;
+        rows-max: 1;
+    }
+}
+
+export component HomePage inherits Rectangle {
+    callback add(CollectionKind);
+    PageScroll {
+        content-height: column.preferred-height;
+        column := VerticalLayout {
+            padding: PageMetrics.padding;
+            padding-top: 22px;
+            spacing: 30px;
+            alignment: start;
+            FilterField { }
+            HomeShelf {
+                title: @tr("" => "Playlists");
+                cards: LibraryView.playlists;
+                total: LibraryView.playlist-count;
+                kind: CollectionKind.playlist;
+                add => {
+                    root.add(CollectionKind.playlist);
+                }
+                see-all => {
+                    Actions.open-page(Page.playlists, "");
+                }
+            }
+
+            HomeShelf {
+                title: @tr("" => "Soundboards");
+                cards: LibraryView.soundboards;
+                total: LibraryView.soundboard-count;
+                kind: CollectionKind.soundboard;
+                add => {
+                    root.add(CollectionKind.soundboard);
+                }
+                see-all => {
+                    Actions.open-page(Page.soundboards, "");
+                }
+            }
+        }
+    }
+}
+
+component PageTitle inherits Text {
+    font-family: Theme.display-font;
+    font-size: Theme.title;
+    font-weight: Theme.display-weight;
+    color: Theme.text;
+    overflow: elide;
+}
+
+export component GridPage inherits Rectangle {
+    in property <CollectionKind> kind;
+    callback add(CollectionKind);
+    PageScroll {
+        content-height: column.preferred-height;
+        column := VerticalLayout {
+            padding: PageMetrics.padding;
+            padding-top: 22px;
+            spacing: 18px;
+            alignment: start;
+            HorizontalLayout {
+                spacing: 10px;
+                PageTitle {
+                    text: root.kind == CollectionKind.playlist ? @tr("" => "Playlists") : @tr("" => "Soundboards");
+                    horizontal-stretch: 1;
+                }
+
+                Button {
+                    y: (parent.height - self.height) / 2;
+                    text: root.kind == CollectionKind.playlist ? @tr("" => "Add Playlist") : @tr("" => "Add Soundboard");
+                    icon: @image-url("icons/plus.svg");
+                    enabled: Session.connected;
+                    clicked => {
+                        root.add(root.kind);
+                    }
+                }
+            }
+
+            FilterField { }
+            if (root.kind == CollectionKind.playlist ? LibraryView.playlists.length : LibraryView.soundboards.length) == 0: Text {
+                text: Search.filter-text != "" ? @tr("" => "Nothing matches the filter.") : root.kind == CollectionKind.playlist ? @tr("" => "Drop a folder of music here: each folder in it that holds audio becomes a playlist.") : @tr("" => "Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard.");
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+            }
+            CardGrid {
+                cards: root.kind == CollectionKind.playlist ? LibraryView.playlists : LibraryView.soundboards;
+                kind: root.kind;
+            }
+        }
+    }
+}
+
+// Sorting and the ⋮ menu of a playlist or soundboard page.
+component CollectionTools inherits HorizontalLayout {
+    // Shows sorting as an icon, without the order's name.
+    in property <bool> compact;
+    callback edit();
+    callback add-files();
+    property <[string]> order-labels: [
+        @tr("" => "Name A→Z"),
+        @tr("" => "Name Z→A"),
+        @tr("" => "Shortest first"),
+        @tr("" => "Longest first"),
+        @tr("" => "Oldest first"),
+        @tr("" => "Newest first"),
+    ];
+    spacing: 2px;
+    property <string> order-label: root.order-labels[LibraryView.order-key * 2 + (LibraryView.order-descending ? 1 : 0)];
+    if !root.compact: Button {
+        y: (parent.height - self.height) / 2;
+        text: root.order-label;
+        icon: @image-url("icons/arrow-down-up.svg");
+        kind: ButtonKind.quiet;
+        clicked => {
+            sort-menu.show();
+        }
+    }
+    if root.compact: IconButton {
+        y: (parent.height - self.height) / 2;
+        icon: @image-url("icons/arrow-down-up.svg");
+        tooltip: @tr("" => "Sort: {0}", root.order-label);
+        clicked => {
+            sort-menu.show();
+        }
+    }
+
+    sort-menu := PopupWindow {
+        x: root.compact ? more.x - 120px : 0;
+        y: more.y + more.height + 4px;
+        MenuSurface {
+            for label[index] in root.order-labels: MenuItem {
+                text: label;
+                activated => {
+                    Actions.set-order(Math.floor(index / 2), Math.mod(index, 2) == 1);
+                    sort-menu.close();
+                }
+            }
+        }
+    }
+
+    more := IconButton {
+        y: (parent.height - self.height) / 2;
+        icon: @image-url("icons/ellipsis-vertical.svg");
+        tooltip: @tr("" => "More");
+        clicked => {
+            menu.show();
+        }
+    }
+
+    menu := PopupWindow {
+        x: more.x - 120px;
+        y: more.y + more.height + 4px;
+        MenuSurface {
+            MenuItem {
+                text: @tr("" => "Edit");
+                activated => {
+                    root.edit();
+                    menu.close();
+                }
+            }
+
+            if !LibraryView.collection-linked: MenuItem {
+                text: @tr("" => "Add files…");
+                activated => {
+                    root.add-files();
+                    menu.close();
+                }
+            }
+            MenuItem {
+                text: LibraryView.collection-linked ? @tr("" => "Stop following") : @tr("" => "Delete");
+                destructive: true;
+                activated => {
+                    Actions.delete-collection(Navigation.collection-id);
+                    menu.close();
+                }
+            }
+        }
+    }
+}
+
+// In a small viewport, the collection's header as one slim row that stays put while its content
+// scrolls: a way back to every playlist or soundboard, the title, and the actions.
+component CollectionBar inherits Rectangle {
+    in property <CollectionKind> kind;
+    callback edit();
+    callback add-files();
+    height: 60px;
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 8px;
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            icon: @image-url("icons/arrow-left.svg");
+            tooltip: root.kind == CollectionKind.playlist ? @tr("" => "Back to Playlists") : @tr("" => "Back to Soundboards");
+            clicked => {
+                Actions.open-page(root.kind == CollectionKind.playlist ? Page.playlists : Page.soundboards, "");
+            }
+        }
+
+        Text {
+            text: LibraryView.collection-title;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            overflow: elide;
+            font-family: Theme.display-font;
+            font-size: Theme.heading;
+            font-weight: Theme.display-weight;
+            color: Theme.text;
+        }
+
+        @children
+        CollectionTools {
+            compact: true;
+            edit => {
+                root.edit();
+            }
+            add-files => {
+                root.add-files();
+            }
+        }
+    }
+
+    Rectangle {
+        y: parent.height - self.height;
+        height: 1px;
+        background: Theme.divider;
+    }
+}
+
+// The collection's painting as a plate beside its title, size, folder, and actions.
+component CollectionHero inherits HorizontalLayout {
+    in property <length> plate-width;
+    in property <length> plate-height;
+    callback edit();
+    callback add-files();
+    spacing: 22px;
+    alignment: start;
+    VerticalLayout {
+        spacing: 8px;
+        alignment: end;
+        Rectangle {
+            width: root.plate-width;
+            height: root.plate-height;
+            border-radius: Theme.radius-plate;
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: Art.painting(Navigation.collection-id, LibraryView.collection-background, self.width, self.height, Theme.radius-plate, Art.pictures-revision);
+                image-fit: fill;
+            }
+        }
+    }
+
+    VerticalLayout {
+        alignment: end;
+        spacing: 6px;
+        horizontal-stretch: 1;
+        PageTitle {
+            text: LibraryView.collection-title;
+        }
+
+        Text {
+            text: LibraryView.collection-summary;
+            font-size: Theme.body-small;
+            color: Theme.text-secondary;
+        }
+
+        if LibraryView.collection-linked: HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 14px;
+                height: 14px;
+                source: @image-url("icons/folder.svg");
+                tint: LibraryView.collection-missing ? Theme.error : Theme.text-faint;
+            }
+
+            Text {
+                text: LibraryView.collection-missing ? @tr("" => "Can't find {0}", LibraryView.collection-folder) : @tr("" => "Follows {0}", LibraryView.collection-folder);
+                font-size: Theme.caption;
+                color: LibraryView.collection-missing ? Theme.error : Theme.text-faint;
+                overflow: elide;
+            }
+        }
+        HorizontalLayout {
+            padding-top: 10px;
+            spacing: 8px;
+            alignment: start;
+            @children
+            CollectionTools {
+                edit => {
+                    root.edit();
+                }
+                add-files => {
+                    root.add-files();
+                }
+            }
+        }
+    }
+}
+
+component TrackItem inherits Rectangle {
+    in property <TrackRow> track;
+    callback edit();
+    height: 48px;
+    border-radius: Theme.radius-row;
+    background: root.track.current ? Theme.current-row : touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    opacity: root.track.missing ? 0.55 : 1;
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        double-clicked => {
+            Actions.play-track(root.track.id);
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 4px;
+        spacing: 10px;
+        Rectangle {
+            width: 32px;
+            if root.track.playing && !touch.has-hover: Equalizer { }
+            if touch.has-hover || !root.track.playing: IconButton {
+                size: 32px;
+                icon-size: 16px;
+                icon: root.track.playing ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                tint: root.track.current ? Theme.lit : Theme.text-faint;
+                opacity: touch.has-hover || self.has-hover ? 1 : 0;
+                tooltip: root.track.playing ? @tr("" => "Pause") : @tr("" => "Play");
+                enabled: !root.track.missing;
+                clicked => {
+                    Actions.play-track(root.track.id);
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            Text {
+                text: root.track.title;
+                overflow: elide;
+                font-size: Theme.body;
+                font-weight: root.track.current ? 800 : 500;
+                color: root.track.current ? Theme.lit-bright : Theme.text;
+            }
+        }
+
+        if root.track.missing: Text {
+            text: @tr("" => "Missing");
+            font-size: Theme.caption;
+            color: Theme.error;
+            vertical-alignment: center;
+        }
+        Text {
+            text: root.track.duration;
+            font-size: Theme.body-small;
+            color: Theme.text-faint;
+            vertical-alignment: center;
+        }
+
+        more := IconButton {
+            y: (parent.height - self.height) / 2;
+            size: 32px;
+            icon-size: 18px;
+            icon: @image-url("icons/ellipsis-vertical.svg");
+            tooltip: @tr("" => "More");
+            opacity: touch.has-hover || self.has-hover ? 1 : 0;
+            clicked => {
+                menu.show();
+            }
+        }
+    }
+
+    menu := PopupWindow {
+        x: root.width - 170px;
+        y: root.height - 4px;
+        MenuSurface {
+            MenuItem {
+                text: @tr("" => "Edit");
+                activated => {
+                    root.edit();
+                    menu.close();
+                }
+            }
+
+            if !LibraryView.collection-linked: MenuItem {
+                text: @tr("" => "Remove");
+                destructive: true;
+                activated => {
+                    Actions.delete-entry(root.track.id);
+                    menu.close();
+                }
+            }
+        }
+    }
+}
+
+export component PlaylistPage inherits Rectangle {
+    // Shows the slim header instead of the plate.
+    in property <bool> compact;
+    callback edit-collection();
+    callback edit-entry(string, string);
+    callback add-files();
+    property <bool> this-plays: PlayerView.collection-id == Navigation.collection-id && PlayerView.playing;
+    VerticalLayout {
+        if root.compact: CollectionBar {
+            kind: CollectionKind.playlist;
+            edit => {
+                root.edit-collection();
+            }
+            add-files => {
+                root.add-files();
+            }
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                icon: root.this-plays ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                tint: Theme.lit;
+                hover-tint: Theme.lit-bright;
+                tooltip: root.this-plays ? @tr("" => "Pause") : @tr("" => "Play");
+                enabled: LibraryView.tracks.length > 0;
+                clicked => {
+                    Actions.play-collection(Navigation.collection-id);
+                }
+            }
+        }
+        PageScroll {
+            vertical-stretch: 1;
+            content-height: column.preferred-height;
+            column := VerticalLayout {
+                padding: PageMetrics.padding;
+                padding-top: root.compact ? 12px : 22px;
+                spacing: 16px;
+                alignment: start;
+                if !root.compact: CollectionHero {
+                    plate-width: 250px;
+                    plate-height: 176px;
+                    edit => {
+                        root.edit-collection();
+                    }
+                    add-files => {
+                        root.add-files();
+                    }
+                    Button {
+                        text: root.this-plays ? @tr("" => "Pause") : @tr("" => "Play");
+                        icon: root.this-plays ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                        kind: ButtonKind.primary;
+                        enabled: LibraryView.tracks.length > 0;
+                        clicked => {
+                            Actions.play-collection(Navigation.collection-id);
+                        }
+                    }
+
+                    Button {
+                        text: PlayerView.shuffle ? @tr("" => "Shuffling") : @tr("" => "Shuffle");
+                        icon: @image-url("icons/shuffle.svg");
+                        clicked => {
+                            Actions.toggle-shuffle();
+                        }
+                    }
+                }
+                FilterField { }
+                VerticalLayout {
+                    spacing: 2px;
+                    max-width: 780px;
+                    if LibraryView.tracks.length == 0: Text {
+                        text: Search.filter-text != "" ? @tr("" => "No track matches the filter.") : LibraryView.collection-linked ? @tr("" => "This folder holds no audio yet.") : @tr("" => "Drop audio files here to add them.");
+                        color: Theme.text-secondary;
+                    }
+                    for track in LibraryView.tracks: TrackItem {
+                        track: track;
+                        edit => {
+                            root.edit-entry(track.id, track.title);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The ring that fills around a playing sound's disc as the sound plays through.
+component ProgressRing inherits Path {
+    in property <float> progress;
+    property <float> fraction: clamp(root.progress, 0, 0.999);
+    property <angle> sweep: root.fraction * 360deg;
+    viewbox-width: 100;
+    viewbox-height: 100;
+    stroke: Theme.lit;
+    stroke-width: 2.5px;
+    commands: "M 50 4 A 46 46 0 " + (root.fraction > 0.5 ? "1" : "0") + " 1 " + (50 + 46 * Math.sin(root.sweep)) + " " + (50 - 46 * Math.cos(root.sweep));
+}
+
+// A sound as a pad: an icon in a disc that the sun lights while it plays, its title, and its
+// volume. Clicking the pad plays or stops it.
+component SoundTileView inherits Rectangle {
+    in property <SoundTile> tile;
+    callback edit();
+    property <bool> playable: !root.tile.missing;
+    border-radius: Theme.radius-tile;
+    background: toggle.has-hover ? Theme.panel-hover : Theme.panel;
+    animate background { duration: Motion.hover; }
+    border-width: 1px;
+    border-color: root.tile.playing ? Theme.lit.with-alpha(0.5) : Theme.panel-edge;
+    opacity: root.tile.missing ? 0.5 : 1;
+    accessible-role: button;
+    accessible-label: root.tile.title;
+    accessible-checked: root.tile.playing;
+    accessible-action-default => {
+        if root.playable {
+            Actions.toggle-sound(root.tile.id);
+        }
+    }
+    toggle := TouchArea {
+        enabled: root.playable;
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            Actions.toggle-sound(root.tile.id);
+        }
+    }
+
+    if root.tile.looping: Icon {
+        x: 14px;
+        y: 14px;
+        width: 15px;
+        height: 15px;
+        source: @image-url("icons/repeat.svg");
+        tint: Theme.accent;
+    }
+    if root.tile.missing: Text {
+        x: 14px;
+        y: 12px;
+        text: @tr("" => "File missing");
+        font-size: 11.5px;
+        font-weight: 700;
+        color: Theme.error;
+    }
+    VerticalLayout {
+        padding: 14px;
+        padding-top: 20px;
+        spacing: 10px;
+        alignment: start;
+        HorizontalLayout {
+            alignment: center;
+            Rectangle {
+                width: 86px;
+                height: 86px;
+                if root.tile.playing: Rectangle {
+                    border-radius: self.width / 2;
+                    border-width: 1px;
+                    border-color: Theme.lit.with-alpha(0.16);
+                }
+                if root.tile.playing: ProgressRing {
+                    progress: root.tile.progress;
+                }
+                Rectangle {
+                    x: 6px;
+                    y: 6px;
+                    width: 74px;
+                    height: 74px;
+                    border-radius: self.width / 2;
+                    background: root.tile.playing ? Theme.lit : Theme.disc;
+                    Icon {
+                        width: 32px;
+                        height: 32px;
+                        source: SoundIcons.images[root.tile.icon];
+                        tint: root.tile.playing ? Theme.on-lit : Theme.text;
+                    }
+                }
+            }
+        }
+
+        Text {
+            text: root.tile.title;
+            font-size: Theme.body-small;
+            font-weight: 800;
+            horizontal-alignment: center;
+            overflow: elide;
+            color: Theme.text;
+        }
+
+        Slider {
+            value: root.tile.volume;
+            fill: root.tile.playing ? Theme.lit : Theme.text-secondary;
+            track: root.tile.playing ? Theme.lit.with-alpha(0.2) : Theme.track;
+            changed(value) => {
+                Actions.set-sound-volume(root.tile.id, value);
+            }
+        }
+    }
+
+    IconButton {
+        x: parent.width - self.width - 6px;
+        y: 6px;
+        size: 32px;
+        icon-size: 18px;
+        icon: @image-url("icons/ellipsis-vertical.svg");
+        tooltip: @tr("" => "More");
+        opacity: toggle.has-hover || self.has-hover ? 1 : 0;
+        clicked => {
+            menu.show();
+        }
+    }
+
+    menu := PopupWindow {
+        x: root.width - 170px;
+        y: 42px;
+        MenuSurface {
+            MenuItem {
+                text: root.tile.looping ? @tr("" => "Stop Looping") : @tr("" => "Loop");
+                activated => {
+                    Actions.set-sound-looping(root.tile.id, !root.tile.looping);
+                    menu.close();
+                }
+            }
+
+            MenuItem {
+                text: @tr("" => "Edit");
+                activated => {
+                    root.edit();
+                    menu.close();
+                }
+            }
+
+            if !LibraryView.collection-linked: MenuItem {
+                text: @tr("" => "Remove");
+                destructive: true;
+                activated => {
+                    Actions.delete-entry(root.tile.id);
+                    menu.close();
+                }
+            }
+        }
+    }
+}
+
+component TileGrid inherits Rectangle {
+    in property <[SoundTile]> tiles;
+    callback edit(SoundTile);
+    property <length> tile-width-min: 150px;
+    property <int> columns: max(1, Math.floor((root.width + PageMetrics.gap) / (root.tile-width-min + PageMetrics.gap)));
+    property <length> tile-width: (root.width - (root.columns - 1) * PageMetrics.gap) / root.columns;
+    property <length> tile-height: 184px;
+    property <int> rows: Math.ceil(root.tiles.length / root.columns);
+    height: root.rows == 0 ? 0 : root.rows * root.tile-height + (root.rows - 1) * PageMetrics.gap;
+    for tile[index] in root.tiles: SoundTileView {
+        x: Math.mod(index, root.columns) * (root.tile-width + PageMetrics.gap);
+        y: Math.floor(index / root.columns) * (root.tile-height + PageMetrics.gap);
+        width: root.tile-width;
+        height: root.tile-height;
+        tile: tile;
+        edit => {
+            root.edit(tile);
+        }
+    }
+}
+
+export component SoundboardPage inherits Rectangle {
+    // Shows the slim header instead of the plate.
+    in property <bool> compact;
+    callback edit-collection();
+    callback edit-sound(SoundTile);
+    callback add-files();
+    VerticalLayout {
+        if root.compact: CollectionBar {
+            kind: CollectionKind.soundboard;
+            edit => {
+                root.edit-collection();
+            }
+            add-files => {
+                root.add-files();
+            }
+        }
+        PageScroll {
+            vertical-stretch: 1;
+            content-height: column.preferred-height;
+            column := VerticalLayout {
+                padding: PageMetrics.padding;
+                padding-top: root.compact ? 12px : 22px;
+                spacing: 16px;
+                alignment: start;
+                if !root.compact: CollectionHero {
+                    plate-width: 150px;
+                    plate-height: 104px;
+                    edit => {
+                        root.edit-collection();
+                    }
+                    add-files => {
+                        root.add-files();
+                    }
+                }
+                FilterField { }
+                if LibraryView.sounds.length == 0: Text {
+                    text: Search.filter-text != "" ? @tr("" => "No sound matches the filter.") : LibraryView.collection-linked ? @tr("" => "This folder holds no audio yet.") : @tr("" => "Drop audio files here to add them.");
+                    color: Theme.text-secondary;
+                }
+                TileGrid {
+                    tiles: LibraryView.sounds;
+                    edit(tile) => {
+                        root.edit-sound(tile);
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Before the server answers for the first time.
+export component ConnectingPage inherits Rectangle {
+    VerticalLayout {
+        alignment: center;
+        spacing: 8px;
+        padding-bottom: 40px;
+        Text {
+            text: @tr("" => "Starting the audio server");
+            font-family: Theme.display-font;
+            font-size: 26px;
+            font-weight: Theme.display-weight;
+            color: Theme.text;
+            horizontal-alignment: center;
+        }
+
+        Text {
+            text: Session.connection-text;
+            font-size: Theme.body;
+            color: Theme.text-secondary;
+            horizontal-alignment: center;
+        }
+    }
+}
