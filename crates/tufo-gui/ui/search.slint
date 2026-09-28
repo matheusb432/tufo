@@ -128,22 +128,12 @@ export component SearchPalette inherits Rectangle {
                     content-y: min(0px, max(-Search.selected * 50px + self.height - 100px, self.height - self.content-height));
                     rows := VerticalLayout {
                         spacing: 2px;
-                        for result[index] in Search.results: VerticalLayout {
-                            if index == 0 || Search.results[index - 1].section != result.section: Text {
-                                text: result.section;
-                                font-size: Theme.caption;
-                                font-weight: 500;
-                                color: Theme.text-secondary;
-                                height: 28px;
-                                vertical-alignment: bottom;
-                            }
-                            ResultRow {
-                                result: result;
-                                selected: index == Search.selected;
-                                activated => {
-                                    Actions.palette-activate(index);
-                                    root.close();
-                                }
+                        for result[index] in Search.results: ResultRow {
+                            result: result;
+                            selected: index == Search.selected;
+                            activated => {
+                                Actions.palette-activate(index);
+                                root.close();
                             }
                         }
                     }
