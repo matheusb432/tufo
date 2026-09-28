@@ -461,7 +461,7 @@ component CollectionTools inherits HorizontalLayout {
     }
 }
 
-// In a small viewport, the collection's header as one slim row that stays put while its content
+// The collection's header as one slim row that stays put while its content
 // scrolls: a way back to every playlist or soundboard, the title, and the actions.
 component CollectionBar inherits Rectangle {
     in property <CollectionKind> kind;
@@ -683,14 +683,14 @@ component TrackItem inherits Rectangle {
 }
 
 export component PlaylistPage inherits Rectangle {
-    // Shows the slim header instead of the plate.
+    // Hides the plate; the slim header shows either way.
     in property <bool> compact;
     callback edit-collection();
     callback edit-entry(string, string);
     callback add-files();
     property <bool> this-plays: PlayerView.collection-id == Navigation.collection-id && PlayerView.playing;
     VerticalLayout {
-        if root.compact: CollectionBar {
+        CollectionBar {
             kind: CollectionKind.playlist;
             edit => {
                 root.edit-collection();
@@ -942,13 +942,13 @@ component TileGrid inherits Rectangle {
 }
 
 export component SoundboardPage inherits Rectangle {
-    // Shows the slim header instead of the plate.
+    // Hides the plate; the slim header shows either way.
     in property <bool> compact;
     callback edit-collection();
     callback edit-sound(SoundTile);
     callback add-files();
     VerticalLayout {
-        if root.compact: CollectionBar {
+        CollectionBar {
             kind: CollectionKind.soundboard;
             edit => {
                 root.edit-collection();
