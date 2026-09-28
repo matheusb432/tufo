@@ -1017,14 +1017,26 @@ impl Controller {
     /// Saves the desktop settings, then the crossfade when it changed, and a new bot token
     /// followed by a server restart so the bot logs in with it; the connection loop starts the
     /// server again.
-    pub(crate) fn save_settings(
-        &self,
-        token: &str,
-        crossfade_ms: i32,
-        keep_playing_after_quit: bool,
-        start_at_login: bool,
-    ) {
-        self.save_start_at_login(start_at_login);
+    pub(crate) fn set_crossfade(&self, crossfade_ms: i32) {
+        let crossfade = CrossfadeDuration::try_new(Duration::from_millis(
+            u64::try_from(crossfade_ms).unwrap_or(0),
+        ))
+        .ok()
+        .filter(|crossfade| *crossfade != self.lock().player.crossfade);
+        if crossfade.is_none() {
+            return;
+        }
+        self.run(move |client| async move {
+            client
+                .update_player_settings(&UpdatePlayerSettings {
+                    crossfade,
+                    ..UpdatePlayerSettings::default()
+                })
+                .await
+        });
+    }
+
+    pub(crate) fn set_keep_playing_after_quit(&self, keep_playing_after_quit: bool) {
         let quit_behavior = if keep_playing_after_quit {
             QuitBehavior::KeepPlaying
         } else {
@@ -1035,29 +1047,17 @@ impl Controller {
             ..self.lock().settings
         };
         self.save_desktop_settings(settings);
-        let crossfade = CrossfadeDuration::try_new(Duration::from_millis(
-            u64::try_from(crossfade_ms).unwrap_or(0),
-        ))
-        .ok()
-        .filter(|crossfade| *crossfade != self.lock().player.crossfade);
+    }
+
+    /// Restarts the server, so its bot logs in with the new token.
+    pub(crate) fn save_discord_token(&self, token: &str) {
         let token = token.trim().to_owned();
-        if crossfade.is_none() && token.is_empty() {
+        if token.is_empty() {
             return;
         }
         self.run(move |client| async move {
-            if crossfade.is_some() {
-                client
-                    .update_player_settings(&UpdatePlayerSettings {
-                        crossfade,
-                        ..UpdatePlayerSettings::default()
-                    })
-                    .await?;
-            }
-            if !token.is_empty() {
-                client.set_discord_bot_token(token).await?;
-                client.stop_server().await?;
-            }
-            Ok(())
+            client.set_discord_bot_token(token).await?;
+            client.stop_server().await
         });
     }
 
@@ -1118,7 +1118,7 @@ impl Controller {
         kenku_folder
     }
 
-    fn save_start_at_login(&self, start_at_login: bool) {
+    pub(crate) fn set_start_at_login(&self, start_at_login: bool) {
         if start_at_login == autostart::is_enabled() {
             return;
         }

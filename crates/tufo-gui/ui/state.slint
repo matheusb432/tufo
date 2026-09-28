@@ -273,7 +273,11 @@ export global Actions {
     callback set-drawer-pinned(bool);
     callback set-player-collapsed(bool);
     callback refresh-outputs();
-    // The token, the crossfade in milliseconds, keep playing after quitting, and start at login.
-    callback save-settings(string, int, bool, bool);
+    // In milliseconds.
+    callback set-crossfade(int);
+    callback set-keep-playing-after-quit(bool);
+    callback set-start-at-login(bool);
+    // Restarts tufo-server, so its bot logs in with the new token.
+    callback save-discord-token(string);
     callback import-kenku-library();
 }

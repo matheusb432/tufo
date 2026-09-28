@@ -352,13 +352,21 @@ export component Slider inherits Rectangle {
 export component Switch inherits Rectangle {
     in-out property <bool> checked;
     in property <string> label;
+    // Fires with the new state when the user flips it.
+    callback toggled(bool);
     width: 40px;
     height: 24px;
     accessible-role: switch;
     accessible-label: root.label;
     accessible-checkable: true;
     accessible-checked: root.checked;
-    accessible-action-default => { root.checked = !root.checked; }
+    accessible-action-default => { root.toggle(); }
+
+    function toggle() {
+        root.checked = !root.checked;
+        root.toggled(root.checked);
+    }
+
     Rectangle {
         border-radius: self.height / 2;
         background: root.checked ? Theme.accent.with-alpha(0.45) : Theme.track;
@@ -377,7 +385,7 @@ export component Switch inherits Rectangle {
     TouchArea {
         mouse-cursor: MouseCursor.pointer;
         clicked => {
-            root.checked = !root.checked;
+            root.toggle();
         }
     }
 }

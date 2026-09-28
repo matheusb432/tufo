@@ -129,7 +129,7 @@ fn render(settings: DesktopSettings) -> String {
     let language = settings.language.config_name();
     let keep_playing = settings.quit_behavior == QuitBehavior::KeepPlaying;
     format!(
-        "# Tufo's desktop settings. Saving Settings in Tufo rewrites this file.\n\
+        "# Tufo's desktop settings. Changing a setting in Tufo rewrites this file.\n\
          \n\
          language = \"{language}\"\n\
          \n\

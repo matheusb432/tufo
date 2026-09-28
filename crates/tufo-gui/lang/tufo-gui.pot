@@ -11,15 +11,15 @@ msgstr ""
 msgid "A name needs at least one character."
 msgstr ""
 
-#: ui/dialogs.slint:200
+#: ui/dialogs.slint:218
 msgid "Add"
 msgstr ""
 
-#: ui/dialogs.slint:145 ui/pages.slint:353 ui/sidebar.slint:423
+#: ui/dialogs.slint:163 ui/pages.slint:353 ui/sidebar.slint:423
 msgid "Add Playlist"
 msgstr ""
 
-#: ui/dialogs.slint:145 ui/pages.slint:353 ui/sidebar.slint:448
+#: ui/dialogs.slint:163 ui/pages.slint:353 ui/sidebar.slint:448
 msgid "Add Soundboard"
 msgstr ""
 
@@ -133,11 +133,11 @@ msgstr ""
 msgid "Bones"
 msgstr ""
 
-#: ui/dialogs.slint:399
+#: ui/dialogs.slint:435
 msgid "Bot token"
 msgstr ""
 
-#: ui/dialogs.slint:450
+#: ui/dialogs.slint:512
 msgid "Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything."
 msgstr ""
 
@@ -149,7 +149,7 @@ msgstr ""
 msgid "Can't find {0}"
 msgstr ""
 
-#: ui/dialogs.slint:192 ui/dialogs.slint:333 ui/dialogs.slint:471
+#: ui/dialogs.slint:210 ui/dialogs.slint:351
 msgid "Cancel"
 msgstr ""
 
@@ -169,11 +169,11 @@ msgstr ""
 msgid "Cathedral"
 msgstr ""
 
-#: ui/dialogs.slint:135
+#: ui/dialogs.slint:153
 msgid "Change background"
 msgstr ""
 
-#: ui/dialogs.slint:79
+#: ui/dialogs.slint:97
 msgid "Change the background"
 msgstr ""
 
@@ -217,7 +217,7 @@ msgstr ""
 msgid "Clock"
 msgstr ""
 
-#: ui/gallery.slint:159
+#: ui/dialogs.slint:57 ui/gallery.slint:159
 msgid "Close"
 msgstr ""
 
@@ -265,7 +265,7 @@ msgstr ""
 msgid "Court"
 msgstr ""
 
-#: ui/dialogs.slint:412
+#: ui/dialogs.slint:465
 msgid "Crossfade: {0} s"
 msgstr ""
 
@@ -289,7 +289,7 @@ msgstr ""
 msgid "Dice"
 msgstr ""
 
-#: ui/dialogs.slint:392
+#: ui/dialogs.slint:425
 msgid "Discord"
 msgstr ""
 
@@ -305,7 +305,7 @@ msgstr ""
 msgid "Dog"
 msgstr ""
 
-#: ui/dialogs.slint:242
+#: ui/dialogs.slint:260
 msgid "Done"
 msgstr ""
 
@@ -361,15 +361,15 @@ msgstr ""
 msgid "Drums"
 msgstr ""
 
-#: ui/dialogs.slint:212 ui/pages.slint:438 ui/pages.slint:666 ui/pages.slint:904
+#: ui/dialogs.slint:230 ui/pages.slint:438 ui/pages.slint:666 ui/pages.slint:904
 msgid "Edit"
 msgstr ""
 
-#: ui/dialogs.slint:306
+#: ui/dialogs.slint:324
 msgid "Edit Sound"
 msgstr ""
 
-#: ui/dialogs.slint:306
+#: ui/dialogs.slint:324
 msgid "Edit Track"
 msgstr ""
 
@@ -389,11 +389,11 @@ msgstr ""
 msgid "Explosion"
 msgstr ""
 
-#: ui/dialogs.slint:321
+#: ui/dialogs.slint:339
 msgid "Fade In (ms)"
 msgstr ""
 
-#: ui/dialogs.slint:326
+#: ui/dialogs.slint:344
 msgid "Fade Out (ms)"
 msgstr ""
 
@@ -501,7 +501,7 @@ msgstr ""
 msgid "House"
 msgstr ""
 
-#: ui/dialogs.slint:260
+#: ui/dialogs.slint:278
 msgid "Icon: {0}"
 msgstr ""
 
@@ -509,7 +509,7 @@ msgstr ""
 msgid "Images"
 msgstr ""
 
-#: ui/dialogs.slint:460
+#: ui/dialogs.slint:522
 msgid "Import"
 msgstr ""
 
@@ -561,11 +561,11 @@ msgstr ""
 msgid "Joining the voice channel…"
 msgstr ""
 
-#: ui/dialogs.slint:427
+#: ui/dialogs.slint:483
 msgid "Keep playing after quitting"
 msgstr ""
 
-#: ui/dialogs.slint:443
+#: ui/dialogs.slint:505
 msgid "Kenku FM"
 msgstr ""
 
@@ -643,7 +643,7 @@ msgstr ""
 msgid "Mute"
 msgstr ""
 
-#: ui/dialogs.slint:151 ui/dialogs.slint:215 ui/dialogs.slint:308
+#: ui/dialogs.slint:169 ui/dialogs.slint:233 ui/dialogs.slint:326
 msgid "Name"
 msgstr ""
 
@@ -723,7 +723,7 @@ msgstr ""
 msgid "Or drop one on this window"
 msgstr ""
 
-#: ui/dialogs.slint:166
+#: ui/dialogs.slint:184
 msgid "Or follow a folder"
 msgstr ""
 
@@ -739,7 +739,7 @@ msgstr ""
 msgid "Paste a Discord bot token before saving."
 msgstr ""
 
-#: ui/dialogs.slint:401
+#: ui/dialogs.slint:437
 msgid "Paste your bot's token"
 msgstr ""
 
@@ -847,19 +847,19 @@ msgstr ""
 msgid "Resume sounds"
 msgstr ""
 
-#: ui/dialogs.slint:341 ui/dialogs.slint:479
+#: ui/dialogs.slint:359
 msgid "Save"
 msgstr ""
 
-#: ui/dialogs.slint:479
+#: ui/dialogs.slint:447
 msgid "Save and restart"
 msgstr ""
 
-#: ui/dialogs.slint:401
+#: ui/dialogs.slint:437
 msgid "Saved; paste a new one to replace it"
 msgstr ""
 
-#: ui/dialogs.slint:405
+#: ui/dialogs.slint:458
 msgid "Saving restarts Tufo so the bot logs in with the new token. The music stops."
 msgstr ""
 
@@ -883,7 +883,7 @@ msgstr ""
 msgid "See all {0}"
 msgstr ""
 
-#: ui/dialogs.slint:390 ui/sidebar.slint:504 ui/sidebar.slint:587
+#: ui/dialogs.slint:414 ui/sidebar.slint:504 ui/sidebar.slint:587
 msgid "Settings"
 msgstr ""
 
@@ -965,7 +965,7 @@ msgstr ""
 msgid "Squirrel"
 msgstr ""
 
-#: ui/dialogs.slint:433
+#: ui/dialogs.slint:492
 msgid "Start at login"
 msgstr ""
 
@@ -1061,7 +1061,7 @@ msgstr ""
 msgid "The audio output is unavailable. Choose another output."
 msgstr ""
 
-#: ui/dialogs.slint:428
+#: ui/dialogs.slint:484
 msgid "The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed."
 msgstr ""
 
@@ -1133,7 +1133,7 @@ msgstr ""
 msgid "Tufo can't open this file"
 msgstr ""
 
-#: ui/dialogs.slint:234
+#: ui/dialogs.slint:252
 msgid "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another."
 msgstr ""
 
@@ -1193,7 +1193,7 @@ msgstr ""
 msgid "Tufo does not have permission to complete this request."
 msgstr ""
 
-#: ui/dialogs.slint:174
+#: ui/dialogs.slint:192
 msgid "Tufo keeps its files in sync."
 msgstr ""
 
@@ -1201,7 +1201,7 @@ msgstr ""
 msgid "Tufo received an invalid response. Update the app and server together."
 msgstr ""
 
-#: ui/dialogs.slint:434
+#: ui/dialogs.slint:493
 msgid "Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them."
 msgstr ""
 

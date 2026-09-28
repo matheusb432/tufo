@@ -5,11 +5,15 @@ import {
     Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
     Navigation, Session, SoundIcons,
 } from "state.slint";
-import { Button, ButtonKind, Icon, ScrollThumb, Slider, Switch, TextField, TextLink } from "widgets.slint";
+import {
+    Button, ButtonKind, Icon, IconButton, ScrollThumb, Slider, Switch, TextField, TextLink,
+} from "widgets.slint";
 
 // A modal card over a dimmed window. Clicking the dimmed area cancels.
 export component DialogFrame inherits Rectangle {
     in property <string> title;
+    // Shows a close button beside the title, for a dialog without a Cancel button.
+    in property <bool> closable;
     callback cancel();
     background: Theme.scrim;
     TouchArea {
@@ -35,12 +39,26 @@ export component DialogFrame inherits Rectangle {
             layout := VerticalLayout {
                 padding: 24px;
                 spacing: 20px;
-                Text {
-                    text: root.title;
-                    font-family: Theme.display-font;
-                    font-size: Theme.heading;
-                    font-weight: Theme.display-weight;
-                    color: Theme.text;
+                HorizontalLayout {
+                    Text {
+                        text: root.title;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                        font-family: Theme.display-font;
+                        font-size: Theme.heading;
+                        font-weight: Theme.display-weight;
+                        color: Theme.text;
+                    }
+
+                    if root.closable: IconButton {
+                        size: 36px;
+                        icon-size: 20px;
+                        icon: @image-url("icons/x.svg");
+                        tooltip: @tr("" => "Close");
+                        clicked => {
+                            root.cancel();
+                        }
+                    }
                 }
 
                 @children
@@ -357,6 +375,7 @@ component SwitchSetting inherits HorizontalLayout {
     in property <string> title;
     in property <string> description;
     in-out property <bool> checked;
+    callback toggled(bool);
     spacing: 16px;
     VerticalLayout {
         spacing: 4px;
@@ -381,13 +400,27 @@ component SwitchSetting inherits HorizontalLayout {
         Switch {
             label: root.title;
             checked <=> root.checked;
+            toggled(checked) => {
+                root.toggled(checked);
+            }
         }
     }
 }
 
+// Each setting saves as it changes; only a new bot token waits for its button, since saving it
+// restarts tufo-server.
 export component SettingsDialog inherits DialogFrame {
     property <float> crossfade: Session.crossfade-ms / 10000;
     title: @tr("" => "Settings");
+    closable: true;
+
+    function save-token() {
+        if token.text != "" {
+            Actions.save-discord-token(token.text);
+            root.cancel();
+        }
+    }
+
     Text {
         text: @tr("" => "Discord");
         font-size: Theme.body;
@@ -395,10 +428,30 @@ export component SettingsDialog inherits DialogFrame {
         color: Theme.text;
     }
 
-    token := TextField {
-        label: @tr("" => "Bot token");
-        password: true;
-        placeholder: Session.discord-configured ? @tr("" => "Saved; paste a new one to replace it") : @tr("" => "Paste your bot's token");
+    HorizontalLayout {
+        spacing: 8px;
+        token := TextField {
+            horizontal-stretch: 1;
+            label: @tr("" => "Bot token");
+            password: true;
+            placeholder: Session.discord-configured ? @tr("" => "Saved; paste a new one to replace it") : @tr("" => "Paste your bot's token");
+            accepted => {
+                root.save-token();
+            }
+        }
+
+        VerticalLayout {
+            alignment: end;
+            padding-bottom: 3px;
+            Button {
+                text: @tr("" => "Save and restart");
+                kind: ButtonKind.primary;
+                enabled: token.text != "";
+                clicked => {
+                    root.save-token();
+                }
+            }
+        }
     }
 
     Text {
@@ -421,18 +474,27 @@ export component SettingsDialog inherits DialogFrame {
         changed(value) => {
             root.crossfade = value;
         }
+        released(value) => {
+            Actions.set-crossfade(Math.round(value * 10000));
+        }
     }
 
-    keep-playing-after-quit := SwitchSetting {
+    SwitchSetting {
         title: @tr("" => "Keep playing after quitting");
         description: @tr("" => "The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed.");
         checked: Session.keep-playing-after-quit;
+        toggled(checked) => {
+            Actions.set-keep-playing-after-quit(checked);
+        }
     }
 
-    start-at-login := SwitchSetting {
+    SwitchSetting {
         title: @tr("" => "Start at login");
         description: @tr("" => "Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them.");
         checked: Session.start-at-login;
+        toggled(checked) => {
+            Actions.set-start-at-login(checked);
+        }
     }
 
     HorizontalLayout {
@@ -462,25 +524,6 @@ export component SettingsDialog inherits DialogFrame {
                     Actions.import-kenku-library();
                     root.cancel();
                 }
-            }
-        }
-    }
-
-    Actions-Row {
-        Button {
-            text: @tr("" => "Cancel");
-            kind: ButtonKind.quiet;
-            clicked => {
-                root.cancel();
-            }
-        }
-
-        Button {
-            text: token.text != "" ? @tr("" => "Save and restart") : @tr("" => "Save");
-            kind: ButtonKind.primary;
-            clicked => {
-                Actions.save-settings(token.text, Math.round(root.crossfade * 10000), keep-playing-after-quit.checked, start-at-login.checked);
-                root.cancel();
             }
         }
     }

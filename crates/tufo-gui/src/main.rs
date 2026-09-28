@@ -340,8 +340,13 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_cycle_repeat, | | controller.cycle_repeat());
     on!(controller => on_select_output, |index| controller.select_output(index));
     on!(controller => on_refresh_outputs, | | controller.refresh_outputs());
-    on!(controller => on_save_settings, |token, crossfade_ms, keep_playing_after_quit, start_at_login| {
-        controller.save_settings(&token, crossfade_ms, keep_playing_after_quit, start_at_login);
+    on!(controller => on_set_crossfade, |crossfade_ms| controller.set_crossfade(crossfade_ms));
+    on!(controller => on_set_keep_playing_after_quit, |keep_playing| {
+        controller.set_keep_playing_after_quit(keep_playing);
     });
+    on!(controller => on_set_start_at_login, |start_at_login| {
+        controller.set_start_at_login(start_at_login);
+    });
+    on!(controller => on_save_discord_token, |token| controller.save_discord_token(&token));
     on!(controller => on_import_kenku_library, | | controller.import_kenku_library());
 }
