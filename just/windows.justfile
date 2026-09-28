@@ -12,10 +12,8 @@ windows-check:
     winvm="${WINVM_RS:-winvm-rs}"
     staging="$(mktemp -d)"
     trap 'rm -rf "$staging"' EXIT
-    # The paintings' full-resolution originals take hundreds of megabytes, and the build never reads them.
-    paintings_originals='assets/backgrounds/originals/'
     while IFS= read -r -d '' file; do
-        if [[ -f "$file" && "$file" != "$paintings_originals"* ]]; then cp --parents -- "$file" "$staging"; fi
+        if [[ -f "$file" ]]; then cp --parents -- "$file" "$staging"; fi
     done < <(
         git ls-files -z --cached --recurse-submodules
         git ls-files -z --others --exclude-standard
