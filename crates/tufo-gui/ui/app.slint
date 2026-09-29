@@ -9,7 +9,7 @@ import {
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
 import { ConnectingPage, GridPage, HomePage, PlaylistPage, SoundboardPage } from "pages.slint";
-import { Dock } from "dock.slint";
+import { Dock, MiniPlayer } from "dock.slint";
 import {
     AddCollectionDialog, EditCollectionDialog, EditEntryDialog, SettingsDialog,
 } from "dialogs.slint";
@@ -30,8 +30,9 @@ export component AppWindow inherits Window {
     // Fits a 1280 × 800 screen at 125% scaling.
     preferred-width: 1000px;
     preferred-height: 700px;
-    min-width: Theme.window-width-min;
-    min-height: Theme.window-height-min;
+    min-width: Session.mini-player ? Theme.mini-player-width-min : Theme.window-width-min;
+    min-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-height-min;
+    always-on-top: Session.mini-player && Session.mini-player-pinned && Session.always-on-top-supported;
     background: Theme.still-shade;
     default-font-family: Theme.font;
     no-frame: true;
@@ -68,6 +69,25 @@ export component AppWindow inherits Window {
     // The background gallery, over the Add or Edit dialog that opened it.
     property <bool> gallery-open;
     property <string> gallery-title;
+    property <bool> mini-player: Session.mini-player;
+    changed mini-player => {
+        if self.mini-player {
+            root.sidebar-overlaid = false;
+            root.gallery-open = false;
+            root.settings-open = false;
+            root.add-open = false;
+            root.edit-collection-open = false;
+            root.edit-entry-open = false;
+            Search.palette-open = false;
+            shortcuts.focus();
+        }
+    }
+    changed width => {
+        root.report-size();
+    }
+    changed height => {
+        root.report-size();
+    }
     property <length> still-glow-radius: max(root.width, root.height) * 1.15;
     property <length> still-glow-x: root.width * 0.92;
 
@@ -80,6 +100,12 @@ export component AppWindow inherits Window {
             return BackgroundTarget.open-collection;
         }
         BackgroundTarget.none
+    }
+
+    function report-size() {
+        if !root.fills-screen {
+            WindowFrame.resized(root.width, root.height);
+        }
     }
 
     function open-add(kind: CollectionKind) {
@@ -174,253 +200,264 @@ export component AppWindow inherits Window {
                 }
                 return accept;
             }
+            if event.modifiers.control && event.modifiers.shift && !event.modifiers.alt && (event.text == "m" || event.text == "M") {
+                WindowFrame.set-mini-player(!Session.mini-player);
+                return accept;
+            }
             if event.text == Key.Escape {
                 return root.close-overlays() ? accept : reject;
             }
             reject
         }
-        main := Rectangle {
-            x: root.page-x;
-            width: parent.width - self.x;
-            WindowDragArea {
-                y: 0;
-                height: Theme.title-row-height;
-            }
-
-            VerticalLayout {
-                page-area := Rectangle {
-                    // Small enough that a collection's page trades its plate for a slim header.
-                    property <bool> compact: self.width < 680px || self.height < 520px;
-                    vertical-stretch: 1;
-                    clip: true;
-                    if !LibraryView.loaded: ConnectingPage { }
-                    if LibraryView.loaded && Navigation.page == Page.home: HomePage {
-                        add(kind) => {
-                            root.open-add(kind);
-                        }
-                    }
-                    if LibraryView.loaded && Navigation.page == Page.playlists: GridPage {
-                        kind: CollectionKind.playlist;
-                        add(kind) => {
-                            root.open-add(kind);
-                        }
-                    }
-                    if LibraryView.loaded && Navigation.page == Page.soundboards: GridPage {
-                        kind: CollectionKind.soundboard;
-                        add(kind) => {
-                            root.open-add(kind);
-                        }
-                    }
-                    if LibraryView.loaded && Navigation.page == Page.playlist: PlaylistPage {
-                        compact: page-area.compact;
-                        edit-collection => {
-                            root.edit-collection-open = true;
-                        }
-                        edit-entry(id, title) => {
-                            root.entry-id = id;
-                            root.entry-title = title;
-                            root.entry-is-sound = false;
-                            root.edit-entry-open = true;
-                        }
-                        add-files => {
-                            Actions.add-files(Navigation.collection-id);
-                        }
-                    }
-                    if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
-                        compact: page-area.compact;
-                        edit-collection => {
-                            root.edit-collection-open = true;
-                        }
-                        edit-sound(tile) => {
-                            root.entry-id = tile.id;
-                            root.entry-title = tile.title;
-                            root.entry-is-sound = true;
-                            root.entry-fade-in-ms = tile.fade-in-ms;
-                            root.entry-fade-out-ms = tile.fade-out-ms;
-                            root.entry-icon = tile.icon;
-                            root.edit-entry-open = true;
-                        }
-                        add-files => {
-                            Actions.add-files(Navigation.collection-id);
-                        }
-                    }
+        if !root.mini-player: Rectangle {
+            main := Rectangle {
+                x: root.page-x;
+                width: parent.width - self.x;
+                WindowDragArea {
+                    y: 0;
+                    height: Theme.title-row-height;
                 }
 
-                if LibraryView.loaded: HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    padding-bottom: 10px;
-                    Dock {
-                        wide: main.width >= 680px;
-                        collapsed: Session.player-collapsed;
-                        set-collapsed(collapsed) => {
-                            Session.player-collapsed = collapsed;
-                            Actions.set-player-collapsed(collapsed);
-                        }
-                    }
-                }
-            }
-
-            if Session.toast != "": Rectangle {
-                x: (parent.width - self.width) / 2;
-                y: 16px;
-                width: min(toast-text.preferred-width + 36px, parent.width - 32px);
-                height: toast-text.preferred-height + 24px;
-                border-radius: Theme.radius-row;
-                background: Session.toast-is-error ? #5a2a2a : Theme.raised;
-                border-width: 1px;
-                border-color: Session.toast-is-error ? Theme.error.with-alpha(0.4) : Theme.raised-edge;
-                // Swallows clicks, so they don't reach the page under the toast.
-                TouchArea { }
-                toast-text := Text {
-                    text: Session.toast;
-                    width: parent.width - 36px;
-                    wrap: word-wrap;
-                    horizontal-alignment: center;
-                    color: Theme.text;
-                    font-size: Theme.body-small;
-                    font-weight: 600;
-                }
-            }
-            if Session.drop-hover: Rectangle {
-                background: Theme.scrim;
                 VerticalLayout {
-                    alignment: center;
-                    spacing: 12px;
-                    Icon {
-                        width: 64px;
-                        height: 64px;
-                        source: @image-url("icons/folder.svg");
-                        tint: Theme.lit;
+                    page-area := Rectangle {
+                        // Small enough that a collection's page trades its plate for a slim header.
+                        property <bool> compact: self.width < 680px || self.height < 520px;
+                        vertical-stretch: 1;
+                        clip: true;
+                        if !LibraryView.loaded: ConnectingPage { }
+                        if LibraryView.loaded && Navigation.page == Page.home: HomePage {
+                            add(kind) => {
+                                root.open-add(kind);
+                            }
+                        }
+                        if LibraryView.loaded && Navigation.page == Page.playlists: GridPage {
+                            kind: CollectionKind.playlist;
+                            add(kind) => {
+                                root.open-add(kind);
+                            }
+                        }
+                        if LibraryView.loaded && Navigation.page == Page.soundboards: GridPage {
+                            kind: CollectionKind.soundboard;
+                            add(kind) => {
+                                root.open-add(kind);
+                            }
+                        }
+                        if LibraryView.loaded && Navigation.page == Page.playlist: PlaylistPage {
+                            compact: page-area.compact;
+                            edit-collection => {
+                                root.edit-collection-open = true;
+                            }
+                            edit-entry(id, title) => {
+                                root.entry-id = id;
+                                root.entry-title = title;
+                                root.entry-is-sound = false;
+                                root.edit-entry-open = true;
+                            }
+                            add-files => {
+                                Actions.add-files(Navigation.collection-id);
+                            }
+                        }
+                        if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
+                            compact: page-area.compact;
+                            edit-collection => {
+                                root.edit-collection-open = true;
+                            }
+                            edit-sound(tile) => {
+                                root.entry-id = tile.id;
+                                root.entry-title = tile.title;
+                                root.entry-is-sound = true;
+                                root.entry-fade-in-ms = tile.fade-in-ms;
+                                root.entry-fade-out-ms = tile.fade-out-ms;
+                                root.entry-icon = tile.icon;
+                                root.edit-entry-open = true;
+                            }
+                            add-files => {
+                                Actions.add-files(Navigation.collection-id);
+                            }
+                        }
                     }
 
-                    Text {
-                        text: Session.drop-label;
-                        font-size: Theme.heading;
-                        font-weight: 800;
-                        color: Theme.text;
+                    if LibraryView.loaded: HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        padding-bottom: 10px;
+                        Dock {
+                            wide: main.width >= 680px;
+                            collapsed: Session.player-collapsed;
+                            set-collapsed(collapsed) => {
+                                Session.player-collapsed = collapsed;
+                                Actions.set-player-collapsed(collapsed);
+                            }
+                        }
+                    }
+                }
+
+                if Session.toast != "": Rectangle {
+                    x: (parent.width - self.width) / 2;
+                    y: 16px;
+                    width: min(toast-text.preferred-width + 36px, parent.width - 32px);
+                    height: toast-text.preferred-height + 24px;
+                    border-radius: Theme.radius-row;
+                    background: Session.toast-is-error ? #5a2a2a : Theme.raised;
+                    border-width: 1px;
+                    border-color: Session.toast-is-error ? Theme.error.with-alpha(0.4) : Theme.raised-edge;
+                    // Swallows clicks, so they don't reach the page under the toast.
+                    TouchArea { }
+                    toast-text := Text {
+                        text: Session.toast;
+                        width: parent.width - 36px;
+                        wrap: word-wrap;
                         horizontal-alignment: center;
+                        color: Theme.text;
+                        font-size: Theme.body-small;
+                        font-weight: 600;
+                    }
+                }
+                if Session.drop-hover: Rectangle {
+                    background: Theme.scrim;
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 12px;
+                        Icon {
+                            width: 64px;
+                            height: 64px;
+                            source: @image-url("icons/folder.svg");
+                            tint: Theme.lit;
+                        }
+
+                        Text {
+                            text: Session.drop-label;
+                            font-size: Theme.heading;
+                            font-weight: 800;
+                            color: Theme.text;
+                            horizontal-alignment: center;
+                        }
                     }
                 }
             }
-        }
 
-        Rectangle {
-            x: Theme.rail-width;
-            width: parent.width - self.x;
-            background: Theme.scrim;
-            opacity: root.sidebar-overlaid ? 1 : 0;
-            visible: self.opacity > 0;
-            animate opacity { duration: Motion.sidebar-slide; }
-            TouchArea {
-                clicked => {
+            Rectangle {
+                x: Theme.rail-width;
+                width: parent.width - self.x;
+                background: Theme.scrim;
+                opacity: root.sidebar-overlaid ? 1 : 0;
+                visible: self.opacity > 0;
+                animate opacity { duration: Motion.sidebar-slide; }
+                TouchArea {
+                    clicked => {
+                        root.sidebar-overlaid = false;
+                    }
+                }
+            }
+
+            Sidebar {
+                x: 0;
+                y: 0;
+                height: parent.height;
+                expanded: root.sidebar-expanded || root.sidebar-overlaid;
+                overlaid: root.sidebar-overlaid;
+                page-opened => {
                     root.sidebar-overlaid = false;
                 }
+                toggle => {
+                    root.toggle-sidebar();
+                }
+                open-search => {
+                    root.sidebar-overlaid = false;
+                    root.open-palette();
+                }
+                open-settings => {
+                    root.sidebar-overlaid = false;
+                    root.settings-open = true;
+                }
+                add(kind) => {
+                    root.sidebar-overlaid = false;
+                    root.open-add(kind);
+                }
             }
-        }
 
-        Sidebar {
-            x: 0;
-            y: 0;
-            height: parent.height;
-            expanded: root.sidebar-expanded || root.sidebar-overlaid;
-            overlaid: root.sidebar-overlaid;
-            page-opened => {
-                root.sidebar-overlaid = false;
+            SearchPalette {
+                close => {
+                    Search.palette-open = false;
+                    shortcuts.focus();
+                }
             }
-            toggle => {
-                root.toggle-sidebar();
+            if root.add-open: AddCollectionDialog {
+                kind: root.add-kind;
+                change-background(title) => {
+                    root.open-gallery(title);
+                }
+                cancel => {
+                    root.add-open = false;
+                    root.gallery-open = false;
+                    shortcuts.focus();
+                }
             }
-            open-search => {
-                root.sidebar-overlaid = false;
-                root.open-palette();
+            if root.edit-collection-open: EditCollectionDialog {
+                change-background(title) => {
+                    root.open-gallery(title);
+                }
+                cancel => {
+                    root.edit-collection-open = false;
+                    root.gallery-open = false;
+                    shortcuts.focus();
+                }
             }
-            open-settings => {
-                root.sidebar-overlaid = false;
-                root.settings-open = true;
+            if root.gallery-open && root.add-open: BackgroundGallery {
+                target: BackgroundTarget.new-collection;
+                heading: root.gallery-title != "" ? @tr("Background for {0}", root.gallery-title) : root.add-kind == CollectionKind.playlist ? @tr("Background for the new playlist") : @tr("Background for the new soundboard");
+                selected: Backgrounds.draft;
+                selected-label: Backgrounds.draft-label;
+                close => {
+                    root.gallery-open = false;
+                }
             }
-            add(kind) => {
-                root.sidebar-overlaid = false;
-                root.open-add(kind);
+            if root.gallery-open && root.edit-collection-open: BackgroundGallery {
+                target: BackgroundTarget.open-collection;
+                collection-id: Navigation.collection-id;
+                heading: @tr("Background for {0}", root.gallery-title != "" ? root.gallery-title : LibraryView.collection-title);
+                selected: LibraryView.collection-background;
+                selected-label: LibraryView.collection-background-label;
+                image-missing: Art.picture-missing(LibraryView.collection-background, Art.pictures-revision);
+                close => {
+                    root.gallery-open = false;
+                }
+            }
+            if root.edit-entry-open: EditEntryDialog {
+                entry-id: root.entry-id;
+                entry-title: root.entry-title;
+                sound: root.entry-is-sound;
+                fade-in-ms: root.entry-fade-in-ms;
+                fade-out-ms: root.entry-fade-out-ms;
+                icon: root.entry-icon;
+                cancel => {
+                    root.edit-entry-open = false;
+                    shortcuts.focus();
+                }
+            }
+            if root.settings-open: SettingsDialog {
+                cancel => {
+                    root.settings-open = false;
+                    shortcuts.focus();
+                }
             }
         }
-
-        SearchPalette {
+        if root.mini-player: MiniPlayer {
             close => {
-                Search.palette-open = false;
-                shortcuts.focus();
-            }
-        }
-        if root.add-open: AddCollectionDialog {
-            kind: root.add-kind;
-            change-background(title) => {
-                root.open-gallery(title);
-            }
-            cancel => {
-                root.add-open = false;
-                root.gallery-open = false;
-                shortcuts.focus();
-            }
-        }
-        if root.edit-collection-open: EditCollectionDialog {
-            change-background(title) => {
-                root.open-gallery(title);
-            }
-            cancel => {
-                root.edit-collection-open = false;
-                root.gallery-open = false;
-                shortcuts.focus();
-            }
-        }
-        if root.gallery-open && root.add-open: BackgroundGallery {
-            target: BackgroundTarget.new-collection;
-            heading: root.gallery-title != "" ? @tr("Background for {0}", root.gallery-title) : root.add-kind == CollectionKind.playlist ? @tr("Background for the new playlist") : @tr("Background for the new soundboard");
-            selected: Backgrounds.draft;
-            selected-label: Backgrounds.draft-label;
-            close => {
-                root.gallery-open = false;
-            }
-        }
-        if root.gallery-open && root.edit-collection-open: BackgroundGallery {
-            target: BackgroundTarget.open-collection;
-            collection-id: Navigation.collection-id;
-            heading: @tr("Background for {0}", root.gallery-title != "" ? root.gallery-title : LibraryView.collection-title);
-            selected: LibraryView.collection-background;
-            selected-label: LibraryView.collection-background-label;
-            image-missing: Art.picture-missing(LibraryView.collection-background, Art.pictures-revision);
-            close => {
-                root.gallery-open = false;
-            }
-        }
-        if root.edit-entry-open: EditEntryDialog {
-            entry-id: root.entry-id;
-            entry-title: root.entry-title;
-            sound: root.entry-is-sound;
-            fade-in-ms: root.entry-fade-in-ms;
-            fade-out-ms: root.entry-fade-out-ms;
-            icon: root.entry-icon;
-            cancel => {
-                root.edit-entry-open = false;
-                shortcuts.focus();
-            }
-        }
-        if root.settings-open: SettingsDialog {
-            cancel => {
-                root.settings-open = false;
-                shortcuts.focus();
+                root.close();
             }
         }
     }
 
     // The title row still moves the window while an overlay dims the page.
-    if root.any-overlay: WindowDragArea {
+    if root.any-overlay && !root.mini-player: WindowDragArea {
         x: root.sidebar-overlaid ? Theme.sidebar-width : 0;
         y: 0;
         width: parent.width - self.x;
         height: Theme.title-row-height;
     }
 
-    WindowButtons {
+    if !root.mini-player: WindowButtons {
         x: parent.width - self.width - 8px;
         y: (Theme.title-row-height - self.height) / 2;
         height: self.preferred-height;

@@ -15,6 +15,7 @@ const TRAY_ID: &str = "tufo";
 /// `tufo-gui.rc` embeds `tufo-tray.ico` under this ID.
 const TRAY_ICON_RESOURCE_ID: u16 = 2;
 const OPEN_ITEM_ID: &str = "open";
+const MINI_PLAYER_ITEM_ID: &str = "mini-player";
 const PLAY_PAUSE_ITEM_ID: &str = "play-pause";
 const PAUSE_SOUNDS_ITEM_ID: &str = "pause-sounds";
 const QUIT_ITEM_ID: &str = "quit";
@@ -31,6 +32,12 @@ impl Tray {
         on_command: impl Fn(TrayCommand) + Clone + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
         let open = MenuItem::with_id(OPEN_ITEM_ID, crate::i18n::tr("Open Tufo"), true, None);
+        let mini_player = MenuItem::with_id(
+            MINI_PLAYER_ITEM_ID,
+            crate::i18n::tr("Mini Player"),
+            true,
+            None,
+        );
         let playback = TrayPlayback::default();
         let (play_pause_label, play_pause_enabled) = play_pause_item(playback.music);
         let play_pause = MenuItem::with_id(
@@ -49,6 +56,7 @@ impl Tray {
         let quit = MenuItem::with_id(QUIT_ITEM_ID, crate::i18n::tr("Quit Tufo"), true, None);
         let menu = Menu::with_items(&[
             &open,
+            &mini_player,
             &play_pause,
             &pause_sounds,
             &PredefinedMenuItem::separator(),
@@ -111,6 +119,7 @@ fn tray_icon() -> anyhow::Result<Icon> {
 fn menu_command(item_id: &str) -> Option<TrayCommand> {
     match item_id {
         OPEN_ITEM_ID => Some(TrayCommand::ShowWindow),
+        MINI_PLAYER_ITEM_ID => Some(TrayCommand::ShowMiniPlayer),
         PLAY_PAUSE_ITEM_ID => Some(TrayCommand::TogglePlayPause),
         PAUSE_SOUNDS_ITEM_ID => Some(TrayCommand::ToggleSoundsPaused),
         QUIT_ITEM_ID => Some(TrayCommand::Quit),
@@ -125,6 +134,10 @@ mod tests {
     #[test]
     fn every_menu_item_maps_to_a_command() {
         assert_eq!(menu_command(OPEN_ITEM_ID), Some(TrayCommand::ShowWindow));
+        assert_eq!(
+            menu_command(MINI_PLAYER_ITEM_ID),
+            Some(TrayCommand::ShowMiniPlayer)
+        );
         assert_eq!(
             menu_command(PLAY_PAUSE_ITEM_ID),
             Some(TrayCommand::TogglePlayPause)

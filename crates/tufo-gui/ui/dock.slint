@@ -1,9 +1,11 @@
 // The player, docked under the page: the playing sounds as chips, then what plays, the transport
-// with its seek bar, and the volume. In a narrow window it collapses into one slim row.
+// with its seek bar, and the volume. In a narrow window it collapses into one slim row, and the
+// mini player shows it alone in a small window.
 
 import { Motion, Theme } from "theme.slint";
-import { Actions, Art, PlayerView, SoundChip } from "state.slint";
+import { Actions, Art, PlayerView, Session, SoundChip, WindowFrame } from "state.slint";
 import { Icon, IconButton, Slider } from "widgets.slint";
+import { WindowDragArea } from "frame.slint";
 
 component SoundChipView inherits Rectangle {
     in property <SoundChip> chip;
@@ -298,6 +300,38 @@ component VolumeControl inherits HorizontalLayout {
     }
 }
 
+// The pause button for every sound, and a chip for each playing sound, scrolling sideways.
+component PlayingSounds inherits HorizontalLayout {
+    spacing: 8px;
+    SoundsPauseButton {
+        y: (parent.height - self.height) / 2;
+    }
+
+    Flickable {
+        height: 30px;
+        horizontal-stretch: 1;
+        content-width: chips.preferred-width;
+        mouse-drag-pan-enabled: false;
+        chips := HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+            for chip in PlayerView.sounds: SoundChipView {
+                chip: chip;
+            }
+        }
+    }
+}
+
+component MiniPlayerButton inherits IconButton {
+    size: 32px;
+    icon-size: 18px;
+    icon: @image-url("icons/picture-in-picture-2.svg");
+    tooltip: @tr("Mini player (Ctrl+Shift+M)");
+    clicked => {
+        WindowFrame.set-mini-player(true);
+    }
+}
+
 export component Dock inherits Rectangle {
     // Lays the controls out in one row, rather than in two.
     in property <bool> wide: true;
@@ -317,23 +351,7 @@ export component Dock inherits Rectangle {
         padding-left: 12px;
         padding-right: root.wide ? 16px : 8px;
         spacing: 8px;
-        if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): HorizontalLayout {
-            spacing: 8px;
-            SoundsPauseButton { }
-            Flickable {
-                height: 30px;
-                horizontal-stretch: 1;
-                content-width: chips.preferred-width;
-                mouse-drag-pan-enabled: false;
-                chips := HorizontalLayout {
-                    spacing: 8px;
-                    alignment: start;
-                    for chip in PlayerView.sounds: SoundChipView {
-                        chip: chip;
-                    }
-                }
-            }
-        }
+        if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): PlayingSounds { }
         if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): Rectangle {
             height: 1px;
             background: Theme.divider;
@@ -354,8 +372,13 @@ export component Dock inherits Rectangle {
             HorizontalLayout {
                 horizontal-stretch: 1;
                 alignment: end;
+                spacing: 8px;
                 VolumeControl {
                     width: 150px;
+                }
+
+                MiniPlayerButton {
+                    y: (parent.height - self.height) / 2;
                 }
             }
         }
@@ -392,6 +415,10 @@ export component Dock inherits Rectangle {
             VolumeControl {
                 width: 110px;
             }
+
+            MiniPlayerButton {
+                y: (parent.height - self.height) / 2;
+            }
         }
         if !root.wide && root.collapsed: HorizontalLayout {
             spacing: 8px;
@@ -408,6 +435,10 @@ export component Dock inherits Rectangle {
                 size: 36px;
             }
 
+            MiniPlayerButton {
+                y: (parent.height - self.height) / 2;
+            }
+
             IconButton {
                 y: (parent.height - self.height) / 2;
                 size: 32px;
@@ -417,6 +448,85 @@ export component Dock inherits Rectangle {
                 clicked => {
                     root.set-collapsed(false);
                 }
+            }
+        }
+    }
+}
+
+// The whole window as a small player that a drag anywhere outside its controls moves.
+export component MiniPlayer inherits Rectangle {
+    callback close();
+    WindowDragArea {
+        maximizes: false;
+    }
+
+    VerticalLayout {
+        padding: 12px;
+        padding-top: 8px;
+        spacing: 4px;
+        HorizontalLayout {
+            spacing: 2px;
+            NowPlaying {
+                art-size: 40px;
+                horizontal-stretch: 1;
+            }
+
+            if Session.always-on-top-supported: IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 32px;
+                icon-size: 18px;
+                icon: @image-url("icons/pin.svg");
+                tint: Session.mini-player-pinned ? Theme.accent : Theme.text-secondary;
+                tooltip: Session.mini-player-pinned ? @tr("Stop keeping on top") : @tr("Keep on top");
+                clicked => {
+                    Session.mini-player-pinned = !Session.mini-player-pinned;
+                    Actions.set-mini-player-pinned(Session.mini-player-pinned);
+                }
+            }
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 32px;
+                icon-size: 18px;
+                icon: @image-url("icons/maximize-2.svg");
+                tooltip: @tr("Full window (Ctrl+Shift+M)");
+                clicked => {
+                    WindowFrame.set-mini-player(false);
+                }
+            }
+
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 32px;
+                icon-size: 18px;
+                icon: @image-url("icons/x.svg");
+                tooltip: @tr("Close");
+                background: self.has-hover ? Theme.window-close-hover : transparent;
+                hover-tint: Theme.text;
+                clicked => {
+                    root.close();
+                }
+            }
+        }
+
+        Transport {
+            spacing: 2px;
+            button-size: 34px;
+            icon-size: 20px;
+            play-size: 40px;
+        }
+
+        SeekRow { }
+
+        HorizontalLayout {
+            spacing: 8px;
+            if PlayerView.sounds.length > 0: PlayingSounds {
+                horizontal-stretch: 1;
+            }
+            if PlayerView.sounds.length == 0: Rectangle {
+                horizontal-stretch: 1;
+            }
+            VolumeControl {
+                width: 120px;
             }
         }
     }

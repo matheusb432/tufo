@@ -93,9 +93,8 @@ fn main() -> anyhow::Result<()> {
     let window = ui::AppWindow::new()?;
     frame::install(&window);
     i18n::select_window_language(language)?;
-    if let Some(file) = window_state::WindowStateFile::from_environment() {
-        window_state::install(&window, runtime.handle(), file);
-    }
+    let window_state_file = window_state::WindowStateFile::from_environment();
+    window_state::install(&window, runtime.handle(), window_state_file);
     // The window picks this up when it first shows; setting it needs the platform the window
     // started.
     slint::set_xdg_app_id(APP_ID)?;
@@ -197,6 +196,14 @@ impl WindowRequests {
             TrayCommand::ShowWindow => {
                 if let Some(window) = self.window.upgrade() {
                     show_window(&window);
+                }
+            }
+            TrayCommand::ShowMiniPlayer => {
+                if let Some(window) = self.window.upgrade() {
+                    show_window(&window);
+                    window
+                        .global::<ui::WindowFrame>()
+                        .invoke_set_mini_player(true);
                 }
             }
             TrayCommand::TogglePlayPause => self.controller.toggle_play_pause(),

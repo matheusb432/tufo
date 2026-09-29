@@ -8,9 +8,12 @@ import { IconButton } from "widgets.slint";
 // Moves the window when dragged, maximizes or restores it on a double click, and opens the
 // desktop's window menu on a right click. Whatever lies above it keeps its own presses.
 export component WindowDragArea inherits WindowMoveArea {
+    in property <bool> maximizes: true;
     TouchArea {
         double-clicked => {
-            WindowFrame.toggle-maximized();
+            if root.maximizes {
+                WindowFrame.toggle-maximized();
+            }
         }
         pointer-event(event) => {
             if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {

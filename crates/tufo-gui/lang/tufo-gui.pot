@@ -11,39 +11,39 @@ msgstr ""
 msgid "A name needs at least one character."
 msgstr ""
 
-#: ui/dialogs.slint:218
+#: ui/dialogs.slint:220
 msgid "Add"
 msgstr ""
 
-#: ui/dialogs.slint:163 ui/pages.slint:353 ui/sidebar.slint:423
+#: ui/dialogs.slint:165 ui/pages.slint:378 ui/sidebar.slint:436
 msgid "Add Playlist"
 msgstr ""
 
-#: ui/dialogs.slint:163 ui/pages.slint:353 ui/sidebar.slint:448
+#: ui/dialogs.slint:165 ui/pages.slint:378 ui/sidebar.slint:461
 msgid "Add Soundboard"
 msgstr ""
 
-#: src/presentation.rs:1063
+#: src/presentation.rs:1080
 msgid "Add a Discord bot token in Settings first."
 msgstr ""
 
-#: ui/pages.slint:230
+#: ui/pages.slint:262
 msgid "Add a playlist"
 msgstr ""
 
-#: ui/pages.slint:230
+#: ui/pages.slint:262
 msgid "Add a soundboard"
 msgstr ""
 
-#: ui/pages.slint:446
+#: ui/pages.slint:518
 msgid "Add files…"
 msgstr ""
 
-#: src/render.rs:430
+#: src/render.rs:431
 msgid "Added {0} with {1}."
 msgstr ""
 
-#: src/render.rs:429
+#: src/render.rs:430
 msgid "Added {n} file."
 msgid_plural "Added {n} files."
 msgstr[0] ""
@@ -53,7 +53,7 @@ msgstr[1] ""
 msgid "Alarm"
 msgstr ""
 
-#: src/presentation.rs:481
+#: src/presentation.rs:482
 msgid "Albert Bierstadt, 1863"
 msgstr ""
 
@@ -61,7 +61,7 @@ msgstr ""
 msgid "Alchemy"
 msgstr ""
 
-#: src/presentation.rs:480
+#: src/presentation.rs:481
 msgid "Arnold Böcklin, 1880"
 msgstr ""
 
@@ -69,7 +69,7 @@ msgstr ""
 msgid "Arrows"
 msgstr ""
 
-#: ui/sidebar.slint:629
+#: ui/sidebar.slint:656
 msgid "Asleep while nothing plays"
 msgstr ""
 
@@ -85,11 +85,11 @@ msgstr ""
 msgid "Automatically start Tufo when you log in."
 msgstr ""
 
-#: src/presentation.rs:445
+#: src/presentation.rs:446
 msgid "Autumn"
 msgstr ""
 
-#: ui/sidebar.slint:629
+#: ui/sidebar.slint:656
 msgid "Awake while something plays"
 msgstr ""
 
@@ -97,27 +97,27 @@ msgstr ""
 msgid "Axe"
 msgstr ""
 
-#: ui/pages.slint:478
+#: ui/pages.slint:553
 msgid "Back to Playlists"
 msgstr ""
 
-#: ui/pages.slint:478
+#: ui/pages.slint:553
 msgid "Back to Soundboards"
 msgstr ""
 
-#: ui/app.slint:367
+#: ui/app.slint:408
 msgid "Background for the new playlist"
 msgstr ""
 
-#: ui/app.slint:367
+#: ui/app.slint:408
 msgid "Background for the new soundboard"
 msgstr ""
 
-#: ui/app.slint:367 ui/app.slint:377
+#: ui/app.slint:408 ui/app.slint:418
 msgid "Background for {0}"
 msgstr ""
 
-#: src/presentation.rs:446
+#: src/presentation.rs:447
 msgid "Battle"
 msgstr ""
 
@@ -129,11 +129,11 @@ msgstr ""
 msgid "Bell"
 msgstr ""
 
-#: src/presentation.rs:487
+#: src/presentation.rs:488
 msgid "Bernardo Bellotto, about 1761"
 msgstr ""
 
-#: src/presentation.rs:951
+#: src/presentation.rs:956
 msgid "Birds"
 msgstr ""
 
@@ -141,7 +141,7 @@ msgstr ""
 msgid "Bones"
 msgstr ""
 
-#: ui/dialogs.slint:435
+#: ui/dialogs.slint:437
 msgid "Bot token"
 msgstr ""
 
@@ -149,11 +149,11 @@ msgstr ""
 msgid "Camp"
 msgstr ""
 
-#: ui/pages.slint:564
+#: ui/pages.slint:635
 msgid "Can't find {0}"
 msgstr ""
 
-#: ui/dialogs.slint:210 ui/dialogs.slint:351
+#: ui/dialogs.slint:212 ui/dialogs.slint:353
 msgid "Cancel"
 msgstr ""
 
@@ -161,7 +161,7 @@ msgstr ""
 msgid "Cannot reach tufo-server. Check the server log."
 msgstr ""
 
-#: src/presentation.rs:447
+#: src/presentation.rs:448
 msgid "Castle"
 msgstr ""
 
@@ -169,23 +169,23 @@ msgstr ""
 msgid "Cat"
 msgstr ""
 
-#: src/presentation.rs:448
+#: src/presentation.rs:449
 msgid "Cathedral"
 msgstr ""
 
-#: ui/dialogs.slint:153
+#: ui/dialogs.slint:155
 msgid "Change background"
 msgstr ""
 
-#: ui/dialogs.slint:97
+#: ui/dialogs.slint:99
 msgid "Change the background"
 msgstr ""
 
-#: src/presentation.rs:472
+#: src/presentation.rs:473
 msgid "Charles de Steuben, 1830s"
 msgstr ""
 
-#: src/controller.rs:1107
+#: src/controller.rs:1115
 msgid "Choose Kenku FM's data folder"
 msgstr ""
 
@@ -193,7 +193,7 @@ msgstr ""
 msgid "Choose a background image"
 msgstr ""
 
-#: ui/gallery.slint:235
+#: ui/gallery.slint:236
 msgid "Choose an image file"
 msgstr ""
 
@@ -213,7 +213,7 @@ msgstr ""
 msgid "City"
 msgstr ""
 
-#: src/presentation.rs:482
+#: src/presentation.rs:483
 msgid "Claude-Joseph Vernet, 1772"
 msgstr ""
 
@@ -221,11 +221,11 @@ msgstr ""
 msgid "Clock"
 msgstr ""
 
-#: ui/dialogs.slint:57 ui/frame.slint:46 ui/gallery.slint:159
+#: ui/dialogs.slint:59 ui/dock.slint:502 ui/frame.slint:55 ui/gallery.slint:160
 msgid "Close"
 msgstr ""
 
-#: src/presentation.rs:449
+#: src/presentation.rs:450
 msgid "Coast"
 msgstr ""
 
@@ -237,23 +237,23 @@ msgstr ""
 msgid "Coins"
 msgstr ""
 
-#: ui/sidebar.slint:343
+#: ui/sidebar.slint:356
 msgid "Collapse (Ctrl+B)"
 msgstr ""
 
-#: ui/dock.slint:360
+#: ui/dock.slint:403
 msgid "Collapse the player"
 msgstr ""
 
-#: src/search.rs:74
+#: src/search.rs:154
 msgid "Collections"
 msgstr ""
 
-#: ui/gallery.slint:206 src/presentation.rs:544
+#: ui/gallery.slint:207 src/presentation.rs:545
 msgid "Colors drawn from the collection"
 msgstr ""
 
-#: ui/sidebar.slint:205
+#: ui/sidebar.slint:216
 msgid "Connect Discord for more outputs"
 msgstr ""
 
@@ -269,11 +269,11 @@ msgstr ""
 msgid "Court"
 msgstr ""
 
-#: ui/dialogs.slint:465
+#: ui/dialogs.slint:470
 msgid "Crossfade: {0} s"
 msgstr ""
 
-#: src/presentation.rs:486
+#: src/presentation.rs:487
 msgid "David Teniers the Younger, 1658"
 msgstr ""
 
@@ -281,11 +281,11 @@ msgstr ""
 msgid "Day"
 msgstr ""
 
-#: ui/pages.slint:453
+#: ui/pages.slint:525
 msgid "Delete"
 msgstr ""
 
-#: src/presentation.rs:450
+#: src/presentation.rs:451
 msgid "Desert"
 msgstr ""
 
@@ -293,15 +293,15 @@ msgstr ""
 msgid "Dice"
 msgstr ""
 
-#: ui/dialogs.slint:465
+#: ui/dialogs.slint:461
 msgid "Disable Discord connection"
 msgstr ""
 
-#: ui/dialogs.slint:425
+#: ui/dialogs.slint:427
 msgid "Discord"
 msgstr ""
 
-#: src/presentation.rs:848
+#: src/presentation.rs:850
 msgid "Discord channel {0}"
 msgstr ""
 
@@ -313,7 +313,7 @@ msgstr ""
 msgid "Dog"
 msgstr ""
 
-#: ui/dialogs.slint:260
+#: ui/dialogs.slint:262
 msgid "Done"
 msgstr ""
 
@@ -321,7 +321,7 @@ msgstr ""
 msgid "Door"
 msgstr ""
 
-#: src/presentation.rs:451
+#: src/presentation.rs:452
 msgid "Dragon"
 msgstr ""
 
@@ -329,11 +329,11 @@ msgstr ""
 msgid "Drop a JPEG or PNG image to use it."
 msgstr ""
 
-#: ui/pages.slint:364
+#: ui/pages.slint:428
 msgid "Drop a folder of music here: each folder in it that holds audio becomes a playlist."
 msgstr ""
 
-#: ui/pages.slint:364
+#: ui/pages.slint:428
 msgid "Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard."
 msgstr ""
 
@@ -341,11 +341,11 @@ msgstr ""
 msgid "Drop an image to show it behind the collection"
 msgstr ""
 
-#: ui/pages.slint:753 ui/pages.slint:980
+#: ui/pages.slint:829 ui/pages.slint:1063
 msgid "Drop audio files here to add them."
 msgstr ""
 
-#: ui/pages.slint:220
+#: ui/pages.slint:252
 msgid "Drop folders of music on Playlists, or add a playlist."
 msgstr ""
 
@@ -353,7 +353,7 @@ msgstr ""
 msgid "Drop folders of music to follow them"
 msgstr ""
 
-#: ui/pages.slint:220
+#: ui/pages.slint:252
 msgid "Drop folders of sounds on Soundboards, or add a soundboard."
 msgstr ""
 
@@ -369,27 +369,27 @@ msgstr ""
 msgid "Drums"
 msgstr ""
 
-#: ui/dialogs.slint:230 ui/pages.slint:438 ui/pages.slint:666 ui/pages.slint:904
+#: ui/dialogs.slint:232 ui/pages.slint:510 ui/pages.slint:737 ui/pages.slint:984
 msgid "Edit"
 msgstr ""
 
-#: ui/dialogs.slint:324
+#: ui/dialogs.slint:326
 msgid "Edit Sound"
 msgstr ""
 
-#: ui/dialogs.slint:324
+#: ui/dialogs.slint:326
 msgid "Edit Track"
 msgstr ""
 
-#: src/presentation.rs:944
+#: src/presentation.rs:949
 msgid "Effects"
 msgstr ""
 
-#: ui/sidebar.slint:537
+#: ui/sidebar.slint:555
 msgid "Expand (Ctrl+B)"
 msgstr ""
 
-#: ui/dock.slint:396
+#: ui/dock.slint:447
 msgid "Expand the player"
 msgstr ""
 
@@ -397,11 +397,11 @@ msgstr ""
 msgid "Explosion"
 msgstr ""
 
-#: ui/dialogs.slint:339
+#: ui/dialogs.slint:341
 msgid "Fade In (ms)"
 msgstr ""
 
-#: ui/dialogs.slint:344
+#: ui/dialogs.slint:346
 msgid "Fade Out (ms)"
 msgstr ""
 
@@ -413,19 +413,19 @@ msgstr ""
 msgid "Fan"
 msgstr ""
 
-#: ui/pages.slint:819
+#: ui/pages.slint:899
 msgid "File missing"
 msgstr ""
 
-#: ui/pages.slint:175
+#: ui/pages.slint:181
 msgid "Filter this page"
 msgstr ""
 
-#: src/presentation.rs:452
+#: src/presentation.rs:453
 msgid "Fire"
 msgstr ""
 
-#: src/presentation.rs:953
+#: src/presentation.rs:958
 msgid "Fireplace"
 msgstr ""
 
@@ -437,11 +437,11 @@ msgstr ""
 msgid "Fog"
 msgstr ""
 
-#: ui/pages.slint:70
+#: ui/pages.slint:72
 msgid "Folder missing"
 msgstr ""
 
-#: ui/pages.slint:564
+#: ui/pages.slint:635
 msgid "Follows {0}"
 msgstr ""
 
@@ -449,7 +449,7 @@ msgstr ""
 msgid "Footsteps"
 msgstr ""
 
-#: src/presentation.rs:453
+#: src/presentation.rs:454
 msgid "Forest"
 msgstr ""
 
@@ -457,11 +457,11 @@ msgstr ""
 msgid "Forge"
 msgstr ""
 
-#: src/presentation.rs:483
+#: src/presentation.rs:484
 msgid "Frederic Edwin Church, 1860"
 msgstr ""
 
-#: src/presentation.rs:473
+#: src/presentation.rs:474
 msgid "Frederik Sødring, 1838"
 msgstr ""
 
@@ -469,11 +469,15 @@ msgstr ""
 msgid "Frost"
 msgstr ""
 
+#: ui/dock.slint:491
+msgid "Full window (Ctrl+Shift+M)"
+msgstr ""
+
 #: src/sound_icons.rs
 msgid "Ghost"
 msgstr ""
 
-#: ui/gallery.slint:206 src/presentation.rs:543
+#: ui/gallery.slint:207 src/presentation.rs:544
 msgid "Gradient"
 msgstr ""
 
@@ -485,7 +489,7 @@ msgstr ""
 msgid "Harbor"
 msgstr ""
 
-#: src/presentation.rs:454
+#: src/presentation.rs:455
 msgid "Haunted"
 msgstr ""
 
@@ -493,11 +497,11 @@ msgstr ""
 msgid "Heartbeat"
 msgstr ""
 
-#: src/presentation.rs:490
+#: src/presentation.rs:491
 msgid "Hendrick Avercamp, about 1608"
 msgstr ""
 
-#: ui/sidebar.slint:411 ui/sidebar.slint:539
+#: ui/sidebar.slint:424 ui/sidebar.slint:557
 msgid "Home"
 msgstr ""
 
@@ -509,7 +513,7 @@ msgstr ""
 msgid "House"
 msgstr ""
 
-#: ui/dialogs.slint:278
+#: ui/dialogs.slint:280
 msgid "Icon: {0}"
 msgstr ""
 
@@ -517,23 +521,23 @@ msgstr ""
 msgid "Images"
 msgstr ""
 
-#: ui/dialogs.slint:522
+#: ui/dialogs.slint:527
 msgid "Import"
 msgstr ""
 
-#: ui/pages.slint:240
+#: ui/pages.slint:272
 msgid "Import my Kenku FM library"
 msgstr ""
 
-#: src/presentation.rs:945
+#: src/presentation.rs:950
 msgid "Imported"
 msgstr ""
 
-#: src/presentation.rs:1089
+#: src/presentation.rs:1110
 msgid "Imported {0} with {1} from Kenku FM."
 msgstr ""
 
-#: src/controller.rs:1070 src/controller.rs:1083
+#: src/controller.rs:1078 src/controller.rs:1091
 msgid "Importing Kenku FM's library…"
 msgstr ""
 
@@ -545,47 +549,51 @@ msgstr ""
 msgid "Insects"
 msgstr ""
 
-#: src/presentation.rs:478
+#: src/presentation.rs:479
 msgid "J. M. W. Turner, 1835"
 msgstr ""
 
-#: src/presentation.rs:479
+#: src/presentation.rs:480
 msgid "Jacob van Ruisdael, about 1655"
 msgstr ""
 
-#: src/presentation.rs:471
+#: src/presentation.rs:472
 msgid "Jasper Francis Cropsey, 1860"
 msgstr ""
 
-#: src/presentation.rs:476
+#: src/presentation.rs:477
 msgid "Jean-Léon Gérôme, 1880s"
 msgstr ""
 
-#: src/presentation.rs:474
+#: src/presentation.rs:475
 msgid "John Constable, about 1825"
 msgstr ""
 
-#: src/presentation.rs:488
+#: src/presentation.rs:489
 msgid "John Martin, 1841"
 msgstr ""
 
-#: src/presentation.rs:896
+#: src/presentation.rs:904
 msgid "Joining the voice channel…"
 msgstr ""
 
-#: ui/dialogs.slint:483
+#: ui/dock.slint:480
+msgid "Keep on top"
+msgstr ""
+
+#: ui/dialogs.slint:488
 msgid "Keep playing after quitting"
 msgstr ""
 
-#: ui/dialogs.slint:505
+#: ui/dialogs.slint:510
 msgid "Kenku FM"
 msgstr ""
 
-#: src/presentation.rs:1126
+#: src/presentation.rs:1147
 msgid "Kenku FM's library is empty."
 msgstr ""
 
-#: src/presentation.rs:1033
+#: src/presentation.rs:1031
 msgid "Kenku FM’s library is invalid. Quit Kenku FM and try again."
 msgstr ""
 
@@ -593,7 +601,7 @@ msgstr ""
 msgid "Key"
 msgstr ""
 
-#: src/presentation.rs:1116
+#: src/presentation.rs:1137
 msgid "Left out {n} web address Tufo cannot play."
 msgid_plural "Left out {n} web addresses Tufo cannot play."
 msgstr[0] ""
@@ -607,15 +615,15 @@ msgstr ""
 msgid "Logs the bot out."
 msgstr ""
 
-#: ui/pages.slint:386
+#: ui/pages.slint:454
 msgid "Longest first"
 msgstr ""
 
-#: ui/pages.slint:896
+#: ui/pages.slint:976
 msgid "Loop"
 msgstr ""
 
-#: ui/dock.slint:41
+#: ui/dock.slint:43
 msgid "Loop {0}"
 msgstr ""
 
@@ -623,7 +631,7 @@ msgstr ""
 msgid "Lost tufo-server; reconnecting…"
 msgstr ""
 
-#: src/presentation.rs:485
+#: src/presentation.rs:486
 msgid "Ludolf Bakhuysen, about 1695"
 msgstr ""
 
@@ -635,7 +643,7 @@ msgstr ""
 msgid "Masquerade"
 msgstr ""
 
-#: ui/frame.slint:38
+#: ui/frame.slint:45
 msgid "Maximize"
 msgstr ""
 
@@ -643,75 +651,83 @@ msgstr ""
 msgid "Mine"
 msgstr ""
 
-#: ui/frame.slint:30
+#: src/tray/linux.rs:73 src/tray/windows.rs:37
+msgid "Mini Player"
+msgstr ""
+
+#: ui/dock.slint:329
+msgid "Mini player (Ctrl+Shift+M)"
+msgstr ""
+
+#: ui/frame.slint:35
 msgid "Minimize"
 msgstr ""
 
-#: ui/pages.slint:636
+#: ui/pages.slint:707
 msgid "Missing"
 msgstr ""
 
-#: ui/pages.slint:427 ui/pages.slint:653 ui/pages.slint:884
+#: ui/pages.slint:499 ui/pages.slint:724 ui/pages.slint:964
 msgid "More"
 msgstr ""
 
-#: src/presentation.rs:455
+#: src/presentation.rs:456
 msgid "Mountain"
 msgstr ""
 
-#: ui/search.slint:22 src/search.rs:91
+#: ui/search.slint:22 src/search.rs:171
 msgid "Music"
 msgstr ""
 
-#: ui/dock.slint:271
+#: ui/dock.slint:287
 msgid "Mute"
 msgstr ""
 
-#: ui/dialogs.slint:169 ui/dialogs.slint:233 ui/dialogs.slint:326
+#: ui/dialogs.slint:171 ui/dialogs.slint:235 ui/dialogs.slint:328
 msgid "Name"
 msgstr ""
 
-#: ui/pages.slint:383
+#: ui/pages.slint:451
 msgid "Name A→Z"
 msgstr ""
 
-#: ui/pages.slint:384
+#: ui/pages.slint:452
 msgid "Name Z→A"
 msgstr ""
 
-#: ui/pages.slint:388
+#: ui/pages.slint:456
 msgid "Newest first"
 msgstr ""
 
-#: ui/dock.slint:179
+#: ui/dock.slint:193
 msgid "Next"
 msgstr ""
 
-#: src/presentation.rs:456
+#: src/presentation.rs:457
 msgid "Night"
 msgstr ""
 
-#: src/controller.rs:1111
+#: src/controller.rs:1119
 msgid "No Kenku FM library imported."
 msgstr ""
 
-#: src/presentation.rs:1027
+#: src/presentation.rs:1025
 msgid "No Kenku FM library was found in that folder."
 msgstr ""
 
-#: src/presentation.rs:1055
+#: src/presentation.rs:1072
 msgid "No music is playing."
 msgstr ""
 
-#: ui/pages.slint:980
+#: ui/pages.slint:1063
 msgid "No sound matches the filter."
 msgstr ""
 
-#: ui/pages.slint:753
+#: ui/pages.slint:829
 msgid "No track matches the filter."
 msgstr ""
 
-#: ui/pages.slint:364
+#: ui/pages.slint:428
 msgid "Nothing matches the filter."
 msgstr ""
 
@@ -719,15 +735,15 @@ msgstr ""
 msgid "Nothing matches."
 msgstr ""
 
-#: src/render.rs:428
+#: src/render.rs:429
 msgid "Nothing new to add."
 msgstr ""
 
-#: ui/dock.slint:96
+#: ui/dock.slint:98
 msgid "Nothing playing"
 msgstr ""
 
-#: ui/pages.slint:387
+#: ui/pages.slint:455
 msgid "Oldest first"
 msgstr ""
 
@@ -739,27 +755,27 @@ msgstr ""
 msgid "Open Playlists or Soundboards to drop folders there."
 msgstr ""
 
-#: src/tray/linux.rs:71 src/tray/windows.rs:33
+#: src/tray/linux.rs:71 src/tray/windows.rs:34
 msgid "Open Tufo"
 msgstr ""
 
-#: ui/gallery.slint:235
+#: ui/gallery.slint:236
 msgid "Or drop one on this window"
 msgstr ""
 
-#: ui/dialogs.slint:184
+#: ui/dialogs.slint:186
 msgid "Or follow a folder"
 msgstr ""
 
-#: ui/sidebar.slint:234
+#: ui/sidebar.slint:245
 msgid "Output: {0}"
 msgstr ""
 
-#: src/presentation.rs:477
+#: src/presentation.rs:478
 msgid "Paolo Uccello, about 1470"
 msgstr ""
 
-#: src/presentation.rs:1077
+#: src/presentation.rs:1098
 msgid "Paste a Discord bot token before saving."
 msgstr ""
 
@@ -767,19 +783,19 @@ msgstr ""
 msgid "Paste a new token"
 msgstr ""
 
-#: ui/dialogs.slint:437
+#: ui/dialogs.slint:440
 msgid "Paste your bot's token"
 msgstr ""
 
-#: ui/dock.slint:121 ui/pages.slint:94 ui/pages.slint:615 ui/pages.slint:706 ui/pages.slint:731 src/tray.rs:57
+#: ui/dock.slint:123 ui/pages.slint:96 ui/pages.slint:686 ui/pages.slint:779 ui/pages.slint:804 src/tray.rs:58
 msgid "Pause"
 msgstr ""
 
-#: src/tray.rs:64 src/tray.rs:65
+#: src/tray.rs:65 src/tray.rs:66
 msgid "Pause Sounds"
 msgstr ""
 
-#: ui/dock.slint:144
+#: ui/dock.slint:146
 msgid "Pause sounds"
 msgstr ""
 
@@ -795,11 +811,11 @@ msgstr ""
 msgid "Piano"
 msgstr ""
 
-#: src/presentation.rs:489
+#: src/presentation.rs:490
 msgid "Pierre-Jacques Volaire, 1771"
 msgstr ""
 
-#: src/presentation.rs:484
+#: src/presentation.rs:485
 msgid "Pieter Claesz, 1628"
 msgstr ""
 
@@ -807,27 +823,27 @@ msgstr ""
 msgid "Places"
 msgstr ""
 
-#: ui/dock.slint:121 ui/pages.slint:94 ui/pages.slint:615 ui/pages.slint:706 ui/pages.slint:731 src/tray.rs:56 src/tray.rs:58
+#: ui/dock.slint:123 ui/pages.slint:96 ui/pages.slint:686 ui/pages.slint:779 ui/pages.slint:804 src/tray.rs:57 src/tray.rs:59
 msgid "Play"
 msgstr ""
 
-#: ui/sidebar.slint:175
+#: ui/sidebar.slint:176
 msgid "Play into"
 msgstr ""
 
-#: src/search.rs:67
+#: src/search.rs:150
 msgid "Playlist"
 msgstr ""
 
-#: ui/pages.slint:298 ui/pages.slint:347 ui/sidebar.slint:420 ui/sidebar.slint:540
+#: ui/pages.slint:334 ui/pages.slint:386 ui/sidebar.slint:433 ui/sidebar.slint:558
 msgid "Playlists"
 msgstr ""
 
-#: ui/dock.slint:167
+#: ui/dock.slint:176
 msgid "Previous"
 msgstr ""
 
-#: src/tray/linux.rs:83 src/tray/windows.rs:49
+#: src/tray/linux.rs:88 src/tray/windows.rs:56
 msgid "Quit Tufo"
 msgstr ""
 
@@ -835,7 +851,7 @@ msgstr ""
 msgid "Rabbit"
 msgstr ""
 
-#: src/presentation.rs:946
+#: src/presentation.rs:951
 msgid "Rain"
 msgstr ""
 
@@ -843,39 +859,39 @@ msgstr ""
 msgid "Rats"
 msgstr ""
 
-#: src/controller.rs:1215
+#: src/controller.rs:1223
 msgid "Reading the audio files…"
 msgstr ""
 
-#: ui/sidebar.slint:188
+#: ui/sidebar.slint:189
 msgid "Refresh the voice channels"
 msgstr ""
 
-#: ui/pages.slint:674 ui/pages.slint:912
+#: ui/pages.slint:745 ui/pages.slint:992
 msgid "Remove"
 msgstr ""
 
-#: ui/dock.slint:191
+#: ui/dock.slint:207
 msgid "Repeat the playlist"
 msgstr ""
 
-#: ui/dock.slint:191
+#: ui/dock.slint:207
 msgid "Repeat the track"
 msgstr ""
 
-#: src/presentation.rs:1123
+#: src/presentation.rs:1144
 msgid "Restarting so the bot logs in with Kenku FM's token."
 msgstr ""
 
-#: ui/frame.slint:38
+#: ui/frame.slint:45
 msgid "Restore"
 msgstr ""
 
-#: src/tray.rs:66
+#: src/tray.rs:67
 msgid "Resume Sounds"
 msgstr ""
 
-#: ui/dock.slint:144
+#: ui/dock.slint:146
 msgid "Resume sounds"
 msgstr ""
 
@@ -883,11 +899,11 @@ msgstr ""
 msgid "Run at startup"
 msgstr ""
 
-#: ui/dialogs.slint:359
+#: ui/dialogs.slint:361
 msgid "Save"
 msgstr ""
 
-#: ui/dialogs.slint:447
+#: ui/dialogs.slint:450
 msgid "Save and restart"
 msgstr ""
 
@@ -899,23 +915,23 @@ msgstr ""
 msgid "Scroll"
 msgstr ""
 
-#: ui/sidebar.slint:382
+#: ui/sidebar.slint:395
 msgid "Search"
 msgstr ""
 
-#: ui/search.slint:108 ui/sidebar.slint:360
+#: ui/search.slint:108 ui/sidebar.slint:373
 msgid "Search everything"
 msgstr ""
 
-#: ui/sidebar.slint:538
+#: ui/sidebar.slint:556
 msgid "Search everything (Ctrl+Shift+F)"
 msgstr ""
 
-#: ui/pages.slint:266
+#: ui/pages.slint:298
 msgid "See all {0}"
 msgstr ""
 
-#: ui/dialogs.slint:414 ui/sidebar.slint:504 ui/sidebar.slint:587
+#: ui/dialogs.slint:416 ui/sidebar.slint:521 ui/sidebar.slint:607
 msgid "Settings"
 msgstr ""
 
@@ -927,15 +943,15 @@ msgstr ""
 msgid "Ship"
 msgstr ""
 
-#: ui/pages.slint:385
+#: ui/pages.slint:453
 msgid "Shortest first"
 msgstr ""
 
-#: ui/dock.slint:158 ui/pages.slint:741
+#: ui/dock.slint:165 ui/pages.slint:814
 msgid "Shuffle"
 msgstr ""
 
-#: ui/pages.slint:741
+#: ui/pages.slint:814
 msgid "Shuffling"
 msgstr ""
 
@@ -943,7 +959,7 @@ msgstr ""
 msgid "Skies and seasons"
 msgstr ""
 
-#: src/render.rs:446
+#: src/render.rs:447
 msgid "Skipped {n} item that is not audio or a folder."
 msgid_plural "Skipped {n} items that are not audio or folders."
 msgstr[0] ""
@@ -953,11 +969,11 @@ msgstr[1] ""
 msgid "Skull"
 msgstr ""
 
-#: src/presentation.rs:458
+#: src/presentation.rs:459
 msgid "Skulls"
 msgstr ""
 
-#: src/presentation.rs:457
+#: src/presentation.rs:458
 msgid "Sky"
 msgstr ""
 
@@ -965,27 +981,27 @@ msgstr ""
 msgid "Snow"
 msgstr ""
 
-#: src/presentation.rs:976
+#: src/presentation.rs:981
 msgid "Some values are invalid. Check them and try again."
 msgstr ""
 
-#: ui/pages.slint:404
+#: ui/pages.slint:474
 msgid "Sort: {0}"
 msgstr ""
 
-#: src/presentation.rs:683
+#: src/presentation.rs:684
 msgid "Sound"
 msgstr ""
 
-#: src/search.rs:68
+#: src/search.rs:151
 msgid "Soundboard"
 msgstr ""
 
-#: ui/pages.slint:311 ui/pages.slint:347 ui/sidebar.slint:445 ui/sidebar.slint:541
+#: ui/pages.slint:348 ui/pages.slint:386 ui/sidebar.slint:458 ui/sidebar.slint:559
 msgid "Soundboards"
 msgstr ""
 
-#: ui/search.slint:22 src/search.rs:99
+#: ui/search.slint:22 src/search.rs:177
 msgid "Sounds"
 msgstr ""
 
@@ -997,7 +1013,7 @@ msgstr ""
 msgid "Squirrel"
 msgstr ""
 
-#: ui/pages.slint:1001
+#: ui/pages.slint:1088
 msgid "Starting the audio server"
 msgstr ""
 
@@ -1005,39 +1021,43 @@ msgstr ""
 msgid "Starting tufo-server…"
 msgstr ""
 
-#: ui/pages.slint:896
+#: ui/pages.slint:976
 msgid "Stop Looping"
 msgstr ""
 
-#: ui/pages.slint:453
+#: ui/pages.slint:525
 msgid "Stop following"
 msgstr ""
 
-#: ui/dock.slint:41
+#: ui/dock.slint:480
+msgid "Stop keeping on top"
+msgstr ""
+
+#: ui/dock.slint:43
 msgid "Stop looping {0}"
 msgstr ""
 
-#: ui/dock.slint:191
+#: ui/dock.slint:207
 msgid "Stop repeating"
 msgstr ""
 
-#: ui/dock.slint:158
+#: ui/dock.slint:165
 msgid "Stop shuffling"
 msgstr ""
 
-#: ui/dock.slint:61
+#: ui/dock.slint:63
 msgid "Stop {0}"
 msgstr ""
 
-#: src/presentation.rs:459 src/presentation.rs:947
+#: src/presentation.rs:460 src/presentation.rs:952
 msgid "Storm"
 msgstr ""
 
-#: src/presentation.rs:950
+#: src/presentation.rs:955
 msgid "Stream"
 msgstr ""
 
-#: src/presentation.rs:952
+#: src/presentation.rs:957
 msgid "Summer Night"
 msgstr ""
 
@@ -1045,7 +1065,7 @@ msgstr ""
 msgid "Summer night"
 msgstr ""
 
-#: src/presentation.rs:460
+#: src/presentation.rs:461
 msgid "Tavern"
 msgstr ""
 
@@ -1053,7 +1073,7 @@ msgstr ""
 msgid "Temple"
 msgstr ""
 
-#: src/presentation.rs:1015
+#: src/presentation.rs:1013
 msgid "That collection no longer exists."
 msgstr ""
 
@@ -1061,67 +1081,67 @@ msgstr ""
 msgid "That image's path isn't usable."
 msgstr ""
 
-#: src/presentation.rs:1058
+#: src/presentation.rs:1075
 msgid "That position is past the end of the track."
 msgstr ""
 
-#: src/presentation.rs:1039
+#: src/presentation.rs:1037
 msgid "That track is missing or cannot be played."
 msgstr ""
 
-#: src/presentation.rs:1021
+#: src/presentation.rs:1019
 msgid "That track or sound no longer exists."
 msgstr ""
 
-#: src/presentation.rs:1065
+#: src/presentation.rs:1086
 msgid "That voice channel is no longer available. Refresh the channels."
 msgstr ""
 
-#: src/presentation.rs:1074
+#: src/presentation.rs:1095
 msgid "The Discord bot is still connecting. Try again shortly."
 msgstr ""
 
-#: ui/sidebar.slint:205
+#: ui/sidebar.slint:206
 msgid "The Discord connection is disabled — enable it in Settings"
 msgstr ""
 
-#: src/presentation.rs:1086
+#: src/presentation.rs:1084
 msgid "The Discord connection is disabled. Enable it in Settings first."
 msgstr ""
 
-#: src/presentation.rs:1043
+#: src/presentation.rs:1060
 msgid "The audio file is missing. Restore it and try again."
 msgstr ""
 
-#: src/presentation.rs:1052
+#: src/presentation.rs:1069
 msgid "The audio output is unavailable. Choose another output."
 msgstr ""
 
-#: src/presentation.rs:970
+#: src/presentation.rs:975
 msgid "The request took too long. Try again."
 msgstr ""
 
-#: src/presentation.rs:971
+#: src/presentation.rs:976
 msgid "The request was cancelled."
 msgstr ""
 
-#: src/presentation.rs:979
+#: src/presentation.rs:984
 msgid "The server is busy. Try again shortly."
 msgstr ""
 
-#: src/presentation.rs:969
+#: src/presentation.rs:974
 msgid "The server is unavailable. Tufo will reconnect shortly."
 msgstr ""
 
-#: src/presentation.rs:1036
+#: src/presentation.rs:1034
 msgid "There are no playable files in this collection."
 msgstr ""
 
-#: src/presentation.rs:795 src/presentation.rs:855
+#: src/presentation.rs:797 src/presentation.rs:857
 msgid "This Computer"
 msgstr ""
 
-#: src/presentation.rs:1025
+#: src/presentation.rs:1023
 msgid "This collection follows a folder. Change the files in that folder."
 msgstr ""
 
@@ -1133,11 +1153,11 @@ msgstr ""
 msgid "This collection follows its folder; add files there"
 msgstr ""
 
-#: ui/pages.slint:753 ui/pages.slint:980
+#: ui/pages.slint:829 ui/pages.slint:1063
 msgid "This folder holds no audio yet."
 msgstr ""
 
-#: src/controller.rs:1143
+#: src/controller.rs:1151
 msgid "This system names no config directory for Tufo's settings."
 msgstr ""
 
@@ -1145,7 +1165,7 @@ msgstr ""
 msgid "Tornado"
 msgstr ""
 
-#: src/presentation.rs:461
+#: src/presentation.rs:462
 msgid "Town"
 msgstr ""
 
@@ -1157,43 +1177,43 @@ msgstr ""
 msgid "Train"
 msgstr ""
 
-#: ui/app.slint:27
+#: ui/app.slint:28
 msgid "Tufo"
 msgstr ""
 
-#: ui/gallery.slint:220
+#: ui/gallery.slint:221
 msgid "Tufo can't open this file"
 msgstr ""
 
-#: ui/dialogs.slint:252
+#: ui/dialogs.slint:254
 msgid "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another."
 msgstr ""
 
-#: src/controller.rs:1116
+#: src/controller.rs:1124
 msgid "Tufo can't read that folder's path."
 msgstr ""
 
-#: src/presentation.rs:1049
+#: src/presentation.rs:1066
 msgid "Tufo cannot play this audio format."
 msgstr ""
 
-#: src/controller.rs:1130
+#: src/controller.rs:1138
 msgid "Tufo could not change starting at login. Check your system settings."
 msgstr ""
 
-#: src/presentation.rs:980
+#: src/presentation.rs:985
 msgid "Tufo could not complete the request. Check the server log."
 msgstr ""
 
-#: src/presentation.rs:1068
+#: src/presentation.rs:1089
 msgid "Tufo could not join the voice channel. Check the bot’s permissions and try again."
 msgstr ""
 
-#: src/presentation.rs:1071
+#: src/presentation.rs:1092
 msgid "Tufo could not open the audio device. Check your system’s audio settings."
 msgstr ""
 
-#: src/presentation.rs:1030
+#: src/presentation.rs:1028
 msgid "Tufo could not read Kenku FM’s library. Check the folder permissions."
 msgstr ""
 
@@ -1201,19 +1221,19 @@ msgstr ""
 msgid "Tufo could not read config.toml. Fix or remove it and restart Tufo."
 msgstr ""
 
-#: src/presentation.rs:1079
+#: src/presentation.rs:1100
 msgid "Tufo could not read or save the Discord bot token. Check the config folder permissions."
 msgstr ""
 
-#: src/presentation.rs:1046
+#: src/presentation.rs:1063
 msgid "Tufo could not read the audio file. Check its permissions."
 msgstr ""
 
-#: src/controller.rs:1157
+#: src/controller.rs:1165
 msgid "Tufo could not save config.toml. Check its contents and permissions."
 msgstr ""
 
-#: src/presentation.rs:1007
+#: src/presentation.rs:1005
 msgid "Tufo could not save or read the library. Check the server log."
 msgstr ""
 
@@ -1221,124 +1241,124 @@ msgstr ""
 msgid "Tufo could not start its server. Check that tufo-server is installed."
 msgstr ""
 
-#: src/presentation.rs:973
+#: src/presentation.rs:978
 msgid "Tufo does not have permission to complete this request."
 msgstr ""
 
-#: ui/dialogs.slint:192
+#: ui/dialogs.slint:194
 msgid "Tufo keeps its files in sync."
 msgstr ""
 
-#: src/presentation.rs:960
+#: src/presentation.rs:965
 msgid "Tufo received an invalid response. Update the app and server together."
 msgstr ""
 
-#: src/presentation.rs:462
+#: src/presentation.rs:463
 msgid "Underworld"
 msgstr ""
 
-#: ui/dock.slint:271
+#: ui/dock.slint:287
 msgid "Unmute"
 msgstr ""
 
-#: src/presentation.rs:978
+#: src/presentation.rs:983
 msgid "Update the app and server together to use this feature."
 msgstr ""
 
-#: src/presentation.rs:898
+#: src/presentation.rs:906
 msgid "Voice dropped; reconnecting (attempt {0})…"
 msgstr ""
 
-#: src/presentation.rs:463
+#: src/presentation.rs:464
 msgid "Volcano"
 msgstr ""
 
-#: src/presentation.rs:949
+#: src/presentation.rs:954
 msgid "Waves"
 msgstr ""
 
-#: src/presentation.rs:475
+#: src/presentation.rs:476
 msgid "William Stanley Haseltine, 1869"
 msgstr ""
 
-#: src/presentation.rs:948
+#: src/presentation.rs:953
 msgid "Wind"
 msgstr ""
 
-#: src/presentation.rs:464
+#: src/presentation.rs:465
 msgid "Winter"
 msgstr ""
 
-#: ui/gallery.slint:197
+#: ui/gallery.slint:198
 msgid "Your own"
 msgstr ""
 
-#: src/controller.rs:1067 src/controller.rs:1193 src/controller.rs:1211
+#: src/controller.rs:1075 src/controller.rs:1201 src/controller.rs:1219
 msgid "tufo-server is not connected."
 msgstr ""
 
-#: ui/sidebar.slint:227
+#: ui/sidebar.slint:238
 msgid "{0} in {1}"
 msgstr ""
 
-#: src/presentation.rs:324
+#: src/presentation.rs:325
 msgid "{0}, {1}"
 msgstr ""
 
-#: src/presentation.rs:1092 src/render.rs:433
+#: src/presentation.rs:1113 src/render.rs:434
 msgid "{n} collection"
 msgid_plural "{n} collections"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:1102
+#: src/presentation.rs:1123
 msgid "{n} collection was already in Tufo."
 msgid_plural "{n} collections were already in Tufo."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:1097 src/render.rs:434
+#: src/presentation.rs:1118 src/render.rs:435
 msgid "{n} file"
 msgid_plural "{n} files"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:1109
+#: src/presentation.rs:1130
 msgid "{n} file could not be found or read."
 msgid_plural "{n} files could not be found or read."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/render.rs:439
+#: src/render.rs:440
 msgid "{n} file could not be read."
 msgid_plural "{n} files could not be read."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:312
+#: src/presentation.rs:313
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:320
+#: src/presentation.rs:321
 msgid "{n} playing"
 msgid_plural "{n} playing"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:284
+#: src/presentation.rs:285
 msgid "{n} sound"
 msgid_plural "{n} sounds"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/presentation.rs:283
+#: src/presentation.rs:284
 msgid "{n} track"
 msgid_plural "{n} tracks"
 msgstr[0] ""
 msgstr[1] ""
 
-#: ui/search.slint:153
+#: ui/search.slint:143
 msgid "↑↓ to choose · Enter to play · Esc to close"
 msgstr ""

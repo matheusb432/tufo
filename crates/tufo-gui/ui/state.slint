@@ -123,6 +123,11 @@ export global Session {
     in property <CurrentOutput> current-output;
     in-out property <bool> drawer-pinned: true;
     in-out property <bool> player-collapsed;
+    // The window shows only the player, as a small widget.
+    in property <bool> mini-player;
+    in-out property <bool> mini-player-pinned: true;
+    // False on Wayland, where only the desktop's window menu keeps a window above the others.
+    in property <bool> always-on-top-supported: true;
     // A short message at the bottom of the window; empty hides it.
     in property <string> toast;
     in property <bool> toast-is-error;
@@ -237,6 +242,10 @@ export global WindowFrame {
     callback toggle-maximized();
     // Opens the desktop's window menu at this point in the window.
     callback show-menu(length, length);
+    // Shrinks the window to the mini player, or grows it back to its full size.
+    callback set-mini-player(bool);
+    // The window's size changed while it wasn't maximized.
+    callback resized(length, length);
 }
 
 export global Actions {
@@ -281,6 +290,7 @@ export global Actions {
     callback select-output(int);
     callback set-drawer-pinned(bool);
     callback set-player-collapsed(bool);
+    callback set-mini-player-pinned(bool);
     callback refresh-outputs();
     // In milliseconds.
     callback set-crossfade(int);

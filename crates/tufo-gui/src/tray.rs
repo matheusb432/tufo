@@ -1,5 +1,5 @@
-//! The tray icon. A left click shows the window; the menu opens the window, plays or pauses the
-//! music, pauses or resumes the sounds, and quits.
+//! The tray icon. A left click shows the window; the menu opens the window or the mini player,
+//! plays or pauses the music, pauses or resumes the sounds, and quits.
 //!
 //! Linux serves a `StatusNotifierItem` over D-Bus with ksni, and Windows uses the notification
 //! area through tray-icon. Both show `icons/tufo-tray.svg` drawn at the size the panel uses, so it
@@ -22,6 +22,7 @@ pub(crate) use windows::Tray;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TrayCommand {
     ShowWindow,
+    ShowMiniPlayer,
     TogglePlayPause,
     ToggleSoundsPaused,
     Quit,
