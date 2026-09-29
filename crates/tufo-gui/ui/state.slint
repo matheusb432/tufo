@@ -8,6 +8,10 @@ export enum OutputRowKind { local, guild, channel }
 
 export enum VoiceBadge { none, joining, dropped }
 
+// The form the window switches to once the one on show has faded out. `none` means no switch
+// is waiting.
+export enum FormSwitch { none, to-mini-player, to-full-window }
+
 // Which collection's background a picker changes. `none` means no dialog shows a picker.
 export enum BackgroundTarget { none, new-collection, open-collection }
 
@@ -242,10 +246,17 @@ export global WindowFrame {
     callback toggle-maximized();
     // Opens the desktop's window menu at this point in the window.
     callback show-menu(length, length);
-    // Shrinks the window to the mini player, or grows it back to its full size.
+    // Shrinks the window to the mini player, or grows it back to its full size, at once.
     callback set-mini-player(bool);
     // The window's size changed while it wasn't maximized.
     callback resized(length, length);
+    in-out property <FormSwitch> form-switch;
+    // Fades the form on show out, then switches the window to the other one.
+    public function switch-form() {
+        if root.form-switch == FormSwitch.none {
+            root.form-switch = Session.mini-player ? FormSwitch.to-full-window : FormSwitch.to-mini-player;
+        }
+    }
 }
 
 export global Actions {

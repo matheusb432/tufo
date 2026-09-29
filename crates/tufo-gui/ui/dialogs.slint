@@ -1,12 +1,12 @@
 // The add and edit dialogs, and the settings dialog.
 
-import { Theme } from "theme.slint";
+import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
     Navigation, Session, SoundIcons,
 } from "state.slint";
 import {
-    Button, ButtonKind, Icon, IconButton, ScrollThumb, Slider, Switch, TextField, TextLink,
+    Button, ButtonKind, Icon, IconButton, Scrim, ScrollThumb, Slider, Switch, TextField, TextLink,
 } from "widgets.slint";
 
 // A modal card over a dimmed window. Clicking the dimmed area cancels.
@@ -14,9 +14,11 @@ export component DialogFrame inherits Rectangle {
     in property <string> title;
     // Shows a close button beside the title, for a dialog without a Cancel button.
     in property <bool> closable;
+    // A `Presence`'s progress, which fades the dialog in and out.
+    in property <float> progress: 1;
     callback cancel();
-    background: Theme.scrim;
-    TouchArea {
+    Scrim {
+        progress: root.progress;
         clicked => {
             root.cancel();
         }
@@ -24,7 +26,8 @@ export component DialogFrame inherits Rectangle {
 
     // Clear of the title row, whose buttons stay above every dialog.
     Rectangle {
-        y: max(Theme.title-row-height, (root.height - self.height) / 2);
+        y: max(Theme.title-row-height, (root.height - self.height) / 2) + Motion.presence-sink(root.progress);
+        opacity: root.progress;
         width: min(parent.width - 48px, 440px);
         height: min(layout.preferred-height, root.height - Theme.title-row-height - 24px);
         background: Theme.raised;
@@ -57,6 +60,7 @@ export component DialogFrame inherits Rectangle {
                         icon-size: 20px;
                         icon: @image-url("icons/x.svg");
                         tooltip: @tr("Close");
+                        tooltip-enabled: root.progress == 1;
                         clicked => {
                             root.cancel();
                         }
@@ -75,6 +79,9 @@ export component DialogFrame inherits Rectangle {
             show: scroll.content-height > scroll.height;
         }
     }
+
+    // Swallows clicks while the dialog moves, so a double click can't act on it twice.
+    if root.progress < 1: TouchArea { }
 }
 
 component Actions-Row inherits HorizontalLayout {

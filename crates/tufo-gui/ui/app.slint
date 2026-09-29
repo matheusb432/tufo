@@ -4,8 +4,9 @@
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
-    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
-    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
+    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, FormSwitch, LibraryView,
+    NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
+    WindowFrame,
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
 import { ConnectingPage, GridPage, HomePage, PlaylistPage, SoundboardPage } from "pages.slint";
@@ -16,7 +17,7 @@ import {
 import { BackgroundGallery } from "gallery.slint";
 import { SearchPalette } from "search.slint";
 import { WindowButtons, WindowDragArea } from "frame.slint";
-import { Icon } from "widgets.slint";
+import { Icon, Presence, Scrim } from "widgets.slint";
 
 export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
@@ -70,6 +71,14 @@ export component AppWindow inherits Window {
     property <bool> gallery-open;
     property <string> gallery-title;
     property <bool> mini-player: Session.mini-player;
+    full-form := Presence {
+        open: !root.mini-player && WindowFrame.form-switch == FormSwitch.none;
+    }
+
+    mini-form := Presence {
+        open: root.mini-player && WindowFrame.form-switch == FormSwitch.none;
+    }
+
     changed mini-player => {
         if self.mini-player {
             root.sidebar-overlaid = false;
@@ -165,6 +174,16 @@ export component AppWindow inherits Window {
         false
     }
 
+    // Switches the window's form once the form on show has faded out.
+    Timer {
+        interval: Motion.presence-exit;
+        running: WindowFrame.form-switch != FormSwitch.none;
+        triggered => {
+            WindowFrame.set-mini-player(WindowFrame.form-switch == FormSwitch.to-mini-player);
+            WindowFrame.form-switch = FormSwitch.none;
+        }
+    }
+
     // The accents' clock, at 30 frames a second.
     Timer {
         interval: 33ms;
@@ -201,7 +220,7 @@ export component AppWindow inherits Window {
                 return accept;
             }
             if event.modifiers.control && event.modifiers.shift && !event.modifiers.alt && (event.text == "m" || event.text == "M") {
-                WindowFrame.set-mini-player(!Session.mini-player);
+                WindowFrame.switch-form();
                 return accept;
             }
             if event.text == Key.Escape {
@@ -209,7 +228,8 @@ export component AppWindow inherits Window {
             }
             reject
         }
-        if !root.mini-player: Rectangle {
+        if full-form.present && !root.mini-player: Rectangle {
+            opacity: full-form.progress;
             main := Rectangle {
                 x: root.page-x;
                 width: parent.width - self.x;
@@ -336,17 +356,13 @@ export component AppWindow inherits Window {
                 }
             }
 
-            Rectangle {
+            Scrim {
                 x: Theme.rail-width;
                 width: parent.width - self.x;
-                background: Theme.scrim;
-                opacity: root.sidebar-overlaid ? 1 : 0;
-                visible: self.opacity > 0;
-                animate opacity { duration: Motion.sidebar-slide; }
-                TouchArea {
-                    clicked => {
-                        root.sidebar-overlaid = false;
-                    }
+                progress: root.sidebar-overlaid ? 1 : 0;
+                animate progress { duration: Motion.sidebar-slide; }
+                clicked => {
+                    root.sidebar-overlaid = false;
                 }
             }
 
@@ -382,7 +398,12 @@ export component AppWindow inherits Window {
                     shortcuts.focus();
                 }
             }
-            if root.add-open: AddCollectionDialog {
+            add-dialog := Presence {
+                open: root.add-open;
+            }
+
+            if add-dialog.present: AddCollectionDialog {
+                progress: add-dialog.progress;
                 kind: root.add-kind;
                 change-background(title) => {
                     root.open-gallery(title);
@@ -393,7 +414,12 @@ export component AppWindow inherits Window {
                     shortcuts.focus();
                 }
             }
-            if root.edit-collection-open: EditCollectionDialog {
+            edit-collection-dialog := Presence {
+                open: root.edit-collection-open;
+            }
+
+            if edit-collection-dialog.present: EditCollectionDialog {
+                progress: edit-collection-dialog.progress;
                 change-background(title) => {
                     root.open-gallery(title);
                 }
@@ -403,7 +429,12 @@ export component AppWindow inherits Window {
                     shortcuts.focus();
                 }
             }
-            if root.gallery-open && root.add-open: BackgroundGallery {
+            new-collection-gallery := Presence {
+                open: root.gallery-open && root.add-open;
+            }
+
+            if new-collection-gallery.present: BackgroundGallery {
+                progress: new-collection-gallery.progress;
                 target: BackgroundTarget.new-collection;
                 heading: root.gallery-title != "" ? @tr("Background for {0}", root.gallery-title) : root.add-kind == CollectionKind.playlist ? @tr("Background for the new playlist") : @tr("Background for the new soundboard");
                 selected: Backgrounds.draft;
@@ -412,7 +443,12 @@ export component AppWindow inherits Window {
                     root.gallery-open = false;
                 }
             }
-            if root.gallery-open && root.edit-collection-open: BackgroundGallery {
+            open-collection-gallery := Presence {
+                open: root.gallery-open && root.edit-collection-open;
+            }
+
+            if open-collection-gallery.present: BackgroundGallery {
+                progress: open-collection-gallery.progress;
                 target: BackgroundTarget.open-collection;
                 collection-id: Navigation.collection-id;
                 heading: @tr("Background for {0}", root.gallery-title != "" ? root.gallery-title : LibraryView.collection-title);
@@ -423,7 +459,12 @@ export component AppWindow inherits Window {
                     root.gallery-open = false;
                 }
             }
-            if root.edit-entry-open: EditEntryDialog {
+            edit-entry-dialog := Presence {
+                open: root.edit-entry-open;
+            }
+
+            if edit-entry-dialog.present: EditEntryDialog {
+                progress: edit-entry-dialog.progress;
                 entry-id: root.entry-id;
                 entry-title: root.entry-title;
                 sound: root.entry-is-sound;
@@ -435,14 +476,20 @@ export component AppWindow inherits Window {
                     shortcuts.focus();
                 }
             }
-            if root.settings-open: SettingsDialog {
+            settings-dialog := Presence {
+                open: root.settings-open;
+            }
+
+            if settings-dialog.present: SettingsDialog {
+                progress: settings-dialog.progress;
                 cancel => {
                     root.settings-open = false;
                     shortcuts.focus();
                 }
             }
         }
-        if root.mini-player: MiniPlayer {
+        if mini-form.present && root.mini-player: MiniPlayer {
+            opacity: mini-form.progress;
             close => {
                 root.close();
             }
@@ -457,7 +504,8 @@ export component AppWindow inherits Window {
         height: Theme.title-row-height;
     }
 
-    if !root.mini-player: WindowButtons {
+    if full-form.present && !root.mini-player: WindowButtons {
+        opacity: full-form.progress;
         x: parent.width - self.width - 8px;
         y: (Theme.title-row-height - self.height) / 2;
         height: self.preferred-height;
@@ -471,4 +519,7 @@ export component AppWindow inherits Window {
         border-width: 1px;
         border-color: Theme.window-edge;
     }
+
+    // Swallows clicks while the form on show fades out.
+    if WindowFrame.form-switch != FormSwitch.none: TouchArea { }
 }

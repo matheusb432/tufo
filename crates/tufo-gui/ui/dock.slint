@@ -328,7 +328,7 @@ component MiniPlayerButton inherits IconButton {
     icon: @image-url("icons/picture-in-picture-2.svg");
     tooltip: @tr("Mini player (Ctrl+Shift+M)");
     clicked => {
-        WindowFrame.set-mini-player(true);
+        WindowFrame.switch-form();
     }
 }
 
@@ -490,7 +490,7 @@ export component MiniPlayer inherits Rectangle {
                 icon: @image-url("icons/maximize-2.svg");
                 tooltip: @tr("Full window (Ctrl+Shift+M)");
                 clicked => {
-                    WindowFrame.set-mini-player(false);
+                    WindowFrame.switch-form();
                 }
             }
 

@@ -102,4 +102,13 @@ export global Motion {
     out property <duration> sidebar-fade-in-delay: 100ms;
     out property <duration> hover: 150ms;
     out property <duration> logo-blink: 350ms;
+    // A `Presence`: an overlay, or the window's form, arriving and leaving.
+    out property <duration> presence-enter: 180ms;
+    out property <duration> presence-exit: 120ms;
+    out property <easing> presence-easing: cubic-bezier(0.2, 0, 0, 1);
+    out property <length> presence-rise: 12px;
+    // How far below its resting place a surface at a `Presence`'s `progress` sits.
+    public pure function presence-sink(progress: float) -> length {
+        (1 - progress) * root.presence-rise
+    }
 }

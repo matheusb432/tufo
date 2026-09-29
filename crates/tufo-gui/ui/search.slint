@@ -1,8 +1,8 @@
 // The Ctrl+Shift+F palette: search every track, sound, and collection, then Enter to play.
 
-import { Theme } from "theme.slint";
+import { Motion, Theme } from "theme.slint";
 import { Actions, Search, SearchResult } from "state.slint";
-import { Icon, TextField } from "widgets.slint";
+import { Icon, Presence, Scrim, TextField } from "widgets.slint";
 
 component ResultRow inherits Rectangle {
     in property <SearchResult> result;
@@ -59,9 +59,13 @@ export component SearchPalette inherits Rectangle {
             query.focus();
         }
     }
-    visible: root.open;
-    background: Theme.scrim;
-    TouchArea {
+    visible: presence.present;
+    presence := Presence {
+        open: root.open;
+    }
+
+    Scrim {
+        progress: presence.progress;
         clicked => {
             root.close();
         }
@@ -92,7 +96,8 @@ export component SearchPalette inherits Rectangle {
         }
         Rectangle {
             x: (root.width - self.width) / 2;
-            y: root.height * 0.12;
+            y: root.height * 0.12 + Motion.presence-sink(presence.progress);
+            opacity: presence.progress;
             width: min(root.width - 48px, 600px);
             height: min(layout.preferred-height, root.height * 0.76);
             background: Theme.raised;
@@ -148,4 +153,7 @@ export component SearchPalette inherits Rectangle {
             }
         }
     }
+
+    // Swallows clicks while the palette moves, so a double click can't play twice.
+    if presence.progress < 1: TouchArea { }
 }

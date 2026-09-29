@@ -31,6 +31,32 @@ export component Logo inherits Rectangle {
     }
 }
 
+// Eases `progress` from 0, gone, to 1, shown, as `open` changes, and keeps `present` set until
+// the exit ends, so whatever `present` mounts can animate out before it goes.
+export component Presence {
+    in property <bool> open;
+    out property <float> progress: root.open ? 1 : 0;
+    animate progress {
+        duration: root.open ? Motion.presence-enter : Motion.presence-exit;
+        easing: Motion.presence-easing;
+    }
+    out property <bool> present: root.open || root.progress > 0;
+}
+
+// Dims what lies under an overlay as far as `progress` goes. A click on it usually closes the
+// overlay.
+export component Scrim inherits Rectangle {
+    in property <float> progress: 1;
+    callback clicked();
+    background: Theme.scrim.transparentize(1 - root.progress);
+    visible: root.progress > 0;
+    TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
 // Three bars that bounce to the host's clock while something plays.
 export component Equalizer inherits Rectangle {
     in property <bool> active: true;

@@ -1,11 +1,11 @@
 // The background gallery: the preset paintings hung on a wall by the kind of scene they set, the
 // chosen one framed in gilt, with the collection's own gradient and image files after them.
 
-import { Theme } from "theme.slint";
+import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, BackgroundTarget, Backgrounds, CollectionBackground,
 } from "state.slint";
-import { Icon, IconButton, ScrollThumb } from "widgets.slint";
+import { Icon, IconButton, Scrim, ScrollThumb } from "widgets.slint";
 
 // The space around a painting inside its frame.
 global GalleryMetrics {
@@ -108,6 +108,8 @@ export component BackgroundGallery inherits Rectangle {
     in property <CollectionBackground> selected;
     in property <BackgroundLabel> selected-label;
     in property <bool> image-missing;
+    // A `Presence`'s progress, which fades the gallery in and out.
+    in property <float> progress: 1;
     callback close();
     property <bool> has-image: root.selected.image-path != "";
     property <length> content-width: wall.width - 56px - 12px;
@@ -115,13 +117,13 @@ export component BackgroundGallery inherits Rectangle {
     property <length> tile-width: (root.content-width - (root.columns - 1) * GalleryMetrics.column-gap) / root.columns;
     property <length> painting-height: root.tile-width * 2 / 3;
     property <length> tile-height: root.painting-height + GalleryMetrics.placard-height;
-    background: Theme.scrim;
     function choose(choice: CollectionBackground) {
         Actions.pick-background(root.target, choice);
         root.close();
     }
 
-    TouchArea {
+    Scrim {
+        progress: root.progress;
         clicked => {
             root.close();
         }
@@ -130,9 +132,10 @@ export component BackgroundGallery inherits Rectangle {
     // Clear of the title row, whose buttons stay above the gallery.
     wall := Rectangle {
         x: 24px;
-        y: Theme.title-row-height;
+        y: Theme.title-row-height + Motion.presence-sink(root.progress);
+        opacity: root.progress;
         width: parent.width - 48px;
-        height: parent.height - self.y - 24px;
+        height: parent.height - Theme.title-row-height - 24px;
         background: Theme.gallery-wall;
         border-radius: Theme.radius-card;
         // Swallows clicks so they don't reach the dimmed area.
@@ -158,6 +161,7 @@ export component BackgroundGallery inherits Rectangle {
                 IconButton {
                     icon: @image-url("icons/x.svg");
                     tooltip: @tr("Close");
+                    tooltip-enabled: root.progress == 1;
                     clicked => {
                         root.close();
                     }
@@ -269,4 +273,7 @@ export component BackgroundGallery inherits Rectangle {
             }
         }
     }
+
+    // Swallows clicks while the gallery moves, so a double click can't pick twice.
+    if root.progress < 1: TouchArea { }
 }
