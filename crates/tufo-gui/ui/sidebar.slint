@@ -237,7 +237,7 @@ component OutputButton inherits Rectangle {
     property <bool> channel: root.output.kind == OutputRowKind.channel;
     property <string> title: root.output.guild-name != "" ? @tr("{0} in {1}", root.output.label, root.output.guild-name) : root.output.label;
     property <bool> tooltip-dismissed;
-    height: root.compact ? 44px : 52px;
+    height: root.compact ? Theme.bar-button-size : 46px;
     border-radius: Theme.radius-row;
     background: touch.has-hover ? Theme.hover : Theme.field;
     animate background { duration: Motion.hover; }
@@ -346,10 +346,12 @@ component FullSidebar inherits SidebarForm {
     VerticalLayout {
         HorizontalLayout {
             height: Theme.title-row-height;
-            padding-right: 10px;
+            padding-right: 8px;
             alignment: end;
             IconButton {
                 y: (parent.height - self.height) / 2;
+                size: Theme.bar-button-size;
+                icon-size: Theme.bar-icon-size;
                 icon: @image-url("icons/panel-left-close.svg");
                 tooltip: @tr("Collapse (Ctrl+B)");
                 tooltip-enabled: root.shown;
@@ -362,9 +364,9 @@ component FullSidebar inherits SidebarForm {
         HorizontalLayout {
             padding-left: 12px;
             padding-right: 12px;
-            padding-bottom: 12px;
+            padding-bottom: 8px;
             search := Rectangle {
-                height: 36px;
+                height: 34px;
                 border-radius: Theme.radius-row;
                 background: search-touch.has-hover ? Theme.hover : Theme.field;
                 accessible-role: button;
@@ -478,9 +480,9 @@ component FullSidebar inherits SidebarForm {
         VerticalLayout {
             padding-left: 10px;
             padding-right: 10px;
-            padding-top: 8px;
-            padding-bottom: 8px;
-            spacing: 6px;
+            padding-top: 6px;
+            padding-bottom: 6px;
+            spacing: 4px;
             OutputButton {
                 tooltip-enabled: root.shown;
                 clicked => {
@@ -529,7 +531,8 @@ component FullSidebar inherits SidebarForm {
 
 component RailButton inherits IconButton {
     in property <bool> active;
-    size: 42px;
+    size: Theme.bar-button-size;
+    icon-size: Theme.bar-icon-size;
     border-radius: Theme.radius-row;
     background: root.active ? Theme.selected : root.has-hover ? Theme.hover : transparent;
     tint: root.active ? Theme.accent : Theme.text-secondary;
@@ -546,7 +549,7 @@ component Rail inherits SidebarForm {
     VerticalLayout {
         padding-top: Theme.title-row-height;
         padding-bottom: 10px;
-        spacing: 6px;
+        spacing: 4px;
         alignment: start;
         for button[index] in [
             { icon: @image-url("icons/panel-left-open.svg"), label: @tr("Expand (Ctrl+B)") },
@@ -581,13 +584,13 @@ component Rail inherits SidebarForm {
     VerticalLayout {
         y: parent.height - self.height;
         height: self.preferred-height;
-        padding-bottom: 12px;
-        spacing: 8px;
+        padding-bottom: 8px;
+        spacing: 4px;
         HorizontalLayout {
             alignment: center;
             OutputButton {
                 compact: true;
-                width: 44px;
+                width: Theme.bar-button-size;
                 tooltip-enabled: root.shown;
                 clicked => {
                     root.open-outputs();
@@ -598,6 +601,8 @@ component Rail inherits SidebarForm {
         HorizontalLayout {
             alignment: center;
             IconButton {
+                size: Theme.bar-button-size;
+                icon-size: Theme.bar-icon-size;
                 icon: @image-url("icons/settings.svg");
                 tooltip: @tr("Settings");
                 tooltip-enabled: root.shown;
@@ -642,7 +647,9 @@ export component Sidebar inherits Rectangle {
     }
 
     Logo {
-        x: 13px;
+        x: (Theme.rail-width - self.width) / 2;
+        width: 32px;
+        height: 32px;
         y: (Theme.title-row-height - self.height) / 2;
         asleep: !PlayerView.something-plays;
         accessible-role: image;
@@ -702,7 +709,7 @@ export component Sidebar inherits Rectangle {
 
     outputs := PopupWindow {
         x: root.expanded ? 10px : Theme.rail-width + 8px;
-        y: root.height - picker.preferred-height - (root.expanded ? 104px : 12px);
+        y: root.height - picker.preferred-height - (root.expanded ? 92px : 8px);
         width: picker.width;
         picker := OutputPicker {
             picked => {

@@ -148,10 +148,15 @@ component SoundsPauseButton inherits IconButton {
 }
 
 component Transport inherits HorizontalLayout {
+    in property <length> button-size: 40px;
+    in property <length> icon-size: 22px;
+    in property <length> play-size: 46px;
     alignment: center;
     spacing: 6px;
     IconButton {
         y: (parent.height - self.height) / 2;
+        size: root.button-size;
+        icon-size: root.icon-size;
         icon: @image-url("icons/shuffle.svg");
         tint: PlayerView.shuffle ? Theme.accent : Theme.text-secondary;
         hover-tint: PlayerView.shuffle ? Theme.accent : Theme.text;
@@ -163,6 +168,8 @@ component Transport inherits HorizontalLayout {
 
     IconButton {
         y: (parent.height - self.height) / 2;
+        size: root.button-size;
+        icon-size: root.icon-size;
         icon: @image-url("icons/skip-back.svg");
         tooltip: @tr("Previous");
         enabled: PlayerView.has-music;
@@ -171,10 +178,15 @@ component Transport inherits HorizontalLayout {
         }
     }
 
-    PlayButton { }
+    PlayButton {
+        y: (parent.height - self.height) / 2;
+        size: root.play-size;
+    }
 
     IconButton {
         y: (parent.height - self.height) / 2;
+        size: root.button-size;
+        icon-size: root.icon-size;
         icon: @image-url("icons/skip-forward.svg");
         tooltip: @tr("Next");
         enabled: PlayerView.has-music;
@@ -185,6 +197,8 @@ component Transport inherits HorizontalLayout {
 
     IconButton {
         y: (parent.height - self.height) / 2;
+        size: root.button-size;
+        icon-size: root.icon-size;
         icon: PlayerView.repeat == 2 ? @image-url("icons/repeat-1.svg") : @image-url("icons/repeat.svg");
         tint: PlayerView.repeat == 0 ? Theme.text-secondary : Theme.accent;
         hover-tint: PlayerView.repeat == 0 ? Theme.text : Theme.accent;
@@ -298,8 +312,8 @@ export component Dock inherits Rectangle {
     // Swallows clicks between the controls, so they don't reach the page under the dock.
     TouchArea { }
     layout := VerticalLayout {
-        padding-top: root.wide || !root.collapsed ? 10px : 8px;
-        padding-bottom: root.wide || !root.collapsed ? 10px : 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
         padding-left: 12px;
         padding-right: root.wide ? 16px : 8px;
         spacing: 8px;
@@ -346,12 +360,18 @@ export component Dock inherits Rectangle {
             }
         }
         if !root.wide && !root.collapsed: HorizontalLayout {
-            spacing: 12px;
+            spacing: 10px;
             NowPlaying {
+                art-size: 40px;
                 horizontal-stretch: 1;
             }
 
-            Transport { }
+            Transport {
+                spacing: 2px;
+                button-size: 34px;
+                icon-size: 20px;
+                play-size: 40px;
+            }
             IconButton {
                 y: (parent.height - self.height) / 2;
                 size: 32px;
@@ -370,7 +390,7 @@ export component Dock inherits Rectangle {
             }
 
             VolumeControl {
-                width: 130px;
+                width: 110px;
             }
         }
         if !root.wide && root.collapsed: HorizontalLayout {

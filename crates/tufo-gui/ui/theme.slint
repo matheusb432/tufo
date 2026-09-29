@@ -41,6 +41,9 @@ export global Theme {
     out property <color> hover: rgba(245, 238, 220, 0.07);
     out property <color> selected: rgba(149, 213, 178, 0.13);
     out property <color> divider: rgba(245, 238, 220, 0.1);
+    // Falls from a page's bar over the content that scrolls under it.
+    out property <brush> bar-shadow: @linear-gradient(180deg, rgba(3, 12, 8, 0.55) 0%, rgba(3, 12, 8, 0) 100%);
+    out property <length> bar-shadow-height: 12px;
     out property <color> scrim: rgba(3, 12, 8, 0.6);
     out property <color> disc: rgba(149, 213, 178, 0.09);
     out property <color> track: rgba(245, 238, 220, 0.14);
@@ -66,12 +69,17 @@ export global Theme {
     out property <length> radius-small: 8px;
     out property <length> sidebar-width: 232px;
     out property <length> rail-width: 64px;
+    // The narrowest page the expanded sidebar sits beside rather than over.
     out property <length> page-width-min: 560px;
+    out property <length> window-width-min: 440px;
+    out property <length> window-height-min: 380px;
     // The top of the sidebar and of every page, where the window's buttons sit and a drag moves
     // the window.
-    out property <length> title-row-height: 60px;
-    // Three 40 px buttons, 2 px apart.
-    out property <length> window-buttons-width: 124px;
+    out property <length> title-row-height: 44px;
+    out property <length> bar-button-size: 36px;
+    out property <length> bar-icon-size: 20px;
+    // Three bar buttons, 2 px apart.
+    out property <length> window-buttons-width: 112px;
 
     out property <string> font: "Nunito";
     out property <string> display-font: "Nunito";

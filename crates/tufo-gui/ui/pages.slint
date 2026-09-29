@@ -13,6 +13,8 @@ import {
 export global PageMetrics {
     out property <length> gap: 18px;
     out property <length> padding: 26px;
+    // Between the bar and the first content of Home and the grids.
+    out property <length> padding-top: 8px;
     // A card's painting is 4 wide to 3.3 high.
     out property <float> card-aspect: 3.3 / 4;
 }
@@ -131,19 +133,23 @@ component CardGrid inherits Rectangle {
     }
 }
 
-// The filter Ctrl+F opens on a page: a search pill that takes focus as it opens.
+// The filter Ctrl+F opens on a page: a search pill that takes focus as it opens. It carries
+// the gap under it, because a layout's spacing would keep a gap while it's closed.
 component FilterField inherits Rectangle {
+    in property <length> space-below;
     property <bool> open: Search.filter-open;
     changed open => {
         if self.open {
             input.focus();
         }
     }
-    height: root.open ? 42px : 0px;
+    height: root.open ? 42px + root.space-below : 0px;
     visible: root.open;
     Rectangle {
         width: min(parent.width, 460px);
+        height: 42px;
         x: 0;
+        y: 0;
         border-radius: self.height / 2;
         background: Theme.raised;
         border-width: input.has-focus ? 2px : 1px;
@@ -186,6 +192,7 @@ component FilterField inherits Rectangle {
 // Scrolls a page's content, with a thumb that shows while the pointer is over it.
 component PageScroll inherits Rectangle {
     in property <length> content-height;
+    out property <bool> scrolled: flick.content-y < 0;
     hover := TouchArea {
         flick := Flickable {
             mouse-drag-pan-enabled: false;
@@ -201,6 +208,31 @@ component PageScroll inherits Rectangle {
             show: hover.has-hover;
         }
     }
+}
+
+// Keeps a page's bar clear of the window's buttons, which lie over it, and sets them apart.
+component WindowButtonsSpace inherits HorizontalLayout {
+    spacing: 8px;
+    Rectangle {
+        y: (parent.height - self.height) / 2;
+        width: 1px;
+        height: 24px;
+        background: Theme.divider;
+    }
+
+    Rectangle {
+        width: Theme.window-buttons-width;
+    }
+}
+
+// Falls from the page's bar once content scrolls under it.
+component BarShadow inherits Rectangle {
+    in property <bool> shown;
+    y: Theme.title-row-height;
+    height: Theme.bar-shadow-height;
+    background: Theme.bar-shadow;
+    opacity: root.shown ? 1 : 0;
+    animate opacity { duration: Motion.hover; }
 }
 
 component Heading inherits Text {
@@ -286,16 +318,18 @@ component HomeShelf inherits VerticalLayout {
 
 export component HomePage inherits Rectangle {
     callback add(CollectionKind);
-    PageScroll {
+    scroll := PageScroll {
         y: Theme.title-row-height;
         height: parent.height - self.y;
         content-height: column.preferred-height;
         column := VerticalLayout {
             padding: PageMetrics.padding;
-            padding-top: 4px;
-            spacing: 30px;
+            padding-top: PageMetrics.padding-top;
             alignment: start;
-            FilterField { }
+            FilterField {
+                space-below: 24px;
+            }
+
             HomeShelf {
                 title: @tr("Playlists");
                 cards: LibraryView.playlists;
@@ -310,6 +344,7 @@ export component HomePage inherits Rectangle {
             }
 
             HomeShelf {
+                padding-top: 24px;
                 title: @tr("Soundboards");
                 cards: LibraryView.soundboards;
                 total: LibraryView.soundboard-count;
@@ -322,6 +357,10 @@ export component HomePage inherits Rectangle {
                 }
             }
         }
+    }
+
+    BarShadow {
+        shown: scroll.scrolled;
     }
 }
 
@@ -336,34 +375,55 @@ component PageTitle inherits Text {
 export component GridPage inherits Rectangle {
     in property <CollectionKind> kind;
     callback add(CollectionKind);
-    PageScroll {
+    property <string> add-label: root.kind == CollectionKind.playlist ? @tr("Add Playlist") : @tr("Add Soundboard");
+    HorizontalLayout {
+        y: 0;
+        height: Theme.title-row-height;
+        padding-left: PageMetrics.padding;
+        padding-right: 8px;
+        spacing: 8px;
+        Heading {
+            text: root.kind == CollectionKind.playlist ? @tr("Playlists") : @tr("Soundboards");
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+
+        if root.width >= 520px: Button {
+            y: (parent.height - self.height) / 2;
+            height: 32px;
+            text: root.add-label;
+            icon: @image-url("icons/plus.svg");
+            enabled: Session.connected;
+            clicked => {
+                root.add(root.kind);
+            }
+        }
+        if root.width < 520px: IconButton {
+            y: (parent.height - self.height) / 2;
+            size: Theme.bar-button-size;
+            icon-size: Theme.bar-icon-size;
+            icon: @image-url("icons/plus.svg");
+            tooltip: root.add-label;
+            enabled: Session.connected;
+            clicked => {
+                root.add(root.kind);
+            }
+        }
+        WindowButtonsSpace { }
+    }
+
+    scroll := PageScroll {
         y: Theme.title-row-height;
         height: parent.height - self.y;
         content-height: column.preferred-height;
         column := VerticalLayout {
             padding: PageMetrics.padding;
-            padding-top: 4px;
-            spacing: 18px;
+            padding-top: PageMetrics.padding-top;
             alignment: start;
-            HorizontalLayout {
-                spacing: 10px;
-                PageTitle {
-                    text: root.kind == CollectionKind.playlist ? @tr("Playlists") : @tr("Soundboards");
-                    horizontal-stretch: 1;
-                }
-
-                Button {
-                    y: (parent.height - self.height) / 2;
-                    text: root.kind == CollectionKind.playlist ? @tr("Add Playlist") : @tr("Add Soundboard");
-                    icon: @image-url("icons/plus.svg");
-                    enabled: Session.connected;
-                    clicked => {
-                        root.add(root.kind);
-                    }
-                }
+            FilterField {
+                space-below: PageMetrics.gap;
             }
 
-            FilterField { }
             if (root.kind == CollectionKind.playlist ? LibraryView.playlists.length : LibraryView.soundboards.length) == 0: Text {
                 text: Search.filter-text != "" ? @tr("Nothing matches the filter.") : root.kind == CollectionKind.playlist ? @tr("Drop a folder of music here: each folder in it that holds audio becomes a playlist.") : @tr("Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard.");
                 color: Theme.text-secondary;
@@ -374,6 +434,10 @@ export component GridPage inherits Rectangle {
                 kind: root.kind;
             }
         }
+    }
+
+    BarShadow {
+        shown: scroll.scrolled;
     }
 }
 
@@ -404,6 +468,8 @@ component CollectionTools inherits HorizontalLayout {
     }
     if root.compact: IconButton {
         y: (parent.height - self.height) / 2;
+        size: Theme.bar-button-size;
+        icon-size: Theme.bar-icon-size;
         icon: @image-url("icons/arrow-down-up.svg");
         tooltip: @tr("Sort: {0}", root.order-label);
         clicked => {
@@ -427,6 +493,8 @@ component CollectionTools inherits HorizontalLayout {
 
     more := IconButton {
         y: (parent.height - self.height) / 2;
+        size: root.compact ? Theme.bar-button-size : 40px;
+        icon-size: root.compact ? Theme.bar-icon-size : 22px;
         icon: @image-url("icons/ellipsis-vertical.svg");
         tooltip: @tr("More");
         clicked => {
@@ -474,11 +542,13 @@ component CollectionBar inherits Rectangle {
     callback add-files();
     height: Theme.title-row-height;
     HorizontalLayout {
-        padding-left: 14px;
-        padding-right: 14px;
+        padding-left: 12px;
+        padding-right: 8px;
         spacing: 8px;
         IconButton {
             y: (parent.height - self.height) / 2;
+            size: Theme.bar-button-size;
+            icon-size: Theme.bar-icon-size;
             icon: @image-url("icons/arrow-left.svg");
             tooltip: root.kind == CollectionKind.playlist ? @tr("Back to Playlists") : @tr("Back to Soundboards");
             clicked => {
@@ -508,22 +578,7 @@ component CollectionBar inherits Rectangle {
             }
         }
 
-        Rectangle {
-            y: (parent.height - self.height) / 2;
-            width: 1px;
-            height: 24px;
-            background: Theme.divider;
-        }
-
-        Rectangle {
-            width: Theme.window-buttons-width;
-        }
-    }
-
-    Rectangle {
-        y: parent.height - self.height;
-        height: 1px;
-        background: Theme.divider;
+        WindowButtonsSpace { }
     }
 }
 
@@ -716,6 +771,8 @@ export component PlaylistPage inherits Rectangle {
             }
             IconButton {
                 y: (parent.height - self.height) / 2;
+                size: Theme.bar-button-size;
+                icon-size: Theme.bar-icon-size;
                 icon: root.this-plays ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
                 tint: Theme.lit;
                 hover-tint: Theme.lit-bright;
@@ -726,15 +783,15 @@ export component PlaylistPage inherits Rectangle {
                 }
             }
         }
-        PageScroll {
+        scroll := PageScroll {
             vertical-stretch: 1;
             content-height: column.preferred-height;
             column := VerticalLayout {
                 padding: PageMetrics.padding;
-                padding-top: root.compact ? 12px : 22px;
-                spacing: 16px;
+                padding-top: root.compact ? PageMetrics.padding-top : 18px;
                 alignment: start;
                 if !root.compact: CollectionHero {
+                    padding-bottom: 16px;
                     plate-width: 250px;
                     plate-height: 176px;
                     edit => {
@@ -761,7 +818,10 @@ export component PlaylistPage inherits Rectangle {
                         }
                     }
                 }
-                FilterField { }
+                FilterField {
+                    space-below: 16px;
+                }
+
                 VerticalLayout {
                     spacing: 2px;
                     max-width: 780px;
@@ -778,6 +838,10 @@ export component PlaylistPage inherits Rectangle {
                 }
             }
         }
+    }
+
+    BarShadow {
+        shown: scroll.scrolled;
     }
 }
 
@@ -973,15 +1037,15 @@ export component SoundboardPage inherits Rectangle {
                 root.add-files();
             }
         }
-        PageScroll {
+        scroll := PageScroll {
             vertical-stretch: 1;
             content-height: column.preferred-height;
             column := VerticalLayout {
                 padding: PageMetrics.padding;
-                padding-top: root.compact ? 12px : 22px;
-                spacing: 16px;
+                padding-top: root.compact ? PageMetrics.padding-top : 18px;
                 alignment: start;
                 if !root.compact: CollectionHero {
+                    padding-bottom: 16px;
                     plate-width: 150px;
                     plate-height: 104px;
                     edit => {
@@ -991,7 +1055,10 @@ export component SoundboardPage inherits Rectangle {
                         root.add-files();
                     }
                 }
-                FilterField { }
+                FilterField {
+                    space-below: 16px;
+                }
+
                 if LibraryView.sounds.length == 0: Text {
                     text: Search.filter-text != "" ? @tr("No sound matches the filter.") : LibraryView.collection-linked ? @tr("This folder holds no audio yet.") : @tr("Drop audio files here to add them.");
                     color: Theme.text-secondary;
@@ -1004,6 +1071,10 @@ export component SoundboardPage inherits Rectangle {
                 }
             }
         }
+    }
+
+    BarShadow {
+        shown: scroll.scrolled;
     }
 }
 

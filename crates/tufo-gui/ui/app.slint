@@ -30,8 +30,8 @@ export component AppWindow inherits Window {
     // Fits a 1280 × 800 screen at 125% scaling.
     preferred-width: 1000px;
     preferred-height: 700px;
-    min-width: Theme.rail-width + Theme.page-width-min;
-    min-height: 600px;
+    min-width: Theme.window-width-min;
+    min-height: Theme.window-height-min;
     background: Theme.still-shade;
     default-font-family: Theme.font;
     no-frame: true;
@@ -247,9 +247,9 @@ export component AppWindow inherits Window {
                 }
 
                 if LibraryView.loaded: HorizontalLayout {
-                    padding-left: 14px;
-                    padding-right: 14px;
-                    padding-bottom: 12px;
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    padding-bottom: 10px;
                     Dock {
                         wide: main.width >= 680px;
                         collapsed: Session.player-collapsed;
@@ -421,7 +421,7 @@ export component AppWindow inherits Window {
     }
 
     WindowButtons {
-        x: parent.width - self.width - 14px;
+        x: parent.width - self.width - 8px;
         y: (Theme.title-row-height - self.height) / 2;
         height: self.preferred-height;
         maximized: root.maximized;
