@@ -427,18 +427,27 @@ impl TufoClient {
         Ok(())
     }
 
-    /// Leaves any voice channel and stops the bot's gateway connection, so Discord uses no
-    /// network and can't be joined by accident until resumed.
-    pub async fn pause_discord(&self) -> Result<(), ClientError> {
-        let request = with_timeout(pb::PauseDiscordRequest {}, QUICK_REQUEST_TIMEOUT);
-        self.server.clone().pause_discord(request).await?;
+    /// Moves playback off any voice channel and logs the bot out until the connection is
+    /// enabled again.
+    pub async fn disable_discord_connection(&self) -> Result<(), ClientError> {
+        // Moving playback off a voice channel reopens the local device.
+        let request = with_timeout(
+            pb::DisableDiscordConnectionRequest {},
+            SELECT_OUTPUT_TIMEOUT,
+        );
+        self.server
+            .clone()
+            .disable_discord_connection(request)
+            .await?;
         Ok(())
     }
 
-    /// Logs the bot back into the gateway after a pause.
-    pub async fn resume_discord(&self) -> Result<(), ClientError> {
-        let request = with_timeout(pb::ResumeDiscordRequest {}, QUICK_REQUEST_TIMEOUT);
-        self.server.clone().resume_discord(request).await?;
+    pub async fn enable_discord_connection(&self) -> Result<(), ClientError> {
+        let request = with_timeout(pb::EnableDiscordConnectionRequest {}, QUICK_REQUEST_TIMEOUT);
+        self.server
+            .clone()
+            .enable_discord_connection(request)
+            .await?;
         Ok(())
     }
 }

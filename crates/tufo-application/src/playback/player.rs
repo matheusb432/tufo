@@ -64,8 +64,8 @@ pub trait Player: Send + Sync {
     /// until something plays again.
     fn stand_by(&self) -> impl Future<Output = ()> + Send;
 
-    /// Re-reads whether Discord is configured and paused, and publishes the change when the
-    /// output is local and idle. Called after Discord is paused or resumed.
+    /// Publishes whether voice channels can be joined, after the Discord connection is disabled
+    /// or enabled. Does nothing while a voice channel is the output.
     fn refresh_voice_availability(&self) -> impl Future<Output = ()> + Send;
 
     /// Observes the current state and every later change.

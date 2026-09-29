@@ -289,6 +289,10 @@ msgstr "Deserto"
 msgid "Dice"
 msgstr "Dados"
 
+#: ui/dialogs.slint:465
+msgid "Disable Discord connection"
+msgstr "Desativar conexão com o Discord"
+
 #: ui/dialogs.slint:425
 msgid "Discord"
 msgstr "Discord"
@@ -590,6 +594,10 @@ msgstr[1] "{n} endereços da web não foram importados porque o Tufo não pode r
 #: src/sound_icons.rs
 msgid "Lightning"
 msgstr "Raio"
+
+#: ui/dialogs.slint:466
+msgid "Logs the bot out, so it can't join a voice channel by accident and uses no network in the background."
+msgstr "Desconecta o bot, para que ele não entre em um canal de voz por engano nem use a rede em segundo plano."
 
 #: ui/pages.slint:386
 msgid "Longest first"
@@ -1052,6 +1060,14 @@ msgstr "Este canal de voz não está mais disponível. Atualize os canais."
 #: src/presentation.rs:1074
 msgid "The Discord bot is still connecting. Try again shortly."
 msgstr "O bot do Discord ainda está conectando. Tente novamente em instantes."
+
+#: ui/sidebar.slint:205
+msgid "The Discord connection is disabled — enable it in Settings"
+msgstr "A conexão com o Discord está desativada — ative-a nas Configurações"
+
+#: src/presentation.rs:1086
+msgid "The Discord connection is disabled. Enable it in Settings first."
+msgstr "A conexão com o Discord está desativada. Ative-a nas Configurações primeiro."
 
 #: src/presentation.rs:1043
 msgid "The audio file is missing. Restore it and try again."

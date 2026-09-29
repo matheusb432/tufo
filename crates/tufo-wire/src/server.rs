@@ -23,5 +23,5 @@ pub enum DiscordConnectionStatus {
     NotConfigured,
     Connecting,
     Ready,
-    Paused,
+    Disabled,
 }

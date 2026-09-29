@@ -504,9 +504,9 @@ async fn renaming_seeded_content_clears_its_translation_key() {
     seed_default_effects::execute(vec![rain], &fixture.library)
         .await
         .unwrap();
-    let player = tufo_infra::player::EnginePlayer::start(tufo_infra::discord::SharedDiscord::new(
-        tufo_infra::discord::Discord::NotConfigured,
-    ));
+    let player = tufo_infra::player::EnginePlayer::start(
+        tufo_infra::discord::SongbirdDiscordClient::not_configured(),
+    );
     let effects = titled(&fixture.snapshot(), "Effects").unwrap().clone();
 
     update_collection::execute(

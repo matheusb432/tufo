@@ -117,7 +117,7 @@ export global Session {
     in property <string> connection-text: @tr("" => "Connecting to tufo-server…");
     in property <[OutputRow]> outputs;
     in property <bool> discord-configured;
-    in property <bool> discord-paused;
+    in property <bool> discord-disabled;
     in property <string> voice-status;
     in property <VoiceBadge> voice-badge;
     in property <CurrentOutput> current-output;
@@ -280,7 +280,7 @@ export global Actions {
     callback set-start-at-login(bool);
     // Restarts tufo-server, so its bot logs in with the new token.
     callback save-discord-token(string);
-    // Stops or resumes the bot's gateway connection without a restart.
-    callback set-discord-paused(bool);
+    // Logs the bot out of Discord, or back in, without a restart.
+    callback set-discord-connection-disabled(bool);
     callback import-kenku-library();
 }

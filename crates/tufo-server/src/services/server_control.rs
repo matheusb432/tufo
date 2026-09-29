@@ -1,6 +1,6 @@
 use tonic::{Request, Response, Status};
 use tufo_application::{
-    discord::{pause_discord, resume_discord, set_discord_bot_token},
+    discord::{disable_discord_connection, enable_discord_connection, set_discord_bot_token},
     server::get_server_status,
 };
 use tufo_wire::{
@@ -63,19 +63,19 @@ impl ServerService for ServerControlGrpcService {
         Ok(Response::new(pb::SetDiscordBotTokenResponse {}))
     }
 
-    async fn pause_discord(
+    async fn disable_discord_connection(
         &self,
-        _request: Request<pb::PauseDiscordRequest>,
-    ) -> Result<Response<pb::PauseDiscordResponse>, Status> {
-        pause_discord::execute(&self.state.discord, self.state.player.as_ref()).await;
-        Ok(Response::new(pb::PauseDiscordResponse {}))
+        _request: Request<pb::DisableDiscordConnectionRequest>,
+    ) -> Result<Response<pb::DisableDiscordConnectionResponse>, Status> {
+        disable_discord_connection::execute(&self.state.discord, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::DisableDiscordConnectionResponse {}))
     }
 
-    async fn resume_discord(
+    async fn enable_discord_connection(
         &self,
-        _request: Request<pb::ResumeDiscordRequest>,
-    ) -> Result<Response<pb::ResumeDiscordResponse>, Status> {
-        resume_discord::execute(&self.state.discord, self.state.player.as_ref()).await;
-        Ok(Response::new(pb::ResumeDiscordResponse {}))
+        _request: Request<pb::EnableDiscordConnectionRequest>,
+    ) -> Result<Response<pb::EnableDiscordConnectionResponse>, Status> {
+        enable_discord_connection::execute(&self.state.discord, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::EnableDiscordConnectionResponse {}))
     }
 }

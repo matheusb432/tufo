@@ -343,7 +343,9 @@ fn voice_message(voice: &VoiceConnectionState) -> pb::VoiceConnection {
         VoiceConnectionState::Reconnecting { attempt } => {
             pb::voice_connection::State::Reconnecting(pb::VoiceReconnecting { attempt: *attempt })
         }
-        VoiceConnectionState::Paused => pb::voice_connection::State::Paused(pb::VoicePaused {}),
+        VoiceConnectionState::Disabled => {
+            pb::voice_connection::State::Disabled(pb::VoiceDisabled {})
+        }
     };
     pb::VoiceConnection { state: Some(state) }
 }
@@ -364,7 +366,7 @@ fn voice_state(message: pb::VoiceConnection) -> Result<VoiceConnectionState, Inv
                     attempt: reconnecting.attempt,
                 }
             }
-            pb::voice_connection::State::Paused(_) => VoiceConnectionState::Paused,
+            pb::voice_connection::State::Disabled(_) => VoiceConnectionState::Disabled,
         },
     )
 }

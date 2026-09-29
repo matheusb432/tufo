@@ -199,10 +199,10 @@ component OutputPicker inherits MenuSurface {
             root.picked();
         }
     }
-    if Session.discord-paused: HorizontalLayout {
+    if Session.discord-disabled: HorizontalLayout {
         padding: 10px;
         TextLink {
-            text: @tr("" => "Discord is paused — resume it in Settings");
+            text: @tr("" => "The Discord connection is disabled — enable it in Settings");
             font-size: Theme.caption;
             clicked => {
                 root.open-settings();

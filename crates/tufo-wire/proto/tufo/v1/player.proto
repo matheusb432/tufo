@@ -103,7 +103,7 @@ message VoiceConnection {
     VoiceConnecting connecting = 3;
     VoiceConnected connected = 4;
     VoiceReconnecting reconnecting = 5;
-    VoicePaused paused = 6;
+    VoiceDisabled disabled = 6;
   }
 }
 
@@ -121,8 +121,8 @@ message VoiceReconnecting {
   uint32 attempt = 1;
 }
 
-// The bot is configured but its gateway connection is stopped, so it can't join a channel.
-message VoicePaused {}
+// The bot is configured but its Discord connection is disabled, so it can't join a channel.
+message VoiceDisabled {}
 
 // Where the server sends audio.
 message Output {

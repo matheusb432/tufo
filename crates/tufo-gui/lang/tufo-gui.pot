@@ -289,6 +289,10 @@ msgstr ""
 msgid "Dice"
 msgstr ""
 
+#: ui/dialogs.slint:465
+msgid "Disable Discord connection"
+msgstr ""
+
 #: ui/dialogs.slint:425
 msgid "Discord"
 msgstr ""
@@ -589,6 +593,10 @@ msgstr[1] ""
 
 #: src/sound_icons.rs
 msgid "Lightning"
+msgstr ""
+
+#: ui/dialogs.slint:466
+msgid "Logs the bot out, so it can't join a voice channel by accident and uses no network in the background."
 msgstr ""
 
 #: ui/pages.slint:386
@@ -1051,6 +1059,14 @@ msgstr ""
 
 #: src/presentation.rs:1074
 msgid "The Discord bot is still connecting. Try again shortly."
+msgstr ""
+
+#: ui/sidebar.slint:205
+msgid "The Discord connection is disabled — enable it in Settings"
+msgstr ""
+
+#: src/presentation.rs:1086
+msgid "The Discord connection is disabled. Enable it in Settings first."
 msgstr ""
 
 #: src/presentation.rs:1043

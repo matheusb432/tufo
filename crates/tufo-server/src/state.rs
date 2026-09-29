@@ -3,7 +3,7 @@ use std::{path::PathBuf, sync::Arc, time::Instant};
 use tokio::sync::Notify;
 use tufo_application::library::Library;
 use tufo_infra::{
-    discord::{SharedDiscord, bot_credentials::FileBotCredentials},
+    discord::{SongbirdDiscordClient, bot_credentials::FileBotCredentials},
     library_files::DiskLibraryFiles,
     player::{EnginePlayer, outputs::DeviceOutputs},
 };
@@ -12,7 +12,7 @@ use tufo_infra::{
 #[derive(Clone)]
 pub struct AppState {
     pub(crate) player: Arc<EnginePlayer<DeviceOutputs>>,
-    pub(crate) discord: SharedDiscord,
+    pub(crate) discord: SongbirdDiscordClient,
     pub(crate) library: Arc<Library<DiskLibraryFiles>>,
     /// Where the server reads its Discord bot token at startup and saves a new one.
     pub(crate) discord_credentials: FileBotCredentials,
@@ -25,7 +25,7 @@ impl AppState {
     #[must_use]
     pub fn new(
         player: Arc<EnginePlayer<DeviceOutputs>>,
-        discord: SharedDiscord,
+        discord: SongbirdDiscordClient,
         library: Arc<Library<DiskLibraryFiles>>,
         discord_credentials_path: PathBuf,
     ) -> Self {

@@ -9,16 +9,14 @@ use tufo_models::playback::{OutputTarget, diagnostics::VoicePacing};
 
 use crate::{
     audio::Mixer,
-    discord::{DISCORD_SAMPLE_RATE, Discord, JoinVoiceError, SharedDiscord, VoiceSession},
+    discord::{
+        DISCORD_SAMPLE_RATE, JoinVoiceError, SongbirdDiscordClient, VoiceAvailability, VoiceSession,
+    },
 };
 
 /// Opens and closes the mixers the engine plays on.
 pub trait AudioOutputs: Send + Sync + 'static {
-    /// Whether Discord credentials are configured, whether or not the bot is paused.
-    fn voice_configured(&self) -> bool;
-
-    /// Whether the bot's gateway connection is paused.
-    fn voice_paused(&self) -> bool;
+    fn voice_availability(&self) -> VoiceAvailability;
 
     /// Opens a mixer for `target`, joining its voice channel when it is one.
     fn open(
@@ -58,23 +56,19 @@ impl OpenedOutput {
 
 /// The real outputs: the default audio device and the Discord bot's voice channels.
 pub struct DeviceOutputs {
-    discord: SharedDiscord,
+    discord: SongbirdDiscordClient,
 }
 
 impl DeviceOutputs {
     #[must_use]
-    pub fn new(discord: SharedDiscord) -> Self {
+    pub fn new(discord: SongbirdDiscordClient) -> Self {
         Self { discord }
     }
 }
 
 impl AudioOutputs for DeviceOutputs {
-    fn voice_configured(&self) -> bool {
-        !matches!(self.discord.snapshot(), Discord::NotConfigured)
-    }
-
-    fn voice_paused(&self) -> bool {
-        matches!(self.discord.snapshot(), Discord::Paused(_))
+    fn voice_availability(&self) -> VoiceAvailability {
+        self.discord.voice_availability()
     }
 
     async fn open(&self, target: OutputTarget) -> Result<OpenedOutput, SelectOutputError> {
@@ -91,23 +85,22 @@ impl AudioOutputs for DeviceOutputs {
                 Ok(OpenedOutput::new(mixer, None))
             }
             OutputTarget::DiscordVoice(voice_target) => {
-                let voice = match self.discord.snapshot() {
-                    Discord::Configured(voice) => voice,
-                    Discord::NotConfigured => return Err(SelectOutputError::DiscordNotConfigured),
-                    Discord::Paused(_) => return Err(SelectOutputError::DiscordPaused),
-                };
                 let (mixer, renderer_receiver) = Mixer::open_pulled(DISCORD_SAMPLE_RATE)
                     .map_err(|error| SelectOutputError::VoiceConnection(error.into()))?;
-                let mut session = voice.join(voice_target, renderer_receiver).await.map_err(
-                    |error| match error {
+                let mut session = self
+                    .discord
+                    .join(voice_target, renderer_receiver)
+                    .await
+                    .map_err(|error| match error {
+                        JoinVoiceError::NotConfigured => SelectOutputError::DiscordNotConfigured,
+                        JoinVoiceError::Disabled => SelectOutputError::DiscordDisabled,
                         JoinVoiceError::UnknownChannel => SelectOutputError::UnknownVoiceChannel,
                         JoinVoiceError::NotReady
                         | JoinVoiceError::TimedOut
                         | JoinVoiceError::Join(_) => {
                             SelectOutputError::VoiceConnection(error.into())
                         }
-                    },
-                )?;
+                    })?;
                 Ok(OpenedOutput {
                     mixer,
                     voice_lost: session.take_lost_signal(),
@@ -118,17 +111,12 @@ impl AudioOutputs for DeviceOutputs {
     }
 
     async fn close(&self, output: OpenedOutput) {
-        if let (Some(session), Discord::Configured(voice)) =
-            (output.session, self.discord.snapshot())
-        {
-            voice.leave(session).await;
+        if let Some(session) = output.session {
+            session.leave().await;
         }
     }
 
     fn voice_pacing(&self) -> Option<VoicePacing> {
-        match self.discord.snapshot() {
-            Discord::NotConfigured | Discord::Paused(_) => None,
-            Discord::Configured(voice) => Some(voice.pacing()),
-        }
+        self.discord.voice_pacing()
     }
 }

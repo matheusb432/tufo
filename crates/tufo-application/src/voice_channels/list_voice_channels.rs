@@ -1,13 +1,13 @@
 use tufo_wire::voice_channels::{ListVoiceChannels, VoiceChannelPage};
 
-use super::voice_channel_directory::{VoiceChannelDirectory, VoiceChannelDirectoryError};
+use crate::discord::discord_client::{DiscordClient, DiscordClientError};
 
 /// Lists the voice channels the bot can see, one page at a time.
 pub fn execute(
     request: &ListVoiceChannels,
-    directory: &impl VoiceChannelDirectory,
-) -> Result<VoiceChannelPage, VoiceChannelDirectoryError> {
-    let mut channels = directory.voice_channels()?;
+    discord: &impl DiscordClient,
+) -> Result<VoiceChannelPage, DiscordClientError> {
+    let mut channels = discord.voice_channels()?;
     channels.sort_unstable_by_key(|channel| channel.target);
     let mut remaining = channels
         .into_iter()
@@ -36,12 +36,16 @@ mod tests {
 
     use super::*;
 
-    struct FixedDirectory(Vec<VoiceChannel>);
+    struct FixedChannels(Vec<VoiceChannel>);
 
-    impl VoiceChannelDirectory for FixedDirectory {
-        fn voice_channels(&self) -> Result<Vec<VoiceChannel>, VoiceChannelDirectoryError> {
+    impl DiscordClient for FixedChannels {
+        fn voice_channels(&self) -> Result<Vec<VoiceChannel>, DiscordClientError> {
             Ok(self.0.clone())
         }
+
+        fn disable_connection(&self) {}
+
+        fn enable_connection(&self) {}
     }
 
     fn channel(guild_id: u64, channel_id: u64) -> VoiceChannel {
@@ -65,7 +69,7 @@ mod tests {
 
     #[test]
     fn pages_follow_guild_then_channel_order_until_the_last_page() {
-        let directory = FixedDirectory(vec![channel(2, 5), channel(1, 9), channel(1, 3)]);
+        let discord = FixedChannels(vec![channel(2, 5), channel(1, 9), channel(1, 3)]);
         let page_size = VoiceChannelPageSize::from_requested(2);
 
         let first = execute(
@@ -73,7 +77,7 @@ mod tests {
                 after: None,
                 page_size,
             },
-            &directory,
+            &discord,
         )
         .unwrap();
         let second = execute(
@@ -81,7 +85,7 @@ mod tests {
                 after: first.next_after,
                 page_size,
             },
-            &directory,
+            &discord,
         )
         .unwrap();
 
@@ -92,14 +96,14 @@ mod tests {
 
     #[test]
     fn an_exactly_full_last_page_has_no_cursor() {
-        let directory = FixedDirectory(vec![channel(1, 1), channel(1, 2)]);
+        let discord = FixedChannels(vec![channel(1, 1), channel(1, 2)]);
 
         let page = execute(
             &ListVoiceChannels {
                 after: None,
                 page_size: VoiceChannelPageSize::from_requested(2),
             },
-            &directory,
+            &discord,
         )
         .unwrap();
 

@@ -1049,12 +1049,11 @@ impl Controller {
         self.save_desktop_settings(settings);
     }
 
-    /// Stops or resumes the bot's gateway connection without a restart.
-    pub(crate) fn set_discord_paused(&self, paused: bool) {
-        if paused {
-            self.run(|client| async move { client.pause_discord().await });
+    pub(crate) fn set_discord_connection_disabled(&self, disabled: bool) {
+        if disabled {
+            self.run(|client| async move { client.disable_discord_connection().await });
         } else {
-            self.run(|client| async move { client.resume_discord().await });
+            self.run(|client| async move { client.enable_discord_connection().await });
         }
     }
 

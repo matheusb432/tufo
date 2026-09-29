@@ -161,11 +161,11 @@ fn discord_checks(status: &ServerStatus) -> [Check; 2] {
             (status.discord_bot_token == DiscordBotTokenStatus::Configured)
                 .then_some("Run `tufo server restart` to load the saved token."),
         ),
-        DiscordConnectionStatus::Paused => Check::new(
+        DiscordConnectionStatus::Disabled => Check::new(
             "Discord",
             CheckStatus::Warning,
-            "Paused; the bot is not logged in",
-            Some("Resume Discord in Tufo Settings to use voice output."),
+            "Connection disabled; the bot is not logged in",
+            Some("Enable the Discord connection in Tufo Settings to use voice output."),
         ),
     };
     [token, connection]

@@ -153,7 +153,7 @@ pub(crate) struct DrawerView {
     pub(crate) voice_status: String,
     pub(crate) voice_badge: VoiceBadge,
     pub(crate) discord_configured: bool,
-    pub(crate) discord_paused: bool,
+    pub(crate) discord_disabled: bool,
 }
 
 /// The library pages' content for the open page and filter.
@@ -772,7 +772,7 @@ pub(crate) fn drawer(
         voice_status: voice_status(&state.voice),
         voice_badge: voice_badge(state),
         discord_configured: !matches!(state.voice, VoiceConnectionState::NotConfigured),
-        discord_paused: matches!(state.voice, VoiceConnectionState::Paused),
+        discord_disabled: matches!(state.voice, VoiceConnectionState::Disabled),
     };
     (view, targets)
 }
@@ -885,7 +885,7 @@ fn voice_badge(state: &PlayerState) -> VoiceBadge {
             _,
             VoiceConnectionState::NotConfigured
             | VoiceConnectionState::Connected
-            | VoiceConnectionState::Paused,
+            | VoiceConnectionState::Disabled,
         ) => VoiceBadge::None,
         (_, VoiceConnectionState::Connecting | VoiceConnectionState::Reconnecting { .. }) => {
             VoiceBadge::Joining
@@ -899,7 +899,7 @@ fn voice_status(voice: &VoiceConnectionState) -> String {
     match voice {
         VoiceConnectionState::NotConfigured
         | VoiceConnectionState::Connected
-        | VoiceConnectionState::Paused => String::new(),
+        | VoiceConnectionState::Disabled => String::new(),
         VoiceConnectionState::Connecting => tr("Joining the voice channel…").to_owned(),
         VoiceConnectionState::Reconnecting { attempt } => {
             tr_args("Voice dropped; reconnecting (attempt {0})…", &[attempt])
@@ -1045,13 +1045,13 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
 fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
     use tufo_application::{
         discord::{
-            bot_credentials::CredentialsError, set_discord_bot_token::SetDiscordBotTokenError,
+            bot_credentials::CredentialsError, discord_client::DiscordClientError,
+            set_discord_bot_token::SetDiscordBotTokenError,
         },
         playback::{
             control_music::ControlMusicError, play_entry_sound::PlayEntrySoundError,
             player::PlayAudioError, select_output::SelectOutputError,
         },
-        voice_channels::voice_channel_directory::VoiceChannelDirectoryError,
     };
     if let Some(text) = library_reason_text(code, reason) {
         return Some(text);
@@ -1078,12 +1078,12 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
         }
         (
             Code::FailedPrecondition,
-            SelectOutputError::DISCORD_NOT_CONFIGURED | VoiceChannelDirectoryError::NOT_CONFIGURED,
+            SelectOutputError::DISCORD_NOT_CONFIGURED | DiscordClientError::NOT_CONFIGURED,
         ) => tr("Add a Discord bot token in Settings first."),
         (
             Code::FailedPrecondition,
-            SelectOutputError::DISCORD_PAUSED | VoiceChannelDirectoryError::PAUSED,
-        ) => tr("Discord is paused. Resume it in Settings first."),
+            SelectOutputError::DISCORD_DISABLED | DiscordClientError::DISABLED,
+        ) => tr("The Discord connection is disabled. Enable it in Settings first."),
         (Code::NotFound, SelectOutputError::UNKNOWN_VOICE_CHANNEL) => {
             tr("That voice channel is no longer available. Refresh the channels.")
         }
@@ -1093,7 +1093,7 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
         (Code::Unavailable, SelectOutputError::LOCAL_DEVICE) => {
             tr("Tufo could not open the audio device. Check your system’s audio settings.")
         }
-        (Code::Unavailable, VoiceChannelDirectoryError::NOT_READY) => {
+        (Code::Unavailable, DiscordClientError::NOT_READY) => {
             tr("The Discord bot is still connecting. Try again shortly.")
         }
         (Code::InvalidArgument, SetDiscordBotTokenError::EMPTY_TOKEN) => {

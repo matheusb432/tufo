@@ -462,11 +462,11 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     if Session.discord-configured: SwitchSetting {
-        title: @tr("" => "Pause Discord");
-        description: @tr("" => "Stops the bot from logging in, so it can't join a voice channel by accident and uses no network in the background.");
-        checked: Session.discord-paused;
+        title: @tr("" => "Disable Discord connection");
+        description: @tr("" => "Logs the bot out, so it can't join a voice channel by accident and uses no network in the background.");
+        checked: Session.discord-disabled;
         toggled(checked) => {
-            Actions.set-discord-paused(checked);
+            Actions.set-discord-connection-disabled(checked);
         }
     }
 

@@ -9,7 +9,7 @@ mod voice_source;
 use std::{
     collections::HashMap,
     sync::{
-        Arc, Mutex, OnceLock, PoisonError, RwLock,
+        Arc, Mutex, OnceLock, PoisonError, RwLock, RwLockReadGuard,
         atomic::{AtomicBool, Ordering},
         mpsc::Receiver,
     },
@@ -26,10 +26,7 @@ use songbird::{
     tracks::TrackHandle,
 };
 use tokio::sync::oneshot;
-use tufo_application::{
-    discord::discord_gateway::DiscordGateway,
-    voice_channels::voice_channel_directory::{VoiceChannelDirectory, VoiceChannelDirectoryError},
-};
+use tufo_application::discord::discord_client::{DiscordClient, DiscordClientError};
 use tufo_models::{
     discord::{GuildId, VoiceChannel, VoiceChannelTarget},
     playback::diagnostics::VoicePacing,
@@ -49,121 +46,66 @@ const LOGIN_RETRY_DELAY_MIN: Duration = Duration::from_secs(2);
 const LOGIN_RETRY_DELAY_MAX: Duration = Duration::from_secs(60);
 const HTTP_UNAUTHORIZED: u16 = 401;
 
-/// The Discord side of the server: absent when no credentials are configured, paused with its
-/// credentials kept for resuming, or logged in.
-#[derive(Clone)]
-pub enum Discord {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VoiceAvailability {
     NotConfigured,
-    Paused(DiscordCredentials),
-    Configured(Arc<DiscordVoice>),
+    Disabled,
+    Enabled,
 }
 
-impl VoiceChannelDirectory for Discord {
-    fn voice_channels(&self) -> Result<Vec<VoiceChannel>, VoiceChannelDirectoryError> {
-        match self {
-            Self::NotConfigured => Err(VoiceChannelDirectoryError::NotConfigured),
-            Self::Paused(_) => Err(VoiceChannelDirectoryError::Paused),
-            Self::Configured(voice) => voice
-                .channels
-                .read()
-                .unwrap_or_else(PoisonError::into_inner)
-                .voice_channels()
-                .ok_or(VoiceChannelDirectoryError::NotReady),
-        }
-    }
-}
-
-/// Shared, toggleable Discord state: the gateway connection can be paused and resumed at
-/// runtime, visible to every clone.
+/// The server's Discord bot: its gateway connection and the voice channels it joins. Clones
+/// share one connection.
 #[derive(Clone)]
-pub struct SharedDiscord(Arc<RwLock<Discord>>);
-
-impl SharedDiscord {
-    #[must_use]
-    pub fn new(discord: Discord) -> Self {
-        Self(Arc::new(RwLock::new(discord)))
-    }
-
-    /// The current state, cheap to clone.
-    #[must_use]
-    pub fn snapshot(&self) -> Discord {
-        self.0
-            .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
-}
-
-impl VoiceChannelDirectory for SharedDiscord {
-    fn voice_channels(&self) -> Result<Vec<VoiceChannel>, VoiceChannelDirectoryError> {
-        self.snapshot().voice_channels()
-    }
-}
-
-impl DiscordGateway for SharedDiscord {
-    fn pause(&self) {
-        let mut discord = self.0.write().unwrap_or_else(PoisonError::into_inner);
-        let Discord::Configured(voice) = &*discord else {
-            return;
-        };
-        *discord = Discord::Paused(voice.credentials.clone());
-    }
-
-    fn resume(&self) {
-        let mut discord = self.0.write().unwrap_or_else(PoisonError::into_inner);
-        let Discord::Paused(credentials) = &*discord else {
-            return;
-        };
-        *discord = Discord::Configured(DiscordVoice::start(credentials.clone()));
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum JoinVoiceError {
-    #[error("the Discord bot has not logged in yet")]
-    NotReady,
-    #[error("the bot cannot see that voice channel")]
-    UnknownChannel,
-    #[error("joining the voice channel timed out")]
-    TimedOut,
-    #[error("joining the voice channel failed")]
-    Join(#[source] songbird::error::JoinError),
-}
-
-/// A logged-in bot: its gateway session, voice connections, and visible voice channels.
-pub struct DiscordVoice {
-    credentials: DiscordCredentials,
-    songbird: Arc<OnceLock<Arc<Songbird>>>,
-    channels: Arc<RwLock<VoiceChannelCache>>,
-    gateway: tokio::task::JoinHandle<()>,
+pub struct SongbirdDiscordClient {
+    connection: Arc<RwLock<Connection>>,
     pacing_totals: Arc<PacingTotals>,
 }
 
-impl DiscordVoice {
+enum Connection {
+    NotConfigured,
+    Disabled(DiscordCredentials),
+    Enabled(Gateway),
+}
+
+impl SongbirdDiscordClient {
+    #[must_use]
+    pub fn not_configured() -> Self {
+        Self::with_connection(Connection::NotConfigured)
+    }
+
     /// Starts logging the bot in and following its gateway in the background, so the server
     /// starts even while Discord is unreachable. Must run inside a tokio runtime.
     #[must_use]
-    pub fn start(credentials: DiscordCredentials) -> Arc<Self> {
-        let songbird = Arc::new(OnceLock::new());
-        let channels = Arc::new(RwLock::new(VoiceChannelCache::default()));
-        let gateway = tokio::spawn(run_gateway(
-            credentials.clone(),
-            Arc::clone(&songbird),
-            Arc::clone(&channels),
-        ));
-        Arc::new(Self {
-            credentials,
-            songbird,
-            channels,
-            gateway,
-            pacing_totals: Arc::default(),
-        })
+    pub fn start(credentials: DiscordCredentials) -> Self {
+        Self::with_connection(Connection::Enabled(Gateway::start(credentials)))
     }
 
-    /// How late songbird ran its voice ticks, over every session since the server started.
+    fn with_connection(connection: Connection) -> Self {
+        Self {
+            connection: Arc::new(RwLock::new(connection)),
+            pacing_totals: Arc::default(),
+        }
+    }
+
     #[must_use]
-    pub fn pacing(&self) -> VoicePacing {
-        self.pacing_totals.summary()
+    pub fn voice_availability(&self) -> VoiceAvailability {
+        match &*self.read_connection() {
+            Connection::NotConfigured => VoiceAvailability::NotConfigured,
+            Connection::Disabled(_) => VoiceAvailability::Disabled,
+            Connection::Enabled(_) => VoiceAvailability::Enabled,
+        }
+    }
+
+    /// How late songbird ran its voice ticks, over every session since the server started;
+    /// `None` when not configured.
+    #[must_use]
+    pub fn voice_pacing(&self) -> Option<VoicePacing> {
+        match self.voice_availability() {
+            VoiceAvailability::NotConfigured => None,
+            VoiceAvailability::Disabled | VoiceAvailability::Enabled => {
+                Some(self.pacing_totals.summary())
+            }
+        }
     }
 
     /// Joins `target` self-deafened and streams whatever the renderer from `renderer_receiver`
@@ -174,15 +116,7 @@ impl DiscordVoice {
         target: VoiceChannelTarget,
         renderer_receiver: Receiver<Renderer>,
     ) -> Result<VoiceSession, JoinVoiceError> {
-        let songbird = self.songbird.get().ok_or(JoinVoiceError::NotReady)?;
-        let visible = self
-            .channels
-            .read()
-            .unwrap_or_else(PoisonError::into_inner)
-            .contains(target);
-        if !visible {
-            return Err(JoinVoiceError::UnknownChannel);
-        }
+        let songbird = self.songbird_seeing(target)?;
         let call = tokio::time::timeout(
             JOIN_TIMEOUT,
             songbird.join(target.guild_id.into_inner(), target.channel_id.into_inner()),
@@ -221,6 +155,7 @@ impl DiscordVoice {
         let reporter = tokio::spawn(report_pacing(stats));
         tracing::info!(?target, "joined the Discord voice channel");
         Ok(VoiceSession {
+            songbird,
             guild_id: target.guild_id,
             track,
             reporter,
@@ -229,28 +164,119 @@ impl DiscordVoice {
         })
     }
 
-    /// Stops streaming and leaves the session's voice channel.
-    pub async fn leave(&self, session: VoiceSession) {
-        session.leaving.store(true, Ordering::Relaxed);
-        if let Err(error) = session.track.stop() {
-            tracing::debug!(%error, "the voice track had already ended");
+    fn songbird_seeing(&self, target: VoiceChannelTarget) -> Result<Arc<Songbird>, JoinVoiceError> {
+        let connection = self.read_connection();
+        let gateway = match &*connection {
+            Connection::NotConfigured => return Err(JoinVoiceError::NotConfigured),
+            Connection::Disabled(_) => return Err(JoinVoiceError::Disabled),
+            Connection::Enabled(gateway) => gateway,
+        };
+        let songbird = gateway.songbird.get().ok_or(JoinVoiceError::NotReady)?;
+        let visible = gateway
+            .channels
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .contains(target);
+        if !visible {
+            return Err(JoinVoiceError::UnknownChannel);
         }
-        if let Some(songbird) = self.songbird.get()
-            && let Err(error) = songbird.remove(session.guild_id.into_inner()).await
-        {
-            tracing::warn!(%error, "leaving the Discord voice channel failed");
+        Ok(Arc::clone(songbird))
+    }
+
+    fn read_connection(&self) -> RwLockReadGuard<'_, Connection> {
+        self.connection
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl DiscordClient for SongbirdDiscordClient {
+    fn voice_channels(&self) -> Result<Vec<VoiceChannel>, DiscordClientError> {
+        match &*self.read_connection() {
+            Connection::NotConfigured => Err(DiscordClientError::NotConfigured),
+            Connection::Disabled(_) => Err(DiscordClientError::Disabled),
+            Connection::Enabled(gateway) => gateway
+                .channels
+                .read()
+                .unwrap_or_else(PoisonError::into_inner)
+                .voice_channels()
+                .ok_or(DiscordClientError::NotReady),
+        }
+    }
+
+    fn disable_connection(&self) {
+        let mut connection = self
+            .connection
+            .write()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Connection::Enabled(gateway) = &*connection {
+            *connection = Connection::Disabled(gateway.credentials.clone());
+            tracing::info!("disabled the Discord connection");
+        }
+    }
+
+    fn enable_connection(&self) {
+        let mut connection = self
+            .connection
+            .write()
+            .unwrap_or_else(PoisonError::into_inner);
+        if let Connection::Disabled(credentials) = &*connection {
+            *connection = Connection::Enabled(Gateway::start(credentials.clone()));
         }
     }
 }
 
-impl Drop for DiscordVoice {
+#[derive(Debug, thiserror::Error)]
+pub enum JoinVoiceError {
+    #[error("Discord is not configured on this server")]
+    NotConfigured,
+    #[error("the Discord connection is disabled on this server")]
+    Disabled,
+    #[error("the Discord bot has not logged in yet")]
+    NotReady,
+    #[error("the bot cannot see that voice channel")]
+    UnknownChannel,
+    #[error("joining the voice channel timed out")]
+    TimedOut,
+    #[error("joining the voice channel failed")]
+    Join(#[source] songbird::error::JoinError),
+}
+
+/// A gateway session following Discord in the background; dropping it logs the bot out.
+struct Gateway {
+    credentials: DiscordCredentials,
+    songbird: Arc<OnceLock<Arc<Songbird>>>,
+    channels: Arc<RwLock<VoiceChannelCache>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl Gateway {
+    fn start(credentials: DiscordCredentials) -> Self {
+        let songbird = Arc::new(OnceLock::new());
+        let channels = Arc::new(RwLock::new(VoiceChannelCache::default()));
+        let task = tokio::spawn(run_gateway(
+            credentials.clone(),
+            Arc::clone(&songbird),
+            Arc::clone(&channels),
+        ));
+        Self {
+            credentials,
+            songbird,
+            channels,
+            task,
+        }
+    }
+}
+
+impl Drop for Gateway {
     fn drop(&mut self) {
-        self.gateway.abort();
+        self.task.abort();
     }
 }
 
 /// A joined voice channel receiving the mixer's output.
 pub struct VoiceSession {
+    songbird: Arc<Songbird>,
     guild_id: GuildId,
     track: TrackHandle,
     reporter: tokio::task::JoinHandle<()>,
@@ -263,6 +289,17 @@ impl VoiceSession {
     /// Resolves with a reason when the connection drops without Tufo leaving. Available once.
     pub fn take_lost_signal(&mut self) -> Option<oneshot::Receiver<String>> {
         self.lost.take()
+    }
+
+    /// Stops streaming and leaves the voice channel.
+    pub async fn leave(self) {
+        self.leaving.store(true, Ordering::Relaxed);
+        if let Err(error) = self.track.stop() {
+            tracing::debug!(%error, "the voice track had already ended");
+        }
+        if let Err(error) = self.songbird.remove(self.guild_id.into_inner()).await {
+            tracing::warn!(%error, "leaving the Discord voice channel failed");
+        }
     }
 }
 
@@ -334,7 +371,9 @@ async fn run_gateway(
             Err(error) => tracing::warn!(%error, "receiving a Discord gateway event failed"),
         }
     }
-    tracing::error!("the Discord gateway closed for good; restart tufo-server to reconnect");
+    tracing::error!(
+        "the Discord gateway closed for good; disable and enable the connection to reconnect"
+    );
 }
 
 fn gateway_events() -> EventTypeFlags {

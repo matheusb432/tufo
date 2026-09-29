@@ -2,9 +2,9 @@ use std::{num::NonZeroU32, time::Duration};
 
 use tufo_wire::server::{DiscordConnectionStatus, ServerStatus};
 
-use crate::{
-    discord::bot_credentials::{BotCredentials, CredentialsError},
-    voice_channels::voice_channel_directory::{VoiceChannelDirectory, VoiceChannelDirectoryError},
+use crate::discord::{
+    bot_credentials::{BotCredentials, CredentialsError},
+    discord_client::{DiscordClient, DiscordClientError},
 };
 
 pub async fn execute(
@@ -12,14 +12,14 @@ pub async fn execute(
     process_id: NonZeroU32,
     uptime: Duration,
     credentials: &impl BotCredentials,
-    channels: &impl VoiceChannelDirectory,
+    discord: &impl DiscordClient,
 ) -> Result<ServerStatus, CredentialsError> {
     let discord_bot_token = credentials.status().await?;
-    let discord_connection = match channels.voice_channels() {
+    let discord_connection = match discord.voice_channels() {
         Ok(_) => DiscordConnectionStatus::Ready,
-        Err(VoiceChannelDirectoryError::NotConfigured) => DiscordConnectionStatus::NotConfigured,
-        Err(VoiceChannelDirectoryError::Paused) => DiscordConnectionStatus::Paused,
-        Err(VoiceChannelDirectoryError::NotReady) => DiscordConnectionStatus::Connecting,
+        Err(DiscordClientError::NotConfigured) => DiscordConnectionStatus::NotConfigured,
+        Err(DiscordClientError::Disabled) => DiscordConnectionStatus::Disabled,
+        Err(DiscordClientError::NotReady) => DiscordConnectionStatus::Connecting,
     };
     Ok(ServerStatus {
         version,

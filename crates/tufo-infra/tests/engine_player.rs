@@ -31,6 +31,7 @@ use tufo_application::{
 use tufo_infra::{
     audio::Mixer,
     database::open_database,
+    discord::VoiceAvailability,
     library_files::DiskLibraryFiles,
     player::{
         EnginePlayer, EngineTimings, ReconnectPolicy,
@@ -72,7 +73,7 @@ const POLL_INTERVAL: Duration = Duration::from_millis(10);
 struct OutputControls {
     voice_lost: Mutex<Vec<oneshot::Sender<String>>>,
     fail_voice_opens: AtomicBool,
-    paused: AtomicBool,
+    voice_disabled: AtomicBool,
     closes: AtomicUsize,
 }
 
@@ -124,12 +125,12 @@ impl TestOutputs {
 }
 
 impl AudioOutputs for TestOutputs {
-    fn voice_configured(&self) -> bool {
-        true
-    }
-
-    fn voice_paused(&self) -> bool {
-        self.controls.paused.load(Ordering::Relaxed)
+    fn voice_availability(&self) -> VoiceAvailability {
+        if self.controls.voice_disabled.load(Ordering::Relaxed) {
+            VoiceAvailability::Disabled
+        } else {
+            VoiceAvailability::Enabled
+        }
     }
 
     fn open(
@@ -523,27 +524,27 @@ async fn rejoining_gives_up_after_the_policy_attempts() -> anyhow::Result<()> {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn pausing_leaves_the_channel_and_blocks_new_ones() -> anyhow::Result<()> {
+async fn disabling_discord_leaves_the_channel_and_blocks_new_ones() -> anyhow::Result<()> {
     let mut rig = Rig::start()?;
     rig.player.select_output(voice_channel()).await?;
     rig.wait_for(|state| state.voice == VoiceConnectionState::Connected)
         .await?;
 
-    rig.controls.paused.store(true, Ordering::Relaxed);
+    rig.controls.voice_disabled.store(true, Ordering::Relaxed);
     rig.player.select_output(OutputTarget::Local).await?;
     rig.player.refresh_voice_availability().await;
     let state = rig
-        .wait_for(|state| state.voice == VoiceConnectionState::Paused)
+        .wait_for(|state| state.voice == VoiceConnectionState::Disabled)
         .await?;
 
     assert_eq!(state.output, OutputTarget::Local);
-    let joined_while_paused = rig.player.select_output(voice_channel()).await;
+    let joined_while_disabled = rig.player.select_output(voice_channel()).await;
     assert!(matches!(
-        joined_while_paused,
-        Err(SelectOutputError::DiscordPaused)
+        joined_while_disabled,
+        Err(SelectOutputError::DiscordDisabled)
     ));
 
-    rig.controls.paused.store(false, Ordering::Relaxed);
+    rig.controls.voice_disabled.store(false, Ordering::Relaxed);
     rig.player.refresh_voice_availability().await;
     rig.wait_for(|state| matches!(state.voice, VoiceConnectionState::Disconnected { .. }))
         .await?;

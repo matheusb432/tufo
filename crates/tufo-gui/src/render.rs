@@ -246,7 +246,7 @@ pub(crate) fn player(
         session.set_voice_status(drawer.voice_status.into());
         session.set_voice_badge(voice_badge(drawer.voice_badge));
         session.set_discord_configured(drawer.discord_configured);
-        session.set_discord_paused(drawer.discord_paused);
+        session.set_discord_disabled(drawer.discord_disabled);
         session.set_crossfade_ms(i32::try_from(crossfade.as_millis()).unwrap_or(i32::MAX));
     });
 }
