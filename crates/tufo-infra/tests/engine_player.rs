@@ -291,6 +291,16 @@ impl Rig {
         self.sound_card.captures().get(output).map_or(0, Vec::len)
     }
 
+    async fn wait_for_recorded_frames(&self, output: usize, frames: usize) -> anyhow::Result<()> {
+        tokio::time::timeout(WAIT_TIMEOUT, async {
+            while self.recorded_frames(output) < frames {
+                tokio::time::sleep(POLL_INTERVAL).await;
+            }
+        })
+        .await
+        .with_context(|| format!("output {output} never recorded {frames} frames"))
+    }
+
     fn state(&self) -> PlayerState {
         self.states.borrow().clone()
     }
@@ -666,6 +676,8 @@ async fn playing_while_paused_starts_the_new_track_without_crossfading() -> anyh
 
 #[tokio::test(flavor = "multi_thread")]
 async fn standing_by_fades_everything_out_and_leaves_the_voice_channel() -> anyhow::Result<()> {
+    // The renderer's frame clock can lag wall time; capture 300 ms around the 250 ms fade.
+    let capture_frames = SAMPLE_RATE as usize * 3 / 10;
     let mut rig = Rig::start()?;
     rig.player.select_output(voice_channel()).await?;
     let track = rig.file("music.wav", &constant(0.5, THREE_SECONDS))?;
@@ -679,10 +691,14 @@ async fn standing_by_fades_everything_out_and_leaves_the_voice_channel() -> anyh
     };
     rig.play_once(entry(track, "Music")).await?;
     rig.player.play_sound(rain).await?;
-    tokio::time::sleep(Duration::from_millis(300)).await;
-    let stood_by_at = rig.sound_card.captures()[0].len();
+    rig.wait_for_recorded_frames(0, rig.recorded_frames(0) + capture_frames)
+        .await?;
+    let before = rig.sound_card.captures();
+    let stood_by_at = before[0].len();
+    assert!(within(&before[0][stood_by_at - 480..], 0.7, 0.01));
 
     rig.player.stand_by().await;
+    let faded_by = rig.recorded_frames(0) + capture_frames;
     let state = rig
         .wait_for(|state| state.music.is_none() && state.sounds.is_empty())
         .await?;
@@ -690,6 +706,7 @@ async fn standing_by_fades_everything_out_and_leaves_the_voice_channel() -> anyh
     let released = rig
         .wait_for(|state| state.output == OutputTarget::Local)
         .await?;
+    rig.wait_for_recorded_frames(0, faded_by).await?;
 
     assert_eq!(state.output, voice_channel());
     assert_eq!(
@@ -699,13 +716,7 @@ async fn standing_by_fades_everything_out_and_leaves_the_voice_channel() -> anyh
     let after = &rig.sound_card.captures()[0][stood_by_at..];
     // The 250 ms fade passes between full level, 0.7, and silence instead of cutting.
     assert!(after.iter().any(|sample| (0.1..0.6).contains(sample)));
-    assert!(
-        after
-            .iter()
-            .rev()
-            .take(480)
-            .all(|sample| sample.abs() < 0.01)
-    );
+    assert!(within(&after[after.len() - 480..], 0.0, 0.01));
     Ok(())
 }
 
