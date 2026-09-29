@@ -231,6 +231,14 @@ export global Clock {
     in property <bool> enabled;
 }
 
+// The window draws its own frame, so its buttons and title row reach the window through here.
+export global WindowFrame {
+    callback minimize();
+    callback toggle-maximized();
+    // Opens the desktop's window menu at this point in the window.
+    callback show-menu(length, length);
+}
+
 export global Actions {
     callback open-page(Page, string);
     callback filter-changed(string);

@@ -127,11 +127,12 @@ export component BackgroundGallery inherits Rectangle {
         }
     }
 
+    // Clear of the title row, whose buttons stay above the gallery.
     wall := Rectangle {
         x: 24px;
-        y: 24px;
+        y: Theme.title-row-height;
         width: parent.width - 48px;
-        height: parent.height - 48px;
+        height: parent.height - self.y - 24px;
         background: Theme.gallery-wall;
         border-radius: Theme.radius-card;
         // Swallows clicks so they don't reach the dimmed area.

@@ -1,0 +1,53 @@
+// The window's own frame, drawn in place of the desktop's: the areas that move the window, and
+// its buttons.
+
+import { Theme } from "theme.slint";
+import { WindowFrame } from "state.slint";
+import { IconButton } from "widgets.slint";
+
+// Moves the window when dragged, maximizes or restores it on a double click, and opens the
+// desktop's window menu on a right click. Whatever lies above it keeps its own presses.
+export component WindowDragArea inherits WindowMoveArea {
+    TouchArea {
+        double-clicked => {
+            WindowFrame.toggle-maximized();
+        }
+        pointer-event(event) => {
+            if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
+                WindowFrame.show-menu(self.absolute-position.x + self.mouse-x, self.absolute-position.y + self.mouse-y);
+            }
+        }
+    }
+}
+
+export component WindowButtons inherits HorizontalLayout {
+    in property <bool> maximized;
+    callback close();
+    width: Theme.window-buttons-width;
+    spacing: 2px;
+    IconButton {
+        icon: @image-url("icons/minus.svg");
+        tooltip: @tr("" => "Minimize");
+        clicked => {
+            WindowFrame.minimize();
+        }
+    }
+
+    IconButton {
+        icon: root.maximized ? @image-url("icons/copy.svg") : @image-url("icons/square.svg");
+        tooltip: root.maximized ? @tr("" => "Restore") : @tr("" => "Maximize");
+        clicked => {
+            WindowFrame.toggle-maximized();
+        }
+    }
+
+    IconButton {
+        icon: @image-url("icons/x.svg");
+        tooltip: @tr("" => "Close");
+        background: self.has-hover ? Theme.window-close-hover : transparent;
+        hover-tint: Theme.text;
+        clicked => {
+            root.close();
+        }
+    }
+}

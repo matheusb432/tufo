@@ -217,7 +217,7 @@ msgstr "Claude-Joseph Vernet, 1772"
 msgid "Clock"
 msgstr "Relógio"
 
-#: ui/dialogs.slint:57 ui/gallery.slint:159
+#: ui/dialogs.slint:57 ui/frame.slint:46 ui/gallery.slint:159
 msgid "Close"
 msgstr "Fechar"
 
@@ -627,9 +627,17 @@ msgstr "Magia"
 msgid "Masquerade"
 msgstr "Baile de máscaras"
 
+#: ui/frame.slint:38
+msgid "Maximize"
+msgstr "Maximizar"
+
 #: src/sound_icons.rs
 msgid "Mine"
 msgstr "Mina"
+
+#: ui/frame.slint:30
+msgid "Minimize"
+msgstr "Minimizar"
 
 #: ui/pages.slint:636
 msgid "Missing"
@@ -846,6 +854,10 @@ msgstr "Repetir a faixa"
 #: src/presentation.rs:1123
 msgid "Restarting so the bot logs in with Kenku FM's token."
 msgstr "Reiniciando para conectar o bot com o token do Kenku FM."
+
+#: ui/frame.slint:38
+msgid "Restore"
+msgstr "Restaurar"
 
 #: src/tray.rs:66
 msgid "Resume Sounds"

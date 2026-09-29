@@ -22,9 +22,11 @@ export component DialogFrame inherits Rectangle {
         }
     }
 
+    // Clear of the title row, whose buttons stay above every dialog.
     Rectangle {
+        y: max(Theme.title-row-height, (root.height - self.height) / 2);
         width: min(parent.width - 48px, 440px);
-        height: min(layout.preferred-height, root.height - 48px);
+        height: min(layout.preferred-height, root.height - Theme.title-row-height - 24px);
         background: Theme.raised;
         border-radius: Theme.radius-card;
         border-width: 1px;

@@ -10,6 +10,7 @@ mod card_art;
 mod controller;
 mod drops;
 mod files;
+mod frame;
 mod i18n;
 mod presentation;
 mod render;
@@ -18,6 +19,8 @@ mod server_process;
 mod settings;
 mod sound_icons;
 mod tray;
+#[cfg(target_os = "linux")]
+mod wayland;
 #[cfg(target_os = "linux")]
 mod wayland_hidden_window;
 mod window_state;
@@ -86,11 +89,9 @@ fn main() -> anyhow::Result<()> {
             None
         }
     };
-    // The window's native platform: Wayland in a Wayland session, whose drops `drops` hears.
-    slint::BackendSelector::new()
-        .with_winit_custom_application_handler(drops::DropHandler::default())
-        .select()?;
+    select_backend()?;
     let window = ui::AppWindow::new()?;
+    frame::install(&window);
     i18n::select_window_language(language)?;
     if let Some(file) = window_state::WindowStateFile::from_environment() {
         window_state::install(&window, runtime.handle(), file);
@@ -161,6 +162,15 @@ fn main() -> anyhow::Result<()> {
     // Hiding the window doesn't end the loop; quitting does, once the server has stopped.
     slint::run_event_loop_until_quit()?;
     Ok(())
+}
+
+/// Selects winit on the window's native platform: Wayland in a Wayland session.
+fn select_backend() -> Result<(), slint::PlatformError> {
+    let backend = slint::BackendSelector::new()
+        .with_winit_custom_application_handler(drops::DropHandler::default());
+    #[cfg(windows)]
+    let backend = backend.with_winit_window_attributes_hook(frame::with_shadow);
+    backend.select()
 }
 
 async fn claim_gui_instance() -> std::io::Result<GuiInstance> {

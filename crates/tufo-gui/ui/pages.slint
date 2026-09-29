@@ -287,10 +287,12 @@ component HomeShelf inherits VerticalLayout {
 export component HomePage inherits Rectangle {
     callback add(CollectionKind);
     PageScroll {
+        y: Theme.title-row-height;
+        height: parent.height - self.y;
         content-height: column.preferred-height;
         column := VerticalLayout {
             padding: PageMetrics.padding;
-            padding-top: 22px;
+            padding-top: 4px;
             spacing: 30px;
             alignment: start;
             FilterField { }
@@ -335,10 +337,12 @@ export component GridPage inherits Rectangle {
     in property <CollectionKind> kind;
     callback add(CollectionKind);
     PageScroll {
+        y: Theme.title-row-height;
+        height: parent.height - self.y;
         content-height: column.preferred-height;
         column := VerticalLayout {
             padding: PageMetrics.padding;
-            padding-top: 22px;
+            padding-top: 4px;
             spacing: 18px;
             alignment: start;
             HorizontalLayout {
@@ -462,12 +466,13 @@ component CollectionTools inherits HorizontalLayout {
 }
 
 // The collection's header as one slim row that stays put while its content
-// scrolls: a way back to every playlist or soundboard, the title, and the actions.
+// scrolls: a way back to every playlist or soundboard, the title, and the actions, left of the
+// window's buttons.
 component CollectionBar inherits Rectangle {
     in property <CollectionKind> kind;
     callback edit();
     callback add-files();
-    height: 60px;
+    height: Theme.title-row-height;
     HorizontalLayout {
         padding-left: 14px;
         padding-right: 14px;
@@ -501,6 +506,17 @@ component CollectionBar inherits Rectangle {
             add-files => {
                 root.add-files();
             }
+        }
+
+        Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 1px;
+            height: 24px;
+            background: Theme.divider;
+        }
+
+        Rectangle {
+            width: Theme.window-buttons-width;
         }
     }
 

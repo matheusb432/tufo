@@ -48,6 +48,9 @@ export global Theme {
     out property <color> badge: rgba(7, 21, 14, 0.72);
     out property <color> badge-hover: rgba(7, 21, 14, 0.88);
     out property <color> current-row: rgba(244, 184, 96, 0.12);
+    // Outlines the window, which has no frame or shadow from the desktop.
+    out property <color> window-edge: rgba(245, 238, 220, 0.12);
+    out property <color> window-close-hover: #c4473d;
 
     // The background gallery hangs its paintings on a wall, ringing the chosen one in sunlight.
     out property <color> gallery-wall: #0e2419;
@@ -64,6 +67,11 @@ export global Theme {
     out property <length> sidebar-width: 232px;
     out property <length> rail-width: 64px;
     out property <length> page-width-min: 560px;
+    // The top of the sidebar and of every page, where the window's buttons sit and a drag moves
+    // the window.
+    out property <length> title-row-height: 60px;
+    // Three 40 px buttons, 2 px apart.
+    out property <length> window-buttons-width: 124px;
 
     out property <string> font: "Nunito";
     out property <string> display-font: "Nunito";

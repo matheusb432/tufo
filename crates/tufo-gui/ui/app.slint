@@ -5,7 +5,7 @@ import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
-    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
+    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
 import { ConnectingPage, GridPage, HomePage, PlaylistPage, SoundboardPage } from "pages.slint";
@@ -15,12 +15,13 @@ import {
 } from "dialogs.slint";
 import { BackgroundGallery } from "gallery.slint";
 import { SearchPalette } from "search.slint";
+import { WindowButtons, WindowDragArea } from "frame.slint";
 import { Icon } from "widgets.slint";
 
 export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
-    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
+    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
 }
 
 export component AppWindow inherits Window {
@@ -33,6 +34,8 @@ export component AppWindow inherits Window {
     min-height: 600px;
     background: Theme.still-shade;
     default-font-family: Theme.font;
+    no-frame: true;
+    resize-border-width: root.fills-screen ? 0 : 6px;
     // Keyboard shortcuts see every key first, wherever focus is inside the window.
     forward-focus: shortcuts;
     property <bool> settings-open;
@@ -47,6 +50,8 @@ export component AppWindow inherits Window {
     property <int> entry-fade-out-ms;
     property <int> entry-icon;
     property <bool> any-dialog: root.settings-open || root.add-open || root.edit-collection-open || root.edit-entry-open;
+    property <bool> any-overlay: root.any-dialog || Search.palette-open || root.sidebar-overlaid;
+    property <bool> fills-screen: root.maximized || root.full-screen;
     property <bool> sidebar-fits: root.width >= Theme.sidebar-width + Theme.page-width-min;
     property <bool> sidebar-expanded: Session.drawer-pinned && root.sidebar-fits;
     // Where the sidebar doesn't fit beside the page, expanding it lays it over the page until
@@ -177,6 +182,11 @@ export component AppWindow inherits Window {
         main := Rectangle {
             x: root.page-x;
             width: parent.width - self.x;
+            WindowDragArea {
+                y: 0;
+                height: Theme.title-row-height;
+            }
+
             VerticalLayout {
                 page-area := Rectangle {
                     // Small enough that a collection's page trades its plate for a slim header.
@@ -400,5 +410,28 @@ export component AppWindow inherits Window {
                 shortcuts.focus();
             }
         }
+    }
+
+    // The title row still moves the window while an overlay dims the page.
+    if root.any-overlay: WindowDragArea {
+        x: root.sidebar-overlaid ? Theme.sidebar-width : 0;
+        y: 0;
+        width: parent.width - self.x;
+        height: Theme.title-row-height;
+    }
+
+    WindowButtons {
+        x: parent.width - self.width - 14px;
+        y: (Theme.title-row-height - self.height) / 2;
+        height: self.preferred-height;
+        maximized: root.maximized;
+        close => {
+            root.close();
+        }
+    }
+
+    if !root.fills-screen: Rectangle {
+        border-width: 1px;
+        border-color: Theme.window-edge;
     }
 }

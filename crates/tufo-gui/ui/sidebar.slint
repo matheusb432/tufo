@@ -7,6 +7,7 @@ import {
     OutputRowKind, Page, PlayerView, Session, VoiceBadge,
 } from "state.slint";
 import { Equalizer, Icon, IconButton, Logo, MenuSurface, TextLink, TooltipBubble } from "widgets.slint";
+import { WindowDragArea } from "frame.slint";
 
 component NavRow inherits Rectangle {
     in property <image> icon;
@@ -344,7 +345,7 @@ component FullSidebar inherits SidebarForm {
     width: Theme.sidebar-width;
     VerticalLayout {
         HorizontalLayout {
-            height: 62px;
+            height: Theme.title-row-height;
             padding-right: 10px;
             alignment: end;
             IconButton {
@@ -543,7 +544,7 @@ component Rail inherits SidebarForm {
     property <Page> page: Navigation.page;
     width: Theme.rail-width;
     VerticalLayout {
-        padding-top: 62px;
+        padding-top: Theme.title-row-height;
         padding-bottom: 10px;
         spacing: 6px;
         alignment: start;
@@ -635,9 +636,14 @@ export component Sidebar inherits Rectangle {
     background: root.overlaid ? Theme.sidebar-overlaid : Theme.sidebar;
     clip: true;
 
+    WindowDragArea {
+        y: 0;
+        height: Theme.title-row-height;
+    }
+
     Logo {
         x: 13px;
-        y: 12px;
+        y: (Theme.title-row-height - self.height) / 2;
         asleep: !PlayerView.something-plays;
         accessible-role: image;
         accessible-label: PlayerView.something-plays ? @tr("" => "Awake while something plays") : @tr("" => "Asleep while nothing plays");

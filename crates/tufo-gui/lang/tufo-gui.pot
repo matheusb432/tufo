@@ -217,7 +217,7 @@ msgstr ""
 msgid "Clock"
 msgstr ""
 
-#: ui/dialogs.slint:57 ui/gallery.slint:159
+#: ui/dialogs.slint:57 ui/frame.slint:46 ui/gallery.slint:159
 msgid "Close"
 msgstr ""
 
@@ -627,8 +627,16 @@ msgstr ""
 msgid "Masquerade"
 msgstr ""
 
+#: ui/frame.slint:38
+msgid "Maximize"
+msgstr ""
+
 #: src/sound_icons.rs
 msgid "Mine"
+msgstr ""
+
+#: ui/frame.slint:30
+msgid "Minimize"
 msgstr ""
 
 #: ui/pages.slint:636
@@ -845,6 +853,10 @@ msgstr ""
 
 #: src/presentation.rs:1123
 msgid "Restarting so the bot logs in with Kenku FM's token."
+msgstr ""
+
+#: ui/frame.slint:38
+msgid "Restore"
 msgstr ""
 
 #: src/tray.rs:66
