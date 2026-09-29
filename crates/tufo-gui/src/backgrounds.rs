@@ -9,11 +9,12 @@
 //! budget.
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{HashMap, HashSet, hash_map::RandomState},
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::mpsc,
+    time::Duration,
 };
 
 use clru::{CLruCache, CLruCacheConfig, WeightScale};
@@ -124,6 +125,42 @@ thread_local! {
     static DRAWING: RefCell<HashMap<CardLook, (u32, u32)>> = RefCell::new(HashMap::new());
     /// Pictures that failed to decode, whose cards show the gradient.
     static MISSING: RefCell<HashSet<Picture>> = RefCell::new(HashSet::new());
+    static LAYOUT_MOVING: Cell<bool> = const { Cell::new(false) };
+    static REDRAW: slint::Timer = slint::Timer::default();
+}
+
+/// Reuses existing artwork while the sidebar slides, then refreshes its settled dimensions.
+pub(crate) fn set_layout_moving(moving: bool) {
+    let was_moving = LAYOUT_MOVING.with(|state| state.replace(moving));
+    if was_moving && !moving {
+        invalidate_cards();
+    }
+}
+
+fn invalidate_cards() {
+    if LAYOUT_MOVING.with(Cell::get) {
+        return;
+    }
+    with_window(|window| {
+        let art = window.global::<Art>();
+        art.set_pictures_revision(art.get_pictures_revision().wrapping_add(1));
+    });
+}
+
+/// Coalesces completions delivered together into one binding refresh.
+fn redraw_cards() {
+    if LAYOUT_MOVING.with(Cell::get) {
+        return;
+    }
+    REDRAW.with(|timer| {
+        if !timer.running() {
+            timer.start(
+                slint::TimerMode::SingleShot,
+                Duration::from_millis(1),
+                invalidate_cards,
+            );
+        }
+    });
 }
 
 /// Starts the worker that decodes pictures for `window`.
@@ -182,6 +219,12 @@ pub(crate) fn card(
     }
     #[cfg(feature = "benchmark")]
     metrics::missed();
+    let cached = same_look_at_any_size(&key.look);
+    if LAYOUT_MOVING.with(Cell::get)
+        && let Some(art) = &cached
+    {
+        return art.clone();
+    }
     let missing = key
         .look
         .picture
@@ -194,7 +237,7 @@ pub(crate) fn card(
         });
         return art;
     }
-    let placeholder = same_look_at_any_size(&key.look).unwrap_or_else(|| gradient_card(&key));
+    let placeholder = cached.unwrap_or_else(|| gradient_card(&key));
     request_card(key);
     placeholder
 }
@@ -252,6 +295,7 @@ fn card_drawn(key: CardKey, pixels: Option<SharedPixelBuffer<Rgba8Pixel>>) {
             });
             if let Some((width, height)) = wanted
                 && (width, height) != (key.width, key.height)
+                && !LAYOUT_MOVING.with(Cell::get)
             {
                 request_card(CardKey {
                     look: key.look,
@@ -266,10 +310,7 @@ fn card_drawn(key: CardKey, pixels: Option<SharedPixelBuffer<Rgba8Pixel>>) {
             }
         }
     }
-    with_window(|window| {
-        let art = window.global::<Art>();
-        art.set_pictures_revision(art.get_pictures_revision().wrapping_add(1));
-    });
+    redraw_cards();
 }
 
 fn same_look_at_any_size(look: &CardLook) -> Option<Image> {
@@ -311,7 +352,9 @@ fn draw(
 
 #[cfg(feature = "benchmark")]
 pub(crate) fn is_idle() -> bool {
-    DRAWING.with(|drawing| drawing.borrow().is_empty()) && backdrop::is_idle()
+    DRAWING.with(|drawing| drawing.borrow().is_empty())
+        && REDRAW.with(|timer| !timer.running())
+        && backdrop::is_idle()
 }
 
 fn send(job: Job) {
@@ -504,5 +547,63 @@ mod tests {
         let drawn = draw_card(&mut pictures, &card_key(Some(Picture::File(not_an_image))));
 
         assert!(drawn.is_none());
+    }
+
+    #[test]
+    fn a_sliding_sidebar_reuses_a_picture_and_only_requests_its_settled_size() {
+        let key = card_key(Some(Picture::Preset(BackgroundPreset::Tavern)));
+        let image = Image::from_rgba8(SharedPixelBuffer::new(key.width, key.height));
+        CARDS.with(|cards| {
+            cards.borrow_mut().put_with_weight(key, image).unwrap();
+        });
+        let (sender, received) = mpsc::channel();
+        JOBS.with(|jobs| *jobs.borrow_mut() = Some(sender));
+
+        set_layout_moving(true);
+        for width in [15, 17, 14] {
+            let image = card(
+                None,
+                &Background::Preset(BackgroundPreset::Tavern),
+                Shade::None,
+                width,
+                8,
+                0,
+            );
+            assert_eq!((image.size().width, image.size().height), (12, 8));
+        }
+        assert!(
+            received.try_recv().is_err(),
+            "intermediate sizes reached the worker"
+        );
+
+        set_layout_moving(false);
+        card(
+            None,
+            &Background::Preset(BackgroundPreset::Tavern),
+            Shade::None,
+            18,
+            8,
+            0,
+        );
+        assert!(matches!(
+            received.try_recv().unwrap(),
+            Job::DrawCard(CardKey {
+                width: 18,
+                height: 8,
+                ..
+            })
+        ));
+        assert!(received.try_recv().is_err());
+    }
+
+    #[test]
+    fn a_sliding_sidebar_also_reuses_gradients_then_draws_the_settled_size() {
+        let original = card(None, &Background::Gradient, Shade::None, 12, 8, 0);
+        set_layout_moving(true);
+        let moving = card(None, &Background::Gradient, Shade::None, 15, 8, 0);
+        assert_eq!(moving.size(), original.size());
+        set_layout_moving(false);
+        let settled = card(None, &Background::Gradient, Shade::None, 18, 8, 0);
+        assert_eq!((settled.size().width, settled.size().height), (18, 8));
     }
 }

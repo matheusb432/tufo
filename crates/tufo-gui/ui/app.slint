@@ -67,6 +67,10 @@ export component AppWindow inherits Window {
         duration: Motion.sidebar-slide;
         easing: Motion.sidebar-slide-easing;
     }
+    property <bool> sidebar-moving: root.page-x != (root.sidebar-expanded ? Theme.sidebar-width : Theme.rail-width);
+    changed sidebar-moving => {
+        Art.layout-moving(root.sidebar-moving);
+    }
     // The background gallery, over the Add or Edit dialog that opened it.
     property <bool> gallery-open;
     property <string> gallery-title;

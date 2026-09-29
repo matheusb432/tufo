@@ -219,6 +219,8 @@ export global SoundIcons {
 // Pictures the host draws off the UI thread, sized and rounded for where they show, since the
 // software renderer can't round gradients or images.
 export global Art {
+    // Holds existing artwork through the sidebar's slide; ending it requests settled sizes.
+    callback layout-moving(bool);
     in property <int> backdrop-revision;
     pure callback backdrop(length, length, color, color, color, int) -> image;
     // Rises whenever the worker delivers a picture, or pictures that failed may decode now.

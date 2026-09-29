@@ -255,6 +255,7 @@ fn kind(kind: ui::CollectionKind) -> CollectionKind {
 
 fn bind_art(window: &ui::AppWindow) {
     let art = window.global::<ui::Art>();
+    art.on_layout_moving(backgrounds::set_layout_moving);
     art.on_card_background(background_art(window, Shade::TitleFoot));
     art.on_painting(background_art(window, Shade::None));
     art.on_backdrop({
