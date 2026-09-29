@@ -54,7 +54,7 @@ use crate::{
         sound_cache::{LoadedSound, SoundCache, SoundKey, load_sound},
         streamed_sound::streamed_sound,
     },
-    discord::Discord,
+    discord::SharedDiscord,
 };
 
 const TICK_INTERVAL: Duration = Duration::from_millis(50);
@@ -122,7 +122,7 @@ pub struct EnginePlayer<O: AudioOutputs> {
 impl EnginePlayer<DeviceOutputs> {
     /// Starts on the local output. Must run inside a tokio runtime.
     #[must_use]
-    pub fn start(discord: Discord) -> Arc<Self> {
+    pub fn start(discord: SharedDiscord) -> Arc<Self> {
         Self::with_outputs(DeviceOutputs::new(discord), EngineTimings::default())
     }
 }
@@ -136,7 +136,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             target: OutputTarget::Local,
             output: None,
             output_generation: 0,
-            voice: idle_voice(outputs.voice_configured(), None),
+            voice: idle_voice(outputs.voice_configured(), outputs.voice_paused(), None),
             music: None,
             music_generation: 0,
             volume: Volume::default(),
@@ -728,7 +728,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         }
         if let OutputTarget::DiscordVoice(_) = engine.target {
             engine.target = OutputTarget::Local;
-            engine.voice = idle_voice(self.outputs.voice_configured(), None);
+            engine.voice = idle_voice(
+                self.outputs.voice_configured(),
+                self.outputs.voice_paused(),
+                None,
+            );
         }
         engine.sound_cache.clear();
         true
@@ -944,10 +948,14 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             return Ok(());
         }
         let voice_configured = self.outputs.voice_configured();
-        if let OutputTarget::DiscordVoice(_) = target
-            && !voice_configured
-        {
-            return Err(SelectOutputError::DiscordNotConfigured);
+        let voice_paused = self.outputs.voice_paused();
+        if let OutputTarget::DiscordVoice(_) = target {
+            if !voice_configured {
+                return Err(SelectOutputError::DiscordNotConfigured);
+            }
+            if voice_paused {
+                return Err(SelectOutputError::DiscordPaused);
+            }
         }
         // Ends reconnection attempts to the previous voice channel.
         engine.output_generation += 1;
@@ -983,7 +991,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         self.suspend_output(&mut engine).await;
         engine.target = target;
         engine.voice = match target {
-            OutputTarget::Local => idle_voice(voice_configured, None),
+            OutputTarget::Local => idle_voice(voice_configured, voice_paused, None),
             OutputTarget::DiscordVoice(_) => VoiceConnectionState::Connected,
         };
         if let Some(opened) = opened {
@@ -991,6 +999,18 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         }
         self.publish(&engine);
         Ok(())
+    }
+
+    async fn refresh_voice_availability(&self) {
+        let mut engine = self.engine.lock().await;
+        if engine.target == OutputTarget::Local {
+            engine.voice = idle_voice(
+                self.outputs.voice_configured(),
+                self.outputs.voice_paused(),
+                None,
+            );
+            self.publish(&engine);
+        }
     }
 
     async fn stand_by(&self) {
@@ -1037,7 +1057,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             return;
         }
         engine.target = OutputTarget::Local;
-        engine.voice = idle_voice(self.outputs.voice_configured(), Some(error_chain(error)));
+        engine.voice = idle_voice(
+            self.outputs.voice_configured(),
+            self.outputs.voice_paused(),
+            Some(error_chain(error)),
+        );
         if engine.has_audio() {
             match self.outputs.open(OutputTarget::Local).await {
                 Ok(opened) => self.install_output(engine, opened).await,
@@ -1354,11 +1378,17 @@ async fn run_ticks<O: AudioOutputs>(player: Weak<EnginePlayer<O>>) {
     }
 }
 
-fn idle_voice(voice_configured: bool, reason: Option<String>) -> VoiceConnectionState {
-    if voice_configured {
-        VoiceConnectionState::Disconnected { reason }
-    } else {
+fn idle_voice(
+    voice_configured: bool,
+    voice_paused: bool,
+    reason: Option<String>,
+) -> VoiceConnectionState {
+    if !voice_configured {
         VoiceConnectionState::NotConfigured
+    } else if voice_paused {
+        VoiceConnectionState::Paused
+    } else {
+        VoiceConnectionState::Disconnected { reason }
     }
 }
 

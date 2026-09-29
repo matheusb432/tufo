@@ -14,6 +14,8 @@ pub trait VoiceChannelDirectory: Send + Sync {
 pub enum VoiceChannelDirectoryError {
     #[error("Discord is not configured on this server")]
     NotConfigured,
+    #[error("Discord is paused on this server")]
+    Paused,
     #[error("the Discord gateway has not delivered the bot's guilds yet")]
     NotReady,
 }
@@ -21,6 +23,7 @@ pub enum VoiceChannelDirectoryError {
 impl VoiceChannelDirectoryError {
     pub const NOT_CONFIGURED: &'static str =
         "voice_channels.voice_channel_directory.not_configured";
+    pub const PAUSED: &'static str = "voice_channels.voice_channel_directory.paused";
     pub const NOT_READY: &'static str = "voice_channels.voice_channel_directory.not_ready";
 }
 
@@ -30,6 +33,10 @@ impl ApplicationError for VoiceChannelDirectoryError {
             Self::NotConfigured => ErrorMetadata {
                 class: ErrorClass::FailedPrecondition,
                 reason: Self::NOT_CONFIGURED,
+            },
+            Self::Paused => ErrorMetadata {
+                class: ErrorClass::FailedPrecondition,
+                reason: Self::PAUSED,
             },
             Self::NotReady => ErrorMetadata {
                 class: ErrorClass::Unavailable,

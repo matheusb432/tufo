@@ -461,6 +461,15 @@ export component SettingsDialog inherits DialogFrame {
         wrap: word-wrap;
     }
 
+    if Session.discord-configured: SwitchSetting {
+        title: @tr("" => "Pause Discord");
+        description: @tr("" => "Stops the bot from logging in, so it can't join a voice channel by accident and uses no network in the background.");
+        checked: Session.discord-paused;
+        toggled(checked) => {
+            Actions.set-discord-paused(checked);
+        }
+    }
+
     Text {
         text: @tr("" => "Crossfade: {0} s", Math.round(root.crossfade * 100) / 10);
         font-size: Theme.body;

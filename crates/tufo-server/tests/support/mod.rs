@@ -3,7 +3,9 @@ use std::{sync::Arc, time::Duration};
 use tufo_application::library::Library;
 use tufo_client::TufoClient;
 use tufo_infra::{
-    database::open_database, discord::Discord, library_files::DiskLibraryFiles,
+    database::open_database,
+    discord::{Discord, SharedDiscord},
+    library_files::DiskLibraryFiles,
     player::EnginePlayer,
 };
 use tufo_local_transport::{LocalEndpoint, LocalListener};
@@ -26,9 +28,10 @@ impl TestServer {
         let listener = LocalListener::bind(&endpoint, TEST_TIMEOUT).await?;
         let database = open_database(&directory.path().join("tufo.sqlite3")).await?;
         let library = Arc::new(Library::open(database, DiskLibraryFiles).await?);
+        let discord = SharedDiscord::new(Discord::NotConfigured);
         let state = AppState::new(
-            EnginePlayer::start(Discord::NotConfigured),
-            Discord::NotConfigured,
+            EnginePlayer::start(discord.clone()),
+            discord,
             library,
             directory.path().join("discord.toml"),
         );

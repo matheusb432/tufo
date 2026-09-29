@@ -26,8 +26,9 @@ use songbird::{
     tracks::TrackHandle,
 };
 use tokio::sync::oneshot;
-use tufo_application::voice_channels::voice_channel_directory::{
-    VoiceChannelDirectory, VoiceChannelDirectoryError,
+use tufo_application::{
+    discord::discord_gateway::DiscordGateway,
+    voice_channels::voice_channel_directory::{VoiceChannelDirectory, VoiceChannelDirectoryError},
 };
 use tufo_models::{
     discord::{GuildId, VoiceChannel, VoiceChannelTarget},
@@ -48,10 +49,12 @@ const LOGIN_RETRY_DELAY_MIN: Duration = Duration::from_secs(2);
 const LOGIN_RETRY_DELAY_MAX: Duration = Duration::from_secs(60);
 const HTTP_UNAUTHORIZED: u16 = 401;
 
-/// The Discord side of the server, absent when no credentials are configured.
+/// The Discord side of the server: absent when no credentials are configured, paused with its
+/// credentials kept for resuming, or logged in.
 #[derive(Clone)]
 pub enum Discord {
     NotConfigured,
+    Paused(DiscordCredentials),
     Configured(Arc<DiscordVoice>),
 }
 
@@ -59,6 +62,7 @@ impl VoiceChannelDirectory for Discord {
     fn voice_channels(&self) -> Result<Vec<VoiceChannel>, VoiceChannelDirectoryError> {
         match self {
             Self::NotConfigured => Err(VoiceChannelDirectoryError::NotConfigured),
+            Self::Paused(_) => Err(VoiceChannelDirectoryError::Paused),
             Self::Configured(voice) => voice
                 .channels
                 .read()
@@ -66,6 +70,51 @@ impl VoiceChannelDirectory for Discord {
                 .voice_channels()
                 .ok_or(VoiceChannelDirectoryError::NotReady),
         }
+    }
+}
+
+/// Shared, toggleable Discord state: the gateway connection can be paused and resumed at
+/// runtime, visible to every clone.
+#[derive(Clone)]
+pub struct SharedDiscord(Arc<RwLock<Discord>>);
+
+impl SharedDiscord {
+    #[must_use]
+    pub fn new(discord: Discord) -> Self {
+        Self(Arc::new(RwLock::new(discord)))
+    }
+
+    /// The current state, cheap to clone.
+    #[must_use]
+    pub fn snapshot(&self) -> Discord {
+        self.0
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl VoiceChannelDirectory for SharedDiscord {
+    fn voice_channels(&self) -> Result<Vec<VoiceChannel>, VoiceChannelDirectoryError> {
+        self.snapshot().voice_channels()
+    }
+}
+
+impl DiscordGateway for SharedDiscord {
+    fn pause(&self) {
+        let mut discord = self.0.write().unwrap_or_else(PoisonError::into_inner);
+        let Discord::Configured(voice) = &*discord else {
+            return;
+        };
+        *discord = Discord::Paused(voice.credentials.clone());
+    }
+
+    fn resume(&self) {
+        let mut discord = self.0.write().unwrap_or_else(PoisonError::into_inner);
+        let Discord::Paused(credentials) = &*discord else {
+            return;
+        };
+        *discord = Discord::Configured(DiscordVoice::start(credentials.clone()));
     }
 }
 
@@ -83,6 +132,7 @@ pub enum JoinVoiceError {
 
 /// A logged-in bot: its gateway session, voice connections, and visible voice channels.
 pub struct DiscordVoice {
+    credentials: DiscordCredentials,
     songbird: Arc<OnceLock<Arc<Songbird>>>,
     channels: Arc<RwLock<VoiceChannelCache>>,
     gateway: tokio::task::JoinHandle<()>,
@@ -97,11 +147,12 @@ impl DiscordVoice {
         let songbird = Arc::new(OnceLock::new());
         let channels = Arc::new(RwLock::new(VoiceChannelCache::default()));
         let gateway = tokio::spawn(run_gateway(
-            credentials,
+            credentials.clone(),
             Arc::clone(&songbird),
             Arc::clone(&channels),
         ));
         Arc::new(Self {
+            credentials,
             songbird,
             channels,
             gateway,

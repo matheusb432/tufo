@@ -426,6 +426,21 @@ impl TufoClient {
         self.server.clone().set_discord_bot_token(request).await?;
         Ok(())
     }
+
+    /// Leaves any voice channel and stops the bot's gateway connection, so Discord uses no
+    /// network and can't be joined by accident until resumed.
+    pub async fn pause_discord(&self) -> Result<(), ClientError> {
+        let request = with_timeout(pb::PauseDiscordRequest {}, QUICK_REQUEST_TIMEOUT);
+        self.server.clone().pause_discord(request).await?;
+        Ok(())
+    }
+
+    /// Logs the bot back into the gateway after a pause.
+    pub async fn resume_discord(&self) -> Result<(), ClientError> {
+        let request = with_timeout(pb::ResumeDiscordRequest {}, QUICK_REQUEST_TIMEOUT);
+        self.server.clone().resume_discord(request).await?;
+        Ok(())
+    }
 }
 
 /// Player states as the server publishes them.

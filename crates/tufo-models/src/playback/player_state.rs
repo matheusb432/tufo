@@ -69,6 +69,9 @@ impl Default for PlayerState {
 pub enum VoiceConnectionState {
     /// The server has no Discord credentials, so only local output exists.
     NotConfigured,
+    /// The bot is configured but paused: its gateway connection is stopped, so it can't join a
+    /// channel until resumed.
+    Paused,
     /// No voice channel is joined. `reason` explains a connection Tufo gave up on.
     Disconnected { reason: Option<String> },
     /// Joining the output's voice channel.

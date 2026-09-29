@@ -348,5 +348,6 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
         controller.set_start_at_login(start_at_login);
     });
     on!(controller => on_save_discord_token, |token| controller.save_discord_token(&token));
+    on!(controller => on_set_discord_paused, |paused| controller.set_discord_paused(paused));
     on!(controller => on_import_kenku_library, | | controller.import_kenku_library());
 }

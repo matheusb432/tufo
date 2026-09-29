@@ -29,6 +29,7 @@ pub fn server_status(message: pb::GetServerStatusResponse) -> Result<ServerStatu
         Ok(pb::DiscordConnectionStatus::NotConfigured) => DiscordConnectionStatus::NotConfigured,
         Ok(pb::DiscordConnectionStatus::Connecting) => DiscordConnectionStatus::Connecting,
         Ok(pb::DiscordConnectionStatus::Ready) => DiscordConnectionStatus::Ready,
+        Ok(pb::DiscordConnectionStatus::Paused) => DiscordConnectionStatus::Paused,
         _ => return Err(invalid()),
     };
     Ok(ServerStatus {
@@ -56,6 +57,7 @@ pub fn server_status_message(status: ServerStatus) -> pb::GetServerStatusRespons
             DiscordConnectionStatus::NotConfigured => pb::DiscordConnectionStatus::NotConfigured,
             DiscordConnectionStatus::Connecting => pb::DiscordConnectionStatus::Connecting,
             DiscordConnectionStatus::Ready => pb::DiscordConnectionStatus::Ready,
+            DiscordConnectionStatus::Paused => pb::DiscordConnectionStatus::Paused,
         }
         .into(),
     }

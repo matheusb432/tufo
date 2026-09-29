@@ -199,6 +199,16 @@ component OutputPicker inherits MenuSurface {
             root.picked();
         }
     }
+    if Session.discord-paused: HorizontalLayout {
+        padding: 10px;
+        TextLink {
+            text: @tr("" => "Discord is paused — resume it in Settings");
+            font-size: Theme.caption;
+            clicked => {
+                root.open-settings();
+            }
+        }
+    }
     if !Session.discord-configured: HorizontalLayout {
         padding: 10px;
         TextLink {
@@ -480,21 +490,25 @@ component FullSidebar inherits SidebarForm {
             HorizontalLayout {
                 padding-left: 6px;
                 spacing: 8px;
-                Rectangle {
-                    y: (parent.height - self.height) / 2;
-                    width: 8px;
-                    height: 8px;
-                    border-radius: 4px;
-                    background: Session.connected ? Theme.online : Theme.warning;
-                }
-
-                Text {
-                    text: Session.connection-text;
-                    vertical-alignment: center;
+                HorizontalLayout {
                     horizontal-stretch: 1;
-                    overflow: elide;
-                    font-size: Theme.caption;
-                    color: Theme.text-faint;
+                    spacing: 8px;
+                    if !Session.connected: Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: Theme.warning;
+                    }
+
+                    if !Session.connected: Text {
+                        text: Session.connection-text;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        font-size: Theme.caption;
+                        color: Theme.text-faint;
+                    }
                 }
 
                 IconButton {
@@ -592,13 +606,13 @@ component Rail inherits SidebarForm {
             }
         }
 
-        HorizontalLayout {
+        if !Session.connected: HorizontalLayout {
             alignment: center;
             Rectangle {
                 width: 8px;
                 height: 8px;
                 border-radius: 4px;
-                background: Session.connected ? Theme.online : Theme.warning;
+                background: Theme.warning;
             }
         }
     }

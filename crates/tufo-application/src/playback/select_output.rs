@@ -7,6 +7,8 @@ use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
 pub enum SelectOutputError {
     #[error("Discord is not configured on this server")]
     DiscordNotConfigured,
+    #[error("Discord is paused on this server")]
+    DiscordPaused,
     #[error("the bot cannot see that voice channel")]
     UnknownVoiceChannel,
     #[error("joining the voice channel failed")]
@@ -18,6 +20,7 @@ pub enum SelectOutputError {
 impl SelectOutputError {
     pub const DISCORD_NOT_CONFIGURED: &'static str =
         "playback.select_output.discord_not_configured";
+    pub const DISCORD_PAUSED: &'static str = "playback.select_output.discord_paused";
     pub const UNKNOWN_VOICE_CHANNEL: &'static str = "playback.select_output.unknown_voice_channel";
     pub const VOICE_CONNECTION: &'static str = "playback.select_output.voice_connection";
     pub const LOCAL_DEVICE: &'static str = "playback.select_output.local_device";
@@ -29,6 +32,10 @@ impl ApplicationError for SelectOutputError {
             Self::DiscordNotConfigured => ErrorMetadata {
                 class: ErrorClass::FailedPrecondition,
                 reason: Self::DISCORD_NOT_CONFIGURED,
+            },
+            Self::DiscordPaused => ErrorMetadata {
+                class: ErrorClass::FailedPrecondition,
+                reason: Self::DISCORD_PAUSED,
             },
             Self::UnknownVoiceChannel => ErrorMetadata {
                 class: ErrorClass::NotFound,

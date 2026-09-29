@@ -18,6 +18,7 @@ pub async fn execute(
     let discord_connection = match channels.voice_channels() {
         Ok(_) => DiscordConnectionStatus::Ready,
         Err(VoiceChannelDirectoryError::NotConfigured) => DiscordConnectionStatus::NotConfigured,
+        Err(VoiceChannelDirectoryError::Paused) => DiscordConnectionStatus::Paused,
         Err(VoiceChannelDirectoryError::NotReady) => DiscordConnectionStatus::Connecting,
     };
     Ok(ServerStatus {

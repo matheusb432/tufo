@@ -3,7 +3,11 @@
 use std::time::Duration;
 
 use tufo_application::playback::{player::Player as _, update_player_settings};
-use tufo_infra::{database::open_database, discord::Discord, player::EnginePlayer};
+use tufo_infra::{
+    database::open_database,
+    discord::{Discord, SharedDiscord},
+    player::EnginePlayer,
+};
 use tufo_models::{
     library::Volume,
     playback::{player_state::CrossfadeDuration, queue::RepeatMode},
@@ -23,12 +27,12 @@ async fn saved_settings_survive_a_restart() {
         repeat: Some(RepeatMode::Track),
         crossfade: Some(CrossfadeDuration::try_new(Duration::from_millis(500)).unwrap()),
     };
-    let before = EnginePlayer::start(Discord::NotConfigured);
+    let before = EnginePlayer::start(SharedDiscord::new(Discord::NotConfigured));
     update_player_settings::execute(update, before.as_ref(), database.clone())
         .await
         .unwrap();
 
-    let after = EnginePlayer::start(Discord::NotConfigured);
+    let after = EnginePlayer::start(SharedDiscord::new(Discord::NotConfigured));
     update_player_settings::restore(after.as_ref(), database)
         .await
         .unwrap();

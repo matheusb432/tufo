@@ -153,6 +153,7 @@ pub(crate) struct DrawerView {
     pub(crate) voice_status: String,
     pub(crate) voice_badge: VoiceBadge,
     pub(crate) discord_configured: bool,
+    pub(crate) discord_paused: bool,
 }
 
 /// The library pages' content for the open page and filter.
@@ -771,6 +772,7 @@ pub(crate) fn drawer(
         voice_status: voice_status(&state.voice),
         voice_badge: voice_badge(state),
         discord_configured: !matches!(state.voice, VoiceConnectionState::NotConfigured),
+        discord_paused: matches!(state.voice, VoiceConnectionState::Paused),
     };
     (view, targets)
 }
@@ -879,9 +881,12 @@ fn current_output(state: &PlayerState, voice_channels: &[VoiceChannel]) -> Curre
 fn voice_badge(state: &PlayerState) -> VoiceBadge {
     match (state.output, &state.voice) {
         (OutputTarget::Local, _)
-        | (_, VoiceConnectionState::NotConfigured | VoiceConnectionState::Connected) => {
-            VoiceBadge::None
-        }
+        | (
+            _,
+            VoiceConnectionState::NotConfigured
+            | VoiceConnectionState::Connected
+            | VoiceConnectionState::Paused,
+        ) => VoiceBadge::None,
         (_, VoiceConnectionState::Connecting | VoiceConnectionState::Reconnecting { .. }) => {
             VoiceBadge::Joining
         }
@@ -892,7 +897,9 @@ fn voice_badge(state: &PlayerState) -> VoiceBadge {
 /// A line under the outputs about the bot's voice connection; empty when there's nothing to say.
 fn voice_status(voice: &VoiceConnectionState) -> String {
     match voice {
-        VoiceConnectionState::NotConfigured | VoiceConnectionState::Connected => String::new(),
+        VoiceConnectionState::NotConfigured
+        | VoiceConnectionState::Connected
+        | VoiceConnectionState::Paused => String::new(),
         VoiceConnectionState::Connecting => tr("Joining the voice channel…").to_owned(),
         VoiceConnectionState::Reconnecting { attempt } => {
             tr_args("Voice dropped; reconnecting (attempt {0})…", &[attempt])
@@ -982,11 +989,9 @@ pub(crate) fn error_text(error: &ClientError) -> String {
     .to_owned()
 }
 
-fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
+/// Reasons about the library: collections, entries, and Kenku FM imports.
+fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
     use tufo_application::{
-        discord::{
-            bot_credentials::CredentialsError, set_discord_bot_token::SetDiscordBotTokenError,
-        },
         library::{
             LibraryStorageError, add_files_to_collection::AddFilesToCollectionError,
             delete_collection::DeleteCollectionError,
@@ -995,12 +1000,7 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             update_collection::UpdateCollectionError,
             update_collection_entry::UpdateCollectionEntryError,
         },
-        playback::{
-            control_music::ControlMusicError, play_collection::PlayCollectionError,
-            play_entry_sound::PlayEntrySoundError, player::PlayAudioError,
-            select_output::SelectOutputError,
-        },
-        voice_channels::voice_channel_directory::VoiceChannelDirectoryError,
+        playback::{play_collection::PlayCollectionError, play_entry_sound::PlayEntrySoundError},
     };
     Some(match (code, reason) {
         (Code::Internal, LibraryStorageError::REASON) => {
@@ -1038,6 +1038,25 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
         (Code::FailedPrecondition, PlayCollectionError::START_NOT_PLAYABLE) => {
             tr("That track is missing or cannot be played.")
         }
+        _ => return None,
+    })
+}
+
+fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
+    use tufo_application::{
+        discord::{
+            bot_credentials::CredentialsError, set_discord_bot_token::SetDiscordBotTokenError,
+        },
+        playback::{
+            control_music::ControlMusicError, play_entry_sound::PlayEntrySoundError,
+            player::PlayAudioError, select_output::SelectOutputError,
+        },
+        voice_channels::voice_channel_directory::VoiceChannelDirectoryError,
+    };
+    if let Some(text) = library_reason_text(code, reason) {
+        return Some(text);
+    }
+    Some(match (code, reason) {
         (Code::NotFound, PlayAudioError::NOT_FOUND)
         | (Code::FailedPrecondition, PlayEntrySoundError::MISSING) => {
             tr("The audio file is missing. Restore it and try again.")
@@ -1061,6 +1080,10 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             Code::FailedPrecondition,
             SelectOutputError::DISCORD_NOT_CONFIGURED | VoiceChannelDirectoryError::NOT_CONFIGURED,
         ) => tr("Add a Discord bot token in Settings first."),
+        (
+            Code::FailedPrecondition,
+            SelectOutputError::DISCORD_PAUSED | VoiceChannelDirectoryError::PAUSED,
+        ) => tr("Discord is paused. Resume it in Settings first."),
         (Code::NotFound, SelectOutputError::UNKNOWN_VOICE_CHANNEL) => {
             tr("That voice channel is no longer available. Refresh the channels.")
         }

@@ -1,5 +1,8 @@
 use tonic::{Request, Response, Status};
-use tufo_application::{discord::set_discord_bot_token, server::get_server_status};
+use tufo_application::{
+    discord::{pause_discord, resume_discord, set_discord_bot_token},
+    server::get_server_status,
+};
 use tufo_wire::{
     pb::{self, server_service_server::ServerService},
     proto,
@@ -58,5 +61,21 @@ impl ServerService for ServerControlGrpcService {
         .await
         .into_grpc()?;
         Ok(Response::new(pb::SetDiscordBotTokenResponse {}))
+    }
+
+    async fn pause_discord(
+        &self,
+        _request: Request<pb::PauseDiscordRequest>,
+    ) -> Result<Response<pb::PauseDiscordResponse>, Status> {
+        pause_discord::execute(&self.state.discord, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::PauseDiscordResponse {}))
+    }
+
+    async fn resume_discord(
+        &self,
+        _request: Request<pb::ResumeDiscordRequest>,
+    ) -> Result<Response<pb::ResumeDiscordResponse>, Status> {
+        resume_discord::execute(&self.state.discord, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::ResumeDiscordResponse {}))
     }
 }

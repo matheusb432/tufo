@@ -22,7 +22,7 @@ use tufo_application::{
 };
 use tufo_infra::{
     database, default_effects,
-    discord::{Discord, DiscordCredentials, DiscordVoice},
+    discord::{Discord, DiscordCredentials, DiscordVoice, SharedDiscord},
     folder_watcher::NotifyFolderWatcher,
     library_files::DiskLibraryFiles,
     player::EnginePlayer,
@@ -133,14 +133,16 @@ async fn write_default_effects(database_path: &Path) -> Option<Vec<DefaultEffect
     }
 }
 
-fn start_discord(path: &Path) -> anyhow::Result<Discord> {
+fn start_discord(path: &Path) -> anyhow::Result<SharedDiscord> {
     if !path.exists() {
         tracing::info!("no Discord credentials; only local output is available");
-        return Ok(Discord::NotConfigured);
+        return Ok(SharedDiscord::new(Discord::NotConfigured));
     }
     let credentials = DiscordCredentials::load(path)
         .with_context(|| format!("loading Discord credentials from {}", path.display()))?;
-    Ok(Discord::Configured(DiscordVoice::start(credentials)))
+    Ok(SharedDiscord::new(Discord::Configured(
+        DiscordVoice::start(credentials),
+    )))
 }
 
 fn default_discord_credentials() -> Option<PathBuf> {

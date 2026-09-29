@@ -13,6 +13,11 @@ service ServerService {
   // Saves the Discord bot token to the server's private credentials file. The server reads the
   // file when it starts, so the token applies after a restart.
   rpc SetDiscordBotToken(SetDiscordBotTokenRequest) returns (SetDiscordBotTokenResponse);
+  // Leaves any voice channel and stops the bot's gateway connection, so it uses no network and
+  // can't be joined to a channel by accident until resumed.
+  rpc PauseDiscord(PauseDiscordRequest) returns (PauseDiscordResponse);
+  // Logs the bot back into the gateway after a pause.
+  rpc ResumeDiscord(ResumeDiscordRequest) returns (ResumeDiscordResponse);
 }
 
 message GetServerStatusRequest {}
@@ -38,6 +43,7 @@ enum DiscordConnectionStatus {
   DISCORD_CONNECTION_STATUS_NOT_CONFIGURED = 1;
   DISCORD_CONNECTION_STATUS_CONNECTING = 2;
   DISCORD_CONNECTION_STATUS_READY = 3;
+  DISCORD_CONNECTION_STATUS_PAUSED = 4;
 }
 
 message StopServerRequest {}
@@ -49,3 +55,11 @@ message SetDiscordBotTokenRequest {
 }
 
 message SetDiscordBotTokenResponse {}
+
+message PauseDiscordRequest {}
+
+message PauseDiscordResponse {}
+
+message ResumeDiscordRequest {}
+
+message ResumeDiscordResponse {}

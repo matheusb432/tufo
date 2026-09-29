@@ -103,6 +103,7 @@ message VoiceConnection {
     VoiceConnecting connecting = 3;
     VoiceConnected connected = 4;
     VoiceReconnecting reconnecting = 5;
+    VoicePaused paused = 6;
   }
 }
 
@@ -119,6 +120,9 @@ message VoiceConnected {}
 message VoiceReconnecting {
   uint32 attempt = 1;
 }
+
+// The bot is configured but its gateway connection is stopped, so it can't join a channel.
+message VoicePaused {}
 
 // Where the server sends audio.
 message Output {

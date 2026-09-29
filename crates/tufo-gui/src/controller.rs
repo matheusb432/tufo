@@ -1049,6 +1049,15 @@ impl Controller {
         self.save_desktop_settings(settings);
     }
 
+    /// Stops or resumes the bot's gateway connection without a restart.
+    pub(crate) fn set_discord_paused(&self, paused: bool) {
+        if paused {
+            self.run(|client| async move { client.pause_discord().await });
+        } else {
+            self.run(|client| async move { client.resume_discord().await });
+        }
+    }
+
     /// Restarts the server, so its bot logs in with the new token.
     pub(crate) fn save_discord_token(&self, token: &str) {
         let token = token.trim().to_owned();
