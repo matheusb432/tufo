@@ -6,7 +6,7 @@ import {
     Search, Session, SoundIcons, SoundTile, TrackRow,
 } from "state.slint";
 import {
-    Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem, MenuSurface, ScrollThumb, Slider,
+    Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem as MenuAction, MenuSurface, ScrollThumb, Slider,
     TextLink,
 } from "widgets.slint";
 
@@ -481,7 +481,7 @@ component CollectionTools inherits HorizontalLayout {
         x: root.compact ? more.x - 120px : 0;
         y: more.y + more.height + 4px;
         MenuSurface {
-            for label[index] in root.order-labels: MenuItem {
+            for label[index] in root.order-labels: MenuAction {
                 text: label;
                 activated => {
                     Actions.set-order(Math.floor(index / 2), Math.mod(index, 2) == 1);
@@ -506,7 +506,7 @@ component CollectionTools inherits HorizontalLayout {
         x: more.x - 120px;
         y: more.y + more.height + 4px;
         MenuSurface {
-            MenuItem {
+            MenuAction {
                 text: @tr("Edit");
                 activated => {
                     root.edit();
@@ -514,14 +514,14 @@ component CollectionTools inherits HorizontalLayout {
                 }
             }
 
-            if !LibraryView.collection-linked: MenuItem {
+            if !LibraryView.collection-linked: MenuAction {
                 text: @tr("Add files…");
                 activated => {
                     root.add-files();
                     menu.close();
                 }
             }
-            MenuItem {
+            MenuAction {
                 text: LibraryView.collection-linked ? @tr("Stop following") : @tr("Delete");
                 destructive: true;
                 activated => {
@@ -715,39 +715,22 @@ component TrackItem inherits Rectangle {
             color: Theme.text-faint;
             vertical-alignment: center;
         }
-
-        more := IconButton {
-            y: (parent.height - self.height) / 2;
-            size: 32px;
-            icon-size: 18px;
-            icon: @image-url("icons/ellipsis-vertical.svg");
-            tooltip: @tr("More");
-            opacity: touch.has-hover || self.has-hover ? 1 : 0;
-            clicked => {
-                menu.show();
-            }
-        }
     }
 
-    menu := PopupWindow {
-        x: root.width - 170px;
-        y: root.height - 4px;
-        MenuSurface {
+    ContextMenuArea {
+        Menu {
             MenuItem {
-                text: @tr("Edit");
-                activated => {
-                    root.edit();
-                    menu.close();
-                }
+                title: PlayerView.can-add-layer ? @tr("Add to mix") : @tr("Mix full (3 songs)");
+                enabled: PlayerView.can-add-layer && !root.track.missing && !root.track.current;
+                activated => { Actions.add-music-layer(root.track.id); }
             }
-
+            MenuItem {
+                title: @tr("Edit");
+                activated => { root.edit(); }
+            }
             if !LibraryView.collection-linked: MenuItem {
-                text: @tr("Remove");
-                destructive: true;
-                activated => {
-                    Actions.delete-entry(root.track.id);
-                    menu.close();
-                }
+                title: @tr("Remove");
+                activated => { Actions.delete-entry(root.track.id); }
             }
         }
     }
@@ -972,7 +955,7 @@ component SoundTileView inherits Rectangle {
         x: root.width - 170px;
         y: 42px;
         MenuSurface {
-            MenuItem {
+            MenuAction {
                 text: root.tile.looping ? @tr("Stop Looping") : @tr("Loop");
                 activated => {
                     Actions.set-sound-looping(root.tile.id, !root.tile.looping);
@@ -980,7 +963,7 @@ component SoundTileView inherits Rectangle {
                 }
             }
 
-            MenuItem {
+            MenuAction {
                 text: @tr("Edit");
                 activated => {
                     root.edit();
@@ -988,7 +971,7 @@ component SoundTileView inherits Rectangle {
                 }
             }
 
-            if !LibraryView.collection-linked: MenuItem {
+            if !LibraryView.collection-linked: MenuAction {
                 text: @tr("Remove");
                 destructive: true;
                 activated => {

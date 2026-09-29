@@ -5,7 +5,7 @@ package tufo.v1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-// Plays one music queue and any number of sound effects on the server's one active output.
+// Plays a music queue with up to two extra songs and any number of sound effects on one output.
 service PlayerService {
   // Streams the player state, then each change. Positions are samples: add the time since
   // position_sampled_at while the music plays. A slow reader skips to the latest state. The
@@ -14,11 +14,19 @@ service PlayerService {
   // Replaces the music with a playlist's tracks, in the playlist's order, starting at one of
   // them. Missing files are skipped.
   rpc PlayCollection(PlayCollectionRequest) returns (PlayCollectionResponse);
-  // Pauses the music. FAILED_PRECONDITION when nothing plays.
+  // Plays one playlist song alongside the main queue. The first song becomes the main track
+  // when there is no queue. At most three songs play; adding an active song is a no-op.
+  rpc AddMusicLayer(AddMusicLayerRequest) returns (AddMusicLayerResponse);
+  // Fades out one song; stopping the main track also drops its playlist queue.
+  // Stopping an absent song succeeds.
+  rpc StopMusicLayer(StopMusicLayerRequest) returns (StopMusicLayerResponse);
+  // Changes only the settings present. An absent extra song is ignored.
+  rpc UpdateMusicLayer(UpdateMusicLayerRequest) returns (UpdateMusicLayerResponse);
+  // Pauses every music layer. FAILED_PRECONDITION when nothing plays.
   rpc PauseMusic(PauseMusicRequest) returns (PauseMusicResponse);
-  // Resumes paused music. FAILED_PRECONDITION when nothing plays.
+  // Resumes every music layer. FAILED_PRECONDITION when nothing plays.
   rpc ResumeMusic(ResumeMusicRequest) returns (ResumeMusicResponse);
-  // Fades the music out and drops its queue. Stopping silence succeeds.
+  // Fades every music layer out and drops the queue. Stopping silence succeeds.
   rpc StopMusic(StopMusicRequest) returns (StopMusicResponse);
   // Crossfades to the queue's next track.
   rpc SkipToNextTrack(SkipToNextTrackRequest) returns (SkipToNextTrackResponse);
@@ -66,6 +74,14 @@ message PlayerState {
   google.protobuf.Duration crossfade = 8;
   repeated ActiveSound sounds = 9;
   bool sounds_paused = 10;
+  // At most two extra songs, accompanying the main playlist track.
+  repeated MusicLayerState music_layers = 11;
+}
+
+message MusicLayerState {
+  MusicState music = 1;
+  float volume = 2;
+  bool looping = 3;
 }
 
 message MusicState {
@@ -148,6 +164,27 @@ message PlayCollectionRequest {
 }
 
 message PlayCollectionResponse {}
+
+message AddMusicLayerRequest {
+  string collection_entry_id = 1;
+}
+
+message AddMusicLayerResponse {}
+
+message StopMusicLayerRequest {
+  string collection_entry_id = 1;
+}
+
+message StopMusicLayerResponse {}
+
+message UpdateMusicLayerRequest {
+  string collection_entry_id = 1;
+  // A linear gain from 0 to 1.
+  optional float volume = 2;
+  optional bool looping = 3;
+}
+
+message UpdateMusicLayerResponse {}
 
 message PauseMusicRequest {}
 

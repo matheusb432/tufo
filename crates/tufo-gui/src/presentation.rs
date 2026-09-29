@@ -261,10 +261,15 @@ pub(crate) fn matches_filter(text: &str, filter: &str) -> bool {
 /// A playlist whose music plays now, unpaused, or a soundboard with a sound playing.
 fn collection_plays(collection: &CollectionView, player: &PlayerState) -> bool {
     match collection.kind {
-        CollectionKind::Playlist => player
-            .music
-            .as_ref()
-            .is_some_and(|music| music.collection_id == collection.id && !music.paused),
+        CollectionKind::Playlist => {
+            player
+                .music
+                .as_ref()
+                .is_some_and(|music| music.collection_id == collection.id && !music.paused)
+                || player.music_layers.iter().any(|(_, layer)| {
+                    layer.music.collection_id == collection.id && !layer.music.paused
+                })
+        }
         CollectionKind::Soundboard => collection
             .entries
             .iter()
@@ -379,7 +384,14 @@ fn track_row(entry: &EntryView, player: &PlayerState) -> TrackRowView {
     let current = player
         .music
         .as_ref()
-        .filter(|music| music.entry.entry_id == entry.id);
+        .filter(|music| music.entry.entry_id == entry.id)
+        .or_else(|| {
+            player
+                .music_layers
+                .iter()
+                .find(|(_, layer)| layer.music.entry.entry_id == entry.id)
+                .map(|(_, layer)| &layer.music)
+        });
     TrackRowView {
         id: entry.id,
         title: entry.title.as_str().to_owned(),
@@ -633,6 +645,11 @@ pub(crate) fn clock(duration: Duration) -> String {
 )]
 pub(crate) struct PlayerBarView {
     pub(crate) has_music: bool,
+    pub(crate) has_playback: bool,
+    pub(crate) entry_id: Option<CollectionEntryId>,
+    pub(crate) can_add_layer: bool,
+    pub(crate) layer_count: i32,
+    pub(crate) music_layers: Vec<MusicLayerView>,
     pub(crate) title: String,
     /// The playing collection, whose background the player shows beside its title.
     pub(crate) collection_id: Option<CollectionId>,
@@ -648,6 +665,14 @@ pub(crate) struct PlayerBarView {
     pub(crate) repeat: i32,
     pub(crate) sounds: Vec<SoundChipView>,
     pub(crate) sounds_paused: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct MusicLayerView {
+    pub(crate) id: CollectionEntryId,
+    pub(crate) title: String,
+    pub(crate) volume: f32,
+    pub(crate) looping: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -692,14 +717,42 @@ pub(crate) fn player_bar(
             }
         })
         .collect();
-    let playing_collection = music.and_then(|music| find_collection(snapshot, music.collection_id));
+    let displayed_music = music.or_else(|| {
+        player
+            .music_layers
+            .iter()
+            .next()
+            .map(|(_, layer)| &layer.music)
+    });
+    let playing_collection =
+        displayed_music.and_then(|music| find_collection(snapshot, music.collection_id));
     PlayerBarView {
         has_music: music.is_some(),
-        collection_id: music.map(|music| music.collection_id),
+        has_playback: music.is_some() || !player.music_layers.is_empty(),
+        entry_id: music.map(|music| music.entry.entry_id),
+        can_add_layer: music.is_none()
+            || player.music_layers.len()
+                < tufo_models::playback::music_layers::MUSIC_LAYERS_EXTRA_MAX,
+        layer_count: i32::try_from(player.music_layers.len() + usize::from(music.is_some()))
+            .unwrap_or(0),
+        music_layers: player
+            .music_layers
+            .iter()
+            .map(|(_, layer)| MusicLayerView {
+                id: layer.music.entry.entry_id,
+                title: find_entry(snapshot, layer.music.entry.entry_id).map_or_else(
+                    || layer.music.entry.title.clone(),
+                    |(_, entry)| entry.title.as_str().to_owned(),
+                ),
+                volume: layer.volume.into_inner(),
+                looping: layer.looping,
+            })
+            .collect(),
+        collection_id: displayed_music.map(|music| music.collection_id),
         collection_background: playing_collection.map_or(Background::Gradient, |collection| {
             collection.background.clone()
         }),
-        title: music.map_or_else(String::new, |music| {
+        title: displayed_music.map_or_else(String::new, |music| {
             find_entry(snapshot, music.entry.entry_id).map_or_else(
                 || music.entry.title.clone(),
                 |(_, entry)| entry.title.as_str().to_owned(),
@@ -708,7 +761,11 @@ pub(crate) fn player_bar(
         collection_title: playing_collection.map_or_else(String::new, |collection| {
             collection.title.as_str().to_owned()
         }),
-        playing: music.is_some_and(|music| !music.paused),
+        playing: music.is_some_and(|music| !music.paused)
+            || player
+                .music_layers
+                .iter()
+                .any(|(_, layer)| !layer.music.paused),
         progress,
         elapsed: clock(elapsed),
         remaining,
@@ -1047,8 +1104,9 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             set_discord_bot_token::SetDiscordBotTokenError,
         },
         playback::{
-            control_music::ControlMusicError, play_entry_sound::PlayEntrySoundError,
-            player::PlayAudioError, select_output::SelectOutputError,
+            add_music_layer::AddMusicLayerError, control_music::ControlMusicError,
+            play_entry_sound::PlayEntrySoundError, player::PlayAudioError,
+            select_output::SelectOutputError,
         },
     };
     if let Some(text) = library_reason_text(code, reason) {
@@ -1056,8 +1114,14 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
     }
     Some(match (code, reason) {
         (Code::NotFound, PlayAudioError::NOT_FOUND)
-        | (Code::FailedPrecondition, PlayEntrySoundError::MISSING) => {
+        | (Code::FailedPrecondition, PlayEntrySoundError::MISSING | AddMusicLayerError::MISSING) => {
             tr("The audio file is missing. Restore it and try again.")
+        }
+        (Code::NotFound, AddMusicLayerError::NOT_FOUND) => {
+            tr("That track or sound no longer exists.")
+        }
+        (Code::FailedPrecondition, AddMusicLayerError::FULL) => {
+            tr("The mix has three songs. Stop a layer before adding another.")
         }
         (Code::FailedPrecondition, PlayAudioError::UNREADABLE) => {
             tr("Tufo could not read the audio file. Check its permissions.")

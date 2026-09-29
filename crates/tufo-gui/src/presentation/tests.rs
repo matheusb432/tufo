@@ -106,6 +106,36 @@ fn playing(entry_seed: u128, paused: bool) -> PlayerState {
 }
 
 #[test]
+fn an_extra_song_keeps_the_playlist_and_player_active_after_the_main_track_stops() {
+    let snapshot = snapshot();
+    let mut player = PlayerState::default();
+    player
+        .music_layers
+        .try_insert(tufo_models::playback::music_layers::MusicLayerState {
+            music: playing(10, false).music.unwrap(),
+            volume: tufo_models::library::Volume::default(),
+            looping: false,
+        })
+        .unwrap();
+    let page = library_page(
+        &snapshot,
+        &player,
+        Navigation {
+            page: PageKind::Playlist,
+            collection_id: Some(CollectionId::from_uuid(uuid(1))),
+        },
+        "",
+        SystemTime::UNIX_EPOCH,
+    );
+    assert!(page.collection.unwrap().tracks[0].playing);
+    let bar = player_bar(&snapshot, &player, SystemTime::UNIX_EPOCH);
+    assert!(bar.has_playback && bar.playing && !bar.has_music && bar.can_add_layer);
+    assert_eq!(bar.title, "Ancient Dragon");
+    assert_eq!(bar.layer_count, 1);
+    assert_eq!(bar.music_layers.len(), 1);
+}
+
+#[test]
 fn the_filter_narrows_cards_on_grids_and_entries_on_collection_pages() {
     let snapshot = snapshot();
     let grid = library_page(

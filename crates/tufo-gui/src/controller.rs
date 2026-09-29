@@ -339,6 +339,11 @@ impl Controller {
                 .music
                 .as_ref()
                 .is_some_and(|music| !music.paused)
+                || shared
+                    .player
+                    .music_layers
+                    .iter()
+                    .any(|(_, layer)| !layer.music.paused)
                 || !shared.player.sounds.is_empty();
             if !active {
                 return;
@@ -350,7 +355,14 @@ impl Controller {
 
     pub(crate) fn tray_playback(&self) -> TrayPlayback {
         let shared = self.lock();
-        let music = match shared.player.music.as_ref() {
+        let music = match shared.player.music.as_ref().or_else(|| {
+            shared
+                .player
+                .music_layers
+                .iter()
+                .next()
+                .map(|(_, layer)| &layer.music)
+        }) {
             None => TrayMusic::Stopped,
             Some(music) if music.paused => TrayMusic::Paused,
             Some(_) => TrayMusic::Playing,
@@ -691,10 +703,23 @@ impl Controller {
         let Some(id) = collection_id(id) else {
             return;
         };
-        let music = self.lock().player.music.clone();
-        match music {
-            Some(music) if music.collection_id == id => self.toggle_play_pause(),
-            _ => self.run(move |client| async move { client.play_collection(id, None).await }),
+        let active = {
+            let shared = self.lock();
+            shared
+                .player
+                .music
+                .as_ref()
+                .is_some_and(|music| music.collection_id == id)
+                || shared
+                    .player
+                    .music_layers
+                    .iter()
+                    .any(|(_, layer)| layer.music.collection_id == id)
+        };
+        if active {
+            self.toggle_play_pause();
+        } else {
+            self.run(move |client| async move { client.play_collection(id, None).await });
         }
     }
 
@@ -706,7 +731,21 @@ impl Controller {
             let shared = self.lock();
             let collection = presentation::find_entry(&shared.snapshot, entry_id)
                 .map(|(collection, _)| collection.id);
-            (shared.player.music.clone(), collection)
+            let music = shared
+                .player
+                .music
+                .as_ref()
+                .filter(|music| music.entry.entry_id == entry_id)
+                .cloned()
+                .or_else(|| {
+                    shared
+                        .player
+                        .music_layers
+                        .iter()
+                        .find(|(_, layer)| layer.music.entry.entry_id == entry_id)
+                        .map(|(_, layer)| layer.music.clone())
+                });
+            (music, collection)
         };
         match (music, collection) {
             (Some(music), _) if music.entry.entry_id == entry_id => self.toggle_play_pause(),
@@ -715,6 +754,42 @@ impl Controller {
             }),
             (_, None) => {}
         }
+    }
+
+    pub(crate) fn add_music_layer(&self, id: &str) {
+        let Some(id) = entry_id_of(id) else {
+            return;
+        };
+        self.run(move |client| async move { client.add_music_layer(id).await });
+    }
+
+    pub(crate) fn stop_music_layer(&self, id: &str) {
+        let Some(id) = entry_id_of(id) else {
+            return;
+        };
+        self.run(move |client| async move { client.stop_music_layer(id).await });
+    }
+
+    pub(crate) fn set_music_layer_volume(&self, id: &str, volume: f32) {
+        let (Some(id), Ok(volume)) = (entry_id_of(id), Volume::try_new(volume)) else {
+            return;
+        };
+        let update = tufo_client::player::UpdateMusicLayer {
+            volume: Some(volume),
+            looping: None,
+        };
+        self.run(move |client| async move { client.update_music_layer(id, update).await });
+    }
+
+    pub(crate) fn set_music_layer_looping(&self, id: &str, looping: bool) {
+        let Some(id) = entry_id_of(id) else {
+            return;
+        };
+        let update = tufo_client::player::UpdateMusicLayer {
+            volume: None,
+            looping: Some(looping),
+        };
+        self.run(move |client| async move { client.update_music_layer(id, update).await });
     }
 
     pub(crate) fn rename_entry(&self, id: &str, title: &str) {
@@ -860,7 +935,22 @@ impl Controller {
     // Transport.
 
     pub(crate) fn toggle_play_pause(&self) {
-        let paused = self.lock().player.music.as_ref().map(|music| music.paused);
+        let paused = {
+            let shared = self.lock();
+            shared
+                .player
+                .music
+                .as_ref()
+                .map(|music| music.paused)
+                .or_else(|| {
+                    shared
+                        .player
+                        .music_layers
+                        .iter()
+                        .next()
+                        .map(|(_, layer)| layer.music.paused)
+                })
+        };
         match paused {
             Some(true) => self.run(|client| async move { client.resume_music().await }),
             Some(false) => self.run(|client| async move { client.pause_music().await }),

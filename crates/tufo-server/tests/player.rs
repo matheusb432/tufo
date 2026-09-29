@@ -29,6 +29,74 @@ fn some_voice_channel() -> VoiceChannelTarget {
 }
 
 #[tokio::test]
+async fn layer_rpcs_reject_invalid_and_unknown_songs_and_ignore_stopped_layers()
+-> anyhow::Result<()> {
+    use tufo_wire::{pb, player::UpdateMusicLayer};
+    let server = TestServer::start().await?;
+    let client = server.client()?;
+    let id = CollectionEntryId::from_uuid(uuid::Uuid::from_u128(1));
+    assert_eq!(
+        status_code(client.add_music_layer(id).await),
+        Some(Code::NotFound)
+    );
+    client.stop_music_layer(id).await?;
+    client
+        .update_music_layer(
+            id,
+            UpdateMusicLayer {
+                volume: None,
+                looping: Some(false),
+            },
+        )
+        .await?;
+    let mut raw = pb::player_service_client::PlayerServiceClient::new(server.channel().await?);
+    assert_eq!(
+        raw.add_music_layer(pb::AddMusicLayerRequest {
+            collection_entry_id: "invalid".to_owned()
+        })
+        .await
+        .unwrap_err()
+        .code(),
+        Code::InvalidArgument
+    );
+    assert_eq!(
+        raw.update_music_layer(pb::UpdateMusicLayerRequest {
+            collection_entry_id: id.to_string(),
+            volume: Some(2.0),
+            looping: None
+        })
+        .await
+        .unwrap_err()
+        .code(),
+        Code::InvalidArgument
+    );
+    let music = tempfile::tempdir()?;
+    let file = music.path().join("song.wav");
+    write_wav(&file, 440.0)?;
+    client
+        .import_paths(&ImportPaths {
+            kind: CollectionKind::Playlist,
+            paths: vec![LocalPath::try_new(music.path().to_owned())?],
+        })
+        .await?;
+    let snapshot = client
+        .watch_library()
+        .await?
+        .next()
+        .await
+        .transpose()?
+        .unwrap();
+    let entry_id = snapshot.collections[0].entries[0].id;
+    std::fs::remove_file(&file)?;
+    assert_eq!(
+        status_code(client.add_music_layer(entry_id).await),
+        Some(Code::NotFound)
+    );
+    server.stop().await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn watching_starts_idle_on_local_output_and_ends_when_the_server_drains() -> anyhow::Result<()>
 {
     let server = TestServer::start().await?;

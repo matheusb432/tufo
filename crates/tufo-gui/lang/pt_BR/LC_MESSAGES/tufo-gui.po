@@ -1362,3 +1362,31 @@ msgstr[1] "{n} faixas"
 #: ui/search.slint:143
 msgid "↑↓ to choose · Enter to play · Esc to close"
 msgstr "↑↓ para escolher · Enter para tocar · Esc para fechar"
+
+#: ui/pages.slint
+msgid "Add to mix"
+msgstr "Adicionar à mixagem"
+
+#: ui/pages.slint
+msgid "Mix full (3 songs)"
+msgstr "Mixagem cheia (3 músicas)"
+
+#: ui/dock.slint
+msgid "Mix · {0}"
+msgstr "Mix · {0}"
+
+#: ui/dock.slint
+msgid "Music mix"
+msgstr "Mixagem de músicas"
+
+#: ui/dock.slint
+msgid "{0} of 3 songs"
+msgstr "{0} de 3 músicas"
+
+#: ui/dock.slint
+msgid "Main track"
+msgstr "Faixa principal"
+
+#: src/presentation.rs
+msgid "The mix has three songs. Stop a layer before adding another."
+msgstr "A mixagem tem três músicas. Pare uma camada antes de adicionar outra."

@@ -1362,3 +1362,31 @@ msgstr[1] ""
 #: ui/search.slint:143
 msgid "↑↓ to choose · Enter to play · Esc to close"
 msgstr ""
+
+#: ui/pages.slint
+msgid "Add to mix"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Mix full (3 songs)"
+msgstr ""
+
+#: ui/dock.slint
+msgid "Mix · {0}"
+msgstr ""
+
+#: ui/dock.slint
+msgid "Music mix"
+msgstr ""
+
+#: ui/dock.slint
+msgid "{0} of 3 songs"
+msgstr ""
+
+#: ui/dock.slint
+msgid "Main track"
+msgstr ""
+
+#: src/presentation.rs
+msgid "The mix has three songs. Stop a layer before adding another."
+msgstr ""

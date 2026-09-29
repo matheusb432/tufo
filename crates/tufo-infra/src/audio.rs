@@ -34,6 +34,7 @@ use limiter::LimiterBuilder;
 use music_deck::MusicDeckHandle;
 use pull_backend::{PullBackend, PullBackendError, PullBackendSettings};
 use streamed_sound::StreamedSound;
+use tufo_models::playback::music_layers::MUSIC_LAYERS_EXTRA_MAX;
 
 /// ALSA period size for the local device. Two periods of 2048 frames, about 85 ms at 48 kHz,
 /// absorb scheduling delays of cpal's callback thread, which runs at normal priority when ALSA
@@ -74,6 +75,7 @@ pub struct Mixer {
     _manager: Box<dyn Send>,
     sample_rate: u32,
     music: MusicDeckHandle,
+    music_layers: [(MusicDeckHandle, TrackHandle); MUSIC_LAYERS_EXTRA_MAX],
     music_track: TrackHandle,
     sounds_track: TrackHandle,
 }
@@ -138,6 +140,16 @@ impl Mixer {
         &mut self.music
     }
 
+    pub(crate) fn music_layer(&mut self, slot: usize) -> Option<&mut MusicDeckHandle> {
+        self.music_layers.get_mut(slot).map(|(deck, _)| deck)
+    }
+
+    pub(crate) fn set_music_layer_volume(&mut self, slot: usize, volume: f32) {
+        if let Some((_, track)) = self.music_layers.get_mut(slot) {
+            track.set_volume(decibels(volume), linear_tween(MUSIC_VOLUME_TWEEN));
+        }
+    }
+
     /// Sets the music's gain, a linear value from silence (0) to full level (1).
     pub fn set_music_volume(&mut self, volume: f32) {
         self.music_track
@@ -191,6 +203,7 @@ fn limited_main_track() -> MainTrackBuilder {
 
 struct MixerTracks {
     music: MusicDeckHandle,
+    music_layers: [(MusicDeckHandle, TrackHandle); MUSIC_LAYERS_EXTRA_MAX],
     music_track: TrackHandle,
     sounds_track: TrackHandle,
 }
@@ -204,8 +217,16 @@ impl MixerTracks {
         let sounds_track = manager.add_sub_track(TrackBuilder::new())?;
         let (deck, music) = music_deck::music_deck(sample_rate);
         music_track.play(deck).map_err(|_| ResourceLimitReached)?;
+        let mut add_layer = || {
+            let (deck, handle) = music_deck::music_deck(sample_rate);
+            let mut track = music_track.add_sub_track(TrackBuilder::new())?;
+            track.play(deck).map_err(|_| ResourceLimitReached)?;
+            Ok::<_, ResourceLimitReached>((handle, track))
+        };
+        let music_layers = [add_layer()?, add_layer()?];
         Ok(Self {
             music,
+            music_layers,
             music_track,
             sounds_track,
         })
@@ -216,6 +237,7 @@ impl MixerTracks {
             _manager: manager,
             sample_rate,
             music: self.music,
+            music_layers: self.music_layers,
             music_track: self.music_track,
             sounds_track: self.sounds_track,
         }

@@ -8,6 +8,7 @@ use crate::{
     library::{CollectionEntryId, CollectionId, SoundSettings, Volume},
     playback::{
         AudioFilePath, OutputTarget,
+        music_layers::{MusicLayerState, MusicLayers},
         queue::{QueueEntry, QueueModes},
     },
 };
@@ -39,6 +40,7 @@ pub struct PlayerState {
     pub output: OutputTarget,
     pub voice: VoiceConnectionState,
     pub music: Option<MusicState>,
+    pub music_layers: MusicLayers<MusicLayerState>,
     pub volume: Volume,
     pub muted: bool,
     pub modes: QueueModes,
@@ -54,6 +56,7 @@ impl Default for PlayerState {
             output: OutputTarget::Local,
             voice: VoiceConnectionState::NotConfigured,
             music: None,
+            music_layers: MusicLayers::default(),
             volume: Volume::default(),
             muted: false,
             modes: QueueModes::default(),

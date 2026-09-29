@@ -65,7 +65,7 @@ export struct TrackRow {
     title: string,
     duration: string,
     missing: bool,
-    // The queue's current track, playing or paused.
+    // A song in the mix, playing or paused.
     current: bool,
     playing: bool,
 }
@@ -83,6 +83,13 @@ export struct SoundTile {
     // How far a playing sound is through its file, from 0 to 1.
     progress: float,
     missing: bool,
+}
+
+export struct MusicLayer {
+    id: string,
+    title: string,
+    volume: float,
+    looping: bool,
 }
 
 export struct OutputRow {
@@ -175,6 +182,11 @@ export global LibraryView {
 
 export global PlayerView {
     in property <bool> has-music;
+    in property <bool> has-playback;
+    in property <string> entry-id;
+    in property <bool> can-add-layer: true;
+    in property <int> layer-count;
+    in property <[MusicLayer]> music-layers;
     in property <string> title;
     in property <string> collection-id;
     in property <string> collection-title;
@@ -190,7 +202,7 @@ export global PlayerView {
     in property <int> repeat: 1;
     in property <[SoundChip]> sounds;
     in property <bool> sounds-paused;
-    out property <bool> something-plays: (self.has-music && self.playing) || (self.sounds.length > 0 && !self.sounds-paused);
+    out property <bool> something-plays: (self.has-playback && self.playing) || (self.sounds.length > 0 && !self.sounds-paused);
 }
 
 // Ctrl+F filters the open page; Ctrl+Shift+F searches everything.
@@ -282,6 +294,10 @@ export global Actions {
 
     callback play-collection(string);
     callback play-track(string);
+    callback add-music-layer(string);
+    callback stop-music-layer(string);
+    callback set-music-layer-volume(string, float);
+    callback set-music-layer-looping(string, bool);
     callback rename-entry(string, string);
     callback delete-entry(string);
 

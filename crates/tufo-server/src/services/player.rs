@@ -2,10 +2,12 @@ use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::playback::{
+    add_music_layer,
     control_music::{self, MusicCommand},
     control_sounds::{self, SoundsCommand},
     get_diagnostics, play_collection, play_entry_sound, resume_saved_loops, select_output,
-    stand_by, stop_sound, update_player_settings, watch_player,
+    stand_by, stop_music_layer, stop_sound, update_music_layer, update_player_settings,
+    watch_player,
 };
 use tufo_models::playback::player_state::PlayerState;
 use tufo_wire::{
@@ -81,6 +83,35 @@ impl PlayerService for PlayerGrpcService {
     ) -> Result<Response<pb::PauseMusicResponse>, Status> {
         self.control(MusicCommand::Pause).await?;
         Ok(Response::new(pb::PauseMusicResponse {}))
+    }
+
+    async fn add_music_layer(
+        &self,
+        request: Request<pb::AddMusicLayerRequest>,
+    ) -> Result<Response<pb::AddMusicLayerResponse>, Status> {
+        let entry_id = proto::player::add_music_layer_request(request.get_ref())?;
+        add_music_layer::execute(entry_id, &self.state.library, self.state.player.as_ref())
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::AddMusicLayerResponse {}))
+    }
+
+    async fn stop_music_layer(
+        &self,
+        request: Request<pb::StopMusicLayerRequest>,
+    ) -> Result<Response<pb::StopMusicLayerResponse>, Status> {
+        let entry_id = proto::player::stop_music_layer_request(request.get_ref())?;
+        stop_music_layer::execute(entry_id, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::StopMusicLayerResponse {}))
+    }
+
+    async fn update_music_layer(
+        &self,
+        request: Request<pb::UpdateMusicLayerRequest>,
+    ) -> Result<Response<pb::UpdateMusicLayerResponse>, Status> {
+        let (entry_id, update) = proto::player::update_music_layer_request(request.get_ref())?;
+        update_music_layer::execute(entry_id, update, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::UpdateMusicLayerResponse {}))
     }
 
     async fn resume_music(

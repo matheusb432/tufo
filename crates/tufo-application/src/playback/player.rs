@@ -14,6 +14,7 @@ use tufo_models::{
 };
 
 use super::{
+    add_music_layer::{AddMusicLayerError, MusicLayerCue},
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
     play_queue::PlayQueueError,
@@ -21,9 +22,26 @@ use super::{
 };
 use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
 
-/// Plays one music queue and any number of sound effects on exactly one output, and publishes
-/// what it plays.
+/// Plays a music queue with up to two extra songs and any number of sound effects on one output,
+/// and publishes what it plays.
 pub trait Player: Send + Sync {
+    /// Adds one song, using the main track while no queue exists. Active songs are left playing;
+    /// a fourth song fails.
+    fn add_music_layer(
+        &self,
+        cue: MusicLayerCue,
+    ) -> impl Future<Output = Result<(), AddMusicLayerError>> + Send;
+
+    /// Stops one song, dropping the queue if it is the main track. Absent songs are ignored.
+    fn stop_music_layer(&self, entry_id: CollectionEntryId) -> impl Future<Output = ()> + Send;
+
+    /// Updates an extra song's settings; absent songs and the main track are ignored.
+    fn update_music_layer(
+        &self,
+        entry_id: CollectionEntryId,
+        update: tufo_wire::player::UpdateMusicLayer,
+    ) -> impl Future<Output = ()> + Send;
+
     /// Replaces the music with a queue of `start`'s tracks, applying the player's shuffle and
     /// repeat modes, and plays its start track.
     fn play_queue(

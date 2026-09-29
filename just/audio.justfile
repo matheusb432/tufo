@@ -26,7 +26,11 @@ stress voice="" minutes="10" music="":
     export PIPEWIRE_NODE="$sink"
     echo "Local audio plays into the silent PipeWire sink $sink; watch Tufo's row under it in pw-top."
     export TUFO_RUNTIME_DIR="$run/runtime" TUFO_DATABASE_PATH="$run/tufo.sqlite3" XDG_STATE_HOME="$run/state"
-    if [[ -f secrets/discord.toml ]]; then export TUFO_DISCORD_CREDENTIALS="$PWD/secrets/discord.toml"; fi
+    if [[ -z "{{ voice }}" ]]; then
+        export TUFO_DISCORD_CREDENTIALS="$run/discord.toml"
+    elif [[ -f secrets/discord.toml ]]; then
+        export TUFO_DISCORD_CREDENTIALS="$PWD/secrets/discord.toml"
+    fi
     taskset -c 2,3 "$target/tufo-server" & server=$!
     # The bot needs a few seconds to log in before it can join a channel.
     sleep 8

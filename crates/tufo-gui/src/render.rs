@@ -18,9 +18,9 @@ use crate::{
     sound_icons,
     ui::{
         AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
-        CollectionBackground, CollectionCard, CurrentOutput, LibraryView, NavItem, Navigation,
-        OutputRow, OutputRowKind, Page, PlayerView, Search, SearchResult, Session, SoundChip,
-        SoundIcons, SoundTile, TrackRow, VoiceBadge,
+        CollectionBackground, CollectionCard, CurrentOutput, LibraryView, MusicLayer, NavItem,
+        Navigation, OutputRow, OutputRowKind, Page, PlayerView, Search, SearchResult, Session,
+        SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
     },
 };
 
@@ -225,6 +225,28 @@ pub(crate) fn player(
         player_progress(&window, &bar);
         let view = window.global::<PlayerView>();
         view.set_has_music(bar.has_music);
+        view.set_has_playback(bar.has_playback);
+        view.set_entry_id(
+            bar.entry_id
+                .map(|id| id.to_string())
+                .unwrap_or_default()
+                .into(),
+        );
+        view.set_can_add_layer(bar.can_add_layer);
+        view.set_layer_count(bar.layer_count);
+        let layers = bar
+            .music_layers
+            .iter()
+            .map(|layer| MusicLayer {
+                id: layer.id.to_string().into(),
+                title: layer.title.as_str().into(),
+                volume: layer.volume,
+                looping: layer.looping,
+            })
+            .collect();
+        show_rows(&view.get_music_layers(), layers, |layers| {
+            view.set_music_layers(layers);
+        });
         view.set_title(bar.title.into());
         view.set_collection_id(
             bar.collection_id

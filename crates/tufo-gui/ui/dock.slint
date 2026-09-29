@@ -3,8 +3,8 @@
 // mini player shows it alone in a small window.
 
 import { Motion, Theme } from "theme.slint";
-import { Actions, Art, PlayerView, Session, SoundChip, WindowFrame } from "state.slint";
-import { Icon, IconButton, Slider } from "widgets.slint";
+import { Actions, Art, PlayerView, Session, SoundChip, WindowFrame, MusicLayer } from "state.slint";
+import { Button, ButtonKind, Icon, IconButton, Slider } from "widgets.slint";
 import { WindowDragArea } from "frame.slint";
 
 component SoundChipView inherits Rectangle {
@@ -68,6 +68,113 @@ component SoundChipView inherits Rectangle {
     }
 }
 
+component MusicLayerRow inherits VerticalLayout {
+    in property <MusicLayer> layer;
+    in property <bool> compact;
+    spacing: 2px;
+    HorizontalLayout {
+        spacing: 4px;
+        Text {
+            text: root.layer.title;
+            overflow: elide;
+            font-size: Theme.body-small;
+            font-weight: 700;
+            color: Theme.text;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        if root.compact: Slider {
+            width: 64px;
+            height: 28px;
+            value: root.layer.volume;
+            changed(value) => { Actions.set-music-layer-volume(root.layer.id, value); }
+        }
+        IconButton {
+            size: 28px;
+            icon-size: 16px;
+            icon: @image-url("icons/repeat.svg");
+            tint: root.layer.looping ? Theme.accent : Theme.text-faint;
+            tooltip: root.layer.looping ? @tr("Stop looping {0}", root.layer.title) : @tr("Loop {0}", root.layer.title);
+            clicked => { Actions.set-music-layer-looping(root.layer.id, !root.layer.looping); }
+        }
+        IconButton {
+            size: 28px;
+            icon-size: 16px;
+            icon: @image-url("icons/x.svg");
+            tooltip: @tr("Stop {0}", root.layer.title);
+            clicked => { Actions.stop-music-layer(root.layer.id); }
+        }
+    }
+    if !root.compact: Slider {
+        height: 20px;
+        value: root.layer.volume;
+        changed(value) => { Actions.set-music-layer-volume(root.layer.id, value); }
+    }
+}
+
+component MixButton inherits Button {
+    text: @tr("Mix · {0}", PlayerView.layer-count);
+    kind: ButtonKind.quiet;
+    height: 22px;
+    clicked => { mix.show(); }
+    mix := PopupWindow {
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        width: 280px;
+        height: layout.preferred-height;
+        y: -self.height - 8px;
+        Rectangle {
+            background: Theme.raised;
+            border-radius: Theme.radius-row;
+            border-width: 1px;
+            border-color: Theme.raised-edge;
+            layout := VerticalLayout {
+                padding: Session.mini-player ? 8px : 12px;
+                spacing: Session.mini-player ? 4px : 8px;
+                Text {
+                    text: Session.mini-player ? @tr("Mix · {0}", PlayerView.layer-count) : @tr("Music mix");
+                    color: Theme.text;
+                    font-size: Theme.body-small;
+                    font-weight: 800;
+                }
+                if !Session.mini-player: Text {
+                    text: @tr("{0} of 3 songs", PlayerView.layer-count);
+                    color: Theme.text-faint;
+                    font-size: Theme.caption;
+                }
+                if PlayerView.has-music: HorizontalLayout {
+                    spacing: 8px;
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+                        Text {
+                            text: PlayerView.title;
+                            overflow: elide;
+                            font-size: Theme.body-small;
+                            color: Theme.text;
+                        }
+                        if !Session.mini-player: Text {
+                            text: @tr("Main track");
+                            font-size: Theme.caption;
+                            color: Theme.text-faint;
+                        }
+                    }
+                    IconButton {
+                        size: 28px;
+                        icon-size: 16px;
+                        icon: @image-url("icons/x.svg");
+                        tooltip: @tr("Stop {0}", PlayerView.title);
+                        clicked => { Actions.stop-music-layer(PlayerView.entry-id); }
+                    }
+                }
+                for layer in PlayerView.music-layers: MusicLayerRow {
+                    layer: layer;
+                    compact: Session.mini-player;
+                }
+            }
+        }
+    }
+}
+
 component NowPlaying inherits HorizontalLayout {
     in property <length> art-size: 46px;
     spacing: 12px;
@@ -77,13 +184,13 @@ component NowPlaying inherits HorizontalLayout {
         height: root.art-size;
         border-radius: 12px;
         background: Theme.disc;
-        if PlayerView.has-music: Image {
+        if PlayerView.has-playback: Image {
             width: parent.width;
             height: parent.height;
             source: Art.painting(PlayerView.collection-id, PlayerView.collection-background, self.width, self.height, 12px, Art.pictures-revision);
             image-fit: fill;
         }
-        if !PlayerView.has-music: Icon {
+        if !PlayerView.has-playback: Icon {
             width: 20px;
             height: 20px;
             source: @image-url("icons/music.svg");
@@ -95,19 +202,20 @@ component NowPlaying inherits HorizontalLayout {
         alignment: center;
         horizontal-stretch: 1;
         Text {
-            text: PlayerView.has-music ? PlayerView.title : @tr("Nothing playing");
+            text: PlayerView.has-playback ? PlayerView.title : @tr("Nothing playing");
             font-size: Theme.body-small;
             font-weight: 800;
-            color: PlayerView.has-music ? Theme.text : Theme.text-faint;
+            color: PlayerView.has-playback ? Theme.text : Theme.text-faint;
             overflow: elide;
         }
 
-        if PlayerView.has-music: Text {
+        if PlayerView.has-playback && PlayerView.music-layers.length == 0: Text {
             text: PlayerView.collection-title;
             font-size: Theme.caption;
             color: Theme.text-secondary;
             overflow: elide;
         }
+        if PlayerView.music-layers.length > 0: MixButton { }
     }
 }
 
@@ -117,21 +225,21 @@ component PlayButton inherits Rectangle {
     width: root.size;
     height: root.size;
     border-radius: self.width / 2;
-    background: !PlayerView.has-music ? Theme.button : touch.has-hover ? Theme.lit-bright : Theme.lit;
+    background: !PlayerView.has-playback ? Theme.button : touch.has-hover ? Theme.lit-bright : Theme.lit;
     animate background { duration: Motion.hover; }
     accessible-role: button;
     accessible-label: PlayerView.playing ? @tr("Pause") : @tr("Play");
-    accessible-enabled: PlayerView.has-music;
+    accessible-enabled: PlayerView.has-playback;
     accessible-action-default => { Actions.toggle-play-pause(); }
     Icon {
         width: root.size * 0.48;
         height: root.size * 0.48;
         source: PlayerView.playing ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
-        tint: PlayerView.has-music ? Theme.on-lit : Theme.text-disabled;
+        tint: PlayerView.has-playback ? Theme.on-lit : Theme.text-disabled;
     }
 
     touch := TouchArea {
-        enabled: PlayerView.has-music;
+        enabled: PlayerView.has-playback;
         mouse-cursor: MouseCursor.pointer;
         clicked => {
             Actions.toggle-play-pause();

@@ -6,6 +6,7 @@
 //! changes the deck made on its own, arms the next track ahead of time, clears finished sounds,
 //! and lets go of the output once nothing plays.
 
+mod layers;
 mod music;
 pub mod outputs;
 mod sounds;
@@ -21,6 +22,7 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use layers::MusicLayer;
 use music::{
     Music, MusicTrack, OpenedTrack, TrackSource, open_track, play_audio_error, probe_track,
 };
@@ -28,6 +30,7 @@ use outputs::{AudioOutputs, DeviceOutputs, OpenedOutput};
 use sounds::{FiredSound, SoundPlayback, decoded_sound, volume_gain};
 use tokio::sync::{Mutex, oneshot, watch};
 use tufo_application::playback::{
+    add_music_layer::{AddMusicLayerError, MusicLayerCue},
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
     play_queue::PlayQueueError,
@@ -39,6 +42,7 @@ use tufo_models::{
     playback::{
         AudioFilePath, OutputTarget,
         diagnostics::PlayerDiagnostics,
+        music_layers::MusicLayers,
         player_state::{
             CrossfadeDuration, MusicState, PlayerState, PositionSample, SoundCue,
             VoiceConnectionState,
@@ -138,6 +142,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             output_generation: 0,
             voice: idle_voice(outputs.voice_availability(), None),
             music: None,
+            music_layers: MusicLayers::default(),
             music_generation: 0,
             volume: Volume::default(),
             muted: false,
@@ -171,6 +176,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         if let Some(music) = engine.music.take() {
             engine.retire_music(&music);
         }
+        engine.stop_layers();
         engine.sounds.clear();
         engine.output_generation += 1;
         if let Some(output) = engine.output.take() {
@@ -234,6 +240,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let sample_rate = opened.mixer.sample_rate();
         engine.output = Some(opened);
         self.restore_music(engine, sample_rate).await;
+        self.restore_layers(engine, sample_rate).await;
         self.restore_sounds(engine).await;
     }
 
@@ -257,6 +264,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             music.arm_requested = false;
         }
         engine.retired_underrun_frames += retired_underruns;
+        engine.suspend_layers();
         engine.sounds.retain(|_, sound| sound.cue.settings.looping);
         for sound in engine.sounds.values_mut() {
             sound.playback = None;
@@ -402,6 +410,29 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 return Err(error);
             }
         };
+        Self::install_music_track(
+            &mut engine,
+            queue,
+            opened,
+            start_offset,
+            fade_in,
+            fade_out,
+            paused,
+        )?;
+        self.publish(&engine);
+        Ok(())
+    }
+
+    fn install_music_track(
+        engine: &mut Engine,
+        queue: MusicQueue,
+        opened: OpenedTrack,
+        start_offset: Duration,
+        fade_in: Duration,
+        fade_out: Duration,
+        paused: bool,
+    ) -> Result<(), PlayAudioError> {
+        engine.pause_layers(paused)?;
         let token = engine.next_token();
         let OpenedTrack {
             track,
@@ -446,7 +477,6 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         if let Some(previous) = previous {
             engine.retire_music(&previous);
         }
-        self.publish(&engine);
         Ok(())
     }
 
@@ -616,6 +646,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     async fn tick(self: &Arc<Self>) {
         let mut engine = self.engine.lock().await;
         let mut changed = engine.reap_finished_sounds();
+        changed |= engine.reap_finished_layers();
         if let Some(deck) = engine.deck() {
             deck.drop_retired();
         }
@@ -797,6 +828,34 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 }
 
 impl<O: AudioOutputs> Player for EnginePlayer<O> {
+    async fn add_music_layer(&self, cue: MusicLayerCue) -> Result<(), AddMusicLayerError> {
+        self.add_layer(cue).await
+    }
+
+    async fn stop_music_layer(&self, entry_id: CollectionEntryId) {
+        let mut engine = self.engine.lock().await;
+        if engine
+            .music
+            .as_ref()
+            .is_some_and(|music| music.queue.current().entry_id == entry_id)
+        {
+            engine.stop_music();
+        } else {
+            engine.stop_layer(entry_id);
+        }
+        self.publish(&engine);
+    }
+
+    async fn update_music_layer(
+        &self,
+        entry_id: CollectionEntryId,
+        update: tufo_wire::player::UpdateMusicLayer,
+    ) {
+        let mut engine = self.engine.lock().await;
+        engine.update_layer(entry_id, update);
+        self.publish(&engine);
+    }
+
     async fn play_queue(&self, start: QueueStart) -> Result<(), PlayQueueError> {
         // Probing the start track first reports a bad file without opening the audio device.
         let start_file = match start.entries.get(start.start_index) {
@@ -838,7 +897,10 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         match command {
             MusicCommand::Pause => engine.set_paused(true)?,
             MusicCommand::Resume => engine.set_paused(false)?,
-            MusicCommand::Stop => engine.stop_music(),
+            MusicCommand::Stop => {
+                engine.stop_music();
+                engine.stop_layers();
+            }
             MusicCommand::SetVolume(volume) => {
                 engine.volume = volume;
                 engine.apply_music_volume();
@@ -1010,6 +1072,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         // Ends reconnection attempts, which would otherwise rejoin a voice channel meanwhile.
         engine.output_generation += 1;
         engine.stop_music();
+        engine.stop_layers();
         let fade = engine.sound_stop_fade(STOP_FADE);
         for sound in std::mem::take(&mut engine.sounds).values_mut() {
             if let Some(playback) = &mut sound.playback {
@@ -1071,6 +1134,7 @@ struct Engine {
     output_generation: u64,
     voice: VoiceConnectionState,
     music: Option<Music>,
+    music_layers: MusicLayers<MusicLayer>,
     /// Advances whenever the current track changes, so superseded changes don't apply.
     music_generation: u64,
     volume: Volume,
@@ -1097,7 +1161,7 @@ impl Engine {
     }
 
     fn has_audio(&self) -> bool {
-        self.music.is_some() || !self.sounds.is_empty()
+        self.music.is_some() || !self.music_layers.is_empty() || !self.sounds.is_empty()
     }
 
     /// The fade for a track change someone asked for: the crossfade, clamped between a click-free
@@ -1113,10 +1177,13 @@ impl Engine {
     }
 
     fn set_paused(&mut self, paused: bool) -> Result<(), ControlMusicError> {
-        let music = self
-            .music
-            .as_mut()
-            .ok_or(ControlMusicError::NothingPlaying)?;
+        if self.music.is_none() && self.music_layers.is_empty() {
+            return Err(ControlMusicError::NothingPlaying);
+        }
+        self.pause_layers(paused)?;
+        let Some(music) = &mut self.music else {
+            return Ok(());
+        };
         if music.paused == paused {
             return Ok(());
         }
@@ -1229,6 +1296,7 @@ impl Engine {
 
     fn underrun_frames(&self) -> u64 {
         self.retired_underrun_frames
+            + self.layer_underrun_frames()
             + self.music.as_ref().map_or(0, |music| {
                 music.current.underrun_frames()
                     + music.armed.as_ref().map_or(0, MusicTrack::underrun_frames)
@@ -1250,6 +1318,7 @@ impl Engine {
                 duration: music.current.duration,
                 paused: music.paused,
             }),
+            music_layers: self.music_layers.map(|layer| layer.snapshot(sampled_at)),
             volume: self.volume,
             muted: self.muted,
             modes: self.modes,

@@ -14,3 +14,10 @@ pub struct UpdatePlayerSettings {
     pub repeat: Option<RepeatMode>,
     pub crossfade: Option<CrossfadeDuration>,
 }
+
+/// Changes only the settings present; a stopped extra layer is ignored.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct UpdateMusicLayer {
+    pub volume: Option<Volume>,
+    pub looping: Option<bool>,
+}

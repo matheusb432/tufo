@@ -11,7 +11,7 @@ use clap::Parser;
 use tufo_client::{
     LocalEndpoint, TufoClient,
     library::{CollectionView, ImportPaths, LibrarySnapshot, UpdateCollectionEntry},
-    player::UpdatePlayerSettings,
+    player::{UpdateMusicLayer, UpdatePlayerSettings},
 };
 use tufo_models::{
     discord::{GuildId, VoiceChannelId, VoiceChannelTarget},
@@ -75,6 +75,18 @@ async fn main() -> anyhow::Result<()> {
         })
         .await?;
     client.play_collection(playlist.id, None).await?;
+    for entry in playlist.entries.iter().skip(1).take(2) {
+        client.add_music_layer(entry.id).await?;
+        client
+            .update_music_layer(
+                entry.id,
+                UpdateMusicLayer {
+                    volume: None,
+                    looping: Some(true),
+                },
+            )
+            .await?;
+    }
     client.play_sound(sounds.entries[0].id).await?;
     println!(
         "Playing {} ({} tracks) with a looping {} for {} min.",

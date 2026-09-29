@@ -8,6 +8,7 @@ use tufo_models::{
     playback::{
         AudioFilePath, OutputTarget,
         diagnostics::{PlayerDiagnostics, VoicePacing},
+        music_layers::{MusicLayerState, MusicLayers},
         player_state::{
             ActiveSound, CrossfadeDuration, MusicState, PlayerState, PositionSample,
             VoiceConnectionState,
@@ -20,9 +21,42 @@ use super::{
     InvalidMessage, duration_message, duration_value, invalid, parse_uuid, required, system_time,
     timestamp_message, voice_channel_target,
 };
-use crate::{pb, player::UpdatePlayerSettings};
+use crate::{
+    pb,
+    player::{UpdateMusicLayer, UpdatePlayerSettings},
+};
 
 // Requests the server parses.
+
+pub fn add_music_layer_request(
+    request: &pb::AddMusicLayerRequest,
+) -> Result<CollectionEntryId, Status> {
+    entry_id(&request.collection_entry_id, "collection_entry_id")
+}
+
+pub fn stop_music_layer_request(
+    request: &pb::StopMusicLayerRequest,
+) -> Result<CollectionEntryId, Status> {
+    entry_id(&request.collection_entry_id, "collection_entry_id")
+}
+
+pub fn update_music_layer_request(
+    request: &pb::UpdateMusicLayerRequest,
+) -> Result<(CollectionEntryId, UpdateMusicLayer), Status> {
+    Ok((
+        entry_id(&request.collection_entry_id, "collection_entry_id")?,
+        UpdateMusicLayer {
+            volume: request
+                .volume
+                .map(|volume| {
+                    Volume::try_new(volume)
+                        .map_err(|_| invalid("volume", "must be between 0 and 1"))
+                })
+                .transpose()?,
+            looping: request.looping,
+        },
+    ))
+}
 
 pub fn play_collection_request(
     request: &pb::PlayCollectionRequest,
@@ -92,6 +126,15 @@ pub fn watch_player_response(state: &PlayerState) -> pb::WatchPlayerResponse {
             output: Some(output_message(state.output)),
             voice: Some(voice_message(&state.voice)),
             music: state.music.as_ref().map(music_message),
+            music_layers: state
+                .music_layers
+                .iter()
+                .map(|(_, layer)| pb::MusicLayerState {
+                    music: Some(music_message(&layer.music)),
+                    volume: layer.volume.into_inner(),
+                    looping: layer.looping,
+                })
+                .collect(),
             volume: state.volume.into_inner(),
             muted: state.muted,
             shuffle: state.modes.shuffle,
@@ -181,6 +224,27 @@ pub fn select_output_message(target: OutputTarget) -> pb::SelectOutputRequest {
 
 // Responses the client decodes.
 
+fn music_layers_state(
+    messages: Vec<pb::MusicLayerState>,
+) -> Result<MusicLayers<MusicLayerState>, InvalidMessage> {
+    let mut layers = MusicLayers::default();
+    for message in messages {
+        let layer = MusicLayerState {
+            music: music_state(message.music.ok_or(InvalidMessage {
+                field: "music_layers.music",
+            })?)?,
+            volume: Volume::try_new(message.volume).map_err(|_| InvalidMessage {
+                field: "music_layers.volume",
+            })?,
+            looping: message.looping,
+        };
+        layers.try_insert(layer).map_err(|_| InvalidMessage {
+            field: "music_layers",
+        })?;
+    }
+    Ok(layers)
+}
+
 pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, InvalidMessage> {
     let state = response.state.ok_or(InvalidMessage { field: "state" })?;
     let invalid = |field| InvalidMessage { field };
@@ -192,6 +256,7 @@ pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, In
             .map_err(|_| invalid("output"))?,
         voice: voice_state(state.voice.ok_or(invalid("voice"))?)?,
         music: state.music.map(music_state).transpose()?,
+        music_layers: music_layers_state(state.music_layers)?,
         volume: Volume::try_new(state.volume).map_err(|_| invalid("volume"))?,
         muted: state.muted,
         modes: QueueModes {
@@ -424,7 +489,7 @@ mod tests {
     #[test]
     fn player_states_survive_the_round_trip() {
         let id = uuid::Uuid::from_u128(5);
-        let state = PlayerState {
+        let mut state = PlayerState {
             output: OutputTarget::DiscordVoice(VoiceChannelTarget {
                 guild_id: GuildId::new(NonZeroU64::new(959_535_519_157_612_664).unwrap()),
                 channel_id: VoiceChannelId::new(NonZeroU64::new(42).unwrap()),
@@ -459,9 +524,23 @@ mod tests {
                 looping: true,
             }],
             sounds_paused: true,
+            music_layers: MusicLayers::default(),
         };
 
+        state
+            .music_layers
+            .try_insert(MusicLayerState {
+                music: state.music.clone().unwrap(),
+                volume: Volume::try_new(0.4).unwrap(),
+                looping: true,
+            })
+            .unwrap();
+
         assert_eq!(player_state(watch_player_response(&state)).unwrap(), state);
+        let mut response = watch_player_response(&state);
+        let wire_state = response.state.as_mut().unwrap();
+        wire_state.music_layers = vec![wire_state.music_layers[0].clone(); 3];
+        assert_eq!(player_state(response).unwrap_err().field, "music_layers");
     }
 
     #[test]
@@ -480,6 +559,34 @@ mod tests {
         assert_eq!(loud.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(long_crossfade.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(untouched, UpdatePlayerSettings::default());
+    }
+
+    #[test]
+    fn layer_updates_preserve_false_and_zero_and_reject_invalid_gain() {
+        let update = update_music_layer_request(&pb::UpdateMusicLayerRequest {
+            collection_entry_id: uuid::Uuid::from_u128(1).to_string(),
+            volume: Some(0.0),
+            looping: Some(false),
+        })
+        .unwrap()
+        .1;
+        assert_eq!(
+            update.volume.unwrap().into_inner().to_bits(),
+            0.0_f32.to_bits()
+        );
+        assert_eq!(update.looping, Some(false));
+        for volume in [f32::NAN, -0.1, 1.1] {
+            assert_eq!(
+                update_music_layer_request(&pb::UpdateMusicLayerRequest {
+                    collection_entry_id: uuid::Uuid::from_u128(1).to_string(),
+                    volume: Some(volume),
+                    looping: None,
+                })
+                .unwrap_err()
+                .code(),
+                Code::InvalidArgument
+            );
+        }
     }
 
     #[test]

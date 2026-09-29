@@ -19,6 +19,7 @@ use tokio::sync::{oneshot, watch};
 use tufo_application::{
     library::{Library, import_paths, update_collection_entry},
     playback::{
+        add_music_layer::{AddMusicLayerError, MusicLayerCue},
         control_music::MusicCommand,
         control_sounds::{self, SoundsCommand},
         play_entry_sound,
@@ -365,6 +366,196 @@ fn voice_channel() -> OutputTarget {
         guild_id: GuildId::new(NonZeroU64::MIN),
         channel_id: VoiceChannelId::new(NonZeroU64::MIN),
     })
+}
+
+fn layer(path: AudioFilePath, title: &str) -> MusicLayerCue {
+    MusicLayerCue {
+        collection_id: CollectionId::from_uuid(Uuid::now_v7()),
+        entry: entry(path, title),
+    }
+}
+
+async fn recorded_level(rig: &Rig, output: usize) -> anyhow::Result<f32> {
+    let end = rig.recorded_frames(output) + 20_000;
+    rig.wait_for_recorded_frames(output, end).await?;
+    let captures = rig.sound_card.captures();
+    let capture = &captures[output];
+    Ok(capture[capture.len() - 100..].iter().sum::<f32>() / 100.0)
+}
+
+#[tokio::test]
+async fn music_layers_mix_with_independent_gains_and_share_pause_mute_and_volume()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let main = rig.file("main.wav", &constant(0.1, SAMPLE_RATE as usize * 8))?;
+    let rain = layer(
+        rig.file("rain.wav", &constant(0.2, SAMPLE_RATE as usize * 8))?,
+        "Rain",
+    );
+    let wind = layer(
+        rig.file("wind.wav", &constant(0.3, SAMPLE_RATE as usize * 8))?,
+        "Wind",
+    );
+    rig.play_once(entry(main, "Main")).await?;
+    rig.player.add_music_layer(rain.clone()).await?;
+    rig.player.add_music_layer(wind.clone()).await?;
+    assert!((recorded_level(&rig, 0).await? - 0.6).abs() < 0.002);
+
+    rig.player
+        .update_music_layer(
+            rain.entry.entry_id,
+            tufo_wire::player::UpdateMusicLayer {
+                volume: Some(tufo_models::library::Volume::try_new(0.5)?),
+                looping: Some(true),
+            },
+        )
+        .await;
+    rig.control(MusicCommand::SetVolume(
+        tufo_models::library::Volume::try_new(0.5)?,
+    ))
+    .await?;
+    assert!((recorded_level(&rig, 0).await? - 0.25).abs() < 0.002);
+
+    rig.control(MusicCommand::Pause).await?;
+    assert!(recorded_level(&rig, 0).await?.abs() < 0.002);
+    assert!(
+        rig.state()
+            .music_layers
+            .iter()
+            .all(|(_, layer)| layer.music.paused)
+    );
+    rig.control(MusicCommand::Resume).await?;
+    assert!((recorded_level(&rig, 0).await? - 0.25).abs() < 0.002);
+    rig.control(MusicCommand::SetMuted(true)).await?;
+    assert!(recorded_level(&rig, 0).await?.abs() < 0.002);
+    rig.control(MusicCommand::SetMuted(false)).await?;
+
+    rig.player.stop_music_layer(rain.entry.entry_id).await;
+    assert!((recorded_level(&rig, 0).await? - 0.2).abs() < 0.002);
+    rig.player.add_music_layer(rain).await?;
+    assert!((recorded_level(&rig, 0).await? - 0.3).abs() < 0.002);
+    rig.control(MusicCommand::Stop).await?;
+    assert!(rig.state().music.is_none() && rig.state().music_layers.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn concurrent_layer_additions_allow_three_songs_and_duplicates_do_not_restart()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let a = layer(rig.file("a.wav", &constant(0.1, THREE_SECONDS))?, "A");
+    let b = layer(rig.file("b.wav", &constant(0.1, THREE_SECONDS))?, "B");
+    let c = layer(rig.file("c.wav", &constant(0.1, THREE_SECONDS))?, "C");
+    let d = layer(rig.file("d.wav", &constant(0.1, THREE_SECONDS))?, "D");
+    let (a_result, b_result, c_result, d_result) = tokio::join!(
+        rig.player.add_music_layer(a.clone()),
+        rig.player.add_music_layer(b.clone()),
+        rig.player.add_music_layer(c.clone()),
+        rig.player.add_music_layer(d.clone())
+    );
+    let results = [a_result, b_result, c_result, d_result];
+    assert_eq!(results.iter().filter(|result| result.is_ok()).count(), 3);
+    assert!(
+        results
+            .iter()
+            .filter_map(|result| result.as_ref().err())
+            .all(|error| matches!(error, AddMusicLayerError::Full))
+    );
+    assert_eq!(rig.state().music_layers.len(), 2);
+    assert!((recorded_level(&rig, 0).await? - 0.3).abs() < 0.002);
+    let active = rig
+        .state()
+        .music_layers
+        .iter()
+        .next()
+        .map(|(_, layer)| layer.music.entry.entry_id)
+        .unwrap();
+    let cue = [a, b, c, d]
+        .into_iter()
+        .find(|cue| cue.entry.entry_id == active)
+        .unwrap();
+    let before = rig.state().music_layers.clone();
+    rig.player.add_music_layer(cue).await?;
+    assert_eq!(rig.state().music_layers, before);
+    Ok(())
+}
+
+#[tokio::test]
+async fn output_switching_restores_all_music_layers_at_their_positions_while_paused()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    rig.play_once(entry(
+        rig.file("main.wav", &constant(0.1, THREE_SECONDS))?,
+        "Main",
+    ))
+    .await?;
+    let rain = layer(rig.file("rain.wav", &ramp(THREE_SECONDS))?, "Rain");
+    rig.player.add_music_layer(rain.clone()).await?;
+    rig.player
+        .update_music_layer(
+            rain.entry.entry_id,
+            tufo_wire::player::UpdateMusicLayer {
+                volume: None,
+                looping: Some(true),
+            },
+        )
+        .await;
+    rig.wait_for_recorded_frames(0, LOCAL_SAMPLE_RATE as usize / 5)
+        .await?;
+    rig.control(MusicCommand::Pause).await?;
+    rig.wait_for_recorded_frames(0, rig.recorded_frames(0) + LOCAL_SAMPLE_RATE as usize / 5)
+        .await?;
+    rig.player.select_output(voice_channel()).await?;
+    let paused = rig.state();
+    let layer = &paused.music_layers.iter().next().unwrap().1.music;
+    let paused_position = layer.position.position;
+    assert!(layer.paused);
+    assert!(recorded_level(&rig, 1).await?.abs() < 0.002);
+    rig.control(MusicCommand::Resume).await?;
+    rig.wait_for_recorded_frames(1, rig.recorded_frames(1) + 9_600)
+        .await?;
+    let captures = rig.sound_card.captures();
+    let expected = paused_position.as_secs_f32();
+    let samples = from_first_sound(&captures[1]);
+    let resumed =
+        ramp_position_seconds(samples[AFTER_FADE_IN_FRAMES] - 0.1) - AFTER_FADE_IN_SECONDS;
+    assert!(
+        (resumed - expected).abs() < 0.03,
+        "resumed at {resumed}, expected near {expected}"
+    );
+    assert_eq!(rig.state().music_layers.len(), 1);
+    assert!(
+        rig.state()
+            .music_layers
+            .iter()
+            .all(|(_, layer)| layer.looping && !layer.music.paused)
+    );
+    rig.player.stand_by().await;
+    assert!(rig.state().music_layers.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_extra_song_keeps_playing_after_the_main_track_stops_and_frees_its_slot_at_the_end()
+-> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let main = entry(rig.file("main.wav", &constant(0.1, 4_800))?, "Main");
+    let extra = layer(rig.file("extra.wav", &constant(0.2, 24_000))?, "Extra");
+    rig.play_once(main).await?;
+    rig.player.add_music_layer(extra).await?;
+    rig.wait_for(|state| state.music.is_none() && state.music_layers.len() == 1)
+        .await?;
+    rig.control(MusicCommand::Pause).await?;
+    assert!(
+        rig.state()
+            .music_layers
+            .iter()
+            .all(|(_, layer)| layer.music.paused)
+    );
+    rig.control(MusicCommand::Resume).await?;
+    rig.wait_for(|state| state.music.is_none() && state.music_layers.is_empty())
+        .await?;
+    Ok(())
 }
 
 fn playing_title(state: &PlayerState) -> Option<&str> {

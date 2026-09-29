@@ -26,7 +26,7 @@ use tufo_wire::{
         player_service_client::PlayerServiceClient, server_service_client::ServerServiceClient,
         voice_channel_service_client::VoiceChannelServiceClient,
     },
-    player::UpdatePlayerSettings,
+    player::{UpdateMusicLayer, UpdatePlayerSettings},
     proto::{self, InvalidMessage},
 };
 
@@ -303,6 +303,45 @@ impl TufoClient {
     pub async fn pause_music(&self) -> Result<(), ClientError> {
         let request = with_timeout(pb::PauseMusicRequest {}, QUICK_REQUEST_TIMEOUT);
         self.player.clone().pause_music(request).await?;
+        Ok(())
+    }
+
+    pub async fn add_music_layer(&self, entry_id: CollectionEntryId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            pb::AddMusicLayerRequest {
+                collection_entry_id: entry_id.to_string(),
+            },
+            PLAY_AUDIO_TIMEOUT,
+        );
+        self.player.clone().add_music_layer(request).await?;
+        Ok(())
+    }
+
+    pub async fn stop_music_layer(&self, entry_id: CollectionEntryId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            pb::StopMusicLayerRequest {
+                collection_entry_id: entry_id.to_string(),
+            },
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.player.clone().stop_music_layer(request).await?;
+        Ok(())
+    }
+
+    pub async fn update_music_layer(
+        &self,
+        entry_id: CollectionEntryId,
+        update: UpdateMusicLayer,
+    ) -> Result<(), ClientError> {
+        let request = with_timeout(
+            pb::UpdateMusicLayerRequest {
+                collection_entry_id: entry_id.to_string(),
+                volume: update.volume.map(tufo_models::library::Volume::into_inner),
+                looping: update.looping,
+            },
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.player.clone().update_music_layer(request).await?;
         Ok(())
     }
 
