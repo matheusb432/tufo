@@ -10459,6 +10459,7 @@ name = "tufo-gui"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "clap",
  "clru",
  "directories",
  "embed-resource",
@@ -10473,6 +10474,7 @@ dependencies = [
  "rfd",
  "rspolib",
  "serde",
+ "serde_json",
  "slint",
  "slint-build",
  "sys-locale",

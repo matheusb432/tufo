@@ -28,6 +28,9 @@ use crate::{
     ui::{AppWindow, Art},
 };
 
+#[cfg(feature = "benchmark")]
+pub(crate) mod metrics;
+
 /// The longest side of an image file decoded, in pixels: sharp on the largest plate at twice the
 /// window's scale. The presets' small renditions match it.
 const PICTURE_SIDE_MAX: u32 = 800;
@@ -159,6 +162,8 @@ pub(crate) fn card(
     height: u32,
     radius: u32,
 ) -> Image {
+    #[cfg(feature = "benchmark")]
+    metrics::requested();
     let key = CardKey {
         look: CardLook {
             picture: Picture::of(background),
@@ -172,6 +177,8 @@ pub(crate) fn card(
     if let Some(art) = CARDS.with(|cards| cards.borrow_mut().get(&key).cloned()) {
         return art;
     }
+    #[cfg(feature = "benchmark")]
+    metrics::missed();
     let missing = key
         .look
         .picture
@@ -230,6 +237,8 @@ fn request_card(key: CardKey) {
 /// Keeps a card the worker drew, draws the size the window wants now if that changed while it
 /// worked, and has the window draw its cards again.
 fn card_drawn(key: CardKey, pixels: Option<SharedPixelBuffer<Rgba8Pixel>>) {
+    #[cfg(feature = "benchmark")]
+    metrics::completed();
     let wanted = DRAWING.with(|drawing| drawing.borrow_mut().remove(&key.look));
     match pixels {
         Some(pixels) => {
@@ -287,12 +296,19 @@ fn draw(
     width: u32,
     height: u32,
 ) -> SharedPixelBuffer<Rgba8Pixel> {
+    #[cfg(feature = "benchmark")]
+    metrics::drawn(width, height);
     #[expect(
         clippy::cast_precision_loss,
         reason = "corner radii are a few dozen pixels"
     )]
     let drawn = card_art::card(base, look.shade, width, height, look.radius as f32);
     SharedPixelBuffer::clone_from_slice(&drawn.rgba, drawn.width, drawn.height)
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn is_idle() -> bool {
+    DRAWING.with(|drawing| drawing.borrow().is_empty())
 }
 
 fn send(job: Job) {

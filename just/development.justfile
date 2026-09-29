@@ -17,6 +17,11 @@ server *args:
     if [[ -f secrets/discord.toml ]]; then credentials=(--discord-credentials secrets/discord.toml); fi
     cargo run --release -p tufo-server -- "${credentials[@]}" "$@"
 
+# Benchmark GUI animations without a display; --update captures the baseline.
+[group('performance')]
+gui-bench *args:
+    cargo run --quiet --release -p tufo-gui --features benchmark -- benchmark {{ args }}
+
 # Drop a folder onto Tufo on native Wayland in a headless GNOME Shell, and check it became a playlist.
 [group('run')]
 wayland-drop-check:

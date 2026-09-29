@@ -6,6 +6,8 @@
 mod accents;
 mod autostart;
 mod backgrounds;
+#[cfg(feature = "benchmark")]
+mod benchmark;
 mod card_art;
 mod controller;
 mod drops;
@@ -60,6 +62,14 @@ const GUI_INSTANCE_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
 const APP_ID: &str = "dev.tufo.Tufo";
 
 fn main() -> anyhow::Result<()> {
+    #[cfg(feature = "benchmark")]
+    if std::env::args().nth(1).as_deref() == Some("benchmark") {
+        return benchmark::run();
+    }
+    run_desktop()
+}
+
+fn run_desktop() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
