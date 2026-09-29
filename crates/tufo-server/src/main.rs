@@ -4,7 +4,7 @@ use std::{
     sync::Mutex,
 };
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use tracing_subscriber::fmt::writer::MakeWriterExt as _;
 
 /// glibc's initial mmap threshold, which it would otherwise raise up to 32 MB.
@@ -22,11 +22,25 @@ struct Arguments {
     /// in Tufo's config directory when that file exists.
     #[arg(long, value_name = "PATH", env = "TUFO_DISCORD_CREDENTIALS")]
     discord_credentials: Option<PathBuf>,
+    #[command(subcommand)]
+    command: Option<Command>,
+}
+
+#[derive(Subcommand)]
+enum Command {
+    #[command(
+        subcommand,
+        about = "Run a one-shot data snapshot operation for `tufo data`."
+    )]
+    Data(tufo_server::data::DataCommand),
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let arguments = Arguments::parse();
+    if let Some(Command::Data(command)) = arguments.command {
+        return tufo_server::data::run(command).await;
+    }
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"));
     // The GUI starts the server without a terminal, so the log also goes to a file.

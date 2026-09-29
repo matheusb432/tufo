@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 /// Check Tufo's services, control its local audio server, and open its window.
@@ -26,6 +28,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: GuiCommand,
     },
+    #[command(about = "Export or import the database and portable settings for machine handoff.")]
+    Data {
+        #[command(subcommand)]
+        command: DataCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -49,4 +56,31 @@ pub(crate) enum GuiCommand {
     /// Start the sibling GUI (or tufo-gui on PATH), which raises the running window instead when
     /// there is one.
     Open,
+}
+
+#[derive(Subcommand)]
+#[command(about = "Selects a data snapshot operation.")]
+pub(crate) enum DataCommand {
+    #[command(
+        about = "Write a consistent snapshot of the database and portable settings into DIR."
+    )]
+    Export {
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Snapshot directory to create; its parent must exist."
+        )]
+        to: PathBuf,
+    },
+    #[command(
+        about = "Replace the database and portable settings with a snapshot, migrating an older snapshot forward."
+    )]
+    Import {
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Snapshot directory written by `tufo data export`."
+        )]
+        from: PathBuf,
+    },
 }

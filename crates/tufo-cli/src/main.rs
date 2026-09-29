@@ -1,6 +1,7 @@
 //! Tufo's command-line process root; all server requests go through tufo-client.
 
 mod command;
+mod data;
 mod doctor;
 mod gui;
 mod render;
@@ -45,10 +46,13 @@ async fn main() -> ExitCode {
 }
 
 async fn run(command: command::Command, console: render::Console) -> anyhow::Result<bool> {
+    // `data` reports through stderr only, so it bypasses the stdout report every other command
+    // prints below.
     let (output, success) = match command {
         command::Command::Doctor { json } => doctor::run(console, "doctor", json).await?,
         command::Command::Server { command } => server::run(command, console).await?,
         command::Command::Gui { command } => gui::run(command, console).await?,
+        command::Command::Data { command } => return data::run(command).await,
     };
     match writeln!(std::io::stdout().lock(), "{output}") {
         Ok(()) => Ok(success),

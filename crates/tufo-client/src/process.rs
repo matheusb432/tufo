@@ -42,6 +42,13 @@ impl Executable {
         detach(&mut command);
         command
     }
+
+    #[must_use]
+    pub fn attached_command(self) -> Command {
+        let mut command = Command::new(self.path());
+        command.stdin(Stdio::null());
+        command
+    }
 }
 
 #[cfg(unix)]

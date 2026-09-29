@@ -5,6 +5,7 @@
 
 mod driver;
 mod migrations;
+pub mod snapshot;
 
 use std::{
     path::{Path, PathBuf},

@@ -1,5 +1,6 @@
 //! Local gRPC process root for Tufo, served over a user-private Unix socket.
 
+pub mod data;
 mod server;
 mod services;
 mod state;

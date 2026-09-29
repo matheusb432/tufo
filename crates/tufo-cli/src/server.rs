@@ -69,7 +69,11 @@ pub(crate) async fn run(
     ))
 }
 
-async fn start(endpoint: &LocalEndpoint) -> anyhow::Result<&'static str> {
+/// Starts the sibling server, or reuses one that is already running and healthy.
+///
+/// Shared with `tufo data import`, which restarts the server after a database swap only when it
+/// was active beforehand.
+pub(crate) async fn start(endpoint: &LocalEndpoint) -> anyhow::Result<&'static str> {
     if let Some(snapshot) = inspect(endpoint).await? {
         ensure!(
             snapshot.serving,
@@ -112,7 +116,10 @@ fn ensure_matching_version(status: &ServerStatus) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn stop(endpoint: &LocalEndpoint) -> anyhow::Result<&'static str> {
+/// Stops the server through its private control endpoint, or reports it already stopped.
+///
+/// Shared with `tufo data import`, which stops the server before swapping the database file.
+pub(crate) async fn stop(endpoint: &LocalEndpoint) -> anyhow::Result<&'static str> {
     if !endpoint.is_listening(PROBE_TIMEOUT).await? {
         return Ok("Already stopped");
     }
