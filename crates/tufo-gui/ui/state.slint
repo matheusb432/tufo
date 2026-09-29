@@ -219,6 +219,8 @@ export global SoundIcons {
 // Pictures the host draws off the UI thread, sized and rounded for where they show, since the
 // software renderer can't round gradients or images.
 export global Art {
+    in property <int> backdrop-revision;
+    pure callback backdrop(length, length, color, color, color, int) -> image;
     // Rises whenever the worker delivers a picture, or pictures that failed may decode now.
     in property <int> pictures-revision;
     // A collection's background with rounded corners, at the given size: its preset or image,

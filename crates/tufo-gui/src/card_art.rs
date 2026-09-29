@@ -79,6 +79,37 @@ pub(crate) fn card(base: &Base<'_>, shade: Shade, width: u32, height: u32, radiu
     }
 }
 
+/// The window's radial gradient, with its glow at the top right and the middle stop at 38%.
+pub(crate) fn backdrop(colors: [Rgb; 3], width: u32, height: u32) -> Pixels {
+    let radius = width.max(height) as f32 * 1.15;
+    let center_x = width as f32 * 0.92;
+    let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
+    for y in 0..height {
+        for x in 0..width {
+            let position = (((x as f32 - center_x).powi(2) + (y as f32).powi(2)).sqrt() / radius)
+                .clamp(0.0, 1.0);
+            let (start, end, blend) = if position <= 0.38 {
+                (colors[0], colors[1], position / 0.38)
+            } else {
+                (colors[1], colors[2], (position - 0.38) / 0.62)
+            };
+            let channel =
+                |start, end| ((1.0 - blend) * f32::from(start) + blend * f32::from(end)) as u8;
+            rgba.extend_from_slice(&[
+                channel(start.0, end.0),
+                channel(start.1, end.1),
+                channel(start.2, end.2),
+                255,
+            ]);
+        }
+    }
+    Pixels {
+        width,
+        height,
+        rgba,
+    }
+}
+
 /// The 135° gradient from `start` at the top left to `end` at the bottom right.
 fn diagonal_gradient(
     start: Rgb,

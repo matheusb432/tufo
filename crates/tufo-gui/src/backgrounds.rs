@@ -28,6 +28,8 @@ use crate::{
     ui::{AppWindow, Art},
 };
 
+pub(crate) mod backdrop;
+
 #[cfg(feature = "benchmark")]
 pub(crate) mod metrics;
 
@@ -80,6 +82,7 @@ struct CardKey {
 
 enum Job {
     DrawCard(CardKey),
+    DrawBackdrop(backdrop::Key),
     /// Forget the pictures that failed to decode, so they're tried again.
     ForgetFailures,
 }
@@ -308,7 +311,7 @@ fn draw(
 
 #[cfg(feature = "benchmark")]
 pub(crate) fn is_idle() -> bool {
-    DRAWING.with(|drawing| drawing.borrow().is_empty())
+    DRAWING.with(|drawing| drawing.borrow().is_empty()) && backdrop::is_idle()
 }
 
 fn send(job: Job) {
@@ -338,6 +341,10 @@ fn work(jobs: &mpsc::Receiver<Job>) {
             Job::ForgetFailures => {
                 pictures.retain(|_, pixels| pixels.is_some());
                 Ok(())
+            }
+            Job::DrawBackdrop(key) => {
+                let pixels = backdrop::draw(&key);
+                slint::invoke_from_event_loop(move || backdrop::drawn(key, pixels))
             }
         };
         if delivered.is_err() {

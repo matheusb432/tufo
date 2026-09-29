@@ -193,8 +193,16 @@ export component AppWindow inherits Window {
         }
     }
 
-    // The backdrop's still: light from beyond the top-right corner fading into shade.
-    Rectangle {
+    backdrop := Image {
+        width: parent.width;
+        height: parent.height;
+        preferred-width: 0px;
+        preferred-height: 0px;
+        source: Art.backdrop(root.width, root.height, Theme.still-light, Theme.still-canopy, Theme.still-shade, Art.backdrop-revision);
+        image-fit: fill;
+    }
+
+    if backdrop.source.width == 0: Rectangle {
         background: @radial-gradient(circle root.still-glow-radius at root.still-glow-x 0px, Theme.still-light 0%, Theme.still-canopy 38%, Theme.still-shade 100%);
     }
 

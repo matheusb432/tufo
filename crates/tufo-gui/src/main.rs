@@ -257,6 +257,19 @@ fn bind_art(window: &ui::AppWindow) {
     let art = window.global::<ui::Art>();
     art.on_card_background(background_art(window, Shade::TitleFoot));
     art.on_painting(background_art(window, Shade::None));
+    art.on_backdrop({
+        let window = window.as_weak();
+        move |width, height, light, canopy, shade, _revision| {
+            let scale = window
+                .upgrade()
+                .map_or(1.0, |window| window.window().scale_factor());
+            backgrounds::backdrop::image(
+                physical_pixels(width, scale),
+                physical_pixels(height, scale),
+                [light, canopy, shade],
+            )
+        }
+    });
     art.on_picture_missing(|background, _pictures_revision| {
         presentation::background_from_fields(background.preset, &background.image_path)
             .is_some_and(|background| backgrounds::picture_missing(&background))
