@@ -18,6 +18,8 @@ mod server_process;
 mod settings;
 mod sound_icons;
 mod tray;
+#[cfg(target_os = "linux")]
+mod wayland_hidden_window;
 mod window_state;
 
 #[allow(
@@ -151,6 +153,10 @@ fn main() -> anyhow::Result<()> {
     runtime.spawn(controller.maintain_connection());
     if !hidden_in_tray {
         window.show()?;
+    }
+    #[cfg(target_os = "linux")]
+    if hidden_in_tray {
+        slint::spawn_local(wayland_hidden_window::close_native_window(window.as_weak()))?;
     }
     // Hiding the window doesn't end the loop; quitting does, once the server has stopped.
     slint::run_event_loop_until_quit()?;
