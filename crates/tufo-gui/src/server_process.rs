@@ -4,7 +4,7 @@
 /// the window's terminal can't stop it: it keeps running after Tufo quits. It inherits the
 /// environment, including `TUFO_DISCORD_CREDENTIALS`.
 pub(crate) fn spawn_server() -> std::io::Result<()> {
-    let mut child = tufo_client::server_process::command().spawn()?;
+    let mut child = tufo_client::process::Executable::Server.command().spawn()?;
     // Collects the exit status whenever the server stops, without blocking the window.
     std::thread::Builder::new()
         .name("tufo-server-reaper".to_owned())

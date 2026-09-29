@@ -79,7 +79,8 @@ async fn start(endpoint: &LocalEndpoint) -> anyhow::Result<&'static str> {
         return Ok("Already running and healthy");
     }
     let mut process = StartingServer(Some(
-        tufo_client::server_process::command()
+        tufo_client::process::Executable::Server
+            .command()
             .spawn()
             .context("start tufo-server; install it beside tufo or put it on PATH")?,
     ));

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-/// Check Tufo's services and control its local audio server.
+/// Check Tufo's services, control its local audio server, and open its window.
 #[derive(Parser)]
 #[command(name = "tufo", version, about, styles = clap_cargo::style::CLAP_STYLING)]
 pub(crate) struct Cli {
@@ -21,6 +21,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: ServerCommand,
     },
+    /// Open the desktop window.
+    Gui {
+        #[command(subcommand)]
+        command: GuiCommand,
+    },
 }
 
 #[derive(Subcommand)]
@@ -37,4 +42,11 @@ pub(crate) enum ServerCommand {
     Kill,
     /// Shut down the server, then start it and wait until healthy.
     Restart,
+}
+
+#[derive(Subcommand)]
+pub(crate) enum GuiCommand {
+    /// Start the sibling GUI (or tufo-gui on PATH), which raises the running window instead when
+    /// there is one.
+    Open,
 }

@@ -2,6 +2,7 @@
 
 mod command;
 mod doctor;
+mod gui;
 mod render;
 mod server;
 
@@ -47,6 +48,7 @@ async fn run(command: command::Command, console: render::Console) -> anyhow::Res
     let (output, success) = match command {
         command::Command::Doctor { json } => doctor::run(console, "doctor", json).await?,
         command::Command::Server { command } => server::run(command, console).await?,
+        command::Command::Gui { command } => gui::run(command, console).await?,
     };
     match writeln!(std::io::stdout().lock(), "{output}") {
         Ok(()) => Ok(success),

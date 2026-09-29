@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-pub mod server_process;
+pub mod process;
 
 pub use tonic::Code;
 use tonic::{Request, Streaming, transport::Channel};

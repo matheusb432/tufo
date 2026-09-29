@@ -309,3 +309,53 @@ async fn inaccessible_and_unresponsive_endpoints_are_not_treated_as_stopped() ->
     drop(listener);
     Ok(())
 }
+
+/// Runs `gui open` from a copy of `tufo` beside a stand-in `tufo-gui` script, with an empty
+/// `PATH`, so neither the workspace's GUI nor an installed one ever starts.
+#[cfg(unix)]
+#[tokio::test]
+async fn opening_the_gui_reports_a_new_window_a_raised_one_or_a_failed_start() -> anyhow::Result<()>
+{
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let directory = tempfile::tempdir()?;
+    let cli = directory.path().join("tufo");
+    let gui = directory.path().join("tufo-gui");
+    let empty_path = directory.path().join("empty");
+    std::fs::create_dir(&empty_path)?;
+    std::fs::copy(env!("CARGO_BIN_EXE_tufo"), &cli)?;
+    let open = || {
+        let mut command = std::process::Command::new(&cli);
+        command
+            .args(["gui", "open"])
+            .env("PATH", &empty_path)
+            .env("NO_COLOR", "1")
+            .stdin(Stdio::null());
+        output(command)
+    };
+    let stand_in = |script: &str| -> anyhow::Result<()> {
+        std::fs::write(&gui, format!("#!/bin/sh\n{script}\n"))?;
+        std::fs::set_permissions(&gui, std::fs::Permissions::from_mode(0o755))?;
+        Ok(())
+    };
+
+    let missing = open().await?;
+    assert_eq!(missing.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("install it beside tufo"));
+
+    stand_in("exit 3")?;
+    let failed = open().await?;
+    assert_eq!(failed.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&failed.stderr).contains("tufo-gui exited during startup"));
+
+    stand_in("exit 0")?;
+    let raised = open().await?;
+    assert!(raised.status.success());
+    assert!(String::from_utf8_lossy(&raised.stdout).contains("Already running; raised"));
+
+    stand_in("PATH=/usr/bin:/bin exec sleep 5")?;
+    let opened = open().await?;
+    assert!(opened.status.success());
+    assert!(String::from_utf8_lossy(&opened.stdout).contains("Opened"));
+    Ok(())
+}
