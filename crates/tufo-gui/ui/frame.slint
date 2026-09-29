@@ -27,7 +27,7 @@ export component WindowButtons inherits HorizontalLayout {
     spacing: 2px;
     IconButton {
         icon: @image-url("icons/minus.svg");
-        tooltip: @tr("" => "Minimize");
+        tooltip: @tr("Minimize");
         clicked => {
             WindowFrame.minimize();
         }
@@ -35,7 +35,7 @@ export component WindowButtons inherits HorizontalLayout {
 
     IconButton {
         icon: root.maximized ? @image-url("icons/copy.svg") : @image-url("icons/square.svg");
-        tooltip: root.maximized ? @tr("" => "Restore") : @tr("" => "Maximize");
+        tooltip: root.maximized ? @tr("Restore") : @tr("Maximize");
         clicked => {
             WindowFrame.toggle-maximized();
         }
@@ -43,7 +43,7 @@ export component WindowButtons inherits HorizontalLayout {
 
     IconButton {
         icon: @image-url("icons/x.svg");
-        tooltip: @tr("" => "Close");
+        tooltip: @tr("Close");
         background: self.has-hover ? Theme.window-close-hover : transparent;
         hover-tint: Theme.text;
         clicked => {

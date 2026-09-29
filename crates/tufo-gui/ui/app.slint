@@ -25,7 +25,7 @@ export {
 }
 
 export component AppWindow inherits Window {
-    title: @tr("" => "Tufo");
+    title: @tr("Tufo");
     icon: @image-url("../icons/tufo.svg");
     // Fits a 1280 × 800 screen at 125% scaling.
     preferred-width: 1000px;
@@ -374,7 +374,7 @@ export component AppWindow inherits Window {
         }
         if root.gallery-open && root.add-open: BackgroundGallery {
             target: BackgroundTarget.new-collection;
-            heading: root.gallery-title != "" ? @tr("" => "Background for {0}", root.gallery-title) : root.add-kind == CollectionKind.playlist ? @tr("" => "Background for the new playlist") : @tr("" => "Background for the new soundboard");
+            heading: root.gallery-title != "" ? @tr("Background for {0}", root.gallery-title) : root.add-kind == CollectionKind.playlist ? @tr("Background for the new playlist") : @tr("Background for the new soundboard");
             selected: Backgrounds.draft;
             selected-label: Backgrounds.draft-label;
             close => {
@@ -384,7 +384,7 @@ export component AppWindow inherits Window {
         if root.gallery-open && root.edit-collection-open: BackgroundGallery {
             target: BackgroundTarget.open-collection;
             collection-id: Navigation.collection-id;
-            heading: @tr("" => "Background for {0}", root.gallery-title != "" ? root.gallery-title : LibraryView.collection-title);
+            heading: @tr("Background for {0}", root.gallery-title != "" ? root.gallery-title : LibraryView.collection-title);
             selected: LibraryView.collection-background;
             selected-label: LibraryView.collection-background-label;
             image-missing: Art.picture-missing(LibraryView.collection-background, Art.pictures-revision);

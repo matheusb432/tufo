@@ -19,7 +19,7 @@ component ResultRow inherits Rectangle {
             y: (parent.height - self.height) / 2;
             width: 20px;
             height: 20px;
-            source: root.result.section == @tr("" => "Sounds") ? @image-url("icons/volume-2.svg") : root.result.section == @tr("" => "Music") ? @image-url("icons/music.svg") : @image-url("icons/folder.svg");
+            source: root.result.section == @tr("Sounds") ? @image-url("icons/volume-2.svg") : root.result.section == @tr("Music") ? @image-url("icons/music.svg") : @image-url("icons/folder.svg");
             tint: root.selected ? Theme.accent : Theme.text-secondary;
         }
 
@@ -105,8 +105,8 @@ export component SearchPalette inherits Rectangle {
                 padding: 16px;
                 spacing: 8px;
                 query := TextField {
-                    label: @tr("" => "Search everything");
-                    placeholder: @tr("" => "Tracks, sounds, playlists, soundboards");
+                    label: @tr("Search everything");
+                    placeholder: @tr("Tracks, sounds, playlists, soundboards");
                     text: Search.palette-query;
                     edited(text) => {
                         Search.palette-query = text;
@@ -116,7 +116,7 @@ export component SearchPalette inherits Rectangle {
                 }
 
                 if Search.palette-query != "" && Search.results.length == 0: Text {
-                    text: @tr("" => "Nothing matches.");
+                    text: @tr("Nothing matches.");
                     color: Theme.text-secondary;
                     horizontal-alignment: center;
                 }
@@ -140,7 +140,7 @@ export component SearchPalette inherits Rectangle {
                 }
 
                 Text {
-                    text: @tr("" => "↑↓ to choose · Enter to play · Esc to close");
+                    text: @tr("↑↓ to choose · Enter to play · Esc to close");
                     font-size: Theme.caption;
                     color: Theme.text-faint;
                     horizontal-alignment: center;

@@ -56,7 +56,7 @@ export component DialogFrame inherits Rectangle {
                         size: 36px;
                         icon-size: 20px;
                         icon: @image-url("icons/x.svg");
-                        tooltip: @tr("" => "Close");
+                        tooltip: @tr("Close");
                         clicked => {
                             root.cancel();
                         }
@@ -96,7 +96,7 @@ component BackgroundPreview inherits VerticalLayout {
         height: 160px;
         border-radius: Theme.radius-card;
         accessible-role: button;
-        accessible-label: @tr("" => "Change the background");
+        accessible-label: @tr("Change the background");
         Image {
             width: parent.width;
             height: parent.height;
@@ -152,7 +152,7 @@ component BackgroundPreview inherits VerticalLayout {
         }
 
         Button {
-            text: @tr("" => "Change background");
+            text: @tr("Change background");
             clicked => {
                 root.change();
             }
@@ -162,13 +162,13 @@ component BackgroundPreview inherits VerticalLayout {
 
 export component AddCollectionDialog inherits DialogFrame {
     in property <CollectionKind> kind;
-    title: root.kind == CollectionKind.playlist ? @tr("" => "Add Playlist") : @tr("" => "Add Soundboard");
+    title: root.kind == CollectionKind.playlist ? @tr("Add Playlist") : @tr("Add Soundboard");
     callback change-background(string);
     init => {
         Actions.start-new-collection();
     }
     name := TextField {
-        label: @tr("" => "Name");
+        label: @tr("Name");
         accepted => {
             if self.text != "" {
                 Actions.create-collection(root.kind, self.text);
@@ -183,7 +183,7 @@ export component AddCollectionDialog inherits DialogFrame {
     VerticalLayout {
         spacing: 4px;
         TextLink {
-            text: @tr("" => "Or follow a folder");
+            text: @tr("Or follow a folder");
             clicked => {
                 Actions.follow-folder(root.kind);
                 root.cancel();
@@ -191,7 +191,7 @@ export component AddCollectionDialog inherits DialogFrame {
         }
 
         Text {
-            text: @tr("" => "Tufo keeps its files in sync.");
+            text: @tr("Tufo keeps its files in sync.");
             color: Theme.text-secondary;
             font-size: Theme.body-small;
             horizontal-stretch: 1;
@@ -209,7 +209,7 @@ export component AddCollectionDialog inherits DialogFrame {
 
     Actions-Row {
         Button {
-            text: @tr("" => "Cancel");
+            text: @tr("Cancel");
             kind: ButtonKind.quiet;
             clicked => {
                 root.cancel();
@@ -217,7 +217,7 @@ export component AddCollectionDialog inherits DialogFrame {
         }
 
         Button {
-            text: @tr("" => "Add");
+            text: @tr("Add");
             kind: ButtonKind.primary;
             enabled: name.text != "";
             clicked => {
@@ -229,10 +229,10 @@ export component AddCollectionDialog inherits DialogFrame {
 }
 
 export component EditCollectionDialog inherits DialogFrame {
-    title: @tr("" => "Edit");
+    title: @tr("Edit");
     callback change-background(string);
     name := TextField {
-        label: @tr("" => "Name");
+        label: @tr("Name");
         text: LibraryView.collection-title;
         accepted => {
             Actions.rename-collection(Navigation.collection-id, self.text);
@@ -251,7 +251,7 @@ export component EditCollectionDialog inherits DialogFrame {
     }
 
     if Art.picture-missing(LibraryView.collection-background, Art.pictures-revision): Text {
-        text: @tr("" => "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another.");
+        text: @tr("Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another.");
         color: Theme.error;
         font-size: Theme.body-small;
         wrap: word-wrap;
@@ -259,7 +259,7 @@ export component EditCollectionDialog inherits DialogFrame {
 
     Actions-Row {
         Button {
-            text: @tr("" => "Done");
+            text: @tr("Done");
             kind: ButtonKind.primary;
             clicked => {
                 if name.text != "" && name.text != LibraryView.collection-title {
@@ -277,7 +277,7 @@ component SoundIconPicker inherits VerticalLayout {
     property <length> cell: grid.width / root.columns;
     spacing: 8px;
     Text {
-        text: @tr("" => "Icon: {0}", SoundIcons.labels[root.selected]);
+        text: @tr("Icon: {0}", SoundIcons.labels[root.selected]);
         font-size: Theme.body-small;
         font-weight: 700;
         color: Theme.text-secondary;
@@ -323,9 +323,9 @@ export component EditEntryDialog inherits DialogFrame {
     // A position in `SoundIcons.images`.
     in property <int> icon;
     property <int> chosen-icon: root.icon;
-    title: root.sound ? @tr("" => "Edit Sound") : @tr("" => "Edit Track");
+    title: root.sound ? @tr("Edit Sound") : @tr("Edit Track");
     name := TextField {
-        label: @tr("" => "Name");
+        label: @tr("Name");
         text: root.entry-title;
     }
 
@@ -338,19 +338,19 @@ export component EditEntryDialog inherits DialogFrame {
         visible: root.sound;
         height: root.sound ? 66px : 0px;
         fade-in := TextField {
-            label: @tr("" => "Fade In (ms)");
+            label: @tr("Fade In (ms)");
             text: root.fade-in-ms;
         }
 
         fade-out := TextField {
-            label: @tr("" => "Fade Out (ms)");
+            label: @tr("Fade Out (ms)");
             text: root.fade-out-ms;
         }
     }
 
     Actions-Row {
         Button {
-            text: @tr("" => "Cancel");
+            text: @tr("Cancel");
             kind: ButtonKind.quiet;
             clicked => {
                 root.cancel();
@@ -358,7 +358,7 @@ export component EditEntryDialog inherits DialogFrame {
         }
 
         Button {
-            text: @tr("" => "Save");
+            text: @tr("Save");
             kind: ButtonKind.primary;
             enabled: name.text != "";
             clicked => {
@@ -413,7 +413,7 @@ component SwitchSetting inherits HorizontalLayout {
 // restarts tufo-server.
 export component SettingsDialog inherits DialogFrame {
     property <float> crossfade: Session.crossfade-ms / 10000;
-    title: @tr("" => "Settings");
+    title: @tr("Settings");
     closable: true;
 
     function save-token() {
@@ -424,7 +424,7 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     Text {
-        text: @tr("" => "Discord");
+        text: @tr("Discord");
         font-size: Theme.body;
         font-weight: 700;
         color: Theme.text;
@@ -434,9 +434,9 @@ export component SettingsDialog inherits DialogFrame {
         spacing: 8px;
         token := TextField {
             horizontal-stretch: 1;
-            label: @tr("" => "Bot token");
+            label: @tr("Bot token");
             password: true;
-            placeholder: Session.discord-configured ? @tr("" => "Saved; paste a new one to replace it") : @tr("" => "Paste your bot's token");
+            placeholder: Session.discord-configured ? @tr("Saved; paste a new one to replace it") : @tr("Paste your bot's token");
             accepted => {
                 root.save-token();
             }
@@ -446,7 +446,7 @@ export component SettingsDialog inherits DialogFrame {
             alignment: end;
             padding-bottom: 3px;
             Button {
-                text: @tr("" => "Save and restart");
+                text: @tr("Save and restart");
                 kind: ButtonKind.primary;
                 enabled: token.text != "";
                 clicked => {
@@ -457,15 +457,15 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     Text {
-        text: @tr("" => "Saving restarts Tufo so the bot logs in with the new token. The music stops.");
+        text: @tr("Saving restarts Tufo so the bot logs in with the new token. The music stops.");
         font-size: Theme.caption;
         color: Theme.text-secondary;
         wrap: word-wrap;
     }
 
     if Session.discord-configured: SwitchSetting {
-        title: @tr("" => "Disable Discord connection");
-        description: @tr("" => "Logs the bot out, so it can't join a voice channel by accident and uses no network in the background.");
+        title: @tr("Disable Discord connection");
+        description: @tr("Logs the bot out, so it can't join a voice channel by accident and uses no network in the background.");
         checked: Session.discord-disabled;
         toggled(checked) => {
             Actions.set-discord-connection-disabled(checked);
@@ -473,7 +473,7 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     Text {
-        text: @tr("" => "Crossfade: {0} s", Math.round(root.crossfade * 100) / 10);
+        text: @tr("Crossfade: {0} s", Math.round(root.crossfade * 100) / 10);
         font-size: Theme.body;
         font-weight: 700;
         color: Theme.text;
@@ -491,8 +491,8 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     SwitchSetting {
-        title: @tr("" => "Keep playing after quitting");
-        description: @tr("" => "The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed.");
+        title: @tr("Keep playing after quitting");
+        description: @tr("The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed.");
         checked: Session.keep-playing-after-quit;
         toggled(checked) => {
             Actions.set-keep-playing-after-quit(checked);
@@ -500,8 +500,8 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     SwitchSetting {
-        title: @tr("" => "Start at login");
-        description: @tr("" => "Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them.");
+        title: @tr("Start at login");
+        description: @tr("Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them.");
         checked: Session.start-at-login;
         toggled(checked) => {
             Actions.set-start-at-login(checked);
@@ -513,14 +513,14 @@ export component SettingsDialog inherits DialogFrame {
         VerticalLayout {
             spacing: 4px;
             Text {
-                text: @tr("" => "Kenku FM");
+                text: @tr("Kenku FM");
                 font-size: Theme.body;
                 font-weight: 700;
                 color: Theme.text;
             }
 
             Text {
-                text: @tr("" => "Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything.");
+                text: @tr("Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything.");
                 font-size: Theme.caption;
                 color: Theme.text-secondary;
                 wrap: word-wrap;
@@ -530,7 +530,7 @@ export component SettingsDialog inherits DialogFrame {
         VerticalLayout {
             alignment: center;
             Button {
-                text: @tr("" => "Import");
+                text: @tr("Import");
                 clicked => {
                     Actions.import-kenku-library();
                     root.cancel();

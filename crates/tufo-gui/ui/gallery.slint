@@ -157,7 +157,7 @@ export component BackgroundGallery inherits Rectangle {
 
                 IconButton {
                     icon: @image-url("icons/x.svg");
-                    tooltip: @tr("" => "Close");
+                    tooltip: @tr("Close");
                     clicked => {
                         root.close();
                     }
@@ -195,7 +195,7 @@ export component BackgroundGallery inherits Rectangle {
                         }
 
                         WallSection {
-                            title: @tr("" => "Your own");
+                            title: @tr("Your own");
                             tile-count: root.has-image ? 3 : 2;
                             columns: root.columns;
                             tile-height: root.tile-height;
@@ -204,7 +204,7 @@ export component BackgroundGallery inherits Rectangle {
                                 columns: root.columns;
                                 width: root.tile-width;
                                 painting-height: root.painting-height;
-                                label: { name: @tr("" => "Gradient"), credit: @tr("" => "Colors drawn from the collection") };
+                                label: { name: @tr("Gradient"), credit: @tr("Colors drawn from the collection") };
                                 selected: !root.has-image && root.selected.preset < 0;
                                 clicked => {
                                     root.choose({ preset: -1, image-path: "" });
@@ -218,7 +218,7 @@ export component BackgroundGallery inherits Rectangle {
                                 columns: root.columns;
                                 width: root.tile-width;
                                 painting-height: root.painting-height;
-                                label: root.image-missing ? { name: root.selected-label.name, credit: @tr("" => "Tufo can't open this file") } : root.selected-label;
+                                label: root.image-missing ? { name: root.selected-label.name, credit: @tr("Tufo can't open this file") } : root.selected-label;
                                 credit-is-error: root.image-missing;
                                 selected: true;
                                 clicked => {
@@ -233,7 +233,7 @@ export component BackgroundGallery inherits Rectangle {
                                 columns: root.columns;
                                 width: root.tile-width;
                                 painting-height: root.painting-height;
-                                label: { name: @tr("" => "Choose an image file"), credit: @tr("" => "Or drop one on this window") };
+                                label: { name: @tr("Choose an image file"), credit: @tr("Or drop one on this window") };
                                 has-painting: false;
                                 clicked => {
                                     Actions.choose-background-file(root.target);

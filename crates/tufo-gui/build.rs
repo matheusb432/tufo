@@ -8,7 +8,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     let output = std::path::PathBuf::from(std::env::var("OUT_DIR")?);
     std::fs::write(output.join("pt_BR.mo"), catalog.as_bytes())?;
-    let config = slint_build::CompilerConfiguration::new().with_bundled_translations("lang");
+    // The Rust side shares the catalog and looks its messages up without a context.
+    let config = slint_build::CompilerConfiguration::new()
+        .with_bundled_translations("lang")
+        .with_default_translation_context(slint_build::DefaultTranslationContext::None);
     slint_build::compile_with_config("ui/app.slint", config)?;
     println!("cargo::rerun-if-changed=lang");
     // Explorer, the Start menu, and the taskbar take the executable's icon from this resource.

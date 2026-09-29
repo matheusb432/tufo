@@ -67,7 +67,7 @@ component CardView inherits Rectangle {
         }
 
         Text {
-            text: root.card.missing ? @tr("" => "Folder missing") : root.card.count-label;
+            text: root.card.missing ? @tr("Folder missing") : root.card.count-label;
             font-size: Theme.caption;
             color: root.card.missing ? Theme.error : Theme.text-secondary;
             overflow: elide;
@@ -91,7 +91,7 @@ component CardView inherits Rectangle {
         border-radius: 19px;
         background: root.card.playing ? (play-touch.has-hover ? Theme.lit-bright : Theme.lit) : play-touch.has-hover ? Theme.badge-hover : Theme.badge;
         accessible-role: button;
-        accessible-label: root.card.playing ? @tr("" => "Pause") : @tr("" => "Play");
+        accessible-label: root.card.playing ? @tr("Pause") : @tr("Play");
         Icon {
             width: 18px;
             height: 18px;
@@ -172,7 +172,7 @@ component FilterField inherits Rectangle {
                     Actions.filter-changed(self.text);
                 }
                 if self.text == "": Text {
-                    text: @tr("" => "Filter this page");
+                    text: @tr("Filter this page");
                     color: Theme.text-faint;
                     font-size: Theme.body;
                     vertical-alignment: center;
@@ -217,7 +217,7 @@ component EmptyShelf inherits VerticalLayout {
     spacing: 12px;
     alignment: start;
     Text {
-        text: root.kind == CollectionKind.playlist ? @tr("" => "Drop folders of music on Playlists, or add a playlist.") : @tr("" => "Drop folders of sounds on Soundboards, or add a soundboard.");
+        text: root.kind == CollectionKind.playlist ? @tr("Drop folders of music on Playlists, or add a playlist.") : @tr("Drop folders of sounds on Soundboards, or add a soundboard.");
         color: Theme.text-secondary;
         font-size: Theme.body;
         wrap: word-wrap;
@@ -227,7 +227,7 @@ component EmptyShelf inherits VerticalLayout {
         alignment: start;
         spacing: 10px;
         Button {
-            text: root.kind == CollectionKind.playlist ? @tr("" => "Add a playlist") : @tr("" => "Add a soundboard");
+            text: root.kind == CollectionKind.playlist ? @tr("Add a playlist") : @tr("Add a soundboard");
             icon: @image-url("icons/folder-plus.svg");
             kind: ButtonKind.primary;
             enabled: Session.connected;
@@ -237,7 +237,7 @@ component EmptyShelf inherits VerticalLayout {
         }
 
         if root.kind == CollectionKind.playlist: Button {
-            text: @tr("" => "Import my Kenku FM library");
+            text: @tr("Import my Kenku FM library");
             kind: ButtonKind.quiet;
             enabled: Session.connected;
             clicked => {
@@ -263,7 +263,7 @@ component HomeShelf inherits VerticalLayout {
         }
 
         if root.total > 0: TextLink {
-            text: @tr("" => "See all {0}", root.total);
+            text: @tr("See all {0}", root.total);
             vertical-alignment: center;
             clicked => {
                 root.see-all();
@@ -297,7 +297,7 @@ export component HomePage inherits Rectangle {
             alignment: start;
             FilterField { }
             HomeShelf {
-                title: @tr("" => "Playlists");
+                title: @tr("Playlists");
                 cards: LibraryView.playlists;
                 total: LibraryView.playlist-count;
                 kind: CollectionKind.playlist;
@@ -310,7 +310,7 @@ export component HomePage inherits Rectangle {
             }
 
             HomeShelf {
-                title: @tr("" => "Soundboards");
+                title: @tr("Soundboards");
                 cards: LibraryView.soundboards;
                 total: LibraryView.soundboard-count;
                 kind: CollectionKind.soundboard;
@@ -348,13 +348,13 @@ export component GridPage inherits Rectangle {
             HorizontalLayout {
                 spacing: 10px;
                 PageTitle {
-                    text: root.kind == CollectionKind.playlist ? @tr("" => "Playlists") : @tr("" => "Soundboards");
+                    text: root.kind == CollectionKind.playlist ? @tr("Playlists") : @tr("Soundboards");
                     horizontal-stretch: 1;
                 }
 
                 Button {
                     y: (parent.height - self.height) / 2;
-                    text: root.kind == CollectionKind.playlist ? @tr("" => "Add Playlist") : @tr("" => "Add Soundboard");
+                    text: root.kind == CollectionKind.playlist ? @tr("Add Playlist") : @tr("Add Soundboard");
                     icon: @image-url("icons/plus.svg");
                     enabled: Session.connected;
                     clicked => {
@@ -365,7 +365,7 @@ export component GridPage inherits Rectangle {
 
             FilterField { }
             if (root.kind == CollectionKind.playlist ? LibraryView.playlists.length : LibraryView.soundboards.length) == 0: Text {
-                text: Search.filter-text != "" ? @tr("" => "Nothing matches the filter.") : root.kind == CollectionKind.playlist ? @tr("" => "Drop a folder of music here: each folder in it that holds audio becomes a playlist.") : @tr("" => "Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard.");
+                text: Search.filter-text != "" ? @tr("Nothing matches the filter.") : root.kind == CollectionKind.playlist ? @tr("Drop a folder of music here: each folder in it that holds audio becomes a playlist.") : @tr("Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard.");
                 color: Theme.text-secondary;
                 wrap: word-wrap;
             }
@@ -384,12 +384,12 @@ component CollectionTools inherits HorizontalLayout {
     callback edit();
     callback add-files();
     property <[string]> order-labels: [
-        @tr("" => "Name A→Z"),
-        @tr("" => "Name Z→A"),
-        @tr("" => "Shortest first"),
-        @tr("" => "Longest first"),
-        @tr("" => "Oldest first"),
-        @tr("" => "Newest first"),
+        @tr("Name A→Z"),
+        @tr("Name Z→A"),
+        @tr("Shortest first"),
+        @tr("Longest first"),
+        @tr("Oldest first"),
+        @tr("Newest first"),
     ];
     spacing: 2px;
     property <string> order-label: root.order-labels[LibraryView.order-key * 2 + (LibraryView.order-descending ? 1 : 0)];
@@ -405,7 +405,7 @@ component CollectionTools inherits HorizontalLayout {
     if root.compact: IconButton {
         y: (parent.height - self.height) / 2;
         icon: @image-url("icons/arrow-down-up.svg");
-        tooltip: @tr("" => "Sort: {0}", root.order-label);
+        tooltip: @tr("Sort: {0}", root.order-label);
         clicked => {
             sort-menu.show();
         }
@@ -428,7 +428,7 @@ component CollectionTools inherits HorizontalLayout {
     more := IconButton {
         y: (parent.height - self.height) / 2;
         icon: @image-url("icons/ellipsis-vertical.svg");
-        tooltip: @tr("" => "More");
+        tooltip: @tr("More");
         clicked => {
             menu.show();
         }
@@ -439,7 +439,7 @@ component CollectionTools inherits HorizontalLayout {
         y: more.y + more.height + 4px;
         MenuSurface {
             MenuItem {
-                text: @tr("" => "Edit");
+                text: @tr("Edit");
                 activated => {
                     root.edit();
                     menu.close();
@@ -447,14 +447,14 @@ component CollectionTools inherits HorizontalLayout {
             }
 
             if !LibraryView.collection-linked: MenuItem {
-                text: @tr("" => "Add files…");
+                text: @tr("Add files…");
                 activated => {
                     root.add-files();
                     menu.close();
                 }
             }
             MenuItem {
-                text: LibraryView.collection-linked ? @tr("" => "Stop following") : @tr("" => "Delete");
+                text: LibraryView.collection-linked ? @tr("Stop following") : @tr("Delete");
                 destructive: true;
                 activated => {
                     Actions.delete-collection(Navigation.collection-id);
@@ -480,7 +480,7 @@ component CollectionBar inherits Rectangle {
         IconButton {
             y: (parent.height - self.height) / 2;
             icon: @image-url("icons/arrow-left.svg");
-            tooltip: root.kind == CollectionKind.playlist ? @tr("" => "Back to Playlists") : @tr("" => "Back to Soundboards");
+            tooltip: root.kind == CollectionKind.playlist ? @tr("Back to Playlists") : @tr("Back to Soundboards");
             clicked => {
                 Actions.open-page(root.kind == CollectionKind.playlist ? Page.playlists : Page.soundboards, "");
             }
@@ -577,7 +577,7 @@ component CollectionHero inherits HorizontalLayout {
             }
 
             Text {
-                text: LibraryView.collection-missing ? @tr("" => "Can't find {0}", LibraryView.collection-folder) : @tr("" => "Follows {0}", LibraryView.collection-folder);
+                text: LibraryView.collection-missing ? @tr("Can't find {0}", LibraryView.collection-folder) : @tr("Follows {0}", LibraryView.collection-folder);
                 font-size: Theme.caption;
                 color: LibraryView.collection-missing ? Theme.error : Theme.text-faint;
                 overflow: elide;
@@ -628,7 +628,7 @@ component TrackItem inherits Rectangle {
                 icon: root.track.playing ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
                 tint: root.track.current ? Theme.lit : Theme.text-faint;
                 opacity: touch.has-hover || self.has-hover ? 1 : 0;
-                tooltip: root.track.playing ? @tr("" => "Pause") : @tr("" => "Play");
+                tooltip: root.track.playing ? @tr("Pause") : @tr("Play");
                 enabled: !root.track.missing;
                 clicked => {
                     Actions.play-track(root.track.id);
@@ -649,7 +649,7 @@ component TrackItem inherits Rectangle {
         }
 
         if root.track.missing: Text {
-            text: @tr("" => "Missing");
+            text: @tr("Missing");
             font-size: Theme.caption;
             color: Theme.error;
             vertical-alignment: center;
@@ -666,7 +666,7 @@ component TrackItem inherits Rectangle {
             size: 32px;
             icon-size: 18px;
             icon: @image-url("icons/ellipsis-vertical.svg");
-            tooltip: @tr("" => "More");
+            tooltip: @tr("More");
             opacity: touch.has-hover || self.has-hover ? 1 : 0;
             clicked => {
                 menu.show();
@@ -679,7 +679,7 @@ component TrackItem inherits Rectangle {
         y: root.height - 4px;
         MenuSurface {
             MenuItem {
-                text: @tr("" => "Edit");
+                text: @tr("Edit");
                 activated => {
                     root.edit();
                     menu.close();
@@ -687,7 +687,7 @@ component TrackItem inherits Rectangle {
             }
 
             if !LibraryView.collection-linked: MenuItem {
-                text: @tr("" => "Remove");
+                text: @tr("Remove");
                 destructive: true;
                 activated => {
                     Actions.delete-entry(root.track.id);
@@ -719,7 +719,7 @@ export component PlaylistPage inherits Rectangle {
                 icon: root.this-plays ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
                 tint: Theme.lit;
                 hover-tint: Theme.lit-bright;
-                tooltip: root.this-plays ? @tr("" => "Pause") : @tr("" => "Play");
+                tooltip: root.this-plays ? @tr("Pause") : @tr("Play");
                 enabled: LibraryView.tracks.length > 0;
                 clicked => {
                     Actions.play-collection(Navigation.collection-id);
@@ -744,7 +744,7 @@ export component PlaylistPage inherits Rectangle {
                         root.add-files();
                     }
                     Button {
-                        text: root.this-plays ? @tr("" => "Pause") : @tr("" => "Play");
+                        text: root.this-plays ? @tr("Pause") : @tr("Play");
                         icon: root.this-plays ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
                         kind: ButtonKind.primary;
                         enabled: LibraryView.tracks.length > 0;
@@ -754,7 +754,7 @@ export component PlaylistPage inherits Rectangle {
                     }
 
                     Button {
-                        text: PlayerView.shuffle ? @tr("" => "Shuffling") : @tr("" => "Shuffle");
+                        text: PlayerView.shuffle ? @tr("Shuffling") : @tr("Shuffle");
                         icon: @image-url("icons/shuffle.svg");
                         clicked => {
                             Actions.toggle-shuffle();
@@ -766,7 +766,7 @@ export component PlaylistPage inherits Rectangle {
                     spacing: 2px;
                     max-width: 780px;
                     if LibraryView.tracks.length == 0: Text {
-                        text: Search.filter-text != "" ? @tr("" => "No track matches the filter.") : LibraryView.collection-linked ? @tr("" => "This folder holds no audio yet.") : @tr("" => "Drop audio files here to add them.");
+                        text: Search.filter-text != "" ? @tr("No track matches the filter.") : LibraryView.collection-linked ? @tr("This folder holds no audio yet.") : @tr("Drop audio files here to add them.");
                         color: Theme.text-secondary;
                     }
                     for track in LibraryView.tracks: TrackItem {
@@ -832,7 +832,7 @@ component SoundTileView inherits Rectangle {
     if root.tile.missing: Text {
         x: 14px;
         y: 12px;
-        text: @tr("" => "File missing");
+        text: @tr("File missing");
         font-size: 11.5px;
         font-weight: 700;
         color: Theme.error;
@@ -897,7 +897,7 @@ component SoundTileView inherits Rectangle {
         size: 32px;
         icon-size: 18px;
         icon: @image-url("icons/ellipsis-vertical.svg");
-        tooltip: @tr("" => "More");
+        tooltip: @tr("More");
         opacity: toggle.has-hover || self.has-hover ? 1 : 0;
         clicked => {
             menu.show();
@@ -909,7 +909,7 @@ component SoundTileView inherits Rectangle {
         y: 42px;
         MenuSurface {
             MenuItem {
-                text: root.tile.looping ? @tr("" => "Stop Looping") : @tr("" => "Loop");
+                text: root.tile.looping ? @tr("Stop Looping") : @tr("Loop");
                 activated => {
                     Actions.set-sound-looping(root.tile.id, !root.tile.looping);
                     menu.close();
@@ -917,7 +917,7 @@ component SoundTileView inherits Rectangle {
             }
 
             MenuItem {
-                text: @tr("" => "Edit");
+                text: @tr("Edit");
                 activated => {
                     root.edit();
                     menu.close();
@@ -925,7 +925,7 @@ component SoundTileView inherits Rectangle {
             }
 
             if !LibraryView.collection-linked: MenuItem {
-                text: @tr("" => "Remove");
+                text: @tr("Remove");
                 destructive: true;
                 activated => {
                     Actions.delete-entry(root.tile.id);
@@ -993,7 +993,7 @@ export component SoundboardPage inherits Rectangle {
                 }
                 FilterField { }
                 if LibraryView.sounds.length == 0: Text {
-                    text: Search.filter-text != "" ? @tr("" => "No sound matches the filter.") : LibraryView.collection-linked ? @tr("" => "This folder holds no audio yet.") : @tr("" => "Drop audio files here to add them.");
+                    text: Search.filter-text != "" ? @tr("No sound matches the filter.") : LibraryView.collection-linked ? @tr("This folder holds no audio yet.") : @tr("Drop audio files here to add them.");
                     color: Theme.text-secondary;
                 }
                 TileGrid {
@@ -1014,7 +1014,7 @@ export component ConnectingPage inherits Rectangle {
         spacing: 8px;
         padding-bottom: 40px;
         Text {
-            text: @tr("" => "Starting the audio server");
+            text: @tr("Starting the audio server");
             font-family: Theme.display-font;
             font-size: 26px;
             font-weight: Theme.display-weight;

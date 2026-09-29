@@ -173,7 +173,7 @@ component OutputPicker inherits MenuSurface {
         padding-left: 10px;
         height: 38px;
         Text {
-            text: @tr("" => "Play into");
+            text: @tr("Play into");
             vertical-alignment: center;
             horizontal-stretch: 1;
             font-size: Theme.body-small;
@@ -186,7 +186,7 @@ component OutputPicker inherits MenuSurface {
             size: 32px;
             icon-size: 18px;
             icon: @image-url("icons/refresh-cw.svg");
-            tooltip: @tr("" => "Refresh the voice channels");
+            tooltip: @tr("Refresh the voice channels");
             enabled: Session.connected && Session.discord-configured;
             clicked => {
                 Actions.refresh-outputs();
@@ -203,7 +203,7 @@ component OutputPicker inherits MenuSurface {
     if Session.discord-disabled: HorizontalLayout {
         padding: 10px;
         TextLink {
-            text: @tr("" => "The Discord connection is disabled — enable it in Settings");
+            text: @tr("The Discord connection is disabled — enable it in Settings");
             font-size: Theme.caption;
             clicked => {
                 root.open-settings();
@@ -213,7 +213,7 @@ component OutputPicker inherits MenuSurface {
     if !Session.discord-configured: HorizontalLayout {
         padding: 10px;
         TextLink {
-            text: @tr("" => "Connect Discord for more outputs");
+            text: @tr("Connect Discord for more outputs");
             font-size: Theme.caption;
             clicked => {
                 root.open-settings();
@@ -235,14 +235,14 @@ component OutputButton inherits Rectangle {
     callback clicked();
     property <CurrentOutput> output: Session.current-output;
     property <bool> channel: root.output.kind == OutputRowKind.channel;
-    property <string> title: root.output.guild-name != "" ? @tr("" => "{0} in {1}", root.output.label, root.output.guild-name) : root.output.label;
+    property <string> title: root.output.guild-name != "" ? @tr("{0} in {1}", root.output.label, root.output.guild-name) : root.output.label;
     property <bool> tooltip-dismissed;
     height: root.compact ? 44px : 52px;
     border-radius: Theme.radius-row;
     background: touch.has-hover ? Theme.hover : Theme.field;
     animate background { duration: Motion.hover; }
     accessible-role: button;
-    accessible-label: @tr("" => "Output: {0}", root.title);
+    accessible-label: @tr("Output: {0}", root.title);
     accessible-action-default => { root.clicked(); }
     touch := TouchArea {
         mouse-cursor: MouseCursor.pointer;
@@ -351,7 +351,7 @@ component FullSidebar inherits SidebarForm {
             IconButton {
                 y: (parent.height - self.height) / 2;
                 icon: @image-url("icons/panel-left-close.svg");
-                tooltip: @tr("" => "Collapse (Ctrl+B)");
+                tooltip: @tr("Collapse (Ctrl+B)");
                 tooltip-enabled: root.shown;
                 clicked => {
                     root.collapse();
@@ -368,7 +368,7 @@ component FullSidebar inherits SidebarForm {
                 border-radius: Theme.radius-row;
                 background: search-touch.has-hover ? Theme.hover : Theme.field;
                 accessible-role: button;
-                accessible-label: @tr("" => "Search everything");
+                accessible-label: @tr("Search everything");
                 accessible-action-default => { root.open-search(); }
                 search-touch := TouchArea {
                     mouse-cursor: MouseCursor.pointer;
@@ -390,7 +390,7 @@ component FullSidebar inherits SidebarForm {
                     }
 
                     Text {
-                        text: @tr("" => "Search");
+                        text: @tr("Search");
                         vertical-alignment: center;
                         horizontal-stretch: 1;
                         font-size: Theme.body-small;
@@ -419,7 +419,7 @@ component FullSidebar inherits SidebarForm {
                 alignment: start;
                 NavRow {
                     icon: @image-url("icons/house.svg");
-                    text: @tr("" => "Home");
+                    text: @tr("Home");
                     active: root.page == Page.home;
                     clicked => {
                         root.open-page(Page.home, "");
@@ -428,10 +428,10 @@ component FullSidebar inherits SidebarForm {
 
                 NavRow {
                     icon: @image-url("icons/list-music.svg");
-                    text: @tr("" => "Playlists");
+                    text: @tr("Playlists");
                     active: root.page == Page.playlists;
                     can-add: Session.connected;
-                    add-label: @tr("" => "Add Playlist");
+                    add-label: @tr("Add Playlist");
                     clicked => {
                         root.open-page(Page.playlists, "");
                     }
@@ -453,10 +453,10 @@ component FullSidebar inherits SidebarForm {
 
                 NavRow {
                     icon: @image-url("icons/layout-grid.svg");
-                    text: @tr("" => "Soundboards");
+                    text: @tr("Soundboards");
                     active: root.page == Page.soundboards;
                     can-add: Session.connected;
-                    add-label: @tr("" => "Add Soundboard");
+                    add-label: @tr("Add Soundboard");
                     clicked => {
                         root.open-page(Page.soundboards, "");
                     }
@@ -516,7 +516,7 @@ component FullSidebar inherits SidebarForm {
                     size: 32px;
                     icon-size: 18px;
                     icon: @image-url("icons/settings.svg");
-                    tooltip: @tr("" => "Settings");
+                    tooltip: @tr("Settings");
                     tooltip-enabled: root.shown;
                     clicked => {
                         root.open-settings();
@@ -549,11 +549,11 @@ component Rail inherits SidebarForm {
         spacing: 6px;
         alignment: start;
         for button[index] in [
-            { icon: @image-url("icons/panel-left-open.svg"), label: @tr("" => "Expand (Ctrl+B)") },
-            { icon: @image-url("icons/search.svg"), label: @tr("" => "Search everything (Ctrl+Shift+F)") },
-            { icon: @image-url("icons/house.svg"), label: @tr("" => "Home") },
-            { icon: @image-url("icons/list-music.svg"), label: @tr("" => "Playlists") },
-            { icon: @image-url("icons/layout-grid.svg"), label: @tr("" => "Soundboards") },
+            { icon: @image-url("icons/panel-left-open.svg"), label: @tr("Expand (Ctrl+B)") },
+            { icon: @image-url("icons/search.svg"), label: @tr("Search everything (Ctrl+Shift+F)") },
+            { icon: @image-url("icons/house.svg"), label: @tr("Home") },
+            { icon: @image-url("icons/list-music.svg"), label: @tr("Playlists") },
+            { icon: @image-url("icons/layout-grid.svg"), label: @tr("Soundboards") },
         ]: HorizontalLayout {
             alignment: center;
             RailButton {
@@ -599,7 +599,7 @@ component Rail inherits SidebarForm {
             alignment: center;
             IconButton {
                 icon: @image-url("icons/settings.svg");
-                tooltip: @tr("" => "Settings");
+                tooltip: @tr("Settings");
                 tooltip-enabled: root.shown;
                 clicked => {
                     root.open-settings();
@@ -646,7 +646,7 @@ export component Sidebar inherits Rectangle {
         y: (Theme.title-row-height - self.height) / 2;
         asleep: !PlayerView.something-plays;
         accessible-role: image;
-        accessible-label: PlayerView.something-plays ? @tr("" => "Awake while something plays") : @tr("" => "Asleep while nothing plays");
+        accessible-label: PlayerView.something-plays ? @tr("Awake while something plays") : @tr("Asleep while nothing plays");
     }
 
     FullSidebar {

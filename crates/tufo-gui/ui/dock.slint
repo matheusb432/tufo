@@ -38,7 +38,7 @@ component SoundChipView inherits Rectangle {
             icon: @image-url("icons/repeat.svg");
             tint: root.chip.looping ? Theme.accent : Theme.text-faint;
             hover-tint: root.chip.looping ? Theme.accent : Theme.text;
-            tooltip: root.chip.looping ? @tr("" => "Stop looping {0}", root.chip.title) : @tr("" => "Loop {0}", root.chip.title);
+            tooltip: root.chip.looping ? @tr("Stop looping {0}", root.chip.title) : @tr("Loop {0}", root.chip.title);
             clicked => {
                 Actions.set-sound-looping(root.chip.id, !root.chip.looping);
             }
@@ -58,7 +58,7 @@ component SoundChipView inherits Rectangle {
             size: 24px;
             icon-size: 15px;
             icon: @image-url("icons/x.svg");
-            tooltip: @tr("" => "Stop {0}", root.chip.title);
+            tooltip: @tr("Stop {0}", root.chip.title);
             clicked => {
                 Actions.stop-sound(root.chip.id);
             }
@@ -93,7 +93,7 @@ component NowPlaying inherits HorizontalLayout {
         alignment: center;
         horizontal-stretch: 1;
         Text {
-            text: PlayerView.has-music ? PlayerView.title : @tr("" => "Nothing playing");
+            text: PlayerView.has-music ? PlayerView.title : @tr("Nothing playing");
             font-size: Theme.body-small;
             font-weight: 800;
             color: PlayerView.has-music ? Theme.text : Theme.text-faint;
@@ -118,7 +118,7 @@ component PlayButton inherits Rectangle {
     background: !PlayerView.has-music ? Theme.button : touch.has-hover ? Theme.lit-bright : Theme.lit;
     animate background { duration: Motion.hover; }
     accessible-role: button;
-    accessible-label: PlayerView.playing ? @tr("" => "Pause") : @tr("" => "Play");
+    accessible-label: PlayerView.playing ? @tr("Pause") : @tr("Play");
     accessible-enabled: PlayerView.has-music;
     accessible-action-default => { Actions.toggle-play-pause(); }
     Icon {
@@ -141,7 +141,7 @@ component SoundsPauseButton inherits IconButton {
     size: 30px;
     icon-size: 16px;
     icon: PlayerView.sounds-paused ? @image-url("icons/play.svg") : @image-url("icons/pause.svg");
-    tooltip: PlayerView.sounds-paused ? @tr("" => "Resume sounds") : @tr("" => "Pause sounds");
+    tooltip: PlayerView.sounds-paused ? @tr("Resume sounds") : @tr("Pause sounds");
     clicked => {
         Actions.toggle-sounds-paused();
     }
@@ -155,7 +155,7 @@ component Transport inherits HorizontalLayout {
         icon: @image-url("icons/shuffle.svg");
         tint: PlayerView.shuffle ? Theme.accent : Theme.text-secondary;
         hover-tint: PlayerView.shuffle ? Theme.accent : Theme.text;
-        tooltip: PlayerView.shuffle ? @tr("" => "Stop shuffling") : @tr("" => "Shuffle");
+        tooltip: PlayerView.shuffle ? @tr("Stop shuffling") : @tr("Shuffle");
         clicked => {
             Actions.toggle-shuffle();
         }
@@ -164,7 +164,7 @@ component Transport inherits HorizontalLayout {
     IconButton {
         y: (parent.height - self.height) / 2;
         icon: @image-url("icons/skip-back.svg");
-        tooltip: @tr("" => "Previous");
+        tooltip: @tr("Previous");
         enabled: PlayerView.has-music;
         clicked => {
             Actions.previous-track();
@@ -176,7 +176,7 @@ component Transport inherits HorizontalLayout {
     IconButton {
         y: (parent.height - self.height) / 2;
         icon: @image-url("icons/skip-forward.svg");
-        tooltip: @tr("" => "Next");
+        tooltip: @tr("Next");
         enabled: PlayerView.has-music;
         clicked => {
             Actions.next-track();
@@ -188,7 +188,7 @@ component Transport inherits HorizontalLayout {
         icon: PlayerView.repeat == 2 ? @image-url("icons/repeat-1.svg") : @image-url("icons/repeat.svg");
         tint: PlayerView.repeat == 0 ? Theme.text-secondary : Theme.accent;
         hover-tint: PlayerView.repeat == 0 ? Theme.text : Theme.accent;
-        tooltip: PlayerView.repeat == 0 ? @tr("" => "Repeat the playlist") : PlayerView.repeat == 1 ? @tr("" => "Repeat the track") : @tr("" => "Stop repeating");
+        tooltip: PlayerView.repeat == 0 ? @tr("Repeat the playlist") : PlayerView.repeat == 1 ? @tr("Repeat the track") : @tr("Stop repeating");
         clicked => {
             Actions.cycle-repeat();
         }
@@ -268,7 +268,7 @@ component VolumeControl inherits HorizontalLayout {
         size: 32px;
         icon-size: 18px;
         icon: PlayerView.muted || PlayerView.volume == 0 ? @image-url("icons/volume-x.svg") : PlayerView.volume < 0.5 ? @image-url("icons/volume-1.svg") : @image-url("icons/volume-2.svg");
-        tooltip: PlayerView.muted ? @tr("" => "Unmute") : @tr("" => "Mute");
+        tooltip: PlayerView.muted ? @tr("Unmute") : @tr("Mute");
         clicked => {
             Actions.toggle-mute();
         }
@@ -357,7 +357,7 @@ export component Dock inherits Rectangle {
                 size: 32px;
                 icon-size: 18px;
                 icon: @image-url("icons/chevron-down.svg");
-                tooltip: @tr("" => "Collapse the player");
+                tooltip: @tr("Collapse the player");
                 clicked => {
                     root.set-collapsed(true);
                 }
@@ -393,7 +393,7 @@ export component Dock inherits Rectangle {
                 size: 32px;
                 icon-size: 18px;
                 icon: @image-url("icons/chevron-up.svg");
-                tooltip: @tr("" => "Expand the player");
+                tooltip: @tr("Expand the player");
                 clicked => {
                     root.set-collapsed(false);
                 }
