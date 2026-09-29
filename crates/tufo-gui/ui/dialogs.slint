@@ -436,7 +436,8 @@ export component SettingsDialog inherits DialogFrame {
             horizontal-stretch: 1;
             label: @tr("Bot token");
             password: true;
-            placeholder: Session.discord-configured ? @tr("Saved; paste a new one to replace it") : @tr("Paste your bot's token");
+            secret-saved: Session.discord-configured;
+            placeholder: Session.discord-configured ? @tr("Paste a new token") : @tr("Paste your bot's token");
             accepted => {
                 root.save-token();
             }
@@ -456,16 +457,9 @@ export component SettingsDialog inherits DialogFrame {
         }
     }
 
-    Text {
-        text: @tr("Saving restarts Tufo so the bot logs in with the new token. The music stops.");
-        font-size: Theme.caption;
-        color: Theme.text-secondary;
-        wrap: word-wrap;
-    }
-
     if Session.discord-configured: SwitchSetting {
         title: @tr("Disable Discord connection");
-        description: @tr("Logs the bot out, so it can't join a voice channel by accident and uses no network in the background.");
+        description: @tr("Logs the bot out.");
         checked: Session.discord-disabled;
         toggled(checked) => {
             Actions.set-discord-connection-disabled(checked);
@@ -492,7 +486,7 @@ export component SettingsDialog inherits DialogFrame {
 
     SwitchSetting {
         title: @tr("Keep playing after quitting");
-        description: @tr("The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed.");
+        description: @tr("Audio keeps playing after the GUI closes.");
         checked: Session.keep-playing-after-quit;
         toggled(checked) => {
             Actions.set-keep-playing-after-quit(checked);
@@ -500,8 +494,8 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     SwitchSetting {
-        title: @tr("Start at login");
-        description: @tr("Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them.");
+        title: @tr("Run at startup");
+        description: @tr("Automatically start Tufo when you log in.");
         checked: Session.start-at-login;
         toggled(checked) => {
             Actions.set-start-at-login(checked);
@@ -520,7 +514,7 @@ export component SettingsDialog inherits DialogFrame {
             }
 
             Text {
-                text: @tr("Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything.");
+                text: @tr("Imports Kenku FM's equivalent settings.");
                 font-size: Theme.caption;
                 color: Theme.text-secondary;
                 wrap: word-wrap;

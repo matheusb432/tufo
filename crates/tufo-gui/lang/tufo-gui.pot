@@ -77,6 +77,14 @@ msgstr ""
 msgid "Audio"
 msgstr ""
 
+#: ui/dialogs.slint:489
+msgid "Audio keeps playing after the GUI closes."
+msgstr ""
+
+#: ui/dialogs.slint:498
+msgid "Automatically start Tufo when you log in."
+msgstr ""
+
 #: src/presentation.rs:445
 msgid "Autumn"
 msgstr ""
@@ -135,10 +143,6 @@ msgstr ""
 
 #: ui/dialogs.slint:435
 msgid "Bot token"
-msgstr ""
-
-#: ui/dialogs.slint:512
-msgid "Brings in Kenku FM's playlists, soundboards, and music settings, and its bot token when Tufo has none. Quit Kenku FM first so it has saved everything."
 msgstr ""
 
 #: src/sound_icons.rs
@@ -533,6 +537,10 @@ msgstr ""
 msgid "Importing Kenku FM's library…"
 msgstr ""
 
+#: ui/dialogs.slint:517
+msgid "Imports Kenku FM's equivalent settings."
+msgstr ""
+
 #: src/sound_icons.rs
 msgid "Insects"
 msgstr ""
@@ -595,8 +603,8 @@ msgstr[1] ""
 msgid "Lightning"
 msgstr ""
 
-#: ui/dialogs.slint:466
-msgid "Logs the bot out, so it can't join a voice channel by accident and uses no network in the background."
+#: ui/dialogs.slint:462
+msgid "Logs the bot out."
 msgstr ""
 
 #: ui/pages.slint:386
@@ -755,6 +763,10 @@ msgstr ""
 msgid "Paste a Discord bot token before saving."
 msgstr ""
 
+#: ui/dialogs.slint:440
+msgid "Paste a new token"
+msgstr ""
+
 #: ui/dialogs.slint:437
 msgid "Paste your bot's token"
 msgstr ""
@@ -867,6 +879,10 @@ msgstr ""
 msgid "Resume sounds"
 msgstr ""
 
+#: ui/dialogs.slint:497
+msgid "Run at startup"
+msgstr ""
+
 #: ui/dialogs.slint:359
 msgid "Save"
 msgstr ""
@@ -875,12 +891,8 @@ msgstr ""
 msgid "Save and restart"
 msgstr ""
 
-#: ui/dialogs.slint:437
-msgid "Saved; paste a new one to replace it"
-msgstr ""
-
-#: ui/dialogs.slint:458
-msgid "Saving restarts Tufo so the bot logs in with the new token. The music stops."
+#: ui/widgets.slint:278
+msgid "Saved"
 msgstr ""
 
 #: src/sound_icons.rs
@@ -985,10 +997,6 @@ msgstr ""
 msgid "Squirrel"
 msgstr ""
 
-#: ui/dialogs.slint:492
-msgid "Start at login"
-msgstr ""
-
 #: ui/pages.slint:1001
 msgid "Starting the audio server"
 msgstr ""
@@ -1087,10 +1095,6 @@ msgstr ""
 
 #: src/presentation.rs:1052
 msgid "The audio output is unavailable. Choose another output."
-msgstr ""
-
-#: ui/dialogs.slint:484
-msgid "The music and sounds keep playing after Tufo quits. Otherwise they fade out, and tufo-server waits in the background with the audio device closed."
 msgstr ""
 
 #: src/presentation.rs:970
@@ -1229,10 +1233,6 @@ msgstr ""
 msgid "Tufo received an invalid response. Update the app and server together."
 msgstr ""
 
-#: ui/dialogs.slint:493
-msgid "Tufo starts hidden in the tray when you log in and resumes the looping sounds you left playing, unless you paused them."
-msgstr ""
-
 #: src/presentation.rs:462
 msgid "Underworld"
 msgstr ""
@@ -1243,10 +1243,6 @@ msgstr ""
 
 #: src/presentation.rs:978
 msgid "Update the app and server together to use this feature."
-msgstr ""
-
-#: src/presentation.rs:901
-msgid "Voice disconnected. Choose the channel to reconnect."
 msgstr ""
 
 #: src/presentation.rs:898

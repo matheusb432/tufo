@@ -526,7 +526,7 @@ fn server_diagnostics_never_become_gui_text() {
         voice_status(&VoiceConnectionState::Disconnected {
             reason: Some(diagnostic.to_owned())
         }),
-        "Voice disconnected. Choose the channel to reconnect."
+        ""
     );
 }
 

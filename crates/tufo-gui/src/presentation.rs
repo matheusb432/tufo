@@ -899,13 +899,11 @@ fn voice_status(voice: &VoiceConnectionState) -> String {
     match voice {
         VoiceConnectionState::NotConfigured
         | VoiceConnectionState::Connected
-        | VoiceConnectionState::Disabled => String::new(),
+        | VoiceConnectionState::Disabled
+        | VoiceConnectionState::Disconnected { .. } => String::new(),
         VoiceConnectionState::Connecting => tr("Joining the voice channel…").to_owned(),
         VoiceConnectionState::Reconnecting { attempt } => {
             tr_args("Voice dropped; reconnecting (attempt {0})…", &[attempt])
-        }
-        VoiceConnectionState::Disconnected { .. } => {
-            tr("Voice disconnected. Choose the channel to reconnect.").to_owned()
         }
     }
 }

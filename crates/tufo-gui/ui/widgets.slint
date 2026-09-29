@@ -205,8 +205,14 @@ export component TextField inherits VerticalLayout {
     in property <string> placeholder;
     in-out property <string> text <=> input.text;
     in property <bool> password;
+    // A secret is saved elsewhere: the empty field masks it and marks it saved until it takes
+    // focus. The field never holds the secret.
+    in property <bool> secret-saved;
+    out property <bool> has-focus: input.has-focus;
     callback accepted();
     callback edited(string);
+    property <bool> shows-saved-secret: root.secret-saved && input.text == "" && !input.has-focus;
+    property <string> saved-secret-mask: "●●●●●●●●●●●●";
     forward-focus: input;
     spacing: 6px;
     if root.label != "": Text {
@@ -246,7 +252,37 @@ export component TextField inherits VerticalLayout {
             }
         }
 
-        if input.text == "" && root.placeholder != "": Text {
+        if root.shows-saved-secret: HorizontalLayout {
+            x: 14px;
+            width: parent.width - 28px;
+            height: parent.height;
+            spacing: 6px;
+            Text {
+                horizontal-stretch: 1;
+                text: root.saved-secret-mask;
+                color: Theme.text;
+                font-size: Theme.body;
+                vertical-alignment: center;
+                overflow: clip;
+            }
+
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 16px;
+                height: 16px;
+                source: @image-url("icons/check.svg");
+                tint: Theme.accent;
+            }
+
+            Text {
+                text: @tr("Saved");
+                color: Theme.accent;
+                font-size: Theme.caption;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+        }
+        if input.text == "" && !root.shows-saved-secret && root.placeholder != "": Text {
             x: 14px;
             width: parent.width - 28px;
             text: root.placeholder;
