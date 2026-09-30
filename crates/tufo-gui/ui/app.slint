@@ -22,7 +22,7 @@ import { Icon, Presence, Scrim } from "widgets.slint";
 export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
-    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
+    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, Theme, VoiceBadge, WindowFrame,
 }
 
 enum DialogKind { none, add-collection, edit-collection, edit-entry, settings }
@@ -35,6 +35,8 @@ export component AppWindow inherits Window {
     preferred-height: 700px;
     min-width: Session.mini-player ? Theme.mini-player-width-min : Theme.window-width-min;
     min-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-height-min;
+    max-width: Session.mini-player ? Theme.mini-player-width-max : Theme.window-size-unbounded;
+    max-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-size-unbounded;
     always-on-top: Session.mini-player && Session.mini-player-pinned && Session.always-on-top-supported;
     background: Theme.still-shade;
     default-font-family: Theme.font;

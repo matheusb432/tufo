@@ -163,6 +163,7 @@ fn run_desktop() -> anyhow::Result<()> {
     runtime.spawn(controller.maintain_connection());
     if !hidden_in_tray {
         window.show()?;
+        window_state::apply_size_limits(&window);
     }
     #[cfg(target_os = "linux")]
     if hidden_in_tray {
@@ -240,6 +241,7 @@ fn show_window(window: &ui::AppWindow) {
         tracing::warn!(%error, "cannot show the window");
         return;
     }
+    window_state::apply_size_limits(window);
     window.window().with_winit_window(|winit_window| {
         winit_window.set_minimized(false);
         winit_window.focus_window();
