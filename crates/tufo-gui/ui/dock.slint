@@ -71,6 +71,7 @@ component SoundChipView inherits Rectangle {
 component MusicLayerRow inherits VerticalLayout {
     in property <MusicLayer> layer;
     in property <bool> compact;
+    callback stop(string);
     spacing: 2px;
     HorizontalLayout {
         spacing: 4px;
@@ -102,7 +103,7 @@ component MusicLayerRow inherits VerticalLayout {
             icon-size: 16px;
             icon: @image-url("icons/x.svg");
             tooltip: @tr("Stop {0}", root.layer.title);
-            clicked => { Actions.stop-music-layer(root.layer.id); }
+            clicked => { root.stop(root.layer.id); }
         }
     }
     if !root.compact: Slider {
@@ -117,6 +118,11 @@ component MixButton inherits Button {
     kind: ButtonKind.quiet;
     height: 22px;
     clicked => { mix.show(); }
+    // Close the popup before playback can remove its rows.
+    function stop-song(entry-id: string) {
+        mix.close();
+        Actions.stop-music-layer(entry-id);
+    }
     mix := PopupWindow {
         close-policy: PopupClosePolicy.close-on-click-outside;
         width: 280px;
@@ -163,12 +169,13 @@ component MixButton inherits Button {
                         icon-size: 16px;
                         icon: @image-url("icons/x.svg");
                         tooltip: @tr("Stop {0}", PlayerView.title);
-                        clicked => { Actions.stop-music-layer(PlayerView.entry-id); }
+                        clicked => { root.stop-song(PlayerView.entry-id); }
                     }
                 }
                 for layer in PlayerView.music-layers: MusicLayerRow {
                     layer: layer;
                     compact: Session.mini-player;
+                    stop(entry-id) => { root.stop-song(entry-id); }
                 }
             }
         }

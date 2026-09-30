@@ -159,9 +159,15 @@ export component IconButton inherits Rectangle {
         }
     }
 
-    if root.tooltip != "" && root.tooltip-enabled && !root.tooltip-dismissed: Tooltip {
-        TooltipBubble {
-            text: root.tooltip;
+    // Slint 1.18 reenters popup cleanup if a visible tooltip is destroyed inside a popup.
+    Rectangle {
+        width: root.width;
+        height: root.height;
+        visible: root.tooltip != "" && root.tooltip-enabled && !root.tooltip-dismissed;
+        Tooltip {
+            TooltipBubble {
+                text: root.tooltip;
+            }
         }
     }
 }
