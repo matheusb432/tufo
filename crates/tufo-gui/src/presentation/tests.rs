@@ -84,6 +84,34 @@ fn snapshot() -> LibrarySnapshot {
     }
 }
 
+#[test]
+fn track_metadata_uses_the_file_folder_and_the_date_in_the_local_timezone() {
+    let mut entry = entry(10, "Ancient Dragon", 241);
+    entry.path = AudioFilePath::try_new(
+        std::env::temp_dir()
+            .join("RPG music")
+            .join("Boss fights")
+            .join("dragon.ogg"),
+    )
+    .unwrap();
+    entry.added_at = "2026-01-11T01:30:00Z".parse().unwrap();
+    let row = track_row(&entry, &PlayerState::default());
+    assert_eq!(
+        row.source,
+        std::env::temp_dir()
+            .join("RPG music")
+            .join("Boss fights")
+            .to_string_lossy(),
+    );
+    assert_eq!(
+        date_added(
+            entry.added_at,
+            jiff::tz::TimeZone::fixed(jiff::tz::Offset::constant(-3))
+        ),
+        "Jan 10, 2026",
+    );
+}
+
 fn playing(entry_seed: u128, paused: bool) -> PlayerState {
     PlayerState {
         music: Some(MusicState {

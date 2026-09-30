@@ -1390,3 +1390,19 @@ msgstr ""
 #: src/presentation.rs
 msgid "The mix has three songs. Stop a layer before adding another."
 msgstr ""
+
+#: ui/pages.slint
+msgid "Date added"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Duration"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Source"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Title"
+msgstr ""

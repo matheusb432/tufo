@@ -1390,3 +1390,19 @@ msgstr "Faixa principal"
 #: src/presentation.rs
 msgid "The mix has three songs. Stop a layer before adding another."
 msgstr "A mixagem tem três músicas. Pare uma camada antes de adicionar outra."
+
+#: ui/pages.slint
+msgid "Date added"
+msgstr "Adicionada em"
+
+#: ui/pages.slint
+msgid "Duration"
+msgstr "Duração"
+
+#: ui/pages.slint
+msgid "Source"
+msgstr "Origem"
+
+#: ui/pages.slint
+msgid "Title"
+msgstr "Título"

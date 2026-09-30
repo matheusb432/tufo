@@ -16,6 +16,7 @@ directories = { workspace = true }
 fastrand = { workspace = true }
 gettext = "0.4.0"
 image = { workspace = true }
+jiff = { workspace = true }
 nucleo-matcher = { workspace = true }
 rfd = { workspace = true }
 serde = { workspace = true }
@@ -46,7 +47,6 @@ windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_
 
 [dev-dependencies]
 tonic = { workspace = true }
-jiff = { workspace = true }
 tempfile = { workspace = true }
 
 [build-dependencies]

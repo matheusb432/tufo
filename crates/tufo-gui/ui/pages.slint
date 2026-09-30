@@ -755,8 +755,27 @@ component EntryContextMenu inherits TouchArea {
     }
 }
 
+component TrackColumns inherits HorizontalLayout {
+    in property <length> available-width;
+    out property <length> source-width: root.available-width >= 760px ? min(420px, root.available-width * 0.3) : 0px;
+    out property <length> date-width: root.available-width >= 1020px ? 140px : 0px;
+    padding-left: 6px;
+    padding-right: 16px;
+    spacing: 16px;
+    @children
+}
+
+component TrackCell inherits Text {
+    font-size: Theme.body-small;
+    color: Theme.text-faint;
+    vertical-alignment: center;
+    overflow: elide;
+}
+
 component TrackItem inherits Rectangle {
     in property <TrackRow> track;
+    in property <int> number;
+    in property <length> available-width;
     callback edit();
     height: 48px;
     border-radius: Theme.radius-row;
@@ -776,13 +795,19 @@ component TrackItem inherits Rectangle {
         }
     }
 
-    HorizontalLayout {
-        padding-left: 6px;
-        padding-right: 4px;
-        spacing: 10px;
+    columns := TrackColumns {
+        available-width: root.available-width;
         Rectangle {
             width: 32px;
             if root.track.playing && !touch.has-hover: Equalizer { }
+            if !root.track.playing: Text {
+                text: "\{root.number}";
+                color: Theme.text-faint;
+                font-size: Theme.body-small;
+                opacity: touch.has-hover ? 0 : 1;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
             if touch.has-hover || !root.track.playing: IconButton {
                 size: 32px;
                 icon-size: 16px;
@@ -801,6 +826,8 @@ component TrackItem inherits Rectangle {
         VerticalLayout {
             alignment: center;
             horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
             Text {
                 text: root.track.title;
                 overflow: elide;
@@ -816,12 +843,56 @@ component TrackItem inherits Rectangle {
             color: Theme.error;
             vertical-alignment: center;
         }
-        Text {
-            text: root.track.duration;
-            font-size: Theme.body-small;
-            color: Theme.text-faint;
-            vertical-alignment: center;
+        if columns.source-width > 0px: TrackCell {
+            width: columns.source-width;
+            text: root.track.source;
         }
+        if columns.date-width > 0px: TrackCell {
+            width: columns.date-width;
+            text: root.track.date-added;
+        }
+        TrackCell {
+            width: 72px;
+            text: root.track.duration;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+component TrackHeader inherits Rectangle {
+    in property <length> available-width;
+    height: 36px;
+    columns := TrackColumns {
+        available-width: root.available-width;
+        TrackCell {
+            width: 32px;
+            text: "#";
+            horizontal-alignment: center;
+        }
+        TrackCell {
+            text: @tr("Title");
+            min-width: 0px;
+            preferred-width: 0px;
+            horizontal-stretch: 1;
+        }
+        if columns.source-width > 0px: TrackCell {
+            width: columns.source-width;
+            text: @tr("Source");
+        }
+        if columns.date-width > 0px: TrackCell {
+            width: columns.date-width;
+            text: @tr("Date added");
+        }
+        TrackCell {
+            width: 72px;
+            text: @tr("Duration");
+            horizontal-alignment: right;
+        }
+    }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.divider;
     }
 }
 
@@ -896,13 +967,17 @@ export component PlaylistPage inherits Rectangle {
 
                 VerticalLayout {
                     spacing: 2px;
-                    max-width: 780px;
+                    if LibraryView.tracks.length > 0: TrackHeader {
+                        available-width: root.width - 2 * PageMetrics.padding;
+                    }
                     if LibraryView.tracks.length == 0: Text {
                         text: Search.filter-text != "" ? @tr("No track matches the filter.") : LibraryView.collection-linked ? @tr("This folder holds no audio yet.") : @tr("Drop audio files here to add them.");
                         color: Theme.text-secondary;
                     }
-                    for track in LibraryView.tracks: TrackItem {
+                    for track[index] in LibraryView.tracks: TrackItem {
                         track: track;
+                        number: index + 1;
+                        available-width: root.width - 2 * PageMetrics.padding;
                         edit => {
                             root.edit-entry(track.id, track.title);
                         }

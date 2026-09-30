@@ -187,6 +187,8 @@ pub(crate) fn library(
                     id: track.id.to_string().into(),
                     title: track.title.into(),
                     duration: track.duration.into(),
+                    date_added: track.date_added.into(),
+                    source: track.source.into(),
                     missing: track.missing,
                     current: track.current,
                     playing: track.playing,

@@ -79,6 +79,8 @@ pub(crate) struct TrackRowView {
     pub(crate) id: CollectionEntryId,
     pub(crate) title: String,
     pub(crate) duration: String,
+    pub(crate) date_added: String,
+    pub(crate) source: String,
     pub(crate) missing: bool,
     pub(crate) current: bool,
     pub(crate) playing: bool,
@@ -382,10 +384,25 @@ fn track_row(entry: &EntryView, player: &PlayerState) -> TrackRowView {
         id: entry.id,
         title: entry.title.as_str().to_owned(),
         duration: clock(entry.duration),
+        date_added: date_added(entry.added_at, jiff::tz::TimeZone::system()),
+        // TODO: Use the registered song source once sources are decoupled from playlists.
+        source: entry
+            .path
+            .as_ref()
+            .parent()
+            .map(|folder| folder.to_string_lossy().into_owned())
+            .unwrap_or_default(),
         missing: entry.missing,
         current: current.is_some(),
         playing: current.is_some_and(|music| !music.paused),
     }
+}
+
+fn date_added(timestamp: jiff::Timestamp, timezone: jiff::tz::TimeZone) -> String {
+    timestamp
+        .to_zoned(timezone)
+        .strftime("%b %-d, %Y")
+        .to_string()
 }
 
 fn sound_tile(entry: &EntryView, player: &PlayerState, now: SystemTime) -> SoundTileView {
