@@ -7,38 +7,25 @@ use tufo_models::{
 };
 
 use super::{Library, LibraryStorageError, library_files::LibraryFiles, store};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum DeleteCollectionEntryError {
     #[error("the entry does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     /// A linked collection lists exactly its folder's files.
     #[error("the collection mirrors a folder; remove the file from that folder instead")]
+    #[meta(class = FailedPrecondition, reason = Self::LINKED)]
     Linked { folder: FolderPath },
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
 }
 
 impl DeleteCollectionEntryError {
     pub const NOT_FOUND: &'static str = "library.delete_collection_entry.not_found";
     pub const LINKED: &'static str = "library.delete_collection_entry.linked";
-}
-
-impl ApplicationError for DeleteCollectionEntryError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Linked { .. } => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::LINKED,
-            },
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 pub async fn execute<F: LibraryFiles>(

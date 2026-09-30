@@ -1,30 +1,20 @@
 use tufo_models::playback::queue::{NewQueueError, QueueStart};
 
 use super::player::{PlayAudioError, Player};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum PlayQueueError {
     #[error(transparent)]
+    #[meta(class = Internal, reason = Self::INVALID_QUEUE)]
     InvalidQueue(#[from] NewQueueError),
     #[error(transparent)]
+    #[meta(transparent)]
     Audio(#[from] PlayAudioError),
 }
 
 impl PlayQueueError {
     pub const INVALID_QUEUE: &'static str = "playback.play_queue.invalid_queue";
-}
-
-impl ApplicationError for PlayQueueError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::InvalidQueue(_) => ErrorMetadata {
-                class: ErrorClass::Internal,
-                reason: Self::INVALID_QUEUE,
-            },
-            Self::Audio(error) => error.metadata(),
-        }
-    }
 }
 
 /// Plays a collection's tracks from `start`, replacing the current music.

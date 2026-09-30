@@ -10,19 +10,23 @@ use super::{
     player::Player,
 };
 use crate::{
-    error::{ApplicationError, ErrorClass, ErrorMetadata},
+    error::ErrorMeta,
     library::{Library, library_files::LibraryFiles},
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum PlayCollectionError {
     #[error("the playlist does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error("the playlist has no track Tufo can find on disk")]
+    #[meta(class = FailedPrecondition, reason = Self::NOTHING_PLAYABLE)]
     NothingPlayable,
     #[error("the track to start from is not in the playlist or its file is missing")]
+    #[meta(class = FailedPrecondition, reason = Self::START_NOT_PLAYABLE)]
     StartNotPlayable,
     #[error(transparent)]
+    #[meta(transparent)]
     Play(#[from] PlayQueueError),
 }
 
@@ -30,26 +34,6 @@ impl PlayCollectionError {
     pub const NOT_FOUND: &'static str = "playback.play_collection.not_found";
     pub const NOTHING_PLAYABLE: &'static str = "playback.play_collection.nothing_playable";
     pub const START_NOT_PLAYABLE: &'static str = "playback.play_collection.start_not_playable";
-}
-
-impl ApplicationError for PlayCollectionError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::NothingPlayable => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::NOTHING_PLAYABLE,
-            },
-            Self::StartNotPlayable => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::START_NOT_PLAYABLE,
-            },
-            Self::Play(error) => error.metadata(),
-        }
-    }
 }
 
 /// Replaces the music with the playlist's tracks, skipping missing files, starting at

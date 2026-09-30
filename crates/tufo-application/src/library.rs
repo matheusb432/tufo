@@ -24,23 +24,16 @@ use tokio::sync::{Mutex, MutexGuard, watch};
 use tufo_wire::library::LibrarySnapshot;
 
 use self::library_files::LibraryFiles;
+use crate::error::ErrorMeta;
 
 /// A failure of the library's database, which callers report without detail.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 #[error("the library database failed")]
+#[meta(class = Internal, reason = Self::REASON)]
 pub struct LibraryStorageError(#[source] pub anyhow::Error);
 
 impl LibraryStorageError {
     pub const REASON: &'static str = "library.storage";
-}
-
-impl crate::error::ApplicationError for LibraryStorageError {
-    fn metadata(&self) -> crate::error::ErrorMetadata {
-        crate::error::ErrorMetadata {
-            class: crate::error::ErrorClass::Internal,
-            reason: Self::REASON,
-        }
-    }
 }
 
 impl From<toasty::Error> for LibraryStorageError {

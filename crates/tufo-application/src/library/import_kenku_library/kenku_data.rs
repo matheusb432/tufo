@@ -3,7 +3,7 @@ use std::{fmt, future::Future};
 use tufo_models::path::FolderPath;
 
 use super::KenkuLibrary;
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
 pub trait KenkuReader: Send + Sync {
     fn read(
@@ -30,15 +30,19 @@ impl fmt::Debug for KenkuData {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum ReadKenkuDataError {
     #[error("the folder holds no Kenku FM library")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error("cannot read Kenku FM's storage; quit Kenku FM and try again")]
+    #[meta(class = FailedPrecondition, reason = Self::UNREADABLE)]
     Unreadable(#[source] anyhow::Error),
     #[error("Kenku FM's library is malformed")]
+    #[meta(class = FailedPrecondition, reason = Self::MALFORMED)]
     Malformed(#[source] anyhow::Error),
     #[error("reading Kenku FM's library stopped")]
+    #[meta(class = Internal, reason = Self::INTERNAL)]
     Internal(#[source] anyhow::Error),
 }
 
@@ -47,27 +51,4 @@ impl ReadKenkuDataError {
     pub const UNREADABLE: &'static str = "library.kenku_data.unreadable";
     pub const MALFORMED: &'static str = "library.kenku_data.malformed";
     pub const INTERNAL: &'static str = "library.kenku_data.internal";
-}
-
-impl ApplicationError for ReadKenkuDataError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Unreadable(_) => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::UNREADABLE,
-            },
-            Self::Malformed(_) => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::MALFORMED,
-            },
-            Self::Internal(_) => ErrorMetadata {
-                class: ErrorClass::Internal,
-                reason: Self::INTERNAL,
-            },
-        }
-    }
 }

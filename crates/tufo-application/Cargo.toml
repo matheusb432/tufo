@@ -6,6 +6,7 @@ publish.workspace = true
 
 [dependencies]
 anyhow = { workspace = true }
+error-meta = { workspace = true }
 fastrand = { workspace = true }
 futures-util = { workspace = true }
 jiff = { workspace = true }

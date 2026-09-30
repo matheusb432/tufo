@@ -2,7 +2,7 @@ use std::future::Future;
 
 use tufo_wire::server::DiscordBotTokenStatus;
 
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
 pub trait BotCredentials: Send + Sync {
     fn status(
@@ -15,19 +15,11 @@ pub trait BotCredentials: Send + Sync {
     ) -> impl Future<Output = Result<bool, CredentialsError>> + Send;
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 #[error("the Discord credentials file cannot be accessed")]
+#[meta(class = Internal, reason = Self::REASON)]
 pub struct CredentialsError(#[source] pub anyhow::Error);
 
 impl CredentialsError {
     pub const REASON: &'static str = "discord.credentials.access";
-}
-
-impl ApplicationError for CredentialsError {
-    fn metadata(&self) -> ErrorMetadata {
-        ErrorMetadata {
-            class: ErrorClass::Internal,
-            reason: Self::REASON,
-        }
-    }
 }

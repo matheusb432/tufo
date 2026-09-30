@@ -22,6 +22,7 @@ publish = false
 
 [workspace.dependencies]
 # Shared utilities.
+error-meta = { path = "shared/error-meta" }
 field = { path = "shared/field" }
 
 # Internal crates.

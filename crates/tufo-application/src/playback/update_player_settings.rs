@@ -8,26 +8,16 @@ use super::{
     control_music::{self, ControlMusicError, MusicCommand},
     player::Player,
 };
-use crate::{
-    error::{ApplicationError, ErrorMetadata},
-    library::LibraryStorageError,
-};
+use crate::{error::ErrorMeta, library::LibraryStorageError};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum UpdatePlayerSettingsError {
     #[error(transparent)]
+    #[meta(transparent)]
     Control(#[from] ControlMusicError),
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
-}
-
-impl ApplicationError for UpdatePlayerSettingsError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::Control(error) => error.metadata(),
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 /// Applies each setting present in `update`, in a fixed order, then saves the player's settings.

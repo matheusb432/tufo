@@ -10,7 +10,7 @@ use super::{
     player::{PlayAudioError, Player},
 };
 use crate::{
-    error::{ApplicationError, ErrorClass, ErrorMetadata},
+    error::ErrorMeta,
     library::{Library, library_files::LibraryFiles},
 };
 
@@ -20,17 +20,22 @@ pub struct MusicLayerCue {
     pub entry: QueueEntry,
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum AddMusicLayerError {
     #[error("the playlist song does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error("the song's audio file is missing")]
+    #[meta(class = FailedPrecondition, reason = Self::MISSING)]
     Missing,
     #[error("the music mix already has three layers")]
+    #[meta(class = FailedPrecondition, reason = Self::FULL)]
     Full,
     #[error(transparent)]
+    #[meta(transparent)]
     Audio(#[from] PlayAudioError),
     #[error(transparent)]
+    #[meta(transparent)]
     Queue(#[from] PlayQueueError),
 }
 
@@ -38,27 +43,6 @@ impl AddMusicLayerError {
     pub const NOT_FOUND: &'static str = "playback.add_music_layer.not_found";
     pub const MISSING: &'static str = "playback.add_music_layer.missing";
     pub const FULL: &'static str = "playback.add_music_layer.full";
-}
-
-impl ApplicationError for AddMusicLayerError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Missing => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::MISSING,
-            },
-            Self::Full => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::FULL,
-            },
-            Self::Audio(error) => error.metadata(),
-            Self::Queue(error) => error.metadata(),
-        }
-    }
 }
 
 /// Adding a song already in the mix succeeds without restarting it.

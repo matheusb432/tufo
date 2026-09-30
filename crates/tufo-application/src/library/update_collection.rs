@@ -4,30 +4,20 @@ use tufo_models::library::{BuiltinTitle, Collection, CollectionId};
 use tufo_wire::library::UpdateCollection;
 
 use super::{Library, LibraryStorageError, library_files::LibraryFiles, store};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum UpdateCollectionError {
     #[error("the collection does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
 }
 
 impl UpdateCollectionError {
     pub const NOT_FOUND: &'static str = "library.update_collection.not_found";
-}
-
-impl ApplicationError for UpdateCollectionError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 pub async fn execute<F: LibraryFiles>(

@@ -20,7 +20,7 @@ use super::{
     play_queue::PlayQueueError,
     select_output::SelectOutputError,
 };
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
 /// Plays a music queue with up to two extra songs and any number of sound effects on one output,
 /// and publishes what it plays.
@@ -93,15 +93,19 @@ pub trait Player: Send + Sync {
 }
 
 /// Why an audio file couldn't start playing.
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum PlayAudioError {
     #[error("the audio file does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error("the audio file cannot be read")]
+    #[meta(class = FailedPrecondition, reason = Self::UNREADABLE)]
     Unreadable(#[source] std::io::Error),
     #[error("the file holds no audio track Tufo can decode")]
+    #[meta(class = FailedPrecondition, reason = Self::UNSUPPORTED)]
     Unsupported(#[source] anyhow::Error),
     #[error("the active output cannot play audio")]
+    #[meta(class = Unavailable, reason = Self::OUTPUT_UNAVAILABLE)]
     OutputUnavailable(#[source] anyhow::Error),
 }
 
@@ -110,27 +114,4 @@ impl PlayAudioError {
     pub const UNREADABLE: &'static str = "playback.player.unreadable";
     pub const UNSUPPORTED: &'static str = "playback.player.unsupported";
     pub const OUTPUT_UNAVAILABLE: &'static str = "playback.player.output_unavailable";
-}
-
-impl ApplicationError for PlayAudioError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Unreadable(_) => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::UNREADABLE,
-            },
-            Self::Unsupported(_) => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::UNSUPPORTED,
-            },
-            Self::OutputUnavailable(_) => ErrorMetadata {
-                class: ErrorClass::Unavailable,
-                reason: Self::OUTPUT_UNAVAILABLE,
-            },
-        }
-    }
 }

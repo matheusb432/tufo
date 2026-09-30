@@ -4,38 +4,25 @@ use tufo_models::path::FolderPath;
 use tufo_wire::library::{AddFilesToCollection, ImportReport};
 
 use super::{Library, LibraryStorageError, library_files::LibraryFiles, manual_files, store};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum AddFilesToCollectionError {
     #[error("the collection does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     /// Tufo never copies files, so a linked collection only changes with its folder.
     #[error("the collection mirrors a folder; add the files to that folder instead")]
+    #[meta(class = FailedPrecondition, reason = Self::LINKED)]
     Linked { folder: FolderPath },
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
 }
 
 impl AddFilesToCollectionError {
     pub const NOT_FOUND: &'static str = "library.add_files_to_collection.not_found";
     pub const LINKED: &'static str = "library.add_files_to_collection.linked";
-}
-
-impl ApplicationError for AddFilesToCollectionError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Linked { .. } => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::LINKED,
-            },
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 /// Adds every audio file among `paths`, and under the folders among them, to the collection.

@@ -1,5 +1,8 @@
 //! Metadata owned by application failures, independent of transport and presentation.
 
+// ast-grep-ignore: no-import-alias -- The facade selects the application contract.
+pub use error_meta::ApplicationErrorMeta as ErrorMeta;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ErrorClass {
     InvalidArgument,

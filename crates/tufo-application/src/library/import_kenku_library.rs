@@ -34,32 +34,26 @@ use super::{
 };
 use crate::{
     discord::bot_credentials::BotCredentials,
-    error::{ApplicationError, ErrorMetadata},
+    error::ErrorMeta,
     playback::{
         player::Player,
         update_player_settings::{self, UpdatePlayerSettingsError},
     },
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum ImportKenkuLibraryError {
     #[error(transparent)]
+    #[meta(transparent)]
     Read(#[from] ReadKenkuDataError),
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
     #[error(transparent)]
+    #[meta(transparent)]
     PlayerSettings(#[from] UpdatePlayerSettingsError),
 }
 
-impl ApplicationError for ImportKenkuLibraryError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::Read(error) => error.metadata(),
-            Self::Storage(error) => error.metadata(),
-            Self::PlayerSettings(error) => error.metadata(),
-        }
-    }
-}
 pub async fn execute<F: LibraryFiles>(
     request: ImportKenkuLibrary,
     library: &Library<F>,

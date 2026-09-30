@@ -1,28 +1,18 @@
 use super::bot_credentials::{BotCredentials, CredentialsError};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum SetDiscordBotTokenError {
     #[error("the Discord bot token is empty")]
+    #[meta(class = InvalidArgument, reason = Self::EMPTY_TOKEN)]
     EmptyToken,
     #[error(transparent)]
+    #[meta(transparent)]
     Credentials(#[from] CredentialsError),
 }
 
 impl SetDiscordBotTokenError {
     pub const EMPTY_TOKEN: &'static str = "discord.set_discord_bot_token.empty_token";
-}
-
-impl ApplicationError for SetDiscordBotTokenError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::EmptyToken => ErrorMetadata {
-                class: ErrorClass::InvalidArgument,
-                reason: Self::EMPTY_TOKEN,
-            },
-            Self::Credentials(error) => error.metadata(),
-        }
-    }
 }
 
 pub async fn execute(

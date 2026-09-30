@@ -8,39 +8,26 @@ use super::{
     saved_loops,
 };
 use crate::{
-    error::{ApplicationError, ErrorClass, ErrorMetadata},
+    error::ErrorMeta,
     library::{Library, library_files::LibraryFiles},
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum PlayEntrySoundError {
     #[error("the entry does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error("the entry's audio file is missing")]
+    #[meta(class = FailedPrecondition, reason = Self::MISSING)]
     Missing,
     #[error(transparent)]
+    #[meta(transparent)]
     Audio(#[from] PlayAudioError),
 }
 
 impl PlayEntrySoundError {
     pub const NOT_FOUND: &'static str = "playback.play_entry_sound.not_found";
     pub const MISSING: &'static str = "playback.play_entry_sound.missing";
-}
-
-impl ApplicationError for PlayEntrySoundError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Missing => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::MISSING,
-            },
-            Self::Audio(error) => error.metadata(),
-        }
-    }
 }
 
 /// Fires the entry's file with its loop, volume, and fades. Firing a playing entry restarts it.

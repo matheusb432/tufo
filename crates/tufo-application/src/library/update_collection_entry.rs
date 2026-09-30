@@ -6,32 +6,22 @@ use tufo_wire::library::UpdateCollectionEntry;
 
 use super::{Library, LibraryStorageError, library_files::LibraryFiles};
 use crate::{
-    error::{ApplicationError, ErrorClass, ErrorMetadata},
+    error::ErrorMeta,
     playback::{player::Player, update_sound},
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum UpdateCollectionEntryError {
     #[error("the entry does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
 }
 
 impl UpdateCollectionEntryError {
     pub const NOT_FOUND: &'static str = "library.update_collection_entry.not_found";
-}
-
-impl ApplicationError for UpdateCollectionEntryError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 pub async fn execute<F: LibraryFiles>(

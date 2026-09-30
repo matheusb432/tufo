@@ -18,20 +18,13 @@ use super::{
     library_files::{ClassifiedPath, LibraryFiles},
     manual_files, store, sync_library,
 };
-use crate::error::{ApplicationError, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum ImportPathsError {
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
-}
-
-impl ApplicationError for ImportPathsError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 pub async fn execute<F: LibraryFiles>(

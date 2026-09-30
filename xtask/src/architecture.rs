@@ -27,7 +27,7 @@ const PACKAGE_POLICIES: [PackagePolicy; 12] = [
     },
     PackagePolicy {
         package: "tufo-application",
-        dependencies: &["tufo-models", "tufo-wire"],
+        dependencies: &["error-meta", "tufo-models", "tufo-wire"],
     },
     PackagePolicy {
         package: "tufo-infra",
@@ -150,7 +150,8 @@ fn package_violations(
             matches!(
                 dependency.kind,
                 DependencyKind::Normal | DependencyKind::Build
-            ) && workspace_packages.contains(dependency.name.as_str())
+            ) && (workspace_packages.contains(dependency.name.as_str())
+                || dependency.name == "error-meta")
         })
         .map(|dependency| dependency.name.as_str())
         .collect::<BTreeSet<_>>();
@@ -159,7 +160,7 @@ fn package_violations(
 
     for dependency in expected.difference(&actual) {
         violations.push(format!(
-            "{manifest}: {} must depend on workspace package {dependency}",
+            "{manifest}: {} must depend on package {dependency}",
             policy.package
         ));
     }
@@ -194,7 +195,7 @@ mod tests {
                 ),
                 (
                     "tufo-application",
-                    "[dependencies]\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
+                    "[dependencies]\nerror-meta = { path = \"../../external/error-meta\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
                 ),
                 ("tufo-local-transport", ""),
                 (
@@ -238,12 +239,12 @@ mod tests {
                 ("field", ""),
                 (
                     "tufo-models",
-                    "[dependencies]\nfield = { path = \"../../shared/field\" }\n",
+                    "[dependencies]\nfield = { path = \"../../shared/field\" }\nerror-meta = { path = \"../../external/error-meta\" }\n",
                 ),
                 ("tufo-wire", ""),
                 (
                     "tufo-application",
-                    "[dependencies]\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
+                    "[dependencies]\nerror-meta = { path = \"../../external/error-meta\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
                 ),
                 ("tufo-local-transport", ""),
                 (
@@ -283,8 +284,13 @@ mod tests {
                 .any(|violation| { violation.contains("tufo-models -> field is outside") })
         );
         assert!(violations.iter().any(|violation| {
-            violation.contains("tufo-wire must depend on workspace package tufo-models")
+            violation.contains("tufo-wire must depend on package tufo-models")
         }));
+        assert!(
+            violations
+                .iter()
+                .any(|violation| { violation.contains("tufo-models -> error-meta is outside") })
+        );
     }
 
     #[test]
@@ -295,7 +301,7 @@ mod tests {
             &[
                 (
                     "tufo-models",
-                    "[build-dependencies]\nfield = { path = \"../../shared/field\" }\n[dev-dependencies]\ntufo-gui = { path = \"../tufo-gui\" }\n",
+                    "[build-dependencies]\nfield = { path = \"../../shared/field\" }\n[dev-dependencies]\nerror-meta = { path = \"../../external/error-meta\" }\ntufo-gui = { path = \"../tufo-gui\" }\n",
                 ),
                 ("field", ""),
                 (
@@ -304,7 +310,7 @@ mod tests {
                 ),
                 (
                     "tufo-application",
-                    "[dependencies]\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
+                    "[dependencies]\nerror-meta = { path = \"../../external/error-meta\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
                 ),
                 ("tufo-local-transport", ""),
                 (
@@ -356,7 +362,7 @@ mod tests {
                 ),
                 (
                     "tufo-application",
-                    "[dependencies]\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
+                    "[dependencies]\nerror-meta = { path = \"../../external/error-meta\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
                 ),
                 ("tufo-local-transport", ""),
                 (
@@ -406,6 +412,14 @@ mod tests {
     }
 
     fn write_workspace(root: &Path, packages: &[(&str, &str)]) {
+        let external = root.join("external/error-meta");
+        fs::create_dir_all(external.join("src")).unwrap();
+        fs::write(
+            external.join("Cargo.toml"),
+            "[package]\nname = \"error-meta\"\nversion = \"0.1.0\"\n[workspace]\n",
+        )
+        .unwrap();
+        fs::write(external.join("src/lib.rs"), "").unwrap();
         let members = packages
             .iter()
             .map(|(name, _)| format!("\"{}\"", member_path(name)))
@@ -413,7 +427,7 @@ mod tests {
             .join(", ");
         fs::write(
             root.join("Cargo.toml"),
-            format!("[workspace]\nmembers = [{members}]\nresolver = \"3\"\n"),
+            format!("[workspace]\nmembers = [{members}]\nexclude = [\"external/error-meta\"]\nresolver = \"3\"\n"),
         )
         .unwrap();
         for (name, body) in packages {

@@ -9,30 +9,20 @@ use toasty_core::driver::operation::TransactionMode;
 use tufo_models::library::{Collection, CollectionEntry, CollectionId};
 
 use super::{Library, LibraryStorageError, library_files::LibraryFiles, store};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum DeleteCollectionError {
     #[error("the collection does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error(transparent)]
+    #[meta(transparent)]
     Storage(#[from] LibraryStorageError),
 }
 
 impl DeleteCollectionError {
     pub const NOT_FOUND: &'static str = "library.delete_collection.not_found";
-}
-
-impl ApplicationError for DeleteCollectionError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NotFound => ErrorMetadata {
-                class: ErrorClass::NotFound,
-                reason: Self::NOT_FOUND,
-            },
-            Self::Storage(error) => error.metadata(),
-        }
-    }
 }
 
 pub async fn execute<F: LibraryFiles>(

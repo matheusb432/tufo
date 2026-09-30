@@ -6,7 +6,7 @@ use tufo_models::{
 };
 
 use super::player::{PlayAudioError, Player};
-use crate::error::{ApplicationError, ErrorClass, ErrorMetadata};
+use crate::error::ErrorMeta;
 
 /// One change to the music. Settings apply with or without a queue; the rest need one.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -26,35 +26,22 @@ pub enum MusicCommand {
     SetCrossfade(CrossfadeDuration),
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum ControlMusicError {
     #[error("no music is playing")]
+    #[meta(class = FailedPrecondition, reason = Self::NOTHING_PLAYING)]
     NothingPlaying,
     #[error("the position is past the end of the track")]
+    #[meta(class = FailedPrecondition, reason = Self::SEEK_PAST_END)]
     SeekPastEnd,
     #[error(transparent)]
+    #[meta(transparent)]
     Audio(#[from] PlayAudioError),
 }
 
 impl ControlMusicError {
     pub const NOTHING_PLAYING: &'static str = "playback.control_music.nothing_playing";
     pub const SEEK_PAST_END: &'static str = "playback.control_music.seek_past_end";
-}
-
-impl ApplicationError for ControlMusicError {
-    fn metadata(&self) -> ErrorMetadata {
-        match self {
-            Self::NothingPlaying => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::NOTHING_PLAYING,
-            },
-            Self::SeekPastEnd => ErrorMetadata {
-                class: ErrorClass::FailedPrecondition,
-                reason: Self::SEEK_PAST_END,
-            },
-            Self::Audio(error) => error.metadata(),
-        }
-    }
 }
 
 /// Applies `command` to the music. Stopping while nothing plays succeeds.
