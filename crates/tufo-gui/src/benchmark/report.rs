@@ -6,7 +6,10 @@ use std::{
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 
-use super::platform::{HEIGHT, WIDTH};
+use super::{
+    BATCHES, FRAME_STEP_NS,
+    platform::{HEIGHT, WIDTH},
+};
 use crate::{backgrounds::metrics::Counters, files};
 
 pub(super) const SCREENSHOTS: [&str; 4] = ["expanded", "collapsed", "settings", "playlist"];
@@ -54,8 +57,8 @@ impl Compatibility {
                 .unwrap_or_default(),
             width: WIDTH,
             height: HEIGHT,
-            frame_step_ns: 8_333_333,
-            batches: 5,
+            frame_step_ns: FRAME_STEP_NS,
+            batches: BATCHES,
         }
     }
 }
@@ -196,11 +199,15 @@ fn compare_screenshots(root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn frame_times(report: &Report, scenario: &str) -> Vec<u64> {
+fn frame_times(report: &Report, scenario: &str, batch: Option<u32>) -> Vec<u64> {
     let mut times = report
         .samples
         .iter()
-        .filter(|sample| sample.scenario == scenario && sample.dirty_pixels > 0)
+        .filter(|sample| {
+            sample.scenario == scenario
+                && sample.dirty_pixels > 0
+                && batch.is_none_or(|batch| sample.batch == batch)
+        })
         .map(|sample| sample.update_ns + sample.render_ns)
         .collect::<Vec<_>>();
     times.sort_unstable();
@@ -219,14 +226,14 @@ fn percentile(times: &[u64], percent: usize) -> u64 {
     reason = "displaying nanosecond samples in milliseconds"
 )]
 fn print_scenario(scenario: &str, report: &Report, baseline: Option<&Report>) {
-    let times = frame_times(report, scenario);
+    let times = frame_times(report, scenario, None);
     let p50 = percentile(&times, 50) as f64 / 1_000_000.0;
     let p95 = percentile(&times, 95) as f64 / 1_000_000.0;
     let over_120 = times.iter().filter(|&&time| time > 8_333_333).count();
     let over_60 = times.iter().filter(|&&time| time > 16_666_667).count();
     let previous = baseline
         .map(|baseline| {
-            let times = frame_times(baseline, scenario);
+            let times = frame_times(baseline, scenario, None);
             format!(
                 " (baseline p50 {:.3}, p95 {:.3} ms)",
                 percentile(&times, 50) as f64 / 1_000_000.0,
@@ -234,17 +241,9 @@ fn print_scenario(scenario: &str, report: &Report, baseline: Option<&Report>) {
             )
         })
         .unwrap_or_default();
-    let medians = (0..5)
+    let medians = (0..report.compatibility.batches)
         .map(|batch| {
-            let mut times = report
-                .samples
-                .iter()
-                .filter(|sample| {
-                    sample.scenario == scenario && sample.batch == batch && sample.dirty_pixels > 0
-                })
-                .map(|sample| sample.update_ns + sample.render_ns)
-                .collect::<Vec<_>>();
-            times.sort_unstable();
+            let times = frame_times(report, scenario, Some(batch));
             percentile(&times, 50) as f64 / 1_000_000.0
         })
         .collect::<Vec<_>>();

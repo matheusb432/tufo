@@ -18,7 +18,7 @@ use crate::{backgrounds, ui::AppWindow};
 
 pub(super) const WIDTH: u32 = 1000;
 pub(super) const HEIGHT: u32 = 700;
-pub(super) const STEP: Duration = Duration::from_nanos(8_333_333);
+pub(super) const STEP: Duration = Duration::from_nanos(super::FRAME_STEP_NS);
 type Event = Box<dyn FnOnce() + Send>;
 
 struct Backend {

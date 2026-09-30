@@ -7,10 +7,7 @@ use std::time::Instant;
 use clap::Parser as _;
 use platform::{Renderer, STEP};
 use report::{Compatibility, Report, Sample};
-use slint::{
-    ComponentHandle as _, LogicalPosition, Model as _,
-    platform::{Key, PointerEventButton, WindowEvent},
-};
+use slint::{ComponentHandle as _, Model as _};
 
 use crate::{
     backgrounds,
@@ -18,6 +15,9 @@ use crate::{
     render,
     ui::{AppWindow, Clock, LibraryView, Session},
 };
+
+const BATCHES: u32 = 5;
+const FRAME_STEP_NS: u64 = 8_333_333;
 
 #[derive(clap::Parser)]
 struct Arguments {
@@ -73,15 +73,15 @@ pub(super) fn run() -> anyhow::Result<()> {
         renderer.settle()?;
     }
     fixture::playback(&window, true);
-    for batch in 0..5 {
+    for batch in 0..BATCHES {
         for expanded in [false, true, false, true, false, true] {
             window.global::<Session>().set_drawer_pinned(expanded);
             animate(&mut renderer, "sidebar", batch, &mut samples)?;
         }
         for _ in 0..2 {
-            settings(&window, true);
+            window.invoke_open_settings();
             animate(&mut renderer, "settings", batch, &mut samples)?;
-            settings(&window, false);
+            window.invoke_close_dialog();
             animate(&mut renderer, "settings", batch, &mut samples)?;
         }
         for kind in [
@@ -106,10 +106,10 @@ pub(super) fn run() -> anyhow::Result<()> {
     }
     window.global::<Session>().set_drawer_pinned(true);
     renderer.settle()?;
-    settings(&window, true);
+    window.invoke_open_settings();
     renderer.settle()?;
     renderer.screenshot(&root.join("current/settings.png"))?;
-    settings(&window, false);
+    window.invoke_close_dialog();
     page(&window, PageKind::Playlist);
     renderer.settle()?;
     renderer.screenshot(&root.join("current/playlist.png"))?;
@@ -161,26 +161,4 @@ fn page(window: &AppWindow, page: PageKind) {
             )),
         },
     );
-}
-
-fn settings(window: &AppWindow, open: bool) {
-    let window = window.window();
-    if open {
-        let position = LogicalPosition::new(28.0, 678.0);
-        window.dispatch_event(WindowEvent::PointerPressed {
-            position,
-            button: PointerEventButton::Left,
-        });
-        window.dispatch_event(WindowEvent::PointerReleased {
-            position,
-            button: PointerEventButton::Left,
-        });
-    } else {
-        window.dispatch_event(WindowEvent::KeyPressed {
-            text: Key::Escape.into(),
-        });
-        window.dispatch_event(WindowEvent::KeyReleased {
-            text: Key::Escape.into(),
-        });
-    }
 }

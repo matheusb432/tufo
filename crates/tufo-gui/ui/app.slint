@@ -25,6 +25,8 @@ export {
     Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
 }
 
+enum DialogKind { none, add-collection, edit-collection, edit-entry, settings }
+
 export component AppWindow inherits Window {
     title: @tr("Tufo");
     icon: @image-url("../icons/tufo.svg");
@@ -40,18 +42,15 @@ export component AppWindow inherits Window {
     resize-border-width: root.fills-screen ? 0 : 6px;
     // Keyboard shortcuts see every key first, wherever focus is inside the window.
     forward-focus: shortcuts;
-    property <bool> settings-open;
-    property <bool> add-open;
+    property <DialogKind> dialog: DialogKind.none;
     property <CollectionKind> add-kind;
-    property <bool> edit-collection-open;
-    property <bool> edit-entry-open;
     property <string> entry-id;
     property <string> entry-title;
     property <bool> entry-is-sound;
     property <int> entry-fade-in-ms;
     property <int> entry-fade-out-ms;
     property <int> entry-icon;
-    property <bool> any-dialog: root.settings-open || root.add-open || root.edit-collection-open || root.edit-entry-open;
+    property <bool> any-dialog: root.dialog != DialogKind.none;
     property <bool> any-overlay: root.any-dialog || Search.palette-open || root.sidebar-overlaid;
     property <bool> fills-screen: root.maximized || root.full-screen;
     property <bool> sidebar-fits: root.width >= Theme.sidebar-width + Theme.page-width-min;
@@ -87,10 +86,7 @@ export component AppWindow inherits Window {
         if self.mini-player {
             root.sidebar-overlaid = false;
             root.gallery-open = false;
-            root.settings-open = false;
-            root.add-open = false;
-            root.edit-collection-open = false;
-            root.edit-entry-open = false;
+            root.dialog = DialogKind.none;
             Search.palette-open = false;
             shortcuts.focus();
         }
@@ -106,10 +102,10 @@ export component AppWindow inherits Window {
 
     // The picker that takes an image dropped on the window, if a dialog shows one.
     public pure function background-drop-target() -> BackgroundTarget {
-        if root.add-open {
+        if root.dialog == DialogKind.add-collection {
             return BackgroundTarget.new-collection;
         }
-        if root.edit-collection-open {
+        if root.dialog == DialogKind.edit-collection {
             return BackgroundTarget.open-collection;
         }
         BackgroundTarget.none
@@ -123,7 +119,18 @@ export component AppWindow inherits Window {
 
     function open-add(kind: CollectionKind) {
         root.add-kind = kind;
-        root.add-open = true;
+        root.dialog = DialogKind.add-collection;
+    }
+
+    public function open-settings() {
+        root.sidebar-overlaid = false;
+        root.dialog = DialogKind.settings;
+    }
+
+    public function close-dialog() {
+        root.dialog = DialogKind.none;
+        root.gallery-open = false;
+        shortcuts.focus();
     }
 
     function toggle-sidebar() {
@@ -161,11 +168,7 @@ export component AppWindow inherits Window {
             return true;
         }
         if root.any-dialog {
-            root.settings-open = false;
-            root.add-open = false;
-            root.edit-collection-open = false;
-            root.edit-entry-open = false;
-            shortcuts.focus();
+            root.close-dialog();
             return true;
         }
         if Search.filter-open {
@@ -277,13 +280,13 @@ export component AppWindow inherits Window {
                         if LibraryView.loaded && Navigation.page == Page.playlist: PlaylistPage {
                             compact: page-area.compact;
                             edit-collection => {
-                                root.edit-collection-open = true;
+                                root.dialog = DialogKind.edit-collection;
                             }
                             edit-entry(id, title) => {
                                 root.entry-id = id;
                                 root.entry-title = title;
                                 root.entry-is-sound = false;
-                                root.edit-entry-open = true;
+                                root.dialog = DialogKind.edit-entry;
                             }
                             add-files => {
                                 Actions.add-files(Navigation.collection-id);
@@ -292,7 +295,7 @@ export component AppWindow inherits Window {
                         if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
                             compact: page-area.compact;
                             edit-collection => {
-                                root.edit-collection-open = true;
+                                root.dialog = DialogKind.edit-collection;
                             }
                             edit-sound(tile) => {
                                 root.entry-id = tile.id;
@@ -301,7 +304,7 @@ export component AppWindow inherits Window {
                                 root.entry-fade-in-ms = tile.fade-in-ms;
                                 root.entry-fade-out-ms = tile.fade-out-ms;
                                 root.entry-icon = tile.icon;
-                                root.edit-entry-open = true;
+                                root.dialog = DialogKind.edit-entry;
                             }
                             add-files => {
                                 Actions.add-files(Navigation.collection-id);
@@ -395,8 +398,7 @@ export component AppWindow inherits Window {
                     root.open-palette();
                 }
                 open-settings => {
-                    root.sidebar-overlaid = false;
-                    root.settings-open = true;
+                    root.open-settings();
                 }
                 add(kind) => {
                     root.sidebar-overlaid = false;
@@ -411,7 +413,7 @@ export component AppWindow inherits Window {
                 }
             }
             add-dialog := Presence {
-                open: root.add-open;
+                open: root.dialog == DialogKind.add-collection;
             }
 
             if add-dialog.present: AddCollectionDialog {
@@ -421,13 +423,11 @@ export component AppWindow inherits Window {
                     root.open-gallery(title);
                 }
                 cancel => {
-                    root.add-open = false;
-                    root.gallery-open = false;
-                    shortcuts.focus();
+                    root.close-dialog();
                 }
             }
             edit-collection-dialog := Presence {
-                open: root.edit-collection-open;
+                open: root.dialog == DialogKind.edit-collection;
             }
 
             if edit-collection-dialog.present: EditCollectionDialog {
@@ -436,13 +436,11 @@ export component AppWindow inherits Window {
                     root.open-gallery(title);
                 }
                 cancel => {
-                    root.edit-collection-open = false;
-                    root.gallery-open = false;
-                    shortcuts.focus();
+                    root.close-dialog();
                 }
             }
             new-collection-gallery := Presence {
-                open: root.gallery-open && root.add-open;
+                open: root.gallery-open && root.dialog == DialogKind.add-collection;
             }
 
             if new-collection-gallery.present: BackgroundGallery {
@@ -456,7 +454,7 @@ export component AppWindow inherits Window {
                 }
             }
             open-collection-gallery := Presence {
-                open: root.gallery-open && root.edit-collection-open;
+                open: root.gallery-open && root.dialog == DialogKind.edit-collection;
             }
 
             if open-collection-gallery.present: BackgroundGallery {
@@ -472,7 +470,7 @@ export component AppWindow inherits Window {
                 }
             }
             edit-entry-dialog := Presence {
-                open: root.edit-entry-open;
+                open: root.dialog == DialogKind.edit-entry;
             }
 
             if edit-entry-dialog.present: EditEntryDialog {
@@ -484,19 +482,17 @@ export component AppWindow inherits Window {
                 fade-out-ms: root.entry-fade-out-ms;
                 icon: root.entry-icon;
                 cancel => {
-                    root.edit-entry-open = false;
-                    shortcuts.focus();
+                    root.close-dialog();
                 }
             }
             settings-dialog := Presence {
-                open: root.settings-open;
+                open: root.dialog == DialogKind.settings;
             }
 
             if settings-dialog.present: SettingsDialog {
                 progress: settings-dialog.progress;
                 cancel => {
-                    root.settings-open = false;
-                    shortcuts.focus();
+                    root.close-dialog();
                 }
             }
         }
