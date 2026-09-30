@@ -27,7 +27,6 @@ use tufo_models::{
     playback::{
         AUDIO_FILE_EXTENSIONS, OutputTarget,
         player_state::{CrossfadeDuration, PlayerState},
-        queue::RepeatMode,
     },
 };
 
@@ -731,6 +730,20 @@ impl Controller {
         self.run(move |client| async move { client.add_music_layer(id).await });
     }
 
+    pub(crate) fn add_to_queue(&self, id: &str) {
+        let Some(id) = entry_id_of(id) else {
+            return;
+        };
+        self.run(move |client| async move { client.add_to_queue(id).await });
+    }
+
+    pub(crate) fn remove_from_queue(&self, id: &str) {
+        let Some(id) = entry_id_of(id) else {
+            return;
+        };
+        self.run(move |client| async move { client.remove_from_queue(id).await });
+    }
+
     pub(crate) fn stop_music_layer(&self, id: &str) {
         let Some(id) = entry_id_of(id) else {
             return;
@@ -1030,12 +1043,13 @@ impl Controller {
         });
     }
 
-    /// Cycles repeat the way Kenku FM does: playlist, then track, then off.
     pub(crate) fn cycle_repeat(&self) {
-        let repeat = match self.lock().player.modes.repeat {
-            RepeatMode::Playlist => RepeatMode::Track,
-            RepeatMode::Track => RepeatMode::Off,
-            RepeatMode::Off => RepeatMode::Playlist,
+        let repeat = {
+            let state = self.lock();
+            presentation::next_repeat_mode(
+                state.player.modes.repeat,
+                !state.player.queued_entry_ids.is_empty(),
+            )
         };
         self.update_settings(UpdatePlayerSettings {
             repeat: Some(repeat),

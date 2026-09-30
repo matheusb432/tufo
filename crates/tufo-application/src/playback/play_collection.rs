@@ -2,12 +2,13 @@
 
 use tufo_models::{
     library::{CollectionEntryId, CollectionId, CollectionKind},
-    playback::queue::{QueueEntry, QueueStart},
+    playback::queue::QueueStart,
 };
 
 use super::{
     play_queue::{self, PlayQueueError},
     player::Player,
+    playlist_song::queue_entry,
 };
 use crate::{
     error::ErrorMeta,
@@ -57,12 +58,7 @@ pub async fn execute<F: LibraryFiles>(
             .entries
             .iter()
             .filter(|entry| !entry.missing)
-            .map(|entry| QueueEntry {
-                entry_id: entry.id,
-                path: entry.path.clone(),
-                title: entry.title.as_str().to_owned(),
-                duration: Some(entry.duration),
-            })
+            .map(queue_entry)
             .collect::<Vec<_>>();
         if entries.is_empty() {
             return Err(PlayCollectionError::NothingPlayable);

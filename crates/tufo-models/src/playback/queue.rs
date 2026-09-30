@@ -3,8 +3,12 @@
 //! Repeating a track restarts it at its end, while "next" and "previous" still move through the
 //! playlist; the playlist wraps unless repeat is off; and "previous" restarts the current track
 //! once it has played for [`PREVIOUS_RESTART_THRESHOLD`].
+//!
+//! Songs added to the queue, from any playlist, play in the order they were added before the
+//! playlist continues after the track they interrupted. With repeat off each plays once; with
+//! repeat on they rotate until removed. Repeating one track excludes queued songs.
 
-use std::time::Duration;
+use std::{collections::VecDeque, time::Duration};
 
 use crate::{
     library::{CollectionEntryId, CollectionId},
@@ -22,6 +26,13 @@ pub struct QueueEntry {
     pub title: String,
     /// The track's length when the library knows it.
     pub duration: Option<Duration>,
+}
+
+/// A song added to the queue, and the playlist it belongs to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct QueuedEntry {
+    pub collection_id: CollectionId,
+    pub entry: QueueEntry,
 }
 
 /// What happens when the queue moves past its current track.
@@ -59,7 +70,20 @@ pub enum NewQueueError {
     StartOutOfRange { start_index: usize, length: usize },
 }
 
-/// A collection's tracks in the order they play, with a current track.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum EnqueueError {
+    #[error("songs can't be queued while one track repeats")]
+    RepeatingTrack,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum SetRepeatError {
+    #[error("one track can't repeat while songs are queued")]
+    SongsQueued,
+}
+
+/// A collection's tracks in the order they play, with a current track, and the songs queued
+/// ahead of them.
 ///
 /// The entries stay in the collection's order. With shuffle on, a separate play order starts at
 /// the track that was current when shuffling began and visits the rest in random order.
@@ -69,9 +93,17 @@ pub struct MusicQueue {
     entries: Vec<QueueEntry>,
     /// Indices into `entries`, in play order.
     order: Vec<usize>,
-    /// The current track's position in `order`.
+    /// The playlist track's position in `order`: the current track's, or while a queued song
+    /// plays, the one it interrupted.
     position: usize,
     modes: QueueModes,
+    /// In play order, each entry at most once, and never while one track repeats. With repeat
+    /// on, a song goes back to the end as it starts, so a queued current song sits last.
+    queued: VecDeque<QueuedEntry>,
+    /// The current track when it came from `queued`.
+    current_queued: Option<QueuedEntry>,
+    /// With repeat off, the queued songs that played before the current one, for "previous".
+    played_queued: Vec<QueuedEntry>,
 }
 
 impl MusicQueue {
@@ -104,14 +136,20 @@ impl MusicQueue {
                 shuffle: false,
                 repeat: modes.repeat,
             },
+            queued: VecDeque::new(),
+            current_queued: None,
+            played_queued: Vec::new(),
         };
         queue.set_shuffle(modes.shuffle, shuffle_seed);
         Ok(queue)
     }
 
+    /// The playlist the current track belongs to.
     #[must_use]
-    pub fn collection_id(&self) -> CollectionId {
-        self.collection_id
+    pub fn current_collection_id(&self) -> CollectionId {
+        self.current_queued
+            .as_ref()
+            .map_or(self.collection_id, |song| song.collection_id)
     }
 
     #[must_use]
@@ -121,7 +159,40 @@ impl MusicQueue {
 
     #[must_use]
     pub fn current(&self) -> &QueueEntry {
-        &self.entries[self.order[self.position]]
+        match &self.current_queued {
+            Some(song) => &song.entry,
+            None => self.playlist_entry(self.position),
+        }
+    }
+
+    /// The queued songs in the order they play.
+    #[must_use]
+    pub fn queued(&self) -> impl ExactSizeIterator<Item = &QueuedEntry> {
+        self.queued.iter()
+    }
+
+    /// Queues `song` after the songs already queued. Queuing a queued song leaves it in place.
+    pub fn enqueue(&mut self, song: QueuedEntry) -> Result<(), EnqueueError> {
+        if self.modes.repeat == RepeatMode::Track {
+            return Err(EnqueueError::RepeatingTrack);
+        }
+        if self.queued_index(song.entry.entry_id).is_some() {
+            return Ok(());
+        }
+        let index = if self.current_rejoins() {
+            self.queued.len() - 1
+        } else {
+            self.queued.len()
+        };
+        self.queued.insert(index, song);
+        Ok(())
+    }
+
+    /// Takes a song out of the queue; a current queued song keeps playing but won't return.
+    pub fn remove_queued(&mut self, entry_id: CollectionEntryId) {
+        if let Some(index) = self.queued_index(entry_id) {
+            self.queued.remove(index);
+        }
     }
 
     /// Turns shuffle on or off without changing the current track. Turning it on shuffles the
@@ -142,45 +213,139 @@ impl MusicQueue {
         self.modes.shuffle = shuffle;
     }
 
-    pub fn set_repeat(&mut self, repeat: RepeatMode) {
+    /// Turning repeat on brings the queued songs that already played back into the rotation;
+    /// turning it off lets the current queued song end its turn.
+    pub fn set_repeat(&mut self, repeat: RepeatMode) -> Result<(), SetRepeatError> {
+        if repeat == self.modes.repeat {
+            return Ok(());
+        }
+        match repeat {
+            RepeatMode::Track if !self.queued.is_empty() => {
+                return Err(SetRepeatError::SongsQueued);
+            }
+            RepeatMode::Track => {}
+            RepeatMode::Playlist => self.rejoin_played(),
+            RepeatMode::Off => {
+                if self.current_rejoins() {
+                    self.queued.pop_back();
+                }
+            }
+        }
+        self.played_queued.clear();
         self.modes.repeat = repeat;
+        Ok(())
     }
 
     /// The track that plays when the current one ends, or `None` when the queue stops there.
     #[must_use]
     pub fn following(&self) -> Option<&QueueEntry> {
-        self.position_after_current()
-            .map(|position| &self.entries[self.order[position]])
+        if self.modes.repeat == RepeatMode::Track {
+            return Some(self.current());
+        }
+        match self.queued.front() {
+            Some(song) => Some(&song.entry),
+            None => self
+                .next_position()
+                .map(|position| self.playlist_entry(position)),
+        }
     }
 
     /// Moves to the track that plays after the current one ends. Returns the new current track,
     /// which is the same one when it repeats, or `None` when the queue stops; a stopped queue
     /// keeps its current track.
     pub fn advance(&mut self) -> Option<&QueueEntry> {
-        self.position = self.position_after_current()?;
-        Some(self.current())
+        if self.modes.repeat == RepeatMode::Track {
+            return Some(self.current());
+        }
+        self.skip_to_next()
     }
 
-    /// Moves to the next track for "next", even when the current one repeats. Returns the new
-    /// current track, or `None` when the queue stops at its end.
+    /// Moves to the next track for "next", even when the current one repeats: the first queued
+    /// song, else the playlist's next track. Returns the new current track, or `None` when the
+    /// queue stops at its end.
     pub fn skip_to_next(&mut self) -> Option<&QueueEntry> {
+        if let Some(next) = self.queued.pop_front() {
+            let left = self.current_queued.replace(next.clone());
+            if self.modes.repeat == RepeatMode::Playlist {
+                self.queued.push_back(next);
+            } else {
+                self.played_queued.extend(left);
+            }
+            return Some(self.current());
+        }
         self.position = self.next_position()?;
+        self.current_queued = None;
+        self.played_queued.clear();
         Some(self.current())
     }
 
-    /// Moves back for "previous", given how long the current track has played. Returns the new
-    /// current track, or `None` when the queue stops at its start.
+    /// Moves back for "previous", given how long the current track has played. From a queued
+    /// song it goes to the one before it, or to the track the queue interrupted, and the song
+    /// returns to the front of the queue. Returns the new current track, or `None` when the
+    /// queue stops at its start.
     pub fn skip_to_previous(&mut self, played: Duration) -> Option<&QueueEntry> {
-        if played < PREVIOUS_RESTART_THRESHOLD {
+        if played >= PREVIOUS_RESTART_THRESHOLD {
+            return Some(self.current());
+        }
+        let Some(left) = self.current_queued.take() else {
             self.position = self.previous_position()?;
+            return Some(self.current());
+        };
+        match self.modes.repeat {
+            RepeatMode::Playlist => {
+                if self.is_last_queued(&left)
+                    && let Some(song) = self.queued.pop_back()
+                {
+                    self.queued.push_front(song);
+                }
+                self.current_queued = self.queued.back().cloned();
+            }
+            RepeatMode::Off => {
+                self.remove_queued(left.entry.entry_id);
+                self.queued.push_front(left);
+                self.current_queued = self.played_queued.pop();
+            }
+            RepeatMode::Track => {}
         }
         Some(self.current())
     }
 
-    fn position_after_current(&self) -> Option<usize> {
-        match self.modes.repeat {
-            RepeatMode::Track => Some(self.position),
-            RepeatMode::Playlist | RepeatMode::Off => self.next_position(),
+    fn playlist_entry(&self, position: usize) -> &QueueEntry {
+        &self.entries[self.order[position]]
+    }
+
+    fn queued_index(&self, entry_id: CollectionEntryId) -> Option<usize> {
+        self.queued
+            .iter()
+            .position(|song| song.entry.entry_id == entry_id)
+    }
+
+    fn is_last_queued(&self, song: &QueuedEntry) -> bool {
+        self.queued
+            .back()
+            .is_some_and(|last| last.entry.entry_id == song.entry.entry_id)
+    }
+
+    /// Whether the current track is a queued song that comes around again.
+    fn current_rejoins(&self) -> bool {
+        self.modes.repeat == RepeatMode::Playlist
+            && self
+                .current_queued
+                .as_ref()
+                .is_some_and(|current| self.is_last_queued(current))
+    }
+
+    /// Queues the songs that played this pass after the upcoming ones, and the current queued
+    /// song last.
+    fn rejoin_played(&mut self) {
+        for song in std::mem::take(&mut self.played_queued) {
+            if self.queued_index(song.entry.entry_id).is_none() {
+                self.queued.push_back(song);
+            }
+        }
+        if let Some(current) = self.current_queued.clone() {
+            self.remove_queued(current.entry.entry_id);
+            self.queued.push_back(current);
         }
     }
 
@@ -263,6 +428,28 @@ mod tests {
 
     fn title(entry: Option<&QueueEntry>) -> Option<&str> {
         entry.map(|entry| entry.title.as_str())
+    }
+
+    /// A song from another playlist.
+    fn song(number: u128) -> QueuedEntry {
+        QueuedEntry {
+            collection_id: CollectionId::from_uuid(Uuid::from_u128(2)),
+            entry: entry(number),
+        }
+    }
+
+    fn with_songs(mut queue: MusicQueue, numbers: impl IntoIterator<Item = u128>) -> MusicQueue {
+        for number in numbers {
+            queue.enqueue(song(number)).unwrap();
+        }
+        queue
+    }
+
+    fn queued_titles(queue: &MusicQueue) -> Vec<&str> {
+        queue
+            .queued()
+            .map(|song| song.entry.title.as_str())
+            .collect()
     }
 
     #[test]
@@ -410,5 +597,121 @@ mod tests {
             play_order(queue(8, 0, modes)),
             play_order(queue(8, 0, modes))
         );
+    }
+
+    #[test]
+    fn queued_songs_play_once_then_the_playlist_resumes_after_the_interrupted_track() {
+        let mut queue = with_songs(queue(4, 1, repeat(RepeatMode::Off)), [10, 11]);
+
+        assert_eq!(title(queue.following()), Some("Track 10"));
+        assert_eq!(title(queue.advance()), Some("Track 10"));
+        assert_eq!(queue.current_collection_id(), song(10).collection_id);
+        assert_eq!(queued_titles(&queue), ["Track 11"]);
+        assert_eq!(title(queue.advance()), Some("Track 11"));
+        assert_eq!(title(queue.advance()), Some("Track 3"));
+        assert_eq!(
+            queue.current_collection_id(),
+            start(Vec::new(), 0).collection_id
+        );
+        assert_eq!(queue.queued().len(), 0);
+    }
+
+    #[test]
+    fn with_repeat_on_queued_songs_rotate_until_removed() {
+        let mut queue = with_songs(queue(4, 1, repeat(RepeatMode::Playlist)), [10, 11]);
+
+        assert_eq!(title(queue.advance()), Some("Track 10"));
+        assert_eq!(title(queue.advance()), Some("Track 11"));
+        assert_eq!(queued_titles(&queue), ["Track 10", "Track 11"]);
+        assert_eq!(title(queue.advance()), Some("Track 10"));
+        queue.remove_queued(song(11).entry.entry_id);
+        assert_eq!(title(queue.advance()), Some("Track 10"));
+        queue.remove_queued(song(10).entry.entry_id);
+        assert_eq!(title(queue.advance()), Some("Track 3"));
+    }
+
+    #[test]
+    fn songs_queued_during_a_rotation_play_before_the_current_one_returns() {
+        let mut queue = with_songs(queue(4, 1, repeat(RepeatMode::Playlist)), [10, 11]);
+        queue.advance();
+
+        queue.enqueue(song(12)).unwrap();
+        queue.enqueue(song(11)).unwrap();
+
+        assert_eq!(queued_titles(&queue), ["Track 11", "Track 12", "Track 10"]);
+    }
+
+    #[test]
+    fn repeating_one_track_excludes_queued_songs() {
+        let mut repeating = queue(3, 0, repeat(RepeatMode::Track));
+        let mut queuing = with_songs(queue(3, 0, repeat(RepeatMode::Playlist)), [10]);
+
+        assert_eq!(
+            repeating.enqueue(song(10)),
+            Err(EnqueueError::RepeatingTrack)
+        );
+        assert_eq!(
+            queuing.set_repeat(RepeatMode::Track),
+            Err(SetRepeatError::SongsQueued)
+        );
+        queuing.remove_queued(song(10).entry.entry_id);
+        assert_eq!(queuing.set_repeat(RepeatMode::Track), Ok(()));
+    }
+
+    #[test]
+    fn next_plays_the_first_queued_song_even_when_a_track_repeats() {
+        let mut queue = with_songs(queue(3, 0, repeat(RepeatMode::Off)), [10]);
+        queue.advance();
+        queue.set_repeat(RepeatMode::Track).unwrap();
+
+        assert_eq!(title(queue.advance()), Some("Track 10"));
+        assert_eq!(title(queue.skip_to_next()), Some("Track 2"));
+    }
+
+    #[test]
+    fn previous_steps_back_through_queued_songs_to_the_interrupted_track() {
+        let mut queue = with_songs(queue(4, 1, repeat(RepeatMode::Off)), [10, 11]);
+        queue.advance();
+        queue.advance();
+
+        assert_eq!(
+            title(queue.skip_to_previous(Duration::ZERO)),
+            Some("Track 10")
+        );
+        assert_eq!(queued_titles(&queue), ["Track 11"]);
+        assert_eq!(
+            title(queue.skip_to_previous(Duration::ZERO)),
+            Some("Track 2")
+        );
+        assert_eq!(queued_titles(&queue), ["Track 10", "Track 11"]);
+        assert_eq!(
+            title(queue.skip_to_previous(Duration::ZERO)),
+            Some("Track 1")
+        );
+    }
+
+    #[test]
+    fn previous_wraps_within_rotating_queued_songs() {
+        let mut queue = with_songs(queue(4, 1, repeat(RepeatMode::Playlist)), [10, 11]);
+        queue.advance();
+
+        assert_eq!(
+            title(queue.skip_to_previous(Duration::ZERO)),
+            Some("Track 11")
+        );
+        assert_eq!(queued_titles(&queue), ["Track 10", "Track 11"]);
+        assert_eq!(title(queue.advance()), Some("Track 10"));
+    }
+
+    #[test]
+    fn turning_repeat_on_rotates_the_songs_that_already_played() {
+        let mut queue = with_songs(queue(4, 1, repeat(RepeatMode::Off)), [10, 11, 12]);
+        queue.advance();
+        queue.advance();
+
+        queue.set_repeat(RepeatMode::Playlist).unwrap();
+        assert_eq!(queued_titles(&queue), ["Track 12", "Track 10", "Track 11"]);
+        queue.set_repeat(RepeatMode::Off).unwrap();
+        assert_eq!(queued_titles(&queue), ["Track 12", "Track 10"]);
     }
 }

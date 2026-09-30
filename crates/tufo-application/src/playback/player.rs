@@ -9,12 +9,13 @@ use tufo_models::{
         OutputTarget,
         diagnostics::PlayerDiagnostics,
         player_state::{PlayerState, SoundCue},
-        queue::QueueStart,
+        queue::{QueueStart, QueuedEntry},
     },
 };
 
 use super::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
+    add_to_queue::QueueSongError,
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
     play_queue::PlayQueueError,
@@ -48,6 +49,15 @@ pub trait Player: Send + Sync {
         &self,
         start: QueueStart,
     ) -> impl Future<Output = Result<(), PlayQueueError>> + Send;
+
+    /// Queues `song` after the songs already queued; a queued song stays in place.
+    fn add_to_queue(
+        &self,
+        song: QueuedEntry,
+    ) -> impl Future<Output = Result<(), QueueSongError>> + Send;
+
+    /// Takes a song out of the queue. Songs that aren't queued are ignored.
+    fn remove_from_queue(&self, entry_id: CollectionEntryId) -> impl Future<Output = ()> + Send;
 
     /// Pauses, resumes, stops, skips, seeks, or changes a music setting.
     fn control_music(

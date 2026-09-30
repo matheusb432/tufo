@@ -660,9 +660,16 @@ component EntryContextMenu inherits TouchArea {
     in property <string> entry-id;
     in property <string> primary-action-title;
     in property <bool> primary-action-enabled: true;
+    in property <bool> secondary-action-shown;
+    in property <string> secondary-action-title;
+    in property <bool> secondary-action-enabled: true;
     callback primary-action();
+    callback secondary-action();
     callback edit();
     property <Point> menu-position;
+    property <int> edit-index: root.secondary-action-shown ? 2 : 1;
+    property <int> remove-index: root.edit-index + 1;
+    property <int> action-count: LibraryView.collection-linked ? root.remove-index : root.remove-index + 1;
     mouse-cursor: MouseCursor.pointer;
 
     public function show-menu(position: Point) {
@@ -673,14 +680,34 @@ component EntryContextMenu inherits TouchArea {
         menu.show();
     }
 
+    function enabled-at(index: int) -> bool {
+        if index == 0 {
+            return root.primary-action-enabled;
+        }
+        if index == 1 && root.secondary-action-shown {
+            return root.secondary-action-enabled;
+        }
+        return true;
+    }
+
+    function step(index: int, down: bool) -> int {
+        Math.mod(index + (down ? 1 : -1) + root.action-count, root.action-count)
+    }
+
     function activate(index: int) {
-        if index == 0 && root.primary-action-enabled {
+        if !root.enabled-at(index) {
+            return;
+        }
+        if index == 0 {
             menu.close();
             root.primary-action();
-        } else if index == 1 {
+        } else if index == 1 && root.secondary-action-shown {
+            menu.close();
+            root.secondary-action();
+        } else if index == root.edit-index {
             menu.close();
             root.edit();
-        } else if index == 2 && !LibraryView.collection-linked {
+        } else if index == root.remove-index && !LibraryView.collection-linked {
             menu.close();
             Actions.delete-entry(root.entry-id);
         }
@@ -701,7 +728,6 @@ component EntryContextMenu inherits TouchArea {
         close-policy: close-on-click-outside;
         keys := FocusScope {
             property <int> selected: -1;
-            property <int> count: LibraryView.collection-linked ? 2 : 3;
             init => { self.focus(); }
             key-pressed(event) => {
                 if event.text == Key.Escape {
@@ -710,10 +736,13 @@ component EntryContextMenu inherits TouchArea {
                 }
                 if event.text == Key.DownArrow || event.text == Key.UpArrow {
                     let down = event.text == Key.DownArrow;
-                    self.selected = self.selected < 0 ? (down ? 0 : self.count - 1)
-                        : Math.mod(self.selected + (down ? 1 : -1) + self.count, self.count);
-                    if self.selected == 0 && !root.primary-action-enabled {
-                        self.selected = down ? 1 : self.count - 1;
+                    self.selected = self.selected < 0 ? (down ? 0 : root.action-count - 1) : root.step(self.selected, down);
+                    // Edit is always enabled, so skipping the two actions before it suffices.
+                    if !root.enabled-at(self.selected) {
+                        self.selected = root.step(self.selected, down);
+                    }
+                    if !root.enabled-at(self.selected) {
+                        self.selected = root.step(self.selected, down);
                     }
                     return accept;
                 }
@@ -733,25 +762,51 @@ component EntryContextMenu inherits TouchArea {
                     }
                     activated => { root.activate(0); }
                 }
-                MenuAction {
-                    text: @tr("Edit");
+                if root.secondary-action-shown: MenuAction {
+                    text: root.secondary-action-title;
+                    enabled: root.secondary-action-enabled;
                     highlighted: keys.selected == 1;
                     changed has-hover => {
                         if self.has-hover { keys.selected = 1; }
                     }
                     activated => { root.activate(1); }
                 }
+                MenuAction {
+                    text: @tr("Edit");
+                    highlighted: keys.selected == root.edit-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.edit-index; }
+                    }
+                    activated => { root.activate(root.edit-index); }
+                }
                 if !LibraryView.collection-linked: MenuAction {
                     text: @tr("Remove");
                     destructive: true;
-                    highlighted: keys.selected == 2;
+                    highlighted: keys.selected == root.remove-index;
                     changed has-hover => {
-                        if self.has-hover { keys.selected = 2; }
+                        if self.has-hover { keys.selected = root.remove-index; }
                     }
-                    activated => { root.activate(2); }
+                    activated => { root.activate(root.remove-index); }
                 }
             }
         }
+    }
+}
+
+// Where a queued song plays in the queue, in place of its row number.
+component QueueChip inherits Rectangle {
+    in property <int> number;
+    width: max(22px, label.preferred-width + 10px);
+    height: 22px;
+    border-radius: self.height / 2;
+    background: Theme.lit;
+    label := Text {
+        text: "\{root.number}";
+        color: Theme.on-lit;
+        font-size: Theme.caption;
+        font-weight: 800;
+        horizontal-alignment: center;
+        vertical-alignment: center;
     }
 }
 
@@ -789,6 +844,17 @@ component TrackItem inherits Rectangle {
         primary-action => {
             Actions.add-music-layer(root.track.id);
         }
+        secondary-action-shown: true;
+        secondary-action-title: root.track.queue-number > 0 ? @tr("Remove from queue")
+            : PlayerView.repeat == 2 ? @tr("Queue off (repeating one song)") : @tr("Add to queue");
+        secondary-action-enabled: root.track.queue-number > 0 || (PlayerView.repeat != 2 && !root.track.missing);
+        secondary-action => {
+            if root.track.queue-number > 0 {
+                Actions.remove-from-queue(root.track.id);
+            } else {
+                Actions.add-to-queue(root.track.id);
+            }
+        }
         edit => { root.edit(); }
         double-clicked => {
             Actions.play-track(root.track.id);
@@ -800,13 +866,17 @@ component TrackItem inherits Rectangle {
         Rectangle {
             width: 32px;
             if root.track.playing && !touch.has-hover: Equalizer { }
-            if !root.track.playing: Text {
+            if !root.track.playing && root.track.queue-number == 0: Text {
                 text: "\{root.number}";
                 color: Theme.text-faint;
                 font-size: Theme.body-small;
                 opacity: touch.has-hover ? 0 : 1;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+            }
+            if !root.track.playing && root.track.queue-number > 0: QueueChip {
+                number: root.track.queue-number;
+                opacity: touch.has-hover ? 0 : 1;
             }
             if touch.has-hover || !root.track.playing: IconButton {
                 size: 32px;

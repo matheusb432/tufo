@@ -317,6 +317,29 @@ impl TufoClient {
         Ok(())
     }
 
+    /// Plays the song now when no music plays.
+    pub async fn add_to_queue(&self, entry_id: CollectionEntryId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            pb::AddToQueueRequest {
+                collection_entry_id: entry_id.to_string(),
+            },
+            PLAY_AUDIO_TIMEOUT,
+        );
+        self.player.clone().add_to_queue(request).await?;
+        Ok(())
+    }
+
+    pub async fn remove_from_queue(&self, entry_id: CollectionEntryId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            pb::RemoveFromQueueRequest {
+                collection_entry_id: entry_id.to_string(),
+            },
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.player.clone().remove_from_queue(request).await?;
+        Ok(())
+    }
+
     pub async fn stop_music_layer(&self, entry_id: CollectionEntryId) -> Result<(), ClientError> {
         let request = with_timeout(
             pb::StopMusicLayerRequest {

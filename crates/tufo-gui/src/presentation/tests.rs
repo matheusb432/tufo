@@ -240,6 +240,55 @@ fn the_current_track_shows_as_playing_until_paused() {
 }
 
 #[test]
+fn queued_songs_number_their_rows_in_play_order_on_their_own_pages() {
+    let snapshot = snapshot();
+    let mut player = playing(10, false);
+    player.queued_entry_ids = vec![
+        CollectionEntryId::from_uuid(uuid(12)),
+        CollectionEntryId::from_uuid(uuid(11)),
+    ];
+    let page = |seed| {
+        library_page(
+            &snapshot,
+            &player,
+            Navigation {
+                page: PageKind::Playlist,
+                collection_id: Some(CollectionId::from_uuid(uuid(seed))),
+            },
+            "",
+            SystemTime::UNIX_EPOCH,
+        )
+        .collection
+        .unwrap()
+    };
+
+    let boss_fights = page(1);
+    let tavern = page(2);
+
+    assert_eq!(boss_fights.tracks[0].queue_number, None);
+    assert_eq!(boss_fights.tracks[1].queue_number, Some(2));
+    assert_eq!(tavern.tracks[0].queue_number, Some(1));
+    assert!(player_bar(&snapshot, &player, SystemTime::UNIX_EPOCH).songs_queued);
+}
+
+#[test]
+fn queued_songs_leave_repeating_one_track_out_of_the_cycle() {
+    assert_eq!(
+        next_repeat_mode(RepeatMode::Playlist, false),
+        RepeatMode::Track
+    );
+    assert_eq!(
+        next_repeat_mode(RepeatMode::Playlist, true),
+        RepeatMode::Off
+    );
+    assert_eq!(next_repeat_mode(RepeatMode::Track, false), RepeatMode::Off);
+    assert_eq!(
+        next_repeat_mode(RepeatMode::Off, true),
+        RepeatMode::Playlist
+    );
+}
+
+#[test]
 fn the_sidebar_lists_every_collection_whatever_the_filter_and_marks_what_plays() {
     let snapshot = snapshot();
 

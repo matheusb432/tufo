@@ -13,6 +13,7 @@ mod sounds;
 
 use std::{
     collections::BTreeMap,
+    convert::Infallible,
     hash::{BuildHasher as _, Hasher as _, RandomState},
     num::NonZeroU64,
     sync::{
@@ -31,6 +32,7 @@ use sounds::{FiredSound, SoundPlayback, decoded_sound, volume_gain};
 use tokio::sync::{Mutex, oneshot, watch};
 use tufo_application::playback::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
+    add_to_queue::QueueSongError,
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
     play_queue::PlayQueueError,
@@ -47,7 +49,7 @@ use tufo_models::{
             CrossfadeDuration, MusicState, PlayerState, PositionSample, SoundCue,
             VoiceConnectionState,
         },
-        queue::{MusicQueue, QueueModes, QueueStart},
+        queue::{EnqueueError, MusicQueue, QueueModes, QueueStart, QueuedEntry, SetRepeatError},
     },
 };
 
@@ -144,6 +146,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             music: None,
             music_layers: MusicLayers::default(),
             music_generation: 0,
+            planned_queue: None,
             volume: Volume::default(),
             muted: false,
             modes: QueueModes::default(),
@@ -363,7 +366,12 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     }
 
     /// Marks a change of the current track and describes it, for [`Self::apply_music_plan`].
-    fn plan_music(engine: &mut Engine, change: MusicChange) -> Result<MusicPlan, PlayAudioError> {
+    /// `queue` waits in the engine meanwhile, so queue edits reach it.
+    fn plan_music(
+        engine: &mut Engine,
+        queue: MusicQueue,
+        change: MusicChange,
+    ) -> Result<MusicPlan, PlayAudioError> {
         let sample_rate = engine
             .output
             .as_ref()
@@ -375,6 +383,10 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         if let Some(music) = &mut engine.music {
             music.changing = true;
         }
+        engine.planned_queue = Some(PlannedQueue {
+            generation: engine.music_generation,
+            queue,
+        });
         Ok(MusicPlan {
             generation: engine.music_generation,
             change,
@@ -385,7 +397,6 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     /// Opens the planned track and makes it current, unless a later change superseded it.
     async fn apply_music_plan(&self, plan: MusicPlan) -> Result<(), PlayAudioError> {
         let MusicChange {
-            queue,
             source,
             start_offset,
             fade_in,
@@ -401,13 +412,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         if engine.music_generation != plan.generation {
             return Ok(());
         }
-        let opened = match opened {
-            Ok(opened) => opened,
-            Err(error) => {
+        let planned = engine.planned_queue.take().map(|planned| planned.queue);
+        let (opened, queue) = match (opened, planned) {
+            (Ok(opened), Some(queue)) => (opened, queue),
+            (opened, _) => {
                 if let Some(music) = &mut engine.music {
                     music.changing = false;
                 }
-                return Err(error);
+                return opened.map(drop);
             }
         };
         Self::install_music_track(
@@ -509,8 +521,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         self.ensure_output(&mut engine).await?;
         let plan = Self::plan_music(
             &mut engine,
+            queue,
             MusicChange {
-                queue,
                 source,
                 start_offset: Duration::ZERO,
                 fade_in: fade,
@@ -535,8 +547,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         {
             return Err(ControlMusicError::SeekPastEnd);
         }
+        let queue = music.queue.clone();
         let change = MusicChange {
-            queue: music.queue.clone(),
             source: TrackSource::Open(music.current.file.clone()),
             start_offset: position,
             fade_in: ANTI_CLICK_FADE,
@@ -544,7 +556,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             paused: music.paused,
         };
         self.ensure_output(&mut engine).await?;
-        let plan = Self::plan_music(&mut engine, change)?;
+        let plan = Self::plan_music(&mut engine, queue, change)?;
         drop(engine);
         Ok(self.apply_music_plan(plan).await?)
     }
@@ -573,14 +585,13 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 TrackSource::Path(next.path)
             };
             let change = MusicChange {
-                queue,
                 source,
                 start_offset: Duration::ZERO,
                 fade_in: Duration::ZERO,
                 fade_out: Duration::ZERO,
                 paused,
             };
-            match Self::plan_music(&mut engine, change) {
+            match Self::plan_music(&mut engine, queue, change) {
                 Ok(plan) => plan,
                 Err(_) => return,
             }
@@ -873,8 +884,8 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         self.ensure_output(&mut engine).await?;
         let plan = Self::plan_music(
             &mut engine,
+            queue,
             MusicChange {
-                queue,
                 source,
                 start_offset: Duration::ZERO,
                 fade_in: fade,
@@ -884,6 +895,29 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         )?;
         drop(engine);
         Ok(self.apply_music_plan(plan).await?)
+    }
+
+    async fn add_to_queue(&self, song: QueuedEntry) -> Result<(), QueueSongError> {
+        let mut engine = self.engine.lock().await;
+        let following = engine.following_entry_id();
+        engine
+            .edit_queues(|queue| queue.enqueue(song.clone()))
+            .ok_or(QueueSongError::NothingPlaying)?
+            .map_err(|EnqueueError::RepeatingTrack| QueueSongError::RepeatingTrack)?;
+        engine.disarm_unless_following(following);
+        self.publish(&engine);
+        Ok(())
+    }
+
+    async fn remove_from_queue(&self, entry_id: CollectionEntryId) {
+        let mut engine = self.engine.lock().await;
+        let following = engine.following_entry_id();
+        engine.edit_queues(|queue| {
+            queue.remove_queued(entry_id);
+            Ok::<_, Infallible>(())
+        });
+        engine.disarm_unless_following(following);
+        self.publish(&engine);
     }
 
     async fn control_music(&self, command: MusicCommand) -> Result<(), ControlMusicError> {
@@ -911,16 +945,18 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             }
             MusicCommand::SetShuffle(shuffle) => {
                 engine.modes.shuffle = shuffle;
-                if let Some(music) = &mut engine.music {
-                    music.queue.set_shuffle(shuffle, shuffle_seed());
-                }
+                let seed = shuffle_seed();
+                engine.edit_queues(|queue| {
+                    queue.set_shuffle(shuffle, seed);
+                    Ok::<_, Infallible>(())
+                });
                 engine.disarm();
             }
             MusicCommand::SetRepeat(repeat) => {
-                engine.modes.repeat = repeat;
-                if let Some(music) = &mut engine.music {
-                    music.queue.set_repeat(repeat);
+                if let Some(edited) = engine.edit_queues(|queue| queue.set_repeat(repeat)) {
+                    edited.map_err(|SetRepeatError::SongsQueued| ControlMusicError::SongsQueued)?;
                 }
+                engine.modes.repeat = repeat;
                 engine.disarm();
             }
             MusicCommand::SetCrossfade(crossfade) => {
@@ -1137,6 +1173,7 @@ struct Engine {
     music_layers: MusicLayers<MusicLayer>,
     /// Advances whenever the current track changes, so superseded changes don't apply.
     music_generation: u64,
+    planned_queue: Option<PlannedQueue>,
     volume: Volume,
     muted: bool,
     modes: QueueModes,
@@ -1234,6 +1271,55 @@ impl Engine {
         }
     }
 
+    /// The queue a track change in flight installs, else the playing one.
+    fn upcoming_queue(&self) -> Option<&MusicQueue> {
+        match &self.planned_queue {
+            Some(planned) if planned.generation == self.music_generation => Some(&planned.queue),
+            _ => self.music.as_ref().map(|music| &music.queue),
+        }
+    }
+
+    /// Applies `edit` to the queue a track change in flight installs, then to the playing queue,
+    /// so the edit survives whether the change applies or fails. Returns the first queue's
+    /// result, or `None` without a queue.
+    fn edit_queues<E>(
+        &mut self,
+        mut edit: impl FnMut(&mut MusicQueue) -> Result<(), E>,
+    ) -> Option<Result<(), E>> {
+        let generation = self.music_generation;
+        let planned = self
+            .planned_queue
+            .as_mut()
+            .filter(|planned| planned.generation == generation)
+            .map(|planned| &mut planned.queue);
+        let playing = self.music.as_mut().map(|music| &mut music.queue);
+        let (first, second) = match (planned, playing) {
+            (Some(planned), playing) => (planned, playing),
+            (None, Some(playing)) => (playing, None),
+            (None, None) => return None,
+        };
+        let edited = edit(first);
+        if edited.is_ok()
+            && let Some(second) = second
+        {
+            // The change in flight replaces the playing queue, which may refuse what it accepted.
+            let _ = edit(second);
+        }
+        Some(edited)
+    }
+
+    fn following_entry_id(&self) -> Option<CollectionEntryId> {
+        let music = self.music.as_ref()?;
+        music.queue.following().map(|entry| entry.entry_id)
+    }
+
+    /// Drops the armed track when a queue edit changed the track that follows.
+    fn disarm_unless_following(&mut self, following: Option<CollectionEntryId>) {
+        if self.following_entry_id() != following {
+            self.disarm();
+        }
+    }
+
     fn apply_music_volume(&mut self) {
         let gain = volume_gain(self.volume, self.muted);
         if let Some(output) = &mut self.output {
@@ -1309,7 +1395,7 @@ impl Engine {
             output: self.target,
             voice: self.voice.clone(),
             music: self.music.as_ref().map(|music| MusicState {
-                collection_id: music.queue.collection_id(),
+                collection_id: music.queue.current_collection_id(),
                 entry: music.queue.current().clone(),
                 position: PositionSample {
                     position: music.current.position(),
@@ -1318,6 +1404,10 @@ impl Engine {
                 duration: music.current.duration,
                 paused: music.paused,
             }),
+            queued_entry_ids: self
+                .upcoming_queue()
+                .map(|queue| queue.queued().map(|song| song.entry.entry_id).collect())
+                .unwrap_or_default(),
             music_layers: self.music_layers.map(|layer| layer.snapshot(sampled_at)),
             volume: self.volume,
             muted: self.muted,
@@ -1329,14 +1419,19 @@ impl Engine {
     }
 }
 
-/// A change of the current track: the queue it leaves behind and how the track starts.
+/// How the new current track starts.
 struct MusicChange {
-    queue: MusicQueue,
     source: TrackSource,
     start_offset: Duration,
     fade_in: Duration,
     fade_out: Duration,
     paused: bool,
+}
+
+/// The queue a track change leaves behind, from planning until its track opens.
+struct PlannedQueue {
+    generation: u64,
+    queue: MusicQueue,
 }
 
 struct MusicPlan {

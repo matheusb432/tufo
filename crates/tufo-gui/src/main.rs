@@ -370,6 +370,8 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_play_collection, |id| controller.play_collection(&id));
     on!(controller => on_play_track, |id| controller.play_track(&id));
     on!(controller => on_add_music_layer, |id| controller.add_music_layer(&id));
+    on!(controller => on_add_to_queue, |id| controller.add_to_queue(&id));
+    on!(controller => on_remove_from_queue, |id| controller.remove_from_queue(&id));
     on!(controller => on_stop_music_layer, |id| controller.stop_music_layer(&id));
     on!(controller => on_set_music_layer_volume, |id, volume| controller.set_music_layer_volume(&id, volume));
     on!(controller => on_set_music_layer_looping, |id, looping| controller.set_music_layer_looping(&id, looping));

@@ -34,6 +34,16 @@ pub fn add_music_layer_request(
     entry_id(&request.collection_entry_id, "collection_entry_id")
 }
 
+pub fn add_to_queue_request(request: &pb::AddToQueueRequest) -> Result<CollectionEntryId, Status> {
+    entry_id(&request.collection_entry_id, "collection_entry_id")
+}
+
+pub fn remove_from_queue_request(
+    request: &pb::RemoveFromQueueRequest,
+) -> Result<CollectionEntryId, Status> {
+    entry_id(&request.collection_entry_id, "collection_entry_id")
+}
+
 pub fn stop_music_layer_request(
     request: &pb::StopMusicLayerRequest,
 ) -> Result<CollectionEntryId, Status> {
@@ -126,6 +136,11 @@ pub fn watch_player_response(state: &PlayerState) -> pb::WatchPlayerResponse {
             output: Some(output_message(state.output)),
             voice: Some(voice_message(&state.voice)),
             music: state.music.as_ref().map(music_message),
+            queued_collection_entry_ids: state
+                .queued_entry_ids
+                .iter()
+                .map(ToString::to_string)
+                .collect(),
             music_layers: state
                 .music_layers
                 .iter()
@@ -256,6 +271,15 @@ pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, In
             .map_err(|_| invalid("output"))?,
         voice: voice_state(state.voice.ok_or(invalid("voice"))?)?,
         music: state.music.map(music_state).transpose()?,
+        queued_entry_ids: state
+            .queued_collection_entry_ids
+            .iter()
+            .map(|id| {
+                parse_uuid(id)
+                    .map(CollectionEntryId::from_uuid)
+                    .ok_or(invalid("queued_collection_entry_ids"))
+            })
+            .collect::<Result<_, _>>()?,
         music_layers: music_layers_state(state.music_layers)?,
         volume: Volume::try_new(state.volume).map_err(|_| invalid("volume"))?,
         muted: state.muted,
@@ -524,6 +548,10 @@ mod tests {
                 looping: true,
             }],
             sounds_paused: true,
+            queued_entry_ids: vec![
+                CollectionEntryId::from_uuid(uuid::Uuid::from_u128(6)),
+                CollectionEntryId::from_uuid(id),
+            ],
             music_layers: MusicLayers::default(),
         };
 

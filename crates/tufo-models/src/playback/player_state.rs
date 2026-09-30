@@ -40,6 +40,8 @@ pub struct PlayerState {
     pub output: OutputTarget,
     pub voice: VoiceConnectionState,
     pub music: Option<MusicState>,
+    /// The songs added to the queue, in the order they play.
+    pub queued_entry_ids: Vec<CollectionEntryId>,
     pub music_layers: MusicLayers<MusicLayerState>,
     pub volume: Volume,
     pub muted: bool,
@@ -65,6 +67,7 @@ impl Default for PlayerState {
             output: OutputTarget::Local,
             voice: VoiceConnectionState::NotConfigured,
             music: None,
+            queued_entry_ids: Vec::new(),
             music_layers: MusicLayers::default(),
             volume: Volume::default(),
             muted: false,

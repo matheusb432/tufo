@@ -20,7 +20,8 @@ use tufo_application::{
     library::{Library, import_paths, update_collection_entry},
     playback::{
         add_music_layer::{AddMusicLayerError, MusicLayerCue},
-        control_music::MusicCommand,
+        add_to_queue::{self, QueueSongError},
+        control_music::{ControlMusicError, MusicCommand},
         control_sounds::{self, SoundsCommand},
         play_entry_sound,
         player::Player,
@@ -47,7 +48,7 @@ use tufo_models::{
         AudioFilePath, OutputTarget,
         diagnostics::VoicePacing,
         player_state::{CrossfadeDuration, PlayerState, SoundCue, VoiceConnectionState},
-        queue::{QueueEntry, QueueStart, RepeatMode},
+        queue::{QueueEntry, QueueStart, QueuedEntry, RepeatMode},
     },
 };
 use tufo_wire::library::{ImportPaths, UpdateCollectionEntry};
@@ -361,6 +362,14 @@ fn entry(path: AudioFilePath, title: &str) -> QueueEntry {
     }
 }
 
+/// A song from another playlist than the one playing.
+fn queued(path: AudioFilePath, title: &str) -> QueuedEntry {
+    QueuedEntry {
+        collection_id: CollectionId::from_uuid(Uuid::now_v7()),
+        entry: entry(path, title),
+    }
+}
+
 fn voice_channel() -> OutputTarget {
     OutputTarget::DiscordVoice(VoiceChannelTarget {
         guild_id: GuildId::new(NonZeroU64::MIN),
@@ -619,6 +628,119 @@ async fn a_queue_plays_its_tracks_back_to_back_and_stops_after_the_last() -> any
     assert!(within(&played[13_400..26_300], -0.25, 0.01));
     assert!(within(&played[26_600..], 0.0, 0.01));
     assert_eq!(rig.player.diagnostics().music_underrun_frames, 0);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_queued_song_plays_between_two_tracks_without_a_gap() -> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let first = rig.file("first.wav", &constant(0.5, 14_400))?;
+    let second = rig.file("second.wav", &constant(-0.25, 14_400))?;
+    let boss = queued(rig.file("boss.wav", &constant(0.75, 14_400))?, "Boss");
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Off))
+        .await?;
+    rig.control(MusicCommand::SetCrossfade(CrossfadeDuration::try_new(
+        Duration::ZERO,
+    )?))
+    .await?;
+
+    rig.play(vec![entry(first, "First"), entry(second, "Second")])
+        .await?;
+    rig.player.add_to_queue(boss.clone()).await?;
+    let queued_ids = rig.state().queued_entry_ids;
+    let during_boss = rig
+        .wait_for(|state| playing_title(state) == Some("Boss"))
+        .await?;
+    rig.wait_for(|state| playing_title(state) == Some("Second"))
+        .await?;
+    rig.wait_for(|state| state.music.is_none()).await?;
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    assert_eq!(queued_ids, [boss.entry.entry_id]);
+    assert!(during_boss.queued_entry_ids.is_empty());
+    assert_eq!(
+        during_boss.music.map(|music| music.collection_id),
+        Some(boss.collection_id)
+    );
+    let captures = rig.sound_card.captures();
+    let played = from_first_sound(&captures[0]);
+    assert!(within(&played[100..13_100], 0.5, 0.01));
+    assert!(within(&played[13_400..26_300], 0.75, 0.01));
+    assert!(within(&played[26_600..39_500], -0.25, 0.01));
+    assert_eq!(rig.player.diagnostics().music_underrun_frames, 0);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn queued_songs_and_repeating_one_track_exclude_each_other() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let main = rig.file("main.wav", &constant(0.1, THREE_SECONDS))?;
+    let boss = queued(rig.file("boss.wav", &constant(0.5, THREE_SECONDS))?, "Boss");
+
+    let before_music = rig.player.add_to_queue(boss.clone()).await;
+    rig.play(vec![entry(main, "Main")]).await?;
+    rig.player.add_to_queue(boss.clone()).await?;
+    let repeating_track = rig
+        .player
+        .control_music(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await;
+    let repeat_while_queued = rig.state().modes.repeat;
+    rig.player.remove_from_queue(boss.entry.entry_id).await;
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await?;
+    let while_repeating_track = rig.player.add_to_queue(boss).await;
+
+    assert_eq!(before_music, Err(QueueSongError::NothingPlaying));
+    assert!(matches!(
+        repeating_track,
+        Err(ControlMusicError::SongsQueued)
+    ));
+    assert_eq!(repeat_while_queued, RepeatMode::Playlist);
+    assert_eq!(while_repeating_track, Err(QueueSongError::RepeatingTrack));
+    assert!(rig.state().queued_entry_ids.is_empty());
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn queuing_with_nothing_playing_starts_the_song_in_its_playlist() -> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let folder = rig.directory.path().join("combat");
+    std::fs::create_dir_all(&folder)?;
+    write_wav(
+        &folder.join("ambush.wav"),
+        SAMPLE_RATE,
+        &constant(0.2, THREE_SECONDS),
+    )?;
+    write_wav(
+        &folder.join("boss.wav"),
+        SAMPLE_RATE,
+        &constant(0.3, THREE_SECONDS),
+    )?;
+    let database = open_database(&rig.directory.path().join("tufo.sqlite3")).await?;
+    let library = Library::open(database, DiskLibraryFiles).await?;
+    import_paths::execute(
+        ImportPaths {
+            kind: CollectionKind::Playlist,
+            paths: vec![LocalPath::try_new(folder)?],
+        },
+        &library,
+    )
+    .await?;
+    let playlist = library.watch().borrow().collections[0].clone();
+    let boss = playlist
+        .entries
+        .iter()
+        .find(|entry| entry.title.as_str() == "boss")
+        .context("the playlist lists the boss track")?
+        .id;
+
+    add_to_queue::execute(boss, &library, rig.player.as_ref()).await?;
+
+    let state = rig.wait_for(|state| state.music.is_some()).await?;
+    let music = state.music.context("the song plays")?;
+    assert_eq!(music.entry.entry_id, boss);
+    assert_eq!(music.collection_id, playlist.id);
+    assert!(state.queued_entry_ids.is_empty());
     Ok(())
 }
 

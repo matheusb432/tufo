@@ -319,7 +319,8 @@ component Transport inherits HorizontalLayout {
         icon: PlayerView.repeat == 2 ? @image-url("icons/repeat-1.svg") : @image-url("icons/repeat.svg");
         tint: PlayerView.repeat == 0 ? Theme.text-secondary : Theme.accent;
         hover-tint: PlayerView.repeat == 0 ? Theme.text : Theme.accent;
-        tooltip: PlayerView.repeat == 0 ? @tr("Repeat the playlist") : PlayerView.repeat == 1 ? @tr("Repeat the track") : @tr("Stop repeating");
+        tooltip: PlayerView.repeat == 0 ? (PlayerView.songs-queued ? @tr("Repeat the queue") : @tr("Repeat the playlist"))
+            : PlayerView.repeat == 1 && !PlayerView.songs-queued ? @tr("Repeat the track") : @tr("Stop repeating");
         clicked => {
             Actions.cycle-repeat();
         }

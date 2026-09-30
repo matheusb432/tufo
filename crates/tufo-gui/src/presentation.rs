@@ -84,6 +84,8 @@ pub(crate) struct TrackRowView {
     pub(crate) missing: bool,
     pub(crate) current: bool,
     pub(crate) playing: bool,
+    /// Its place in the queue, from 1.
+    pub(crate) queue_number: Option<usize>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -395,6 +397,11 @@ fn track_row(entry: &EntryView, player: &PlayerState) -> TrackRowView {
         missing: entry.missing,
         current: current.is_some(),
         playing: current.is_some_and(|music| !music.paused),
+        queue_number: player
+            .queued_entry_ids
+            .iter()
+            .position(|id| *id == entry.id)
+            .map(|index| index + 1),
     }
 }
 
@@ -666,6 +673,7 @@ pub(crate) struct PlayerBarView {
     pub(crate) muted: bool,
     pub(crate) shuffle: bool,
     pub(crate) repeat: i32,
+    pub(crate) songs_queued: bool,
     pub(crate) sounds: Vec<SoundChipView>,
     pub(crate) sounds_paused: bool,
 }
@@ -770,8 +778,19 @@ pub(crate) fn player_bar(
             RepeatMode::Playlist => 1,
             RepeatMode::Track => 2,
         },
+        songs_queued: !player.queued_entry_ids.is_empty(),
         sounds,
         sounds_paused: player.sounds_paused,
+    }
+}
+
+/// The repeat mode after `repeat`, the way Kenku FM cycles: playlist, then track, then off.
+/// Queued songs skip repeating one track, which excludes them.
+pub(crate) fn next_repeat_mode(repeat: RepeatMode, songs_queued: bool) -> RepeatMode {
+    match repeat {
+        RepeatMode::Playlist if !songs_queued => RepeatMode::Track,
+        RepeatMode::Playlist | RepeatMode::Track => RepeatMode::Off,
+        RepeatMode::Off => RepeatMode::Playlist,
     }
 }
 
@@ -1097,9 +1116,9 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             set_discord_bot_token::SetDiscordBotTokenError,
         },
         playback::{
-            add_music_layer::AddMusicLayerError, control_music::ControlMusicError,
-            play_entry_sound::PlayEntrySoundError, player::PlayAudioError,
-            select_output::SelectOutputError,
+            add_music_layer::AddMusicLayerError, add_to_queue::AddToQueueError,
+            control_music::ControlMusicError, play_entry_sound::PlayEntrySoundError,
+            player::PlayAudioError, select_output::SelectOutputError,
         },
     };
     if let Some(text) = library_reason_text(code, reason) {
@@ -1107,11 +1126,18 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
     }
     Some(match (code, reason) {
         (Code::NotFound, PlayAudioError::NOT_FOUND)
-        | (Code::FailedPrecondition, PlayEntrySoundError::MISSING | AddMusicLayerError::MISSING) => {
-            tr("The audio file is missing. Restore it and try again.")
-        }
-        (Code::NotFound, AddMusicLayerError::NOT_FOUND) => {
+        | (
+            Code::FailedPrecondition,
+            PlayEntrySoundError::MISSING | AddMusicLayerError::MISSING | AddToQueueError::MISSING,
+        ) => tr("The audio file is missing. Restore it and try again."),
+        (Code::NotFound, AddMusicLayerError::NOT_FOUND | AddToQueueError::NOT_FOUND) => {
             tr("That track or sound no longer exists.")
+        }
+        (Code::FailedPrecondition, AddToQueueError::REPEATING_TRACK) => {
+            tr("Stop repeating the song to queue others.")
+        }
+        (Code::FailedPrecondition, ControlMusicError::SONGS_QUEUED) => {
+            tr("Remove the queued songs to repeat one song.")
         }
         (Code::FailedPrecondition, AddMusicLayerError::FULL) => {
             tr("The mix has three songs. Stop a layer before adding another.")

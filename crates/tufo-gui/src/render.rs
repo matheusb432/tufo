@@ -192,6 +192,10 @@ pub(crate) fn library(
                     missing: track.missing,
                     current: track.current,
                     playing: track.playing,
+                    queue_number: track
+                        .queue_number
+                        .and_then(|number| i32::try_from(number).ok())
+                        .unwrap_or(0),
                 })
                 .collect(),
         ));
@@ -263,6 +267,7 @@ pub(crate) fn player(
         view.set_muted(bar.muted);
         view.set_shuffle(bar.shuffle);
         view.set_repeat(bar.repeat);
+        view.set_songs_queued(bar.songs_queued);
         view.set_sounds_paused(bar.sounds_paused);
         let session = window.global::<Session>();
         session.set_outputs(model(drawer.rows.into_iter().map(output_row).collect()));

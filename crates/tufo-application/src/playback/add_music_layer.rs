@@ -1,13 +1,14 @@
 //! Playing one playlist song alongside the music already playing.
 
 use tufo_models::{
-    library::{CollectionEntryId, CollectionId, CollectionKind},
+    library::{CollectionEntryId, CollectionId},
     playback::queue::QueueEntry,
 };
 
 use super::{
     play_queue::PlayQueueError,
     player::{PlayAudioError, Player},
+    playlist_song::{find_playlist_song, queue_entry},
 };
 use crate::{
     error::ErrorMeta,
@@ -53,29 +54,14 @@ pub async fn execute<F: LibraryFiles>(
 ) -> Result<(), AddMusicLayerError> {
     let cue = {
         let snapshot = library.watch().borrow().clone();
-        let (collection, entry) = snapshot
-            .collections
-            .iter()
-            .filter(|collection| collection.kind == CollectionKind::Playlist)
-            .find_map(|collection| {
-                collection
-                    .entries
-                    .iter()
-                    .find(|entry| entry.id == entry_id)
-                    .map(|entry| (collection, entry))
-            })
-            .ok_or(AddMusicLayerError::NotFound)?;
+        let (collection, entry) =
+            find_playlist_song(&snapshot, entry_id).ok_or(AddMusicLayerError::NotFound)?;
         if entry.missing {
             return Err(AddMusicLayerError::Missing);
         }
         MusicLayerCue {
             collection_id: collection.id,
-            entry: QueueEntry {
-                entry_id,
-                path: entry.path.clone(),
-                title: entry.title.as_str().to_owned(),
-                duration: Some(entry.duration),
-            },
+            entry: queue_entry(entry),
         }
     };
     player.add_music_layer(cue).await

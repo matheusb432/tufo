@@ -70,6 +70,8 @@ export struct TrackRow {
     // A song in the mix, playing or paused.
     current: bool,
     playing: bool,
+    // Its place in the queue, from 1, or 0.
+    queue-number: int,
 }
 
 export struct SoundTile {
@@ -202,6 +204,7 @@ export global PlayerView {
     in property <bool> shuffle;
     // 0 off, 1 playlist, 2 track.
     in property <int> repeat: 1;
+    in property <bool> songs-queued;
     in property <[SoundChip]> sounds;
     in property <bool> sounds-paused;
     out property <bool> something-plays: (self.has-playback && self.playing) || (self.sounds.length > 0 && !self.sounds-paused);
@@ -297,6 +300,8 @@ export global Actions {
     callback play-collection(string);
     callback play-track(string);
     callback add-music-layer(string);
+    callback add-to-queue(string);
+    callback remove-from-queue(string);
     callback stop-music-layer(string);
     callback set-music-layer-volume(string, float);
     callback set-music-layer-looping(string, bool);

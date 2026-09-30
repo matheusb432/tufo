@@ -876,6 +876,10 @@ msgid "Repeat the playlist"
 msgstr "Repetir a playlist"
 
 #: ui/dock.slint
+msgid "Repeat the queue"
+msgstr "Repetir a fila"
+
+#: ui/dock.slint
 msgid "Repeat the track"
 msgstr "Repetir a faixa"
 
@@ -1371,6 +1375,18 @@ msgstr "Adicionar à mixagem"
 msgid "Mix full (3 songs)"
 msgstr "Mixagem cheia (3 músicas)"
 
+#: ui/pages.slint
+msgid "Add to queue"
+msgstr "Adicionar à fila"
+
+#: ui/pages.slint
+msgid "Remove from queue"
+msgstr "Remover da fila"
+
+#: ui/pages.slint
+msgid "Queue off (repeating one song)"
+msgstr "Fila desativada (repetindo uma música)"
+
 #: ui/dock.slint
 msgid "Mix · {0}"
 msgstr "Mix · {0}"
@@ -1390,6 +1406,14 @@ msgstr "Faixa principal"
 #: src/presentation.rs
 msgid "The mix has three songs. Stop a layer before adding another."
 msgstr "A mixagem tem três músicas. Pare uma camada antes de adicionar outra."
+
+#: src/presentation.rs
+msgid "Stop repeating the song to queue others."
+msgstr "Pare de repetir a música para enfileirar outras."
+
+#: src/presentation.rs
+msgid "Remove the queued songs to repeat one song."
+msgstr "Remova as músicas da fila para repetir uma música."
 
 #: ui/pages.slint
 msgid "Date added"

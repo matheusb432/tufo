@@ -258,3 +258,52 @@ async fn playback_failures_identify_the_application_reason_without_rpc_context()
     server.stop().await.unwrap();
     Ok(())
 }
+
+#[tokio::test]
+async fn queue_rpcs_reject_invalid_unknown_and_missing_songs() -> anyhow::Result<()> {
+    use tufo_application::playback::add_to_queue::AddToQueueError;
+    use tufo_client::error;
+    use tufo_wire::pb;
+
+    let server = TestServer::start().await?;
+    let client = server.client()?;
+    let unknown = CollectionEntryId::from_uuid(uuid::Uuid::from_u128(1));
+    let unknown_added = client.add_to_queue(unknown).await;
+    let unknown_removed = client.remove_from_queue(unknown).await;
+    let mut raw = pb::player_service_client::PlayerServiceClient::new(server.channel().await?);
+    let invalid = raw
+        .add_to_queue(pb::AddToQueueRequest {
+            collection_entry_id: "invalid".to_owned(),
+        })
+        .await;
+    let music = tempfile::tempdir()?;
+    let file = music.path().join("ambush.wav");
+    write_wav(&file, 440.0)?;
+    // A hand-picked playlist keeps a song whose file vanished, marked missing.
+    client
+        .import_paths(&ImportPaths {
+            kind: CollectionKind::Playlist,
+            paths: vec![LocalPath::try_new(file.clone())?],
+        })
+        .await?;
+    let mut library = client.watch_library().await?;
+    let snapshot = library.next().await.transpose()?.unwrap();
+    let entry_id = snapshot.collections[0].entries[0].id;
+    std::fs::remove_file(&file)?;
+    client.rescan_library().await?;
+    let missing = client.add_to_queue(entry_id).await;
+    server.stop().await?;
+
+    assert_eq!(status_code(unknown_added), Some(Code::NotFound));
+    assert!(unknown_removed.is_ok());
+    assert_eq!(invalid.unwrap_err().code(), Code::InvalidArgument);
+    let Err(ClientError::Status(missing)) = missing else {
+        anyhow::bail!("expected a remote failure");
+    };
+    assert_eq!(missing.code(), Code::FailedPrecondition);
+    assert_eq!(
+        error::reason(&missing).as_deref(),
+        Some(AddToQueueError::MISSING)
+    );
+    Ok(())
+}

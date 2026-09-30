@@ -2,12 +2,12 @@ use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::playback::{
-    add_music_layer,
+    add_music_layer, add_to_queue,
     control_music::{self, MusicCommand},
     control_sounds::{self, SoundsCommand},
-    get_diagnostics, play_collection, play_entry_sound, resume_saved_loops, select_output,
-    stand_by, stop_music_layer, stop_sound, update_music_layer, update_player_settings,
-    watch_player,
+    get_diagnostics, play_collection, play_entry_sound, remove_from_queue, resume_saved_loops,
+    select_output, stand_by, stop_music_layer, stop_sound, update_music_layer,
+    update_player_settings, watch_player,
 };
 use tufo_models::playback::player_state::PlayerState;
 use tufo_wire::{
@@ -112,6 +112,26 @@ impl PlayerService for PlayerGrpcService {
         let (entry_id, update) = proto::player::update_music_layer_request(request.get_ref())?;
         update_music_layer::execute(entry_id, update, self.state.player.as_ref()).await;
         Ok(Response::new(pb::UpdateMusicLayerResponse {}))
+    }
+
+    async fn add_to_queue(
+        &self,
+        request: Request<pb::AddToQueueRequest>,
+    ) -> Result<Response<pb::AddToQueueResponse>, Status> {
+        let entry_id = proto::player::add_to_queue_request(request.get_ref())?;
+        add_to_queue::execute(entry_id, &self.state.library, self.state.player.as_ref())
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::AddToQueueResponse {}))
+    }
+
+    async fn remove_from_queue(
+        &self,
+        request: Request<pb::RemoveFromQueueRequest>,
+    ) -> Result<Response<pb::RemoveFromQueueResponse>, Status> {
+        let entry_id = proto::player::remove_from_queue_request(request.get_ref())?;
+        remove_from_queue::execute(entry_id, self.state.player.as_ref()).await;
+        Ok(Response::new(pb::RemoveFromQueueResponse {}))
     }
 
     async fn resume_music(

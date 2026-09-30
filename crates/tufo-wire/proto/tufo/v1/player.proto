@@ -22,6 +22,12 @@ service PlayerService {
   rpc StopMusicLayer(StopMusicLayerRequest) returns (StopMusicLayerResponse);
   // Changes only the settings present. An absent extra song is ignored.
   rpc UpdateMusicLayer(UpdateMusicLayerRequest) returns (UpdateMusicLayerResponse);
+  // Queues a playlist song after the songs already queued, from any playlist; the playlist
+  // continues after them. Plays the song now when no music plays. Queuing a queued song leaves it
+  // in place. FAILED_PRECONDITION while one track repeats.
+  rpc AddToQueue(AddToQueueRequest) returns (AddToQueueResponse);
+  // Takes a song out of the queue. Removing a song that isn't queued succeeds.
+  rpc RemoveFromQueue(RemoveFromQueueRequest) returns (RemoveFromQueueResponse);
   // Pauses every music layer. FAILED_PRECONDITION when nothing plays.
   rpc PauseMusic(PauseMusicRequest) returns (PauseMusicResponse);
   // Resumes every music layer. FAILED_PRECONDITION when nothing plays.
@@ -34,7 +40,8 @@ service PlayerService {
   rpc SkipToPreviousTrack(SkipToPreviousTrackRequest) returns (SkipToPreviousTrackResponse);
   // Moves the current track to a position.
   rpc SeekMusic(SeekMusicRequest) returns (SeekMusicResponse);
-  // Changes the settings present in the request and leaves the others.
+  // Changes the settings present in the request and leaves the others. Repeating one track is
+  // FAILED_PRECONDITION while songs are queued.
   rpc UpdatePlayerSettings(UpdatePlayerSettingsRequest) returns (UpdatePlayerSettingsResponse);
   // Fires one soundboard entry over the music, restarting it when it already plays.
   rpc PlaySound(PlaySoundRequest) returns (PlaySoundResponse);
@@ -76,6 +83,9 @@ message PlayerState {
   bool sounds_paused = 10;
   // At most two extra songs, accompanying the main playlist track.
   repeated MusicLayerState music_layers = 11;
+  // The songs added to the queue, in the order they play. With repeat on, a queued song that
+  // plays now is last, since it comes around again.
+  repeated string queued_collection_entry_ids = 12;
 }
 
 message MusicLayerState {
@@ -185,6 +195,18 @@ message UpdateMusicLayerRequest {
 }
 
 message UpdateMusicLayerResponse {}
+
+message AddToQueueRequest {
+  string collection_entry_id = 1;
+}
+
+message AddToQueueResponse {}
+
+message RemoveFromQueueRequest {
+  string collection_entry_id = 1;
+}
+
+message RemoveFromQueueResponse {}
 
 message PauseMusicRequest {}
 

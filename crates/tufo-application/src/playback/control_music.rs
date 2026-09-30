@@ -34,6 +34,9 @@ pub enum ControlMusicError {
     #[error("the position is past the end of the track")]
     #[meta(class = FailedPrecondition, reason = Self::SEEK_PAST_END)]
     SeekPastEnd,
+    #[error("one track can't repeat while songs are queued")]
+    #[meta(class = FailedPrecondition, reason = Self::SONGS_QUEUED)]
+    SongsQueued,
     #[error(transparent)]
     #[meta(transparent)]
     Audio(#[from] PlayAudioError),
@@ -42,6 +45,7 @@ pub enum ControlMusicError {
 impl ControlMusicError {
     pub const NOTHING_PLAYING: &'static str = "playback.control_music.nothing_playing";
     pub const SEEK_PAST_END: &'static str = "playback.control_music.seek_past_end";
+    pub const SONGS_QUEUED: &'static str = "playback.control_music.songs_queued";
 }
 
 /// Applies `command` to the music. Stopping while nothing plays succeeds.

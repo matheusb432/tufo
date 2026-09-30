@@ -14,7 +14,7 @@ use tufo_models::{
         AudioFile, Collection, CollectionEntry, CollectionId, CollectionKind, SoundSettings,
     },
     path::FolderPath,
-    playback::AudioFilePath,
+    playback::{AudioFilePath, queue::RepeatMode},
 };
 use tufo_wire::{
     library::{ImportKenkuLibrary, KenkuImportReport},
@@ -64,19 +64,8 @@ pub async fn execute<F: LibraryFiles>(
     let data = reader.read(request.kenku_folder).await?;
     let kenku = data.library;
     let mut report = import_collections(kenku.collections, library).await?;
-    let KenkuPlayerSettings {
-        volume,
-        muted,
-        shuffle,
-        repeat,
-    } = kenku.player_settings;
-    let update = UpdatePlayerSettings {
-        volume,
-        muted,
-        shuffle,
-        repeat,
-        crossfade: None,
-    };
+    let songs_queued = !player.watch_player().borrow().queued_entry_ids.is_empty();
+    let update = settings_update(kenku.player_settings, songs_queued);
     if update != UpdatePlayerSettings::default() {
         update_player_settings::execute(update, player, library.database()).await?;
     }
@@ -90,6 +79,23 @@ pub async fn execute<F: LibraryFiles>(
         };
     }
     Ok(report)
+}
+
+/// Songs queued now keep Kenku FM's repeat-one out, since repeating one track refuses them.
+fn settings_update(kenku: KenkuPlayerSettings, songs_queued: bool) -> UpdatePlayerSettings {
+    let KenkuPlayerSettings {
+        volume,
+        muted,
+        shuffle,
+        repeat,
+    } = kenku;
+    UpdatePlayerSettings {
+        volume,
+        muted,
+        shuffle,
+        repeat: repeat.filter(|repeat| !(songs_queued && *repeat == RepeatMode::Track)),
+        crossfade: None,
+    }
 }
 
 async fn import_collections<F: LibraryFiles>(
@@ -286,4 +292,34 @@ async fn apply_file_settings(
     }
     transaction.commit().await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn queued_songs_keep_kenkus_repeat_one_out_of_the_settings() {
+        let repeating_track = KenkuPlayerSettings {
+            volume: None,
+            muted: Some(true),
+            shuffle: None,
+            repeat: Some(RepeatMode::Track),
+        };
+        let repeating_playlist = KenkuPlayerSettings {
+            repeat: Some(RepeatMode::Playlist),
+            ..repeating_track
+        };
+
+        assert_eq!(settings_update(repeating_track, true).repeat, None);
+        assert_eq!(settings_update(repeating_track, true).muted, Some(true));
+        assert_eq!(
+            settings_update(repeating_track, false).repeat,
+            Some(RepeatMode::Track)
+        );
+        assert_eq!(
+            settings_update(repeating_playlist, true).repeat,
+            Some(RepeatMode::Playlist)
+        );
+    }
 }
