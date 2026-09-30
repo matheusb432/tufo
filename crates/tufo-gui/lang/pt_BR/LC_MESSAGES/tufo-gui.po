@@ -7,43 +7,43 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: src/controller.rs:444
+#: src/controller.rs
 msgid "A name needs at least one character."
 msgstr "O nome precisa ter pelo menos um caractere."
 
-#: ui/dialogs.slint:220
+#: ui/dialogs.slint
 msgid "Add"
 msgstr "Adicionar"
 
-#: ui/dialogs.slint:165 ui/pages.slint:378 ui/sidebar.slint:436
+#: ui/dialogs.slint ui/pages.slint ui/sidebar.slint
 msgid "Add Playlist"
 msgstr "Adicionar playlist"
 
-#: ui/dialogs.slint:165 ui/pages.slint:378 ui/sidebar.slint:461
+#: ui/dialogs.slint ui/pages.slint ui/sidebar.slint
 msgid "Add Soundboard"
 msgstr "Adicionar painel de sons"
 
-#: src/presentation.rs:1080
+#: src/presentation.rs
 msgid "Add a Discord bot token in Settings first."
 msgstr "Adicione um token de bot do Discord nas Configurações primeiro."
 
-#: ui/pages.slint:262
+#: ui/pages.slint
 msgid "Add a playlist"
 msgstr "Adicionar uma playlist"
 
-#: ui/pages.slint:262
+#: ui/pages.slint
 msgid "Add a soundboard"
 msgstr "Adicionar um painel de sons"
 
-#: ui/pages.slint:518
+#: ui/pages.slint
 msgid "Add files…"
 msgstr "Adicionar arquivos…"
 
-#: src/render.rs:431
+#: src/render.rs
 msgid "Added {0} with {1}."
 msgstr "Adição concluída: {0} com {1}."
 
-#: src/render.rs:430
+#: src/render.rs
 msgid "Added {n} file."
 msgid_plural "Added {n} files."
 msgstr[0] "{n} arquivo adicionado."
@@ -53,7 +53,7 @@ msgstr[1] "{n} arquivos adicionados."
 msgid "Alarm"
 msgstr "Alarme"
 
-#: src/presentation.rs:482
+#: src/presentation.rs
 msgid "Albert Bierstadt, 1863"
 msgstr "Albert Bierstadt, 1863"
 
@@ -61,7 +61,7 @@ msgstr "Albert Bierstadt, 1863"
 msgid "Alchemy"
 msgstr "Alquimia"
 
-#: src/presentation.rs:481
+#: src/presentation.rs
 msgid "Arnold Böcklin, 1880"
 msgstr "Arnold Böcklin, 1880"
 
@@ -69,27 +69,27 @@ msgstr "Arnold Böcklin, 1880"
 msgid "Arrows"
 msgstr "Flechas"
 
-#: ui/sidebar.slint:656
+#: ui/sidebar.slint
 msgid "Asleep while nothing plays"
 msgstr "Dormindo enquanto nada toca"
 
-#: src/controller.rs:588
+#: src/controller.rs
 msgid "Audio"
 msgstr "Áudio"
 
-#: ui/dialogs.slint:489
+#: ui/dialogs.slint
 msgid "Audio keeps playing after the GUI closes."
 msgstr "O áudio continua tocando depois que a interface fecha."
 
-#: ui/dialogs.slint:498
+#: ui/dialogs.slint
 msgid "Automatically start Tufo when you log in."
 msgstr "Inicia o Tufo automaticamente quando você entra no sistema."
 
-#: src/presentation.rs:446
+#: src/presentation.rs
 msgid "Autumn"
 msgstr "Outono"
 
-#: ui/sidebar.slint:656
+#: ui/sidebar.slint
 msgid "Awake while something plays"
 msgstr "Acordado enquanto algo toca"
 
@@ -97,27 +97,27 @@ msgstr "Acordado enquanto algo toca"
 msgid "Axe"
 msgstr "Machado"
 
-#: ui/pages.slint:553
+#: ui/pages.slint
 msgid "Back to Playlists"
 msgstr "Voltar às playlists"
 
-#: ui/pages.slint:553
+#: ui/pages.slint
 msgid "Back to Soundboards"
 msgstr "Voltar aos painéis de sons"
 
-#: ui/app.slint:408
+#: ui/app.slint
 msgid "Background for the new playlist"
 msgstr "Fundo da nova playlist"
 
-#: ui/app.slint:408
+#: ui/app.slint
 msgid "Background for the new soundboard"
 msgstr "Fundo do novo painel de sons"
 
-#: ui/app.slint:408 ui/app.slint:418
+#: ui/app.slint
 msgid "Background for {0}"
 msgstr "Fundo de {0}"
 
-#: src/presentation.rs:447
+#: src/presentation.rs
 msgid "Battle"
 msgstr "Batalha"
 
@@ -129,11 +129,11 @@ msgstr "Fera"
 msgid "Bell"
 msgstr "Sino"
 
-#: src/presentation.rs:488
+#: src/presentation.rs
 msgid "Bernardo Bellotto, about 1761"
 msgstr "Bernardo Bellotto, por volta de 1761"
 
-#: src/presentation.rs:956
+#: src/presentation.rs
 msgid "Birds"
 msgstr "Pássaros"
 
@@ -141,7 +141,7 @@ msgstr "Pássaros"
 msgid "Bones"
 msgstr "Ossos"
 
-#: ui/dialogs.slint:437
+#: ui/dialogs.slint
 msgid "Bot token"
 msgstr "Token do bot"
 
@@ -149,19 +149,19 @@ msgstr "Token do bot"
 msgid "Camp"
 msgstr "Acampamento"
 
-#: ui/pages.slint:635
+#: ui/pages.slint
 msgid "Can't find {0}"
 msgstr "Não foi possível encontrar {0}"
 
-#: ui/dialogs.slint:212 ui/dialogs.slint:353
+#: ui/dialogs.slint
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/controller.rs:144
+#: src/controller.rs
 msgid "Cannot reach tufo-server. Check the server log."
 msgstr "Não foi possível conectar ao tufo-server. Consulte o log do servidor."
 
-#: src/presentation.rs:448
+#: src/presentation.rs
 msgid "Castle"
 msgstr "Castelo"
 
@@ -169,39 +169,39 @@ msgstr "Castelo"
 msgid "Cat"
 msgstr "Gato"
 
-#: src/presentation.rs:449
+#: src/presentation.rs
 msgid "Cathedral"
 msgstr "Catedral"
 
-#: ui/dialogs.slint:155
+#: ui/dialogs.slint
 msgid "Change background"
 msgstr "Alterar fundo"
 
-#: ui/dialogs.slint:99
+#: ui/dialogs.slint
 msgid "Change the background"
 msgstr "Alterar o fundo"
 
-#: src/presentation.rs:473
+#: src/presentation.rs
 msgid "Charles de Steuben, 1830s"
 msgstr "Charles de Steuben, década de 1830"
 
-#: src/controller.rs:1115
+#: src/controller.rs
 msgid "Choose Kenku FM's data folder"
 msgstr "Escolha a pasta de dados do Kenku FM"
 
-#: src/controller.rs:528
+#: src/controller.rs
 msgid "Choose a background image"
 msgstr "Escolha uma imagem de fundo"
 
-#: ui/gallery.slint:236
+#: ui/gallery.slint
 msgid "Choose an image file"
 msgstr "Escolher uma imagem"
 
-#: src/controller.rs:587
+#: src/controller.rs
 msgid "Choose audio files"
 msgstr "Escolha arquivos de áudio"
 
-#: src/controller.rs:464
+#: src/controller.rs
 msgid "Choose folders for Tufo to follow"
 msgstr "Escolha pastas para o Tufo acompanhar"
 
@@ -213,7 +213,7 @@ msgstr "Igreja"
 msgid "City"
 msgstr "Cidade"
 
-#: src/presentation.rs:483
+#: src/presentation.rs
 msgid "Claude-Joseph Vernet, 1772"
 msgstr "Claude-Joseph Vernet, 1772"
 
@@ -221,11 +221,11 @@ msgstr "Claude-Joseph Vernet, 1772"
 msgid "Clock"
 msgstr "Relógio"
 
-#: ui/dialogs.slint:59 ui/dock.slint:502 ui/frame.slint:55 ui/gallery.slint:160
+#: ui/dialogs.slint ui/dock.slint ui/frame.slint ui/gallery.slint
 msgid "Close"
 msgstr "Fechar"
 
-#: src/presentation.rs:450
+#: src/presentation.rs
 msgid "Coast"
 msgstr "Litoral"
 
@@ -237,31 +237,31 @@ msgstr "Cafeteria"
 msgid "Coins"
 msgstr "Moedas"
 
-#: ui/sidebar.slint:356
+#: ui/sidebar.slint
 msgid "Collapse (Ctrl+B)"
 msgstr "Recolher (Ctrl+B)"
 
-#: ui/dock.slint:403
+#: ui/dock.slint
 msgid "Collapse the player"
 msgstr "Recolher o player"
 
-#: src/search.rs:154
+#: src/search.rs
 msgid "Collections"
 msgstr "Coleções"
 
-#: ui/gallery.slint:207 src/presentation.rs:545
+#: ui/gallery.slint src/presentation.rs
 msgid "Colors drawn from the collection"
 msgstr "Cores da coleção"
 
-#: ui/sidebar.slint:216
+#: ui/sidebar.slint
 msgid "Connect Discord for more outputs"
 msgstr "Conectar ao Discord para ver mais saídas"
 
-#: src/controller.rs:219
+#: src/controller.rs
 msgid "Connected to tufo-server"
 msgstr "Conectado ao tufo-server"
 
-#: ui/state.slint:117
+#: ui/state.slint
 msgid "Connecting to tufo-server…"
 msgstr "Conectando ao tufo-server…"
 
@@ -269,11 +269,11 @@ msgstr "Conectando ao tufo-server…"
 msgid "Court"
 msgstr "Corte"
 
-#: ui/dialogs.slint:470
+#: ui/dialogs.slint
 msgid "Crossfade: {0} s"
 msgstr "Transição entre faixas: {0} s"
 
-#: src/presentation.rs:487
+#: src/presentation.rs
 msgid "David Teniers the Younger, 1658"
 msgstr "David Teniers the Younger, 1658"
 
@@ -281,11 +281,11 @@ msgstr "David Teniers the Younger, 1658"
 msgid "Day"
 msgstr "Dia"
 
-#: ui/pages.slint:525
+#: ui/pages.slint
 msgid "Delete"
 msgstr "Excluir"
 
-#: src/presentation.rs:451
+#: src/presentation.rs
 msgid "Desert"
 msgstr "Deserto"
 
@@ -293,19 +293,19 @@ msgstr "Deserto"
 msgid "Dice"
 msgstr "Dados"
 
-#: ui/dialogs.slint:461
+#: ui/dialogs.slint
 msgid "Disable Discord connection"
 msgstr "Desativar conexão com o Discord"
 
-#: ui/dialogs.slint:427
+#: ui/dialogs.slint
 msgid "Discord"
 msgstr "Discord"
 
-#: src/presentation.rs:850
+#: src/presentation.rs
 msgid "Discord channel {0}"
 msgstr "Canal do Discord {0}"
 
-#: src/controller.rs:302
+#: src/controller.rs
 msgid "Discord voice channels are still loading; press refresh."
 msgstr "Os canais de voz do Discord ainda estão carregando; clique em atualizar."
 
@@ -313,7 +313,7 @@ msgstr "Os canais de voz do Discord ainda estão carregando; clique em atualizar
 msgid "Dog"
 msgstr "Cachorro"
 
-#: ui/dialogs.slint:262
+#: ui/dialogs.slint
 msgid "Done"
 msgstr "Concluir"
 
@@ -321,47 +321,47 @@ msgstr "Concluir"
 msgid "Door"
 msgstr "Porta"
 
-#: src/presentation.rs:452
+#: src/presentation.rs
 msgid "Dragon"
 msgstr "Dragão"
 
-#: src/controller.rs:660
+#: src/controller.rs
 msgid "Drop a JPEG or PNG image to use it."
 msgstr "Solte uma imagem JPEG ou PNG para usá-la."
 
-#: ui/pages.slint:428
+#: ui/pages.slint
 msgid "Drop a folder of music here: each folder in it that holds audio becomes a playlist."
 msgstr "Solte uma pasta de músicas aqui: cada pasta com áudio vira uma playlist."
 
-#: ui/pages.slint:428
+#: ui/pages.slint
 msgid "Drop a folder of sounds here: each folder in it that holds audio becomes a soundboard."
 msgstr "Solte uma pasta de sons aqui: cada pasta com áudio vira um painel de sons."
 
-#: src/controller.rs:620
+#: src/controller.rs
 msgid "Drop an image to show it behind the collection"
 msgstr "Solte uma imagem para usar como fundo da coleção"
 
-#: ui/pages.slint:829 ui/pages.slint:1063
+#: ui/pages.slint
 msgid "Drop audio files here to add them."
 msgstr "Solte arquivos de áudio aqui para adicioná-los."
 
-#: ui/pages.slint:252
+#: ui/pages.slint
 msgid "Drop folders of music on Playlists, or add a playlist."
 msgstr "Solte pastas de músicas em Playlists ou adicione uma playlist."
 
-#: src/controller.rs:626
+#: src/controller.rs
 msgid "Drop folders of music to follow them"
 msgstr "Solte pastas de músicas para acompanhá-las"
 
-#: ui/pages.slint:252
+#: ui/pages.slint
 msgid "Drop folders of sounds on Soundboards, or add a soundboard."
 msgstr "Solte pastas de sons em Painéis de sons ou adicione um painel."
 
-#: src/controller.rs:627
+#: src/controller.rs
 msgid "Drop folders of sounds to follow them"
 msgstr "Solte pastas de sons para acompanhá-las"
 
-#: src/controller.rs:631
+#: src/controller.rs
 msgid "Drop the files here…"
 msgstr "Solte os arquivos aqui…"
 
@@ -369,27 +369,27 @@ msgstr "Solte os arquivos aqui…"
 msgid "Drums"
 msgstr "Tambores"
 
-#: ui/dialogs.slint:232 ui/pages.slint:510 ui/pages.slint:737 ui/pages.slint:984
+#: ui/dialogs.slint ui/pages.slint
 msgid "Edit"
 msgstr "Editar"
 
-#: ui/dialogs.slint:326
+#: ui/dialogs.slint
 msgid "Edit Sound"
 msgstr "Editar som"
 
-#: ui/dialogs.slint:326
+#: ui/dialogs.slint
 msgid "Edit Track"
 msgstr "Editar faixa"
 
-#: src/presentation.rs:949
+#: src/presentation.rs
 msgid "Effects"
 msgstr "Efeitos"
 
-#: ui/sidebar.slint:555
+#: ui/sidebar.slint
 msgid "Expand (Ctrl+B)"
 msgstr "Expandir (Ctrl+B)"
 
-#: ui/dock.slint:447
+#: ui/dock.slint
 msgid "Expand the player"
 msgstr "Expandir o player"
 
@@ -397,15 +397,15 @@ msgstr "Expandir o player"
 msgid "Explosion"
 msgstr "Explosão"
 
-#: ui/dialogs.slint:341
+#: ui/dialogs.slint
 msgid "Fade In (ms)"
 msgstr "Entrada gradual (ms)"
 
-#: ui/dialogs.slint:346
+#: ui/dialogs.slint
 msgid "Fade Out (ms)"
 msgstr "Saída gradual (ms)"
 
-#: src/controller.rs:828
+#: src/controller.rs
 msgid "Fades must be between 0 and 60,000 ms."
 msgstr "A duração da entrada e da saída deve estar entre 0 e 60.000 ms."
 
@@ -413,19 +413,19 @@ msgstr "A duração da entrada e da saída deve estar entre 0 e 60.000 ms."
 msgid "Fan"
 msgstr "Ventilador"
 
-#: ui/pages.slint:899
+#: ui/pages.slint
 msgid "File missing"
 msgstr "Arquivo não encontrado"
 
-#: ui/pages.slint:181
+#: ui/pages.slint
 msgid "Filter this page"
 msgstr "Filtrar esta página"
 
-#: src/presentation.rs:453
+#: src/presentation.rs
 msgid "Fire"
 msgstr "Fogo"
 
-#: src/presentation.rs:958
+#: src/presentation.rs
 msgid "Fireplace"
 msgstr "Lareira"
 
@@ -437,11 +437,11 @@ msgstr "Peixes"
 msgid "Fog"
 msgstr "Névoa"
 
-#: ui/pages.slint:72
+#: ui/pages.slint
 msgid "Folder missing"
 msgstr "Pasta não encontrada"
 
-#: ui/pages.slint:635
+#: ui/pages.slint
 msgid "Follows {0}"
 msgstr "Acompanha {0}"
 
@@ -449,7 +449,7 @@ msgstr "Acompanha {0}"
 msgid "Footsteps"
 msgstr "Passos"
 
-#: src/presentation.rs:454
+#: src/presentation.rs
 msgid "Forest"
 msgstr "Floresta"
 
@@ -457,11 +457,11 @@ msgstr "Floresta"
 msgid "Forge"
 msgstr "Forja"
 
-#: src/presentation.rs:484
+#: src/presentation.rs
 msgid "Frederic Edwin Church, 1860"
 msgstr "Frederic Edwin Church, 1860"
 
-#: src/presentation.rs:474
+#: src/presentation.rs
 msgid "Frederik Sødring, 1838"
 msgstr "Frederik Sødring, 1838"
 
@@ -469,7 +469,7 @@ msgstr "Frederik Sødring, 1838"
 msgid "Frost"
 msgstr "Geada"
 
-#: ui/dock.slint:491
+#: ui/dock.slint
 msgid "Full window (Ctrl+Shift+M)"
 msgstr "Janela completa (Ctrl+Shift+M)"
 
@@ -477,7 +477,7 @@ msgstr "Janela completa (Ctrl+Shift+M)"
 msgid "Ghost"
 msgstr "Fantasma"
 
-#: ui/gallery.slint:207 src/presentation.rs:544
+#: ui/gallery.slint src/presentation.rs
 msgid "Gradient"
 msgstr "Degradê"
 
@@ -489,7 +489,7 @@ msgstr "Guitarra"
 msgid "Harbor"
 msgstr "Porto"
 
-#: src/presentation.rs:455
+#: src/presentation.rs
 msgid "Haunted"
 msgstr "Assombrado"
 
@@ -497,11 +497,11 @@ msgstr "Assombrado"
 msgid "Heartbeat"
 msgstr "Batimentos cardíacos"
 
-#: src/presentation.rs:491
+#: src/presentation.rs
 msgid "Hendrick Avercamp, about 1608"
 msgstr "Hendrick Avercamp, por volta de 1608"
 
-#: ui/sidebar.slint:424 ui/sidebar.slint:557
+#: ui/sidebar.slint
 msgid "Home"
 msgstr "Início"
 
@@ -513,35 +513,35 @@ msgstr "Ampulheta"
 msgid "House"
 msgstr "Casa"
 
-#: ui/dialogs.slint:280
+#: ui/dialogs.slint
 msgid "Icon: {0}"
 msgstr "Ícone: {0}"
 
-#: src/controller.rs:529
+#: src/controller.rs
 msgid "Images"
 msgstr "Imagens"
 
-#: ui/dialogs.slint:527
+#: ui/dialogs.slint
 msgid "Import"
 msgstr "Importar"
 
-#: ui/pages.slint:272
+#: ui/pages.slint
 msgid "Import my Kenku FM library"
 msgstr "Importar minha biblioteca do Kenku FM"
 
-#: src/presentation.rs:950
+#: src/presentation.rs
 msgid "Imported"
 msgstr "Importados"
 
-#: src/presentation.rs:1110
+#: src/presentation.rs
 msgid "Imported {0} with {1} from Kenku FM."
 msgstr "Importação do Kenku FM: {0} com {1}."
 
-#: src/controller.rs:1078 src/controller.rs:1091
+#: src/controller.rs
 msgid "Importing Kenku FM's library…"
 msgstr "Importando a biblioteca do Kenku FM…"
 
-#: ui/dialogs.slint:517
+#: ui/dialogs.slint
 msgid "Imports Kenku FM's equivalent settings."
 msgstr "Importa as configurações equivalentes do Kenku FM."
 
@@ -549,51 +549,51 @@ msgstr "Importa as configurações equivalentes do Kenku FM."
 msgid "Insects"
 msgstr "Insetos"
 
-#: src/presentation.rs:479
+#: src/presentation.rs
 msgid "J. M. W. Turner, 1835"
 msgstr "J. M. W. Turner, 1835"
 
-#: src/presentation.rs:480
+#: src/presentation.rs
 msgid "Jacob van Ruisdael, about 1655"
 msgstr "Jacob van Ruisdael, por volta de 1655"
 
-#: src/presentation.rs:472
+#: src/presentation.rs
 msgid "Jasper Francis Cropsey, 1860"
 msgstr "Jasper Francis Cropsey, 1860"
 
-#: src/presentation.rs:477
+#: src/presentation.rs
 msgid "Jean-Léon Gérôme, 1880s"
 msgstr "Jean-Léon Gérôme, década de 1880"
 
-#: src/presentation.rs:475
+#: src/presentation.rs
 msgid "John Constable, about 1825"
 msgstr "John Constable, por volta de 1825"
 
-#: src/presentation.rs:489
+#: src/presentation.rs
 msgid "John Martin, 1841"
 msgstr "John Martin, 1841"
 
-#: src/presentation.rs:904
+#: src/presentation.rs
 msgid "Joining the voice channel…"
 msgstr "Entrando no canal de voz…"
 
-#: ui/dock.slint:480
+#: ui/dock.slint
 msgid "Keep on top"
 msgstr "Manter no topo"
 
-#: ui/dialogs.slint:488
+#: ui/dialogs.slint
 msgid "Keep playing after quitting"
 msgstr "Continuar tocando ao sair"
 
-#: ui/dialogs.slint:510
+#: ui/dialogs.slint
 msgid "Kenku FM"
 msgstr "Kenku FM"
 
-#: src/presentation.rs:1147
+#: src/presentation.rs
 msgid "Kenku FM's library is empty."
 msgstr "A biblioteca do Kenku FM está vazia."
 
-#: src/presentation.rs:1031
+#: src/presentation.rs
 msgid "Kenku FM’s library is invalid. Quit Kenku FM and try again."
 msgstr "A biblioteca do Kenku FM é inválida. Feche o Kenku FM e tente novamente."
 
@@ -601,7 +601,7 @@ msgstr "A biblioteca do Kenku FM é inválida. Feche o Kenku FM e tente novament
 msgid "Key"
 msgstr "Chave"
 
-#: src/presentation.rs:1137
+#: src/presentation.rs
 msgid "Left out {n} web address Tufo cannot play."
 msgid_plural "Left out {n} web addresses Tufo cannot play."
 msgstr[0] "{n} endereço da web não foi importado porque o Tufo não pode reproduzi-lo."
@@ -611,27 +611,27 @@ msgstr[1] "{n} endereços da web não foram importados porque o Tufo não pode r
 msgid "Lightning"
 msgstr "Raio"
 
-#: ui/dialogs.slint:462
+#: ui/dialogs.slint
 msgid "Logs the bot out."
 msgstr "Desconecta o bot."
 
-#: ui/pages.slint:454
+#: ui/pages.slint
 msgid "Longest first"
 msgstr "Maior duração"
 
-#: ui/pages.slint:976
+#: ui/pages.slint
 msgid "Loop"
 msgstr "Repetir"
 
-#: ui/dock.slint:43
+#: ui/dock.slint
 msgid "Loop {0}"
 msgstr "Repetir {0}"
 
-#: src/controller.rs:249
+#: src/controller.rs
 msgid "Lost tufo-server; reconnecting…"
 msgstr "Conexão com tufo-server perdida; reconectando…"
 
-#: src/presentation.rs:486
+#: src/presentation.rs
 msgid "Ludolf Bakhuysen, about 1695"
 msgstr "Ludolf Bakhuysen, por volta de 1695"
 
@@ -643,7 +643,7 @@ msgstr "Magia"
 msgid "Masquerade"
 msgstr "Baile de máscaras"
 
-#: ui/frame.slint:45
+#: ui/frame.slint
 msgid "Maximize"
 msgstr "Maximizar"
 
@@ -651,151 +651,151 @@ msgstr "Maximizar"
 msgid "Mine"
 msgstr "Mina"
 
-#: src/tray/linux.rs:73 src/tray/windows.rs:37
+#: src/tray/linux.rs src/tray/windows.rs
 msgid "Mini Player"
 msgstr "Miniplayer"
 
-#: ui/dock.slint:329
+#: ui/dock.slint
 msgid "Mini player (Ctrl+Shift+M)"
 msgstr "Miniplayer (Ctrl+Shift+M)"
 
-#: ui/frame.slint:35
+#: ui/frame.slint
 msgid "Minimize"
 msgstr "Minimizar"
 
-#: ui/pages.slint:707
+#: ui/pages.slint
 msgid "Missing"
 msgstr "Não encontrado"
 
-#: ui/pages.slint:499 ui/pages.slint:724 ui/pages.slint:964
+#: ui/pages.slint
 msgid "More"
 msgstr "Mais"
 
-#: src/presentation.rs:456
+#: src/presentation.rs
 msgid "Mountain"
 msgstr "Montanha"
 
-#: ui/search.slint:22 src/search.rs:171
+#: ui/search.slint src/search.rs
 msgid "Music"
 msgstr "Músicas"
 
-#: ui/dock.slint:287
+#: ui/dock.slint
 msgid "Mute"
 msgstr "Silenciar"
 
-#: ui/dialogs.slint:171 ui/dialogs.slint:235 ui/dialogs.slint:328
+#: ui/dialogs.slint
 msgid "Name"
 msgstr "Nome"
 
-#: ui/pages.slint:451
+#: ui/pages.slint
 msgid "Name A→Z"
 msgstr "Nome A→Z"
 
-#: ui/pages.slint:452
+#: ui/pages.slint
 msgid "Name Z→A"
 msgstr "Nome Z→A"
 
-#: ui/pages.slint:456
+#: ui/pages.slint
 msgid "Newest first"
 msgstr "Mais recentes"
 
-#: ui/dock.slint:193
+#: ui/dock.slint
 msgid "Next"
 msgstr "Próxima"
 
-#: src/presentation.rs:457
+#: src/presentation.rs
 msgid "Night"
 msgstr "Noite"
 
-#: src/controller.rs:1119
+#: src/controller.rs
 msgid "No Kenku FM library imported."
 msgstr "Nenhuma biblioteca do Kenku FM foi importada."
 
-#: src/presentation.rs:1025
+#: src/presentation.rs
 msgid "No Kenku FM library was found in that folder."
 msgstr "Nenhuma biblioteca do Kenku FM foi encontrada nesta pasta."
 
-#: src/presentation.rs:1072
+#: src/presentation.rs
 msgid "No music is playing."
 msgstr "Nenhuma música está tocando."
 
-#: ui/pages.slint:1063
+#: ui/pages.slint
 msgid "No sound matches the filter."
 msgstr "Nenhum som corresponde ao filtro."
 
-#: ui/pages.slint:829
+#: ui/pages.slint
 msgid "No track matches the filter."
 msgstr "Nenhuma faixa corresponde ao filtro."
 
-#: ui/pages.slint:428
+#: ui/pages.slint
 msgid "Nothing matches the filter."
 msgstr "Nenhum resultado para este filtro."
 
-#: ui/search.slint:119
+#: ui/search.slint
 msgid "Nothing matches."
 msgstr "Nenhum resultado."
 
-#: src/render.rs:429
+#: src/render.rs
 msgid "Nothing new to add."
 msgstr "Nada novo para adicionar."
 
-#: ui/dock.slint:98
+#: ui/dock.slint
 msgid "Nothing playing"
 msgstr "Nada tocando"
 
-#: ui/pages.slint:455
+#: ui/pages.slint
 msgid "Oldest first"
 msgstr "Mais antigas"
 
-#: src/controller.rs:632
+#: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders"
 msgstr "Abra Playlists ou Painéis de sons para soltar pastas"
 
-#: src/controller.rs:684
+#: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders there."
 msgstr "Abra Playlists ou Painéis de sons para soltar pastas lá."
 
-#: src/tray/linux.rs:71 src/tray/windows.rs:34
+#: src/tray/linux.rs src/tray/windows.rs
 msgid "Open Tufo"
 msgstr "Abrir Tufo"
 
-#: ui/gallery.slint:236
+#: ui/gallery.slint
 msgid "Or drop one on this window"
 msgstr "Ou solte uma nesta janela"
 
-#: ui/dialogs.slint:186
+#: ui/dialogs.slint
 msgid "Or follow a folder"
 msgstr "Ou acompanhe uma pasta"
 
-#: ui/sidebar.slint:245
+#: ui/sidebar.slint
 msgid "Output: {0}"
 msgstr "Saída: {0}"
 
-#: src/presentation.rs:478
+#: src/presentation.rs
 msgid "Paolo Uccello, about 1470"
 msgstr "Paolo Uccello, por volta de 1470"
 
-#: src/presentation.rs:1098
+#: src/presentation.rs
 msgid "Paste a Discord bot token before saving."
 msgstr "Cole um token de bot do Discord antes de salvar."
 
-#: ui/dialogs.slint:440
+#: ui/dialogs.slint
 msgid "Paste a new token"
 msgstr "Cole um novo token"
 
-#: ui/dialogs.slint:440
+#: ui/dialogs.slint
 msgid "Paste your bot's token"
 msgstr "Cole o token do seu bot"
 
-#: ui/dock.slint:123 ui/pages.slint:96 ui/pages.slint:686 ui/pages.slint:779 ui/pages.slint:804 src/tray.rs:58
+#: ui/dock.slint ui/pages.slint src/tray.rs
 msgid "Pause"
 msgstr "Pausar"
 
-#: src/tray.rs:65 src/tray.rs:66
+#: src/tray.rs
 msgid "Pause Sounds"
 msgstr "Pausar sons"
 
-#: ui/dock.slint:146
+#: ui/dock.slint
 msgid "Pause sounds"
 msgstr "Pausar sons"
 
@@ -811,11 +811,11 @@ msgstr "Perigos"
 msgid "Piano"
 msgstr "Piano"
 
-#: src/presentation.rs:490
+#: src/presentation.rs
 msgid "Pierre-Jacques Volaire, 1771"
 msgstr "Pierre-Jacques Volaire, 1771"
 
-#: src/presentation.rs:485
+#: src/presentation.rs
 msgid "Pieter Claesz, 1628"
 msgstr "Pieter Claesz, 1628"
 
@@ -823,27 +823,27 @@ msgstr "Pieter Claesz, 1628"
 msgid "Places"
 msgstr "Lugares"
 
-#: ui/dock.slint:123 ui/pages.slint:96 ui/pages.slint:686 ui/pages.slint:779 ui/pages.slint:804 src/tray.rs:57 src/tray.rs:59
+#: ui/dock.slint ui/pages.slint src/tray.rs
 msgid "Play"
 msgstr "Reproduzir"
 
-#: ui/sidebar.slint:176
+#: ui/sidebar.slint
 msgid "Play into"
 msgstr "Tocar em"
 
-#: src/search.rs:150
+#: src/search.rs
 msgid "Playlist"
 msgstr "Playlist"
 
-#: ui/pages.slint:334 ui/pages.slint:386 ui/sidebar.slint:433 ui/sidebar.slint:558
+#: ui/pages.slint ui/sidebar.slint
 msgid "Playlists"
 msgstr "Playlists"
 
-#: ui/dock.slint:176
+#: ui/dock.slint
 msgid "Previous"
 msgstr "Anterior"
 
-#: src/tray/linux.rs:88 src/tray/windows.rs:56
+#: src/tray/linux.rs src/tray/windows.rs
 msgid "Quit Tufo"
 msgstr "Sair do Tufo"
 
@@ -851,7 +851,7 @@ msgstr "Sair do Tufo"
 msgid "Rabbit"
 msgstr "Coelho"
 
-#: src/presentation.rs:951
+#: src/presentation.rs
 msgid "Rain"
 msgstr "Chuva"
 
@@ -859,55 +859,55 @@ msgstr "Chuva"
 msgid "Rats"
 msgstr "Ratos"
 
-#: src/controller.rs:1223
+#: src/controller.rs
 msgid "Reading the audio files…"
 msgstr "Lendo os arquivos de áudio…"
 
-#: ui/sidebar.slint:189
+#: ui/sidebar.slint
 msgid "Refresh the voice channels"
 msgstr "Atualizar canais de voz"
 
-#: ui/pages.slint:745 ui/pages.slint:992
+#: ui/pages.slint
 msgid "Remove"
 msgstr "Remover"
 
-#: ui/dock.slint:207
+#: ui/dock.slint
 msgid "Repeat the playlist"
 msgstr "Repetir a playlist"
 
-#: ui/dock.slint:207
+#: ui/dock.slint
 msgid "Repeat the track"
 msgstr "Repetir a faixa"
 
-#: src/presentation.rs:1144
+#: src/presentation.rs
 msgid "Restarting so the bot logs in with Kenku FM's token."
 msgstr "Reiniciando para conectar o bot com o token do Kenku FM."
 
-#: ui/frame.slint:45
+#: ui/frame.slint
 msgid "Restore"
 msgstr "Restaurar"
 
-#: src/tray.rs:67
+#: src/tray.rs
 msgid "Resume Sounds"
 msgstr "Retomar sons"
 
-#: ui/dock.slint:146
+#: ui/dock.slint
 msgid "Resume sounds"
 msgstr "Retomar sons"
 
-#: ui/dialogs.slint:497
+#: ui/dialogs.slint
 msgid "Run at startup"
 msgstr "Iniciar com o sistema"
 
-#: ui/dialogs.slint:361
+#: ui/dialogs.slint
 msgid "Save"
 msgstr "Salvar"
 
-#: ui/dialogs.slint:450
+#: ui/dialogs.slint
 msgid "Save and restart"
 msgstr "Salvar e reiniciar"
 
-#: ui/widgets.slint:278
+#: ui/widgets.slint
 msgid "Saved"
 msgstr "Salvo"
 
@@ -915,23 +915,23 @@ msgstr "Salvo"
 msgid "Scroll"
 msgstr "Pergaminho"
 
-#: ui/sidebar.slint:395
+#: ui/sidebar.slint
 msgid "Search"
 msgstr "Buscar"
 
-#: ui/search.slint:108 ui/sidebar.slint:373
+#: ui/search.slint ui/sidebar.slint
 msgid "Search everything"
 msgstr "Buscar em tudo"
 
-#: ui/sidebar.slint:556
+#: ui/sidebar.slint
 msgid "Search everything (Ctrl+Shift+F)"
 msgstr "Buscar em tudo (Ctrl+Shift+F)"
 
-#: ui/pages.slint:298
+#: ui/pages.slint
 msgid "See all {0}"
 msgstr "Ver tudo ({0})"
 
-#: ui/dialogs.slint:416 ui/sidebar.slint:521 ui/sidebar.slint:607
+#: ui/dialogs.slint ui/sidebar.slint
 msgid "Settings"
 msgstr "Configurações"
 
@@ -943,15 +943,15 @@ msgstr "Escudo"
 msgid "Ship"
 msgstr "Navio"
 
-#: ui/pages.slint:453
+#: ui/pages.slint
 msgid "Shortest first"
 msgstr "Menor duração"
 
-#: ui/dock.slint:165 ui/pages.slint:814
+#: ui/dock.slint ui/pages.slint
 msgid "Shuffle"
 msgstr "Ordem aleatória"
 
-#: ui/pages.slint:814
+#: ui/pages.slint
 msgid "Shuffling"
 msgstr "Em ordem aleatória"
 
@@ -959,7 +959,7 @@ msgstr "Em ordem aleatória"
 msgid "Skies and seasons"
 msgstr "Céus e estações"
 
-#: src/render.rs:447
+#: src/render.rs
 msgid "Skipped {n} item that is not audio or a folder."
 msgid_plural "Skipped {n} items that are not audio or folders."
 msgstr[0] "{n} item ignorado por não ser áudio nem pasta."
@@ -969,11 +969,11 @@ msgstr[1] "{n} itens ignorados por não serem áudio nem pastas."
 msgid "Skull"
 msgstr "Crânio"
 
-#: src/presentation.rs:459
+#: src/presentation.rs
 msgid "Skulls"
 msgstr "Crânios"
 
-#: src/presentation.rs:458
+#: src/presentation.rs
 msgid "Sky"
 msgstr "Céu"
 
@@ -981,27 +981,27 @@ msgstr "Céu"
 msgid "Snow"
 msgstr "Neve"
 
-#: src/presentation.rs:981
+#: src/presentation.rs
 msgid "Some values are invalid. Check them and try again."
 msgstr "Alguns valores são inválidos. Confira e tente novamente."
 
-#: ui/pages.slint:474
+#: ui/pages.slint
 msgid "Sort: {0}"
 msgstr "Ordenar: {0}"
 
-#: src/presentation.rs:684
+#: src/presentation.rs
 msgid "Sound"
 msgstr "Som"
 
-#: src/search.rs:151
+#: src/search.rs
 msgid "Soundboard"
 msgstr "Painel de sons"
 
-#: ui/pages.slint:348 ui/pages.slint:386 ui/sidebar.slint:458 ui/sidebar.slint:559
+#: ui/pages.slint ui/sidebar.slint
 msgid "Soundboards"
 msgstr "Painéis de sons"
 
-#: ui/search.slint:22 src/search.rs:177
+#: ui/search.slint src/search.rs
 msgid "Sounds"
 msgstr "Sons"
 
@@ -1013,51 +1013,51 @@ msgstr "Feitiço"
 msgid "Squirrel"
 msgstr "Esquilo"
 
-#: ui/pages.slint:1088
+#: ui/pages.slint
 msgid "Starting the audio server"
 msgstr "Iniciando o servidor de áudio"
 
-#: src/controller.rs:189 src/controller.rs:196
+#: src/controller.rs
 msgid "Starting tufo-server…"
 msgstr "Iniciando tufo-server…"
 
-#: ui/pages.slint:976
+#: ui/pages.slint
 msgid "Stop Looping"
 msgstr "Parar de repetir"
 
-#: ui/pages.slint:525
+#: ui/pages.slint
 msgid "Stop following"
 msgstr "Parar de acompanhar"
 
-#: ui/dock.slint:480
+#: ui/dock.slint
 msgid "Stop keeping on top"
 msgstr "Parar de manter no topo"
 
-#: ui/dock.slint:43
+#: ui/dock.slint
 msgid "Stop looping {0}"
 msgstr "Parar de repetir {0}"
 
-#: ui/dock.slint:207
+#: ui/dock.slint
 msgid "Stop repeating"
 msgstr "Parar de repetir"
 
-#: ui/dock.slint:165
+#: ui/dock.slint
 msgid "Stop shuffling"
 msgstr "Desativar ordem aleatória"
 
-#: ui/dock.slint:63
+#: ui/dock.slint
 msgid "Stop {0}"
 msgstr "Parar {0}"
 
-#: src/presentation.rs:460 src/presentation.rs:952
+#: src/presentation.rs
 msgid "Storm"
 msgstr "Tempestade"
 
-#: src/presentation.rs:955
+#: src/presentation.rs
 msgid "Stream"
 msgstr "Riacho"
 
-#: src/presentation.rs:957
+#: src/presentation.rs
 msgid "Summer Night"
 msgstr "Noite de verão"
 
@@ -1065,7 +1065,7 @@ msgstr "Noite de verão"
 msgid "Summer night"
 msgstr "Noite de verão"
 
-#: src/presentation.rs:461
+#: src/presentation.rs
 msgid "Tavern"
 msgstr "Taverna"
 
@@ -1073,91 +1073,91 @@ msgstr "Taverna"
 msgid "Temple"
 msgstr "Templo"
 
-#: src/presentation.rs:1013
+#: src/presentation.rs
 msgid "That collection no longer exists."
 msgstr "Esta coleção não existe mais."
 
-#: src/controller.rs:542
+#: src/controller.rs
 msgid "That image's path isn't usable."
 msgstr "O caminho desta imagem é inválido."
 
-#: src/presentation.rs:1075
+#: src/presentation.rs
 msgid "That position is past the end of the track."
 msgstr "Esta posição ultrapassa o fim da faixa."
 
-#: src/presentation.rs:1037
+#: src/presentation.rs
 msgid "That track is missing or cannot be played."
 msgstr "Esta faixa não foi encontrada ou não pode ser reproduzida."
 
-#: src/presentation.rs:1019
+#: src/presentation.rs
 msgid "That track or sound no longer exists."
 msgstr "Esta faixa ou som não existe mais."
 
-#: src/presentation.rs:1086
+#: src/presentation.rs
 msgid "That voice channel is no longer available. Refresh the channels."
 msgstr "Este canal de voz não está mais disponível. Atualize os canais."
 
-#: src/presentation.rs:1095
+#: src/presentation.rs
 msgid "The Discord bot is still connecting. Try again shortly."
 msgstr "O bot do Discord ainda está conectando. Tente novamente em instantes."
 
-#: ui/sidebar.slint:206
+#: ui/sidebar.slint
 msgid "The Discord connection is disabled — enable it in Settings"
 msgstr "A conexão com o Discord está desativada — ative-a nas Configurações"
 
-#: src/presentation.rs:1084
+#: src/presentation.rs
 msgid "The Discord connection is disabled. Enable it in Settings first."
 msgstr "A conexão com o Discord está desativada. Ative-a nas Configurações primeiro."
 
-#: src/presentation.rs:1060
+#: src/presentation.rs
 msgid "The audio file is missing. Restore it and try again."
 msgstr "O arquivo de áudio não foi encontrado. Restaure-o e tente novamente."
 
-#: src/presentation.rs:1069
+#: src/presentation.rs
 msgid "The audio output is unavailable. Choose another output."
 msgstr "A saída de áudio está indisponível. Escolha outra saída."
 
-#: src/presentation.rs:975
+#: src/presentation.rs
 msgid "The request took too long. Try again."
 msgstr "A solicitação demorou demais. Tente novamente."
 
-#: src/presentation.rs:976
+#: src/presentation.rs
 msgid "The request was cancelled."
 msgstr "A solicitação foi cancelada."
 
-#: src/presentation.rs:984
+#: src/presentation.rs
 msgid "The server is busy. Try again shortly."
 msgstr "O servidor está ocupado. Tente novamente em instantes."
 
-#: src/presentation.rs:974
+#: src/presentation.rs
 msgid "The server is unavailable. Tufo will reconnect shortly."
 msgstr "O servidor está indisponível. O Tufo vai reconectar em instantes."
 
-#: src/presentation.rs:1034
+#: src/presentation.rs
 msgid "There are no playable files in this collection."
 msgstr "Não há arquivos que possam ser reproduzidos nesta coleção."
 
-#: src/presentation.rs:797 src/presentation.rs:857
+#: src/presentation.rs
 msgid "This Computer"
 msgstr "Este computador"
 
-#: src/presentation.rs:1023
+#: src/presentation.rs
 msgid "This collection follows a folder. Change the files in that folder."
 msgstr "Esta coleção acompanha uma pasta. Altere os arquivos nessa pasta."
 
-#: src/controller.rs:678
+#: src/controller.rs
 msgid "This collection follows its folder. Copy the files into that folder instead."
 msgstr "Esta coleção acompanha uma pasta. Copie os arquivos para essa pasta."
 
-#: src/controller.rs:629
+#: src/controller.rs
 msgid "This collection follows its folder; add files there"
 msgstr "Esta coleção acompanha uma pasta; adicione os arquivos lá"
 
-#: ui/pages.slint:829 ui/pages.slint:1063
+#: ui/pages.slint
 msgid "This folder holds no audio yet."
 msgstr "Esta pasta ainda não tem áudio."
 
-#: src/controller.rs:1151
+#: src/controller.rs
 msgid "This system names no config directory for Tufo's settings."
 msgstr "O sistema não informou uma pasta para as configurações do Tufo."
 
@@ -1165,11 +1165,11 @@ msgstr "O sistema não informou uma pasta para as configurações do Tufo."
 msgid "Tornado"
 msgstr "Tornado"
 
-#: src/presentation.rs:462
+#: src/presentation.rs
 msgid "Town"
 msgstr "Vila"
 
-#: ui/search.slint:109
+#: ui/search.slint
 msgid "Tracks, sounds, playlists, soundboards"
 msgstr "Faixas, sons, playlists, painéis de sons"
 
@@ -1177,189 +1177,189 @@ msgstr "Faixas, sons, playlists, painéis de sons"
 msgid "Train"
 msgstr "Trem"
 
-#: ui/app.slint:28
+#: ui/app.slint
 msgid "Tufo"
 msgstr "Tufo"
 
-#: ui/gallery.slint:221
+#: ui/gallery.slint
 msgid "Tufo can't open this file"
 msgstr "O Tufo não consegue abrir este arquivo"
 
-#: ui/dialogs.slint:254
+#: ui/dialogs.slint
 msgid "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another."
 msgstr "O Tufo não consegue mais abrir esta imagem e está exibindo o degradê. Altere o fundo para escolher outra."
 
-#: src/controller.rs:1124
+#: src/controller.rs
 msgid "Tufo can't read that folder's path."
 msgstr "O Tufo não consegue ler o caminho desta pasta."
 
-#: src/presentation.rs:1066
+#: src/presentation.rs
 msgid "Tufo cannot play this audio format."
 msgstr "O Tufo não consegue reproduzir este formato de áudio."
 
-#: src/controller.rs:1138
+#: src/controller.rs
 msgid "Tufo could not change starting at login. Check your system settings."
 msgstr "O Tufo não conseguiu alterar a inicialização ao entrar no sistema. Confira as configurações do sistema."
 
-#: src/presentation.rs:985
+#: src/presentation.rs
 msgid "Tufo could not complete the request. Check the server log."
 msgstr "O Tufo não conseguiu concluir a solicitação. Consulte o log do servidor."
 
-#: src/presentation.rs:1089
+#: src/presentation.rs
 msgid "Tufo could not join the voice channel. Check the bot’s permissions and try again."
 msgstr "O Tufo não conseguiu entrar no canal de voz. Confira as permissões do bot e tente novamente."
 
-#: src/presentation.rs:1092
+#: src/presentation.rs
 msgid "Tufo could not open the audio device. Check your system’s audio settings."
 msgstr "O Tufo não conseguiu abrir o dispositivo de áudio. Confira as configurações de áudio do sistema."
 
-#: src/presentation.rs:1028
+#: src/presentation.rs
 msgid "Tufo could not read Kenku FM’s library. Check the folder permissions."
 msgstr "O Tufo não conseguiu ler a biblioteca do Kenku FM. Confira as permissões da pasta."
 
-#: src/controller.rs:176
+#: src/controller.rs
 msgid "Tufo could not read config.toml. Fix or remove it and restart Tufo."
 msgstr "O Tufo não conseguiu ler config.toml. Corrija ou remova o arquivo e reinicie o Tufo."
 
-#: src/presentation.rs:1100
+#: src/presentation.rs
 msgid "Tufo could not read or save the Discord bot token. Check the config folder permissions."
 msgstr "Não foi possível ler ou salvar o token do bot do Discord. Verifique as permissões da pasta de configuração."
 
-#: src/presentation.rs:1063
+#: src/presentation.rs
 msgid "Tufo could not read the audio file. Check its permissions."
 msgstr "O Tufo não conseguiu ler o arquivo de áudio. Confira as permissões dele."
 
-#: src/controller.rs:1165
+#: src/controller.rs
 msgid "Tufo could not save config.toml. Check its contents and permissions."
 msgstr "O Tufo não conseguiu salvar config.toml. Confira o conteúdo e as permissões do arquivo."
 
-#: src/presentation.rs:1005
+#: src/presentation.rs
 msgid "Tufo could not save or read the library. Check the server log."
 msgstr "O Tufo não conseguiu salvar ou ler a biblioteca. Consulte o log do servidor."
 
-#: src/controller.rs:203
+#: src/controller.rs
 msgid "Tufo could not start its server. Check that tufo-server is installed."
 msgstr "O Tufo não conseguiu iniciar o servidor. Confira se o tufo-server está instalado."
 
-#: src/presentation.rs:978
+#: src/presentation.rs
 msgid "Tufo does not have permission to complete this request."
 msgstr "O Tufo não tem permissão para concluir esta solicitação."
 
-#: ui/dialogs.slint:194
+#: ui/dialogs.slint
 msgid "Tufo keeps its files in sync."
 msgstr "O Tufo mantém os arquivos sincronizados."
 
-#: src/presentation.rs:965
+#: src/presentation.rs
 msgid "Tufo received an invalid response. Update the app and server together."
 msgstr "O Tufo recebeu uma resposta inválida. Atualize o aplicativo e o servidor juntos."
 
-#: src/presentation.rs:463
+#: src/presentation.rs
 msgid "Underworld"
 msgstr "Submundo"
 
-#: ui/dock.slint:287
+#: ui/dock.slint
 msgid "Unmute"
 msgstr "Ativar som"
 
-#: src/presentation.rs:983
+#: src/presentation.rs
 msgid "Update the app and server together to use this feature."
 msgstr "Atualize o aplicativo e o servidor juntos para usar este recurso."
 
-#: src/presentation.rs:906
+#: src/presentation.rs
 msgid "Voice dropped; reconnecting (attempt {0})…"
 msgstr "A voz caiu; reconectando (tentativa {0})…"
 
-#: src/presentation.rs:464
+#: src/presentation.rs
 msgid "Volcano"
 msgstr "Vulcão"
 
-#: src/presentation.rs:954
+#: src/presentation.rs
 msgid "Waves"
 msgstr "Ondas"
 
-#: src/presentation.rs:476
+#: src/presentation.rs
 msgid "William Stanley Haseltine, 1869"
 msgstr "William Stanley Haseltine, 1869"
 
-#: src/presentation.rs:953
+#: src/presentation.rs
 msgid "Wind"
 msgstr "Vento"
 
-#: src/presentation.rs:465
+#: src/presentation.rs
 msgid "Winter"
 msgstr "Inverno"
 
-#: ui/gallery.slint:198
+#: ui/gallery.slint
 msgid "Your own"
 msgstr "Personalizado"
 
-#: src/controller.rs:1075 src/controller.rs:1201 src/controller.rs:1219
+#: src/controller.rs
 msgid "tufo-server is not connected."
 msgstr "Sem conexão com o tufo-server."
 
-#: ui/sidebar.slint:238
+#: ui/sidebar.slint
 msgid "{0} in {1}"
 msgstr "{0} em {1}"
 
-#: src/presentation.rs:325
+#: src/presentation.rs
 msgid "{0}, {1}"
 msgstr "{0}, {1}"
 
-#: src/presentation.rs:1113 src/render.rs:434
+#: src/presentation.rs src/render.rs
 msgid "{n} collection"
 msgid_plural "{n} collections"
 msgstr[0] "{n} coleção"
 msgstr[1] "{n} coleções"
 
-#: src/presentation.rs:1123
+#: src/presentation.rs
 msgid "{n} collection was already in Tufo."
 msgid_plural "{n} collections were already in Tufo."
 msgstr[0] "{n} coleção já estava no Tufo."
 msgstr[1] "{n} coleções já estavam no Tufo."
 
-#: src/presentation.rs:1118 src/render.rs:435
+#: src/presentation.rs src/render.rs
 msgid "{n} file"
 msgid_plural "{n} files"
 msgstr[0] "{n} arquivo"
 msgstr[1] "{n} arquivos"
 
-#: src/presentation.rs:1130
+#: src/presentation.rs
 msgid "{n} file could not be found or read."
 msgid_plural "{n} files could not be found or read."
 msgstr[0] "Não foi possível encontrar ou ler {n} arquivo."
 msgstr[1] "Não foi possível encontrar ou ler {n} arquivos."
 
-#: src/render.rs:440
+#: src/render.rs
 msgid "{n} file could not be read."
 msgid_plural "{n} files could not be read."
 msgstr[0] "Não foi possível ler {n} arquivo."
 msgstr[1] "Não foi possível ler {n} arquivos."
 
-#: src/presentation.rs:313
+#: src/presentation.rs
 msgid "{n} minute"
 msgid_plural "{n} minutes"
 msgstr[0] "{n} minuto"
 msgstr[1] "{n} minutos"
 
-#: src/presentation.rs:321
+#: src/presentation.rs
 msgid "{n} playing"
 msgid_plural "{n} playing"
 msgstr[0] "{n} tocando"
 msgstr[1] "{n} tocando"
 
-#: src/presentation.rs:285
+#: src/presentation.rs
 msgid "{n} sound"
 msgid_plural "{n} sounds"
 msgstr[0] "{n} som"
 msgstr[1] "{n} sons"
 
-#: src/presentation.rs:284
+#: src/presentation.rs
 msgid "{n} track"
 msgid_plural "{n} tracks"
 msgstr[0] "{n} faixa"
 msgstr[1] "{n} faixas"
 
-#: ui/search.slint:143
+#: ui/search.slint
 msgid "↑↓ to choose · Enter to play · Esc to close"
 msgstr "↑↓ para escolher · Enter para tocar · Esc para fechar"
 

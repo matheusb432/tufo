@@ -4,6 +4,7 @@ fmt:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo fmt --all
+    just translations-fmt
     mise exec -- buf format --write
     markdown_files=()
     while IFS= read -r -d '' file; do [[ -f "$file" ]] && markdown_files+=("$file"); done < <(git ls-files --cached --others --exclude-standard -z -- '*.md')
@@ -15,10 +16,16 @@ fmt-check:
     #!/usr/bin/env bash
     set -euo pipefail
     cargo fmt --all --check
+    just translations-fmt --check
     mise exec -- buf format --diff --exit-code
     markdown_files=()
     while IFS= read -r -d '' file; do [[ -f "$file" ]] && markdown_files+=("$file"); done < <(git ls-files --cached --others --exclude-standard -z -- '*.md')
     if ((${#markdown_files[@]})); then mise exec -- rumdl fmt --check --no-cache --deny-config-warnings -- "${markdown_files[@]}"; fi
+
+# Normalize translation references to filenames without line numbers.
+[group('quality')]
+translations-fmt *args:
+    cargo run --quiet -p xtask -- translations-fmt {{ args }}
 
 # Run buf lint and clippy with warnings denied.
 [group('quality')]

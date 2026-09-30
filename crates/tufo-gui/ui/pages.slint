@@ -655,6 +655,106 @@ component CollectionHero inherits HorizontalLayout {
     }
 }
 
+// Slint's built-in MenuItem cannot color destructive actions.
+component EntryContextMenu inherits TouchArea {
+    in property <string> entry-id;
+    in property <string> primary-action-title;
+    in property <bool> primary-action-enabled: true;
+    callback primary-action();
+    callback edit();
+    property <Point> menu-position;
+    mouse-cursor: MouseCursor.pointer;
+
+    public function show-menu(position: Point) {
+        root.menu-position = {
+            x: position.x - root.absolute-position.x,
+            y: position.y - root.absolute-position.y,
+        };
+        menu.show();
+    }
+
+    function activate(index: int) {
+        if index == 0 && root.primary-action-enabled {
+            menu.close();
+            root.primary-action();
+        } else if index == 1 {
+            menu.close();
+            root.edit();
+        } else if index == 2 && !LibraryView.collection-linked {
+            menu.close();
+            Actions.delete-entry(root.entry-id);
+        }
+    }
+
+    pointer-event(event) => {
+        if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+            root.show-menu({
+                x: root.absolute-position.x + root.mouse-x,
+                y: root.absolute-position.y + root.mouse-y,
+            });
+        }
+    }
+
+    menu := PopupWindow {
+        x: root.menu-position.x;
+        y: root.menu-position.y;
+        close-policy: close-on-click-outside;
+        keys := FocusScope {
+            property <int> selected: -1;
+            property <int> count: LibraryView.collection-linked ? 2 : 3;
+            init => { self.focus(); }
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    menu.close();
+                    return accept;
+                }
+                if event.text == Key.DownArrow || event.text == Key.UpArrow {
+                    let down = event.text == Key.DownArrow;
+                    self.selected = self.selected < 0 ? (down ? 0 : self.count - 1)
+                        : Math.mod(self.selected + (down ? 1 : -1) + self.count, self.count);
+                    if self.selected == 0 && !root.primary-action-enabled {
+                        self.selected = down ? 1 : self.count - 1;
+                    }
+                    return accept;
+                }
+                if event.text == Key.Return || event.text == " " {
+                    root.activate(self.selected);
+                    return accept;
+                }
+                reject
+            }
+            MenuSurface {
+                MenuAction {
+                    text: root.primary-action-title;
+                    enabled: root.primary-action-enabled;
+                    highlighted: keys.selected == 0;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = 0; }
+                    }
+                    activated => { root.activate(0); }
+                }
+                MenuAction {
+                    text: @tr("Edit");
+                    highlighted: keys.selected == 1;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = 1; }
+                    }
+                    activated => { root.activate(1); }
+                }
+                if !LibraryView.collection-linked: MenuAction {
+                    text: @tr("Remove");
+                    destructive: true;
+                    highlighted: keys.selected == 2;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = 2; }
+                    }
+                    activated => { root.activate(2); }
+                }
+            }
+        }
+    }
+}
+
 component TrackItem inherits Rectangle {
     in property <TrackRow> track;
     callback edit();
@@ -663,8 +763,14 @@ component TrackItem inherits Rectangle {
     background: root.track.current ? Theme.current-row : touch.has-hover ? Theme.hover : transparent;
     animate background { duration: Motion.hover; }
     opacity: root.track.missing ? 0.55 : 1;
-    touch := TouchArea {
-        mouse-cursor: MouseCursor.pointer;
+    touch := EntryContextMenu {
+        entry-id: root.track.id;
+        primary-action-title: PlayerView.can-add-layer ? @tr("Add to mix") : @tr("Mix full (3 songs)");
+        primary-action-enabled: PlayerView.can-add-layer && !root.track.missing && !root.track.current;
+        primary-action => {
+            Actions.add-music-layer(root.track.id);
+        }
+        edit => { root.edit(); }
         double-clicked => {
             Actions.play-track(root.track.id);
         }
@@ -688,6 +794,7 @@ component TrackItem inherits Rectangle {
                 clicked => {
                     Actions.play-track(root.track.id);
                 }
+                context-menu-requested(position) => { touch.show-menu(position); }
             }
         }
 
@@ -714,24 +821,6 @@ component TrackItem inherits Rectangle {
             font-size: Theme.body-small;
             color: Theme.text-faint;
             vertical-alignment: center;
-        }
-    }
-
-    ContextMenuArea {
-        Menu {
-            MenuItem {
-                title: PlayerView.can-add-layer ? @tr("Add to mix") : @tr("Mix full (3 songs)");
-                enabled: PlayerView.can-add-layer && !root.track.missing && !root.track.current;
-                activated => { Actions.add-music-layer(root.track.id); }
-            }
-            MenuItem {
-                title: @tr("Edit");
-                activated => { root.edit(); }
-            }
-            if !LibraryView.collection-linked: MenuItem {
-                title: @tr("Remove");
-                activated => { Actions.delete-entry(root.track.id); }
-            }
         }
     }
 }
@@ -860,11 +949,17 @@ component SoundTileView inherits Rectangle {
             Actions.toggle-sound(root.tile.id);
         }
     }
-    toggle := TouchArea {
-        enabled: root.playable;
-        mouse-cursor: MouseCursor.pointer;
+    toggle := EntryContextMenu {
+        entry-id: root.tile.id;
+        primary-action-title: root.tile.looping ? @tr("Stop Looping") : @tr("Loop");
+        primary-action => {
+            Actions.set-sound-looping(root.tile.id, !root.tile.looping);
+        }
+        edit => { root.edit(); }
         clicked => {
-            Actions.toggle-sound(root.tile.id);
+            if root.playable {
+                Actions.toggle-sound(root.tile.id);
+            }
         }
     }
 
@@ -935,50 +1030,7 @@ component SoundTileView inherits Rectangle {
             changed(value) => {
                 Actions.set-sound-volume(root.tile.id, value);
             }
-        }
-    }
-
-    IconButton {
-        x: parent.width - self.width - 6px;
-        y: 6px;
-        size: 32px;
-        icon-size: 18px;
-        icon: @image-url("icons/ellipsis-vertical.svg");
-        tooltip: @tr("More");
-        opacity: toggle.has-hover || self.has-hover ? 1 : 0;
-        clicked => {
-            menu.show();
-        }
-    }
-
-    menu := PopupWindow {
-        x: root.width - 170px;
-        y: 42px;
-        MenuSurface {
-            MenuAction {
-                text: root.tile.looping ? @tr("Stop Looping") : @tr("Loop");
-                activated => {
-                    Actions.set-sound-looping(root.tile.id, !root.tile.looping);
-                    menu.close();
-                }
-            }
-
-            MenuAction {
-                text: @tr("Edit");
-                activated => {
-                    root.edit();
-                    menu.close();
-                }
-            }
-
-            if !LibraryView.collection-linked: MenuAction {
-                text: @tr("Remove");
-                destructive: true;
-                activated => {
-                    Actions.delete-entry(root.tile.id);
-                    menu.close();
-                }
-            }
+            context-menu-requested(position) => { toggle.show-menu(position); }
         }
     }
 }

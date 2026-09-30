@@ -7,6 +7,7 @@ use clap::{Parser, Subcommand};
 mod app_icon;
 mod architecture;
 mod install;
+mod translations;
 mod windows_installer;
 
 #[derive(Parser)]
@@ -28,6 +29,13 @@ enum Command {
     /// Render the app icon's SVG into the Windows icon the GUI executable embeds.
     #[command(name = "app-icon")]
     AppIcon,
+    /// Keep translation source references stable when source lines move.
+    #[command(name = "translations-fmt")]
+    TranslationsFmt {
+        /// Check formatting without modifying the catalogs.
+        #[arg(long)]
+        check: bool,
+    },
     /// Install the release build for the current user, with a launcher desktop search finds.
     Install,
     /// Close the session's Tufo and its server, then install the release build over them.
@@ -64,6 +72,7 @@ fn main() -> Result<()> {
     match cli.command {
         Command::CheckArchitecture => architecture::check(workspace_root),
         Command::AppIcon => app_icon::render(workspace_root),
+        Command::TranslationsFmt { check } => translations::format_catalogs(workspace_root, check),
         Command::Install => install::install(workspace_root, &release_dir(workspace_root)?),
         Command::Update => install::update(workspace_root, &release_dir(workspace_root)?),
         Command::Uninstall => install::uninstall(),
