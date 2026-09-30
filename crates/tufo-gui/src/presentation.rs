@@ -261,15 +261,9 @@ pub(crate) fn matches_filter(text: &str, filter: &str) -> bool {
 /// A playlist whose music plays now, unpaused, or a soundboard with a sound playing.
 fn collection_plays(collection: &CollectionView, player: &PlayerState) -> bool {
     match collection.kind {
-        CollectionKind::Playlist => {
-            player
-                .music
-                .as_ref()
-                .is_some_and(|music| music.collection_id == collection.id && !music.paused)
-                || player.music_layers.iter().any(|(_, layer)| {
-                    layer.music.collection_id == collection.id && !layer.music.paused
-                })
-        }
+        CollectionKind::Playlist => player
+            .music_tracks()
+            .any(|music| music.collection_id == collection.id && !music.paused),
         CollectionKind::Soundboard => collection
             .entries
             .iter()
@@ -382,16 +376,8 @@ fn collection_page(
 
 fn track_row(entry: &EntryView, player: &PlayerState) -> TrackRowView {
     let current = player
-        .music
-        .as_ref()
-        .filter(|music| music.entry.entry_id == entry.id)
-        .or_else(|| {
-            player
-                .music_layers
-                .iter()
-                .find(|(_, layer)| layer.music.entry.entry_id == entry.id)
-                .map(|(_, layer)| &layer.music)
-        });
+        .music_tracks()
+        .find(|music| music.entry.entry_id == entry.id);
     TrackRowView {
         id: entry.id,
         title: entry.title.as_str().to_owned(),
@@ -717,18 +703,12 @@ pub(crate) fn player_bar(
             }
         })
         .collect();
-    let displayed_music = music.or_else(|| {
-        player
-            .music_layers
-            .iter()
-            .next()
-            .map(|(_, layer)| &layer.music)
-    });
+    let displayed_music = player.music_tracks().next();
     let playing_collection =
         displayed_music.and_then(|music| find_collection(snapshot, music.collection_id));
     PlayerBarView {
         has_music: music.is_some(),
-        has_playback: music.is_some() || !player.music_layers.is_empty(),
+        has_playback: displayed_music.is_some(),
         entry_id: music.map(|music| music.entry.entry_id),
         can_add_layer: music.is_none()
             || player.music_layers.len()
@@ -761,11 +741,7 @@ pub(crate) fn player_bar(
         collection_title: playing_collection.map_or_else(String::new, |collection| {
             collection.title.as_str().to_owned()
         }),
-        playing: music.is_some_and(|music| !music.paused)
-            || player
-                .music_layers
-                .iter()
-                .any(|(_, layer)| !layer.music.paused),
+        playing: player.music_tracks().any(|music| !music.paused),
         progress,
         elapsed: clock(elapsed),
         remaining,

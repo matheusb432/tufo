@@ -50,6 +50,15 @@ pub struct PlayerState {
     pub sounds_paused: bool,
 }
 
+impl PlayerState {
+    /// The main queue track first, then extra songs in slot order.
+    pub fn music_tracks(&self) -> impl Iterator<Item = &MusicState> {
+        self.music
+            .iter()
+            .chain(self.music_layers.iter().map(|(_, layer)| &layer.music))
+    }
+}
+
 impl Default for PlayerState {
     fn default() -> Self {
         Self {

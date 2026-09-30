@@ -42,6 +42,14 @@ impl<T> MusicLayers<T> {
         self.slots.get_mut(slot).and_then(Option::take)
     }
 
+    pub fn get(&self, slot: usize) -> Option<&T> {
+        self.slots.get(slot)?.as_ref()
+    }
+
+    pub fn get_mut(&mut self, slot: usize) -> Option<&mut T> {
+        self.slots.get_mut(slot)?.as_mut()
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (usize, &T)> {
         self.slots
             .iter()

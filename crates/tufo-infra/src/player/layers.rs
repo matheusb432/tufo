@@ -133,12 +133,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     }
 
     pub(super) async fn restore_layers(&self, engine: &mut Engine, sample_rate: u32) {
-        let slots = engine
-            .music_layers
-            .iter()
-            .map(|(slot, _)| slot)
-            .collect::<Vec<_>>();
-        for slot in slots {
+        for slot in 0..MUSIC_LAYERS_EXTRA_MAX {
             if let Err(error) = restore_layer(engine, slot, sample_rate).await {
                 tracing::warn!(%error, "a music layer cannot resume on the new output");
                 engine.remove_layer(slot);
@@ -152,7 +147,7 @@ async fn restore_layer(
     slot: usize,
     sample_rate: u32,
 ) -> Result<(), PlayAudioError> {
-    let Some((_, layer)) = engine.music_layers.iter().find(|(index, _)| *index == slot) else {
+    let Some(layer) = engine.music_layers.get(slot) else {
         return Ok(());
     };
     let position = layer.position();
@@ -187,11 +182,7 @@ async fn restore_layer(
         paused,
         RESTORE_FADE_IN,
     )?;
-    if let Some((_, layer)) = engine
-        .music_layers
-        .iter_mut()
-        .find(|(index, _)| *index == slot)
-    {
+    if let Some(layer) = engine.music_layers.get_mut(slot) {
         layer.track = MusicTrack {
             token,
             file: opened.file,
@@ -313,13 +304,14 @@ impl Engine {
     }
 
     pub(super) fn pause_layers(&mut self, paused: bool) -> Result<(), PlayAudioError> {
-        let mut slots = Vec::new();
-        for (slot, layer) in self.music_layers.iter_mut() {
+        for (_, layer) in self.music_layers.iter_mut() {
             layer.paused = paused;
-            slots.push(slot);
         }
-        for slot in slots {
-            let Some(deck) = self.layer_deck(slot) else {
+        let Some(output) = &mut self.output else {
+            return Ok(());
+        };
+        for (slot, _) in self.music_layers.iter() {
+            let Some(deck) = output.mixer.music_layer(slot) else {
                 continue;
             };
             let sent = if paused {
@@ -368,13 +360,11 @@ impl Engine {
     }
 
     pub(super) fn reap_finished_layers(&mut self) -> bool {
-        let slots = self
-            .music_layers
-            .iter()
-            .map(|(slot, _)| slot)
-            .collect::<Vec<_>>();
         let mut changed = false;
-        for slot in slots {
+        for slot in 0..MUSIC_LAYERS_EXTRA_MAX {
+            if self.music_layers.get(slot).is_none() {
+                continue;
+            }
             let Some(deck) = self.layer_deck(slot) else {
                 continue;
             };

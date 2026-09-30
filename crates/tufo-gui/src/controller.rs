@@ -334,16 +334,7 @@ impl Controller {
     pub(crate) fn tick(&self, window: &AppWindow) {
         let bar = {
             let shared = self.lock();
-            let active = shared
-                .player
-                .music
-                .as_ref()
-                .is_some_and(|music| !music.paused)
-                || shared
-                    .player
-                    .music_layers
-                    .iter()
-                    .any(|(_, layer)| !layer.music.paused)
+            let active = shared.player.music_tracks().any(|music| !music.paused)
                 || !shared.player.sounds.is_empty();
             if !active {
                 return;
@@ -355,14 +346,7 @@ impl Controller {
 
     pub(crate) fn tray_playback(&self) -> TrayPlayback {
         let shared = self.lock();
-        let music = match shared.player.music.as_ref().or_else(|| {
-            shared
-                .player
-                .music_layers
-                .iter()
-                .next()
-                .map(|(_, layer)| &layer.music)
-        }) {
+        let music = match shared.player.music_tracks().next() {
             None => TrayMusic::Stopped,
             Some(music) if music.paused => TrayMusic::Paused,
             Some(_) => TrayMusic::Playing,
@@ -707,14 +691,8 @@ impl Controller {
             let shared = self.lock();
             shared
                 .player
-                .music
-                .as_ref()
-                .is_some_and(|music| music.collection_id == id)
-                || shared
-                    .player
-                    .music_layers
-                    .iter()
-                    .any(|(_, layer)| layer.music.collection_id == id)
+                .music_tracks()
+                .any(|music| music.collection_id == id)
         };
         if active {
             self.toggle_play_pause();
@@ -727,32 +705,22 @@ impl Controller {
         let Some(entry_id) = entry_id_of(entry_id) else {
             return;
         };
-        let (music, collection) = {
+        let (playing, collection) = {
             let shared = self.lock();
             let collection = presentation::find_entry(&shared.snapshot, entry_id)
                 .map(|(collection, _)| collection.id);
-            let music = shared
+            let playing = shared
                 .player
-                .music
-                .as_ref()
-                .filter(|music| music.entry.entry_id == entry_id)
-                .cloned()
-                .or_else(|| {
-                    shared
-                        .player
-                        .music_layers
-                        .iter()
-                        .find(|(_, layer)| layer.music.entry.entry_id == entry_id)
-                        .map(|(_, layer)| layer.music.clone())
-                });
-            (music, collection)
+                .music_tracks()
+                .any(|music| music.entry.entry_id == entry_id);
+            (playing, collection)
         };
-        match (music, collection) {
-            (Some(music), _) if music.entry.entry_id == entry_id => self.toggle_play_pause(),
-            (_, Some(collection)) => self.run(move |client| async move {
+        match (playing, collection) {
+            (true, _) => self.toggle_play_pause(),
+            (false, Some(collection)) => self.run(move |client| async move {
                 client.play_collection(collection, Some(entry_id)).await
             }),
-            (_, None) => {}
+            (false, None) => {}
         }
     }
 
@@ -939,17 +907,9 @@ impl Controller {
             let shared = self.lock();
             shared
                 .player
-                .music
-                .as_ref()
+                .music_tracks()
+                .next()
                 .map(|music| music.paused)
-                .or_else(|| {
-                    shared
-                        .player
-                        .music_layers
-                        .iter()
-                        .next()
-                        .map(|(_, layer)| layer.music.paused)
-                })
         };
         match paused {
             Some(true) => self.run(|client| async move { client.resume_music().await }),

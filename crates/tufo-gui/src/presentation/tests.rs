@@ -117,6 +117,12 @@ fn an_extra_song_keeps_the_playlist_and_player_active_after_the_main_track_stops
             looping: false,
         })
         .unwrap();
+    player.music = playing(11, false).music;
+    assert_eq!(
+        player_bar(&snapshot, &player, SystemTime::UNIX_EPOCH).title,
+        "Lich King"
+    );
+    player.music = None;
     let page = library_page(
         &snapshot,
         &player,
