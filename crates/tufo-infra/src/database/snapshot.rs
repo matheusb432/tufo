@@ -115,24 +115,36 @@ pub async fn stage_database_snapshot(
 }
 
 pub fn replace_database_file(staged_path: &Path, database_path: &Path) -> anyhow::Result<()> {
-    for suffix in SQLITE_COMPANION_SUFFIXES {
-        let companion = companion_path(database_path, suffix);
-        match fs::remove_file(&companion) {
-            Ok(()) => {}
-            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
-            Err(source) => {
-                return Err(source).with_context(|| {
-                    format!("removing stale database companion {}", companion.display())
-                });
-            }
-        }
-    }
+    remove_database_companions(database_path)?;
     fs::rename(staged_path, database_path).with_context(|| {
         format!(
             "moving staged database into place at {}",
             database_path.display()
         )
     })
+}
+
+/// Removes a staged database and its journals after all its connections have closed.
+pub fn remove_staged_database(staged_path: &Path) -> anyhow::Result<()> {
+    remove_file_if_present(staged_path)?;
+    remove_database_companions(staged_path)
+}
+
+fn remove_database_companions(database_path: &Path) -> anyhow::Result<()> {
+    for suffix in SQLITE_COMPANION_SUFFIXES {
+        remove_file_if_present(&companion_path(database_path, suffix))?;
+    }
+    Ok(())
+}
+
+fn remove_file_if_present(path: &Path) -> anyhow::Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        Err(error) => {
+            Err(error).with_context(|| format!("removing database file {}", path.display()))
+        }
+    }
 }
 
 fn single_file_connection(path: &Path) -> anyhow::Result<Connection> {

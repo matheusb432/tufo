@@ -17,7 +17,6 @@ const SNAPSHOT_MANIFEST_FILE_NAME: &str = "manifest.json";
 const SNAPSHOT_DATABASE_FILE_NAME: &str = "tufo.sqlite3";
 const SNAPSHOT_SETTINGS_FILE_NAME: &str = "config.toml";
 const STAGED_DATABASE_SUFFIX: &str = ".import";
-const SQLITE_COMPANION_SUFFIXES: [&str; 3] = ["-wal", "-shm", "-journal"];
 
 #[derive(Subcommand)]
 pub enum DataCommand {
@@ -136,7 +135,7 @@ async fn stage_import(database_path: &Path, snapshot_directory: &Path) -> anyhow
     })?;
 
     let staged = staged_database_path(database_path);
-    remove_staged_database(&staged)?;
+    snapshot::remove_staged_database(&staged)?;
     match snapshot::stage_database_snapshot(
         &snapshot_directory.join(SNAPSHOT_DATABASE_FILE_NAME),
         &staged,
@@ -153,7 +152,7 @@ async fn stage_import(database_path: &Path, snapshot_directory: &Path) -> anyhow
             Ok(())
         }
         Err(error) => {
-            let _ = remove_staged_database(&staged);
+            let _ = snapshot::remove_staged_database(&staged);
             Err(error)
         }
     }
@@ -174,26 +173,6 @@ fn staged_database_path(database_path: &Path) -> PathBuf {
     let mut path = database_path.as_os_str().to_os_string();
     path.push(STAGED_DATABASE_SUFFIX);
     path.into()
-}
-
-fn remove_staged_database(staged: &Path) -> anyhow::Result<()> {
-    let mut paths = vec![staged.to_path_buf()];
-    paths.extend(SQLITE_COMPANION_SUFFIXES.map(|suffix| {
-        let mut companion = staged.as_os_str().to_os_string();
-        companion.push(suffix);
-        PathBuf::from(companion)
-    }));
-    for path in paths {
-        match fs::remove_file(&path) {
-            Ok(()) => {}
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => {
-                return Err(error)
-                    .with_context(|| format!("removing staged import {}", path.display()));
-            }
-        }
-    }
-    Ok(())
 }
 
 fn settings_path() -> Option<PathBuf> {
