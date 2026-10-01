@@ -1,9 +1,16 @@
 //! The library: audio files Tufo points at, kept in step with the folders that hold them.
+//!
+//! A file stays while a collection lists it or a source keeps it. Song sources are the followed
+//! music folders and the files added to a playlist by their own path, so deleting a playlist
+//! leaves its songs in the library.
 
 pub mod add_files_to_collection;
+pub mod add_songs_to_playlist;
 pub mod create_collection;
 pub mod delete_collection;
 pub mod delete_collection_entry;
+pub mod delete_library_folder;
+pub mod delete_song;
 pub mod folder_watcher;
 pub mod import_kenku_library;
 pub mod import_paths;
@@ -61,10 +68,9 @@ impl<F: LibraryFiles> Library<F> {
     /// Opens the library over a migrated database and publishes its first snapshot.
     pub async fn open(database: Db, files: F) -> Result<Self, LibraryStorageError> {
         let mut reader = database.clone();
-        let collections = snapshot::load_collections(&mut reader).await?;
         let first = LibrarySnapshot {
             revision: 1,
-            collections,
+            ..snapshot::load_snapshot(&mut reader).await?
         };
         Ok(Self {
             database,
@@ -94,15 +100,13 @@ impl<F: LibraryFiles> Library<F> {
         self.write_gate.lock().await
     }
 
-    /// Reloads the collections and publishes them as the next revision.
+    /// Reloads the library and publishes it as the next revision.
     async fn publish(&self) -> Result<(), LibraryStorageError> {
         let mut reader = self.database();
-        let collections = snapshot::load_collections(&mut reader).await?;
+        let mut next = snapshot::load_snapshot(&mut reader).await?;
         self.snapshot.send_modify(|current| {
-            *current = Arc::new(LibrarySnapshot {
-                revision: current.revision + 1,
-                collections,
-            });
+            next.revision = current.revision + 1;
+            *current = Arc::new(next);
         });
         Ok(())
     }

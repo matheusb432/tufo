@@ -305,6 +305,9 @@ pub struct AudioFile {
     pub missing_since: Option<Timestamp>,
     /// When the file was added to Tufo; the "date added" order.
     pub created_at: Timestamp,
+    /// Added to a playlist by its own path, so it stays among the songs, wherever it moves,
+    /// until removed from them.
+    pub song_source: bool,
 }
 
 impl AudioFile {

@@ -6,19 +6,23 @@ use jiff::Timestamp;
 use tufo_models::{
     library::{
         AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
-        CollectionKind, EntryOrder, SoundIcon, SoundSettings, Title,
+        CollectionKind, EntryOrder, LibraryFolderId, SoundIcon, SoundSettings, Title,
     },
     path::{FolderPath, ImageFilePath, LocalPath},
     playback::AudioFilePath,
 };
 
-/// Every collection with its entries in the collection's order. Each change to the library
-/// publishes a new snapshot with a higher revision.
+/// Every collection with its entries in the collection's order, the songs, and the followed
+/// folders. Each change to the library publishes a new snapshot with a higher revision.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct LibrarySnapshot {
     pub revision: u64,
     /// Playlists, then soundboards, each by title.
     pub collections: Vec<CollectionView>,
+    /// By title.
+    pub songs: Vec<SongView>,
+    /// By path.
+    pub library_folders: Vec<LibraryFolderView>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -91,6 +95,38 @@ pub struct EntryView {
     pub icon: SoundIcon,
 }
 
+/// An audio file a song source keeps in the library, whether or not a playlist lists it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SongView {
+    pub audio_file_id: AudioFileId,
+    pub title: Title,
+    pub builtin_title: Option<BuiltinTitle>,
+    pub path: AudioFilePath,
+    pub duration: Duration,
+    /// When the file was added to Tufo.
+    pub added_at: Timestamp,
+    /// Whether Tufo last looked for the file and didn't find it.
+    pub missing: bool,
+    pub source: SongSource,
+}
+
+/// What keeps a song in the library. A followed folder wins over the file's own path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SongSource {
+    /// A followed music folder holds the file.
+    Folder(LibraryFolderId),
+    /// The file was added to a playlist by its own path.
+    File,
+}
+
+/// A folder Tufo follows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LibraryFolderView {
+    pub id: LibraryFolderId,
+    pub kind: CollectionKind,
+    pub folder: FolderPath,
+}
+
 /// Folders and files dropped on the playlists or soundboards grid.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ImportPaths {
@@ -103,6 +139,14 @@ pub struct ImportPaths {
 pub struct AddFilesToCollection {
     pub collection_id: CollectionId,
     pub paths: Vec<LocalPath>,
+}
+
+/// Songs added to one hand-picked playlist.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AddSongsToPlaylist {
+    pub playlist_id: CollectionId,
+    /// At least one.
+    pub audio_file_ids: Vec<AudioFileId>,
 }
 
 /// What an import or addition changed.

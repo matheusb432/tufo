@@ -7,8 +7,8 @@ use tonic::Status;
 use tufo_models::{
     library::{
         AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
-        CollectionKind, EntryOrder, EntryOrderKey, FadeDuration, SoundIcon, SoundSettings, Title,
-        Volume,
+        CollectionKind, EntryOrder, EntryOrderKey, FadeDuration, LibraryFolderId, SoundIcon,
+        SoundSettings, Title, Volume,
     },
     path::{FolderPath, ImageFilePath, LocalPath},
     playback::AudioFilePath,
@@ -17,9 +17,10 @@ use tufo_models::{
 use super::{InvalidMessage, duration_message, duration_value, invalid, parse_uuid, required};
 use crate::{
     library::{
-        AddFilesToCollection, Background, CollectionSource, CollectionView, CreateCollection,
-        EntryView, ImportKenkuLibrary, ImportPaths, ImportReport, KenkuImportReport,
-        LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
+        AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
+        CreateCollection, EntryView, ImportKenkuLibrary, ImportPaths, ImportReport,
+        KenkuImportReport, LibraryFolderView, LibrarySnapshot, SongSource, SongView,
+        UpdateCollection, UpdateCollectionEntry,
     },
     pb,
 };
@@ -123,6 +124,36 @@ pub fn delete_collection_entry_request(
     collection_entry_id(&request.collection_entry_id)
 }
 
+pub fn add_songs_to_playlist_request(
+    request: pb::AddSongsToPlaylistRequest,
+) -> Result<AddSongsToPlaylist, Status> {
+    let ids = required(
+        "audio_file_ids",
+        (!request.audio_file_ids.is_empty()).then_some(request.audio_file_ids),
+    )?;
+    Ok(AddSongsToPlaylist {
+        playlist_id: parse_uuid(&request.playlist_id)
+            .map(CollectionId::from_uuid)
+            .ok_or_else(|| invalid("playlist_id", "must be a canonical UUID"))?,
+        audio_file_ids: ids
+            .iter()
+            .map(|id| audio_file_id("audio_file_ids", id))
+            .collect::<Result<_, _>>()?,
+    })
+}
+
+pub fn delete_song_request(request: &pb::DeleteSongRequest) -> Result<AudioFileId, Status> {
+    audio_file_id("audio_file_id", &request.audio_file_id)
+}
+
+pub fn delete_library_folder_request(
+    request: &pb::DeleteLibraryFolderRequest,
+) -> Result<LibraryFolderId, Status> {
+    parse_uuid(&request.library_folder_id)
+        .map(LibraryFolderId::from_uuid)
+        .ok_or_else(|| invalid("library_folder_id", "must be a canonical UUID"))
+}
+
 // Responses the server builds.
 
 #[must_use]
@@ -135,7 +166,20 @@ pub fn watch_library_response(snapshot: &LibrarySnapshot) -> pb::WatchLibraryRes
                 .iter()
                 .map(collection_message)
                 .collect(),
+            songs: snapshot.songs.iter().map(song_message).collect(),
+            library_folders: snapshot
+                .library_folders
+                .iter()
+                .map(library_folder_message)
+                .collect(),
         }),
+    }
+}
+
+#[must_use]
+pub fn add_songs_to_playlist_response(songs_added: usize) -> pb::AddSongsToPlaylistResponse {
+    pb::AddSongsToPlaylistResponse {
+        songs_added: u32::try_from(songs_added).unwrap_or(u32::MAX),
     }
 }
 
@@ -271,6 +315,34 @@ pub fn delete_collection_entry_message(id: CollectionEntryId) -> pb::DeleteColle
     }
 }
 
+#[must_use]
+pub fn add_songs_to_playlist_message(
+    request: &AddSongsToPlaylist,
+) -> pb::AddSongsToPlaylistRequest {
+    pb::AddSongsToPlaylistRequest {
+        playlist_id: request.playlist_id.to_string(),
+        audio_file_ids: request
+            .audio_file_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
+    }
+}
+
+#[must_use]
+pub fn delete_song_message(id: AudioFileId) -> pb::DeleteSongRequest {
+    pb::DeleteSongRequest {
+        audio_file_id: id.to_string(),
+    }
+}
+
+#[must_use]
+pub fn delete_library_folder_message(id: LibraryFolderId) -> pb::DeleteLibraryFolderRequest {
+    pb::DeleteLibraryFolderRequest {
+        library_folder_id: id.to_string(),
+    }
+}
+
 // Responses the client decodes.
 
 pub fn library_snapshot(
@@ -286,7 +358,22 @@ pub fn library_snapshot(
             .into_iter()
             .map(collection_view)
             .collect::<Result<_, _>>()?,
+        songs: snapshot
+            .songs
+            .into_iter()
+            .map(song_view)
+            .collect::<Result<_, _>>()?,
+        library_folders: snapshot
+            .library_folders
+            .into_iter()
+            .map(library_folder_view)
+            .collect::<Result<_, _>>()?,
     })
+}
+
+#[must_use]
+pub fn songs_added(response: pb::AddSongsToPlaylistResponse) -> usize {
+    usize::try_from(response.songs_added).unwrap_or(usize::MAX)
 }
 
 pub fn import_report(report: Option<pb::ImportReport>) -> Result<ImportReport, InvalidMessage> {
@@ -391,10 +478,7 @@ fn entry_message(entry: &EntryView) -> pb::CollectionEntry {
         builtin_title: entry.builtin_title.map(builtin_title_message),
         path: path_text(entry.path.as_ref()),
         duration: Some(duration_message(entry.duration)),
-        added_at: Some(prost_types::Timestamp {
-            seconds: entry.added_at.as_second(),
-            nanos: entry.added_at.subsec_nanosecond(),
-        }),
+        added_at: Some(timestamp_message(entry.added_at)),
         missing: entry.missing,
         sound: Some(sound_settings_message(entry.sound)),
         icon: sound_icon_message(entry.icon).into(),
@@ -464,6 +548,79 @@ fn entry_view(message: pb::CollectionEntry) -> Result<EntryView, InvalidMessage>
             .map_err(|_| invalid("sound"))?,
         icon: sound_icon(message.icon).map_err(|_| invalid("icon"))?,
     })
+}
+
+fn song_message(song: &SongView) -> pb::Song {
+    let source = match song.source {
+        SongSource::Folder(id) => pb::song::Source::LibraryFolderId(id.to_string()),
+        SongSource::File => pb::song::Source::File(pb::FileSongSource {}),
+    };
+    pb::Song {
+        audio_file_id: song.audio_file_id.to_string(),
+        title: song.title.as_str().to_owned(),
+        builtin_title: song.builtin_title.map(builtin_title_message),
+        path: path_text(song.path.as_ref()),
+        duration: Some(duration_message(song.duration)),
+        added_at: Some(timestamp_message(song.added_at)),
+        missing: song.missing,
+        source: Some(source),
+    }
+}
+
+fn song_view(message: pb::Song) -> Result<SongView, InvalidMessage> {
+    let invalid = |field| InvalidMessage { field };
+    let source = match message.source.ok_or(invalid("source"))? {
+        pb::song::Source::LibraryFolderId(id) => SongSource::Folder(
+            parse_uuid(&id)
+                .map(LibraryFolderId::from_uuid)
+                .ok_or(invalid("library_folder_id"))?,
+        ),
+        pb::song::Source::File(_) => SongSource::File,
+    };
+    let added_at = message.added_at.ok_or(invalid("added_at"))?;
+    Ok(SongView {
+        audio_file_id: parse_uuid(&message.audio_file_id)
+            .map(AudioFileId::from_uuid)
+            .ok_or(invalid("audio_file_id"))?,
+        title: Title::try_new(message.title).map_err(|_| invalid("title"))?,
+        builtin_title: message.builtin_title.map(builtin_title).transpose()?,
+        path: AudioFilePath::try_new(PathBuf::from(message.path)).map_err(|_| invalid("path"))?,
+        duration: message
+            .duration
+            .and_then(duration_value)
+            .ok_or(invalid("duration"))?,
+        added_at: Timestamp::new(added_at.seconds, added_at.nanos)
+            .map_err(|_| invalid("added_at"))?,
+        missing: message.missing,
+        source,
+    })
+}
+
+fn library_folder_message(folder: &LibraryFolderView) -> pb::LibraryFolder {
+    pb::LibraryFolder {
+        id: folder.id.to_string(),
+        kind: collection_kind_message(folder.kind).into(),
+        folder_path: path_text(folder.folder.as_ref()),
+    }
+}
+
+fn library_folder_view(message: pb::LibraryFolder) -> Result<LibraryFolderView, InvalidMessage> {
+    let invalid = |field| InvalidMessage { field };
+    Ok(LibraryFolderView {
+        id: parse_uuid(&message.id)
+            .map(LibraryFolderId::from_uuid)
+            .ok_or(invalid("id"))?,
+        kind: collection_kind(message.kind).map_err(|_| invalid("kind"))?,
+        folder: FolderPath::try_new(PathBuf::from(message.folder_path))
+            .map_err(|_| invalid("folder_path"))?,
+    })
+}
+
+fn timestamp_message(timestamp: Timestamp) -> prost_types::Timestamp {
+    prost_types::Timestamp {
+        seconds: timestamp.as_second(),
+        nanos: timestamp.subsec_nanosecond(),
+    }
 }
 
 fn builtin_title(value: i32) -> Result<BuiltinTitle, InvalidMessage> {
@@ -736,6 +893,12 @@ fn collection_id(text: &str) -> Result<CollectionId, Status> {
         .ok_or_else(|| invalid("collection_id", "must be a canonical UUID"))
 }
 
+fn audio_file_id(field: &'static str, text: &str) -> Result<AudioFileId, Status> {
+    parse_uuid(text)
+        .map(AudioFileId::from_uuid)
+        .ok_or_else(|| invalid(field, "must be a canonical UUID"))
+}
+
 fn collection_entry_id(text: &str) -> Result<CollectionEntryId, Status> {
     parse_uuid(text)
         .map(CollectionEntryId::from_uuid)
@@ -808,6 +971,33 @@ mod tests {
                     icon: SoundIcon::CloudLightning,
                 }],
             }],
+            songs: vec![
+                SongView {
+                    audio_file_id: AudioFileId::from_uuid(id),
+                    title: Title::try_new("Tavern Brawl".to_owned()).unwrap(),
+                    builtin_title: None,
+                    path: AudioFilePath::try_new(absolute("music/tavern brawl.ogg")).unwrap(),
+                    duration: Duration::from_secs(185),
+                    added_at: Timestamp::from_second(1_790_000_100).unwrap(),
+                    missing: false,
+                    source: SongSource::Folder(LibraryFolderId::from_uuid(id)),
+                },
+                SongView {
+                    audio_file_id: AudioFileId::from_uuid(uuid::Uuid::from_u128(8)),
+                    title: Title::try_new("Wandering".to_owned()).unwrap(),
+                    builtin_title: None,
+                    path: AudioFilePath::try_new(absolute("wandering.mp3")).unwrap(),
+                    duration: Duration::from_secs(240),
+                    added_at: Timestamp::from_second(1_790_000_200).unwrap(),
+                    missing: true,
+                    source: SongSource::File,
+                },
+            ],
+            library_folders: vec![LibraryFolderView {
+                id: LibraryFolderId::from_uuid(id),
+                kind: CollectionKind::Playlist,
+                folder: FolderPath::try_new(absolute("music")).unwrap(),
+            }],
         }
     }
 
@@ -847,6 +1037,23 @@ mod tests {
             report
         );
         assert_eq!(relative_folder.unwrap_err().code(), Code::InvalidArgument);
+    }
+
+    #[test]
+    fn songs_to_add_survive_the_round_trip() {
+        let request = AddSongsToPlaylist {
+            playlist_id: CollectionId::from_uuid(uuid::Uuid::from_u128(1)),
+            audio_file_ids: vec![
+                AudioFileId::from_uuid(uuid::Uuid::from_u128(2)),
+                AudioFileId::from_uuid(uuid::Uuid::from_u128(3)),
+            ],
+        };
+
+        assert_eq!(
+            add_songs_to_playlist_request(add_songs_to_playlist_message(&request)).unwrap(),
+            request
+        );
+        assert_eq!(songs_added(add_songs_to_playlist_response(2)), 2);
     }
 
     #[test]
@@ -935,7 +1142,17 @@ mod tests {
             }),
         });
 
+        let no_songs = add_songs_to_playlist_request(pb::AddSongsToPlaylistRequest {
+            playlist_id: uuid::Uuid::from_u128(1).to_string(),
+            audio_file_ids: Vec::new(),
+        });
+        let not_a_song = delete_song_request(&pb::DeleteSongRequest {
+            audio_file_id: "tavern.mp3".to_owned(),
+        });
+
         assert_eq!(not_a_uuid.unwrap_err().code(), Code::InvalidArgument);
+        assert_eq!(no_songs.unwrap_err().code(), Code::InvalidArgument);
+        assert_eq!(not_a_song.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(no_background.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(unknown_preset.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(no_kind.unwrap_err().code(), Code::InvalidArgument);

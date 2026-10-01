@@ -3,7 +3,8 @@
 //! A dropped folder becomes a library folder that Tufo follows. Dropping a folder inside one it
 //! already follows re-follows the collections under it that were deleted. Dropping a folder
 //! that holds library folders of the same kind absorbs them, keeping their collections.
-//! Loose audio files become one manual collection, titled after the first file's folder.
+//! Loose audio files become one manual collection, titled after the first file's folder; dropped
+//! as music, they also become song sources.
 
 use jiff::Timestamp;
 use toasty::Db;
@@ -69,7 +70,7 @@ pub async fn execute<F: LibraryFiles>(
             folder_name.is_none().then_some(BuiltinTitle::Imported),
         )
         .await?;
-        let added = manual_files::add_files(library, collection.id, loose_files).await?;
+        let added = manual_files::add_files(library, &collection, loose_files).await?;
         report.collections_created += 1;
         report.files_added += added.files_added;
         report.unreadable_files.extend(added.unreadable);

@@ -11,15 +11,16 @@ use tonic::{Request, Streaming, transport::Channel};
 pub use tufo_local_transport::{ConnectError, LocalEndpoint};
 use tufo_models::{
     discord::VoiceChannel,
-    library::{CollectionEntryId, CollectionId},
+    library::{AudioFileId, CollectionEntryId, CollectionId, LibraryFolderId},
     playback::{OutputTarget, diagnostics::PlayerDiagnostics, player_state::PlayerState},
 };
 /// The operation and status contracts callers exchange with the server.
 pub use tufo_wire::{error, library, player, server};
 use tufo_wire::{
     library::{
-        AddFilesToCollection, CreateCollection, ImportKenkuLibrary, ImportPaths, ImportReport,
-        KenkuImportReport, LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
+        AddFilesToCollection, AddSongsToPlaylist, CreateCollection, ImportKenkuLibrary,
+        ImportPaths, ImportReport, KenkuImportReport, LibrarySnapshot, UpdateCollection,
+        UpdateCollectionEntry,
     },
     pb::{
         self, library_service_client::LibraryServiceClient,
@@ -231,6 +232,37 @@ impl TufoClient {
             .clone()
             .delete_collection_entry(request)
             .await?;
+        Ok(())
+    }
+
+    /// How many songs the playlist didn't list before.
+    pub async fn add_songs_to_playlist(
+        &self,
+        request: &AddSongsToPlaylist,
+    ) -> Result<usize, ClientError> {
+        let request = with_timeout(
+            proto::library::add_songs_to_playlist_message(request),
+            QUICK_REQUEST_TIMEOUT,
+        );
+        let response = self.library.clone().add_songs_to_playlist(request).await?;
+        Ok(proto::library::songs_added(response.into_inner()))
+    }
+
+    pub async fn delete_song(&self, id: AudioFileId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            proto::library::delete_song_message(id),
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.library.clone().delete_song(request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_library_folder(&self, id: LibraryFolderId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            proto::library::delete_library_folder_message(id),
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.library.clone().delete_library_folder(request).await?;
         Ok(())
     }
 

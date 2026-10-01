@@ -35,11 +35,13 @@ pub async fn execute<F: LibraryFiles>(
     let collection = store::find_visible_collection(&mut database, request.collection_id)
         .await?
         .ok_or(AddFilesToCollectionError::NotFound)?;
-    if let Some(folder) = collection.folder_path {
-        return Err(AddFilesToCollectionError::Linked { folder });
+    if let Some(folder) = &collection.folder_path {
+        return Err(AddFilesToCollectionError::Linked {
+            folder: folder.clone(),
+        });
     }
     let dropped = manual_files::collect_audio_files(library.files(), request.paths).await;
-    let added = manual_files::add_files(library, collection.id, dropped.audio_files).await?;
+    let added = manual_files::add_files(library, &collection, dropped.audio_files).await?;
     library.publish().await?;
     Ok(ImportReport {
         collections_created: 0,

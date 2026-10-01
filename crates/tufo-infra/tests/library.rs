@@ -6,7 +6,10 @@ use support::wav_bytes;
 use tufo_application::library::{
     Library,
     add_files_to_collection::{self, AddFilesToCollectionError},
-    create_collection, delete_collection, folder_watcher, import_paths,
+    add_songs_to_playlist::{self, AddSongsToPlaylistError},
+    create_collection, delete_collection, delete_library_folder,
+    delete_song::{self, DeleteSongError},
+    folder_watcher, import_paths,
     seed_default_effects::{self, DefaultEffectFile, SeedDefaultEffectsOutcome},
     sync_library, update_collection,
 };
@@ -14,13 +17,16 @@ use tufo_infra::{
     database::open_database, folder_watcher::NotifyFolderWatcher, library_files::DiskLibraryFiles,
 };
 use tufo_models::{
-    library::{BackgroundPreset, CollectionKind, SoundIcon, Title, default_effects::DefaultEffect},
+    library::{
+        AudioFileId, BackgroundPreset, CollectionId, CollectionKind, SoundIcon, Title,
+        default_effects::DefaultEffect,
+    },
     path::{ImageFilePath, LocalPath},
     playback::AudioFilePath,
 };
 use tufo_wire::library::{
-    AddFilesToCollection, Background, CollectionSource, CollectionView, CreateCollection,
-    ImportPaths, LibrarySnapshot, UpdateCollection,
+    AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
+    CreateCollection, ImportPaths, LibrarySnapshot, SongSource, SongView, UpdateCollection,
 };
 
 mod support;
@@ -64,6 +70,24 @@ impl Fixture {
     fn snapshot(&self) -> Arc<LibrarySnapshot> {
         self.library.watch().borrow().clone()
     }
+
+    async fn import(&self, kind: CollectionKind, relative_paths: &[&str]) -> anyhow::Result<()> {
+        let paths = relative_paths
+            .iter()
+            .map(|relative| self.local(relative))
+            .collect::<anyhow::Result<_>>()?;
+        import_paths::execute(ImportPaths { kind, paths }, &self.library).await?;
+        Ok(())
+    }
+
+    async fn create_playlist(&self, title: &str) -> anyhow::Result<CollectionId> {
+        let request = CreateCollection {
+            kind: CollectionKind::Playlist,
+            title: Title::try_new(title.to_owned())?,
+            background: Background::Gradient,
+        };
+        Ok(create_collection::execute(request, &self.library).await?)
+    }
 }
 
 fn titled<'a>(snapshot: &'a LibrarySnapshot, title: &str) -> Option<&'a CollectionView> {
@@ -71,6 +95,21 @@ fn titled<'a>(snapshot: &'a LibrarySnapshot, title: &str) -> Option<&'a Collecti
         .collections
         .iter()
         .find(|collection| collection.title.as_str() == title)
+}
+
+fn song_titles(snapshot: &LibrarySnapshot) -> Vec<&str> {
+    snapshot
+        .songs
+        .iter()
+        .map(|song| song.title.as_str())
+        .collect()
+}
+
+fn song<'a>(snapshot: &'a LibrarySnapshot, title: &str) -> Option<&'a SongView> {
+    snapshot
+        .songs
+        .iter()
+        .find(|song| song.title.as_str() == title)
 }
 
 fn entry_titles(collection: &CollectionView) -> Vec<&str> {
@@ -243,16 +282,158 @@ async fn a_deleted_linked_playlist_stays_deleted_until_its_folder_is_dropped_aga
     delete_collection::execute(boss, &fixture.library)
         .await
         .unwrap();
+    fixture.write_track("rpg/boss/lich.wav", 450.0).unwrap();
     sync_library::execute(&fixture.library).await.unwrap();
-    assert!(fixture.snapshot().collections.is_empty());
+    let deleted = fixture.snapshot();
+    assert!(deleted.collections.is_empty());
+    assert_eq!(song_titles(&deleted), ["dragon", "lich"]);
 
     import_paths::execute(import(), &fixture.library)
         .await
         .unwrap();
     let restored = fixture.snapshot();
     assert_eq!(titled(&restored, "boss").unwrap().id, boss);
-    assert_eq!(titled(&restored, "boss").unwrap().entries.len(), 1);
+    assert_eq!(titled(&restored, "boss").unwrap().entries.len(), 2);
     assert!(fs::exists(fixture.music.path().join("rpg/boss/dragon.wav")).unwrap());
+}
+
+#[tokio::test]
+async fn a_deleted_hand_picked_playlist_leaves_its_songs() {
+    let fixture = Fixture::new().await.unwrap();
+    fixture.write_track("loose/ambush.wav", 440.0).unwrap();
+    fixture.write_track("loose/chase.wav", 450.0).unwrap();
+    fixture
+        .import(
+            CollectionKind::Playlist,
+            &["loose/ambush.wav", "loose/chase.wav"],
+        )
+        .await
+        .unwrap();
+    let loose = titled(&fixture.snapshot(), "loose").unwrap().id;
+
+    delete_collection::execute(loose, &fixture.library)
+        .await
+        .unwrap();
+
+    let snapshot = fixture.snapshot();
+    assert!(snapshot.collections.is_empty());
+    assert_eq!(song_titles(&snapshot), ["ambush", "chase"]);
+    assert_eq!(song(&snapshot, "ambush").unwrap().source, SongSource::File);
+}
+
+#[tokio::test]
+async fn songs_join_a_hand_picked_playlist_once() {
+    let fixture = Fixture::new().await.unwrap();
+    fixture.write_track("rpg/boss/dragon.wav", 440.0).unwrap();
+    fixture
+        .import(CollectionKind::Playlist, &["rpg"])
+        .await
+        .unwrap();
+    let session = fixture.create_playlist("Session 12").await.unwrap();
+    let snapshot = fixture.snapshot();
+    let boss = titled(&snapshot, "boss").unwrap().id;
+    let dragon = song(&snapshot, "dragon").unwrap();
+    assert!(matches!(dragon.source, SongSource::Folder(_)));
+    let add_to = |playlist_id, audio_file_id| {
+        add_songs_to_playlist::execute(
+            AddSongsToPlaylist {
+                playlist_id,
+                audio_file_ids: vec![audio_file_id],
+            },
+            &fixture.library,
+        )
+    };
+
+    let first = add_to(session, dragon.audio_file_id).await.unwrap();
+    let again = add_to(session, dragon.audio_file_id).await.unwrap();
+    let linked = add_to(boss, dragon.audio_file_id).await;
+    let unknown = add_to(session, AudioFileId::from_uuid(uuid::Uuid::from_u128(7))).await;
+
+    assert_eq!((first, again), (1, 0));
+    assert!(matches!(
+        linked,
+        Err(AddSongsToPlaylistError::Linked { .. })
+    ));
+    assert!(matches!(
+        unknown,
+        Err(AddSongsToPlaylistError::SongNotFound)
+    ));
+    assert_eq!(
+        entry_titles(titled(&fixture.snapshot(), "Session 12").unwrap()),
+        ["dragon"]
+    );
+}
+
+#[tokio::test]
+async fn a_removed_song_stays_in_the_playlists_that_list_it() {
+    let fixture = Fixture::new().await.unwrap();
+    fixture.write_track("loose/ambush.wav", 440.0).unwrap();
+    fixture.write_track("rpg/dragon.wav", 450.0).unwrap();
+    fixture
+        .import(CollectionKind::Playlist, &["loose/ambush.wav"])
+        .await
+        .unwrap();
+    fixture
+        .import(CollectionKind::Playlist, &["rpg"])
+        .await
+        .unwrap();
+    let snapshot = fixture.snapshot();
+    let ambush = song(&snapshot, "ambush").unwrap().audio_file_id;
+    let dragon = song(&snapshot, "dragon").unwrap().audio_file_id;
+
+    delete_song::execute(ambush, &fixture.library)
+        .await
+        .unwrap();
+    let followed = delete_song::execute(dragon, &fixture.library).await;
+
+    let snapshot = fixture.snapshot();
+    assert_eq!(song_titles(&snapshot), ["dragon"]);
+    assert_eq!(
+        entry_titles(titled(&snapshot, "loose").unwrap()),
+        ["ambush"]
+    );
+    assert!(matches!(
+        followed,
+        Err(DeleteSongError::InFollowedFolder { .. })
+    ));
+}
+
+#[tokio::test]
+async fn an_unfollowed_folder_takes_its_playlists_but_not_hand_picked_entries() {
+    let fixture = Fixture::new().await.unwrap();
+    fixture.write_track("rpg/boss/dragon.wav", 440.0).unwrap();
+    fixture.write_track("rpg/ambient/rain.wav", 450.0).unwrap();
+    fixture
+        .import(CollectionKind::Playlist, &["rpg"])
+        .await
+        .unwrap();
+    let session = fixture.create_playlist("Session 12").await.unwrap();
+    let snapshot = fixture.snapshot();
+    add_songs_to_playlist::execute(
+        AddSongsToPlaylist {
+            playlist_id: session,
+            audio_file_ids: vec![song(&snapshot, "dragon").unwrap().audio_file_id],
+        },
+        &fixture.library,
+    )
+    .await
+    .unwrap();
+
+    delete_library_folder::execute(snapshot.library_folders[0].id, &fixture.library)
+        .await
+        .unwrap();
+    sync_library::execute(&fixture.library).await.unwrap();
+
+    let snapshot = fixture.snapshot();
+    let titles = snapshot
+        .collections
+        .iter()
+        .map(|collection| collection.title.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(titles, ["Session 12"]);
+    assert_eq!(entry_titles(&snapshot.collections[0]), ["dragon"]);
+    assert!(snapshot.songs.is_empty());
+    assert!(snapshot.library_folders.is_empty());
 }
 
 #[tokio::test]

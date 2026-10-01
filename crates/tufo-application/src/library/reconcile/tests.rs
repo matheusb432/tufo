@@ -415,7 +415,7 @@ fn an_unreadable_library_folder_leaves_its_files_alone() {
 }
 
 #[test]
-fn a_hidden_collection_stays_hidden_and_empty() {
+fn a_hidden_collection_stays_empty_while_its_folder_keeps_adding_files() {
     let mut deleted = collection(20, "rpg/boss", "d:20", &[]);
     deleted.hidden = true;
     let input = ReconcileInput {
@@ -428,10 +428,11 @@ fn a_hidden_collection_stays_hidden_and_empty() {
         ..ReconcileInput::default()
     };
 
-    let pending = plan(input);
+    let changes = reconcile(input, &[("rpg/boss/dragon.mp3", facts('a'))]);
 
-    assert!(pending.inspections_needed().is_empty());
-    assert!(pending.finish(&HashMap::new()).is_empty());
+    assert_eq!(changes.new_files.len(), 1);
+    assert!(changes.new_collections.is_empty());
+    assert!(changes.entries_added.is_empty());
 }
 
 #[test]

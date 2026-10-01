@@ -1,8 +1,9 @@
-//! Deleting a collection. Audio files on disk are never touched.
+//! Deleting a collection. Audio files on disk are never touched, and the songs stay in the
+//! library while their sources keep them.
 //!
-//! A manual collection is deleted outright. A linked collection keeps a hidden row, so Tufo
-//! stops following its folder instead of recreating it on the next scan; dropping the folder
-//! again follows it once more.
+//! A manual collection is deleted outright. A linked collection keeps a hidden row, so the next
+//! scan doesn't recreate it while Tufo keeps following its folder; dropping the folder again
+//! shows it once more.
 
 use jiff::Timestamp;
 use toasty_core::driver::operation::TransactionMode;
@@ -58,7 +59,7 @@ pub async fn execute<F: LibraryFiles>(
             .await
             .map_err(LibraryStorageError::from)?;
     }
-    store::delete_unlisted_files(&mut transaction).await?;
+    store::delete_unkept_files(&mut transaction).await?;
     transaction
         .commit()
         .await

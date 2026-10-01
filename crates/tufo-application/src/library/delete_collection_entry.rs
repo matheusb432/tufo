@@ -60,7 +60,7 @@ pub async fn execute<F: LibraryFiles>(
         .exec(&mut transaction)
         .await
         .map_err(LibraryStorageError::from)?;
-    store::delete_unlisted_files(&mut transaction).await?;
+    store::delete_unkept_files(&mut transaction).await?;
     transaction
         .commit()
         .await

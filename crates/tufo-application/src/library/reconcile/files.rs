@@ -19,19 +19,12 @@ use crate::library::library_files::{AudioFacts, ScannedFile};
 /// Stored files matched to what's on disk, before their audio is read.
 #[derive(Debug)]
 pub(super) struct MatchedFiles {
-    scanned: BTreeMap<PathBuf, ScannedEntry>,
+    scanned: BTreeMap<PathBuf, ScannedFile>,
     found: HashMap<AudioFileId, FileMatch>,
     /// Stored files nothing matched that are authoritatively absent from their path.
     absent: Vec<AudioFileId>,
-    /// Scanned paths no stored file claimed, outside hidden folders.
+    /// Scanned paths no stored file claimed.
     candidates: Vec<PathBuf>,
-}
-
-#[derive(Debug, Clone)]
-struct ScannedEntry {
-    file: ScannedFile,
-    /// Whether every folder this file was scanned in belongs to a hidden collection.
-    hidden: bool,
 }
 
 /// Where a stored file was found; `changed` means its content may differ from what's stored.
@@ -78,59 +71,30 @@ pub(super) fn match_files(input: &ReconcileInput) -> MatchedFiles {
     }
 }
 
-/// Every scanned audio file by path. A file inside two library folders appears once, hidden only
-/// when every collection of its folder is.
-fn index_scanned_files(input: &ReconcileInput) -> BTreeMap<PathBuf, ScannedEntry> {
-    let hidden_folders = input
-        .collections
-        .iter()
-        .filter(|collection| collection.hidden)
-        .map(|collection| {
-            (
-                collection.library_folder_id,
-                collection.folder_path.as_ref().as_path(),
-            )
-        })
-        .collect::<BTreeSet<_>>();
-    let scanned_files = input
+/// Every scanned audio file by path, once even when it lies inside two library folders.
+fn index_scanned_files(input: &ReconcileInput) -> BTreeMap<PathBuf, ScannedFile> {
+    input
         .library_folders
         .iter()
         .filter_map(|library_folder| match &library_folder.outcome {
-            ScanOutcome::Scanned(scan) => Some((library_folder.id, scan)),
+            ScanOutcome::Scanned(scan) => Some(scan),
             ScanOutcome::Gone | ScanOutcome::Unreadable => None,
         })
-        .flat_map(|(library_folder_id, scan)| {
-            scan.folders
-                .iter()
-                .map(move |folder| (library_folder_id, folder))
-        })
-        .flat_map(|(library_folder_id, folder)| {
-            let hidden =
-                hidden_folders.contains(&(library_folder_id, folder.path.as_ref().as_path()));
-            folder.audio_files.iter().map(move |file| (file, hidden))
-        });
-    let mut scanned = BTreeMap::new();
-    for (file, hidden) in scanned_files {
-        scanned
-            .entry(file.path.as_ref().clone())
-            .and_modify(|entry: &mut ScannedEntry| entry.hidden &= hidden)
-            .or_insert_with(|| ScannedEntry {
-                file: file.clone(),
-                hidden,
-            });
-    }
-    scanned
+        .flat_map(|scan| &scan.folders)
+        .flat_map(|folder| &folder.audio_files)
+        .map(|file| (file.path.as_ref().clone(), file.clone()))
+        .collect()
 }
 
 /// What's at the stored file's own path, or `None` when nothing authoritative says.
 fn look_at(
     file: &KnownFile,
-    scanned: &BTreeMap<PathBuf, ScannedEntry>,
+    scanned: &BTreeMap<PathBuf, ScannedFile>,
     stat_results: &HashMap<AudioFileId, Option<FileStamp>>,
     roots: &[&Path],
 ) -> Option<Seen> {
-    if let Some(entry) = scanned.get(file.path.as_ref()) {
-        return Some(Seen::Present(entry.file.stamp.clone()));
+    if let Some(scanned_file) = scanned.get(file.path.as_ref()) {
+        return Some(Seen::Present(scanned_file.stamp.clone()));
     }
     if is_under_any(file.path.as_ref(), roots) {
         return Some(Seen::Absent);
@@ -142,7 +106,7 @@ fn look_at(
 }
 
 struct Matcher<'a> {
-    scanned: &'a BTreeMap<PathBuf, ScannedEntry>,
+    scanned: &'a BTreeMap<PathBuf, ScannedFile>,
     claimed: BTreeSet<PathBuf>,
     found: HashMap<AudioFileId, FileMatch>,
 }
@@ -162,10 +126,10 @@ impl Matcher<'_> {
         );
     }
 
-    fn unclaimed(&self) -> impl Iterator<Item = (&PathBuf, &ScannedEntry)> {
+    fn unclaimed(&self) -> impl Iterator<Item = (&PathBuf, &ScannedFile)> {
         self.scanned
             .iter()
-            .filter(|(path, entry)| !self.claimed.contains(*path) && !entry.hidden)
+            .filter(|(path, _)| !self.claimed.contains(*path))
     }
 
     /// The same file identity at the stored path is the file itself.
@@ -189,7 +153,7 @@ impl Matcher<'_> {
         let scanned = self.scanned;
         let scanned_by_identity = unique_by(
             self.unclaimed()
-                .map(|(path, entry)| (entry.file.stamp.identity.clone(), path.clone())),
+                .map(|(path, scanned_file)| (scanned_file.stamp.identity.clone(), path.clone())),
         );
         let stored_by_identity = unique_by(
             unmatched
@@ -206,7 +170,7 @@ impl Matcher<'_> {
                 let Some(path) = moved_to else {
                     return Some((file, seen));
                 };
-                let moved = &scanned[path].file;
+                let moved = &scanned[path];
                 let changed = !same_content(&moved.stamp, &file.stamp);
                 self.claim(file.id, moved.path.clone(), moved.stamp.clone(), changed);
                 None
@@ -251,7 +215,7 @@ impl MatchedFiles {
         let candidates = self
             .candidates
             .iter()
-            .map(|path| self.scanned[path].file.path.clone());
+            .map(|path| self.scanned[path].path.clone());
         changed.chain(candidates).collect()
     }
 
@@ -288,7 +252,7 @@ impl MatchedFiles {
                 None => settled
                     .changes
                     .unreadable_files
-                    .push(self.scanned[&path].file.path.clone()),
+                    .push(self.scanned[&path].path.clone()),
             }
         }
 
@@ -300,12 +264,12 @@ impl MatchedFiles {
         absent.sort_by(|left, right| left.path.as_ref().cmp(right.path.as_ref()));
         for file in absent {
             match take_relink_candidate(&mut readable, file) {
-                Some((path, facts)) => settled.relink(file, &self.scanned[&path].file, facts),
+                Some((path, facts)) => settled.relink(file, &self.scanned[&path], facts),
                 None => settled.mark_missing(file),
             }
         }
         for (path, facts) in readable {
-            settled.add_new(&self.scanned[&path].file, facts);
+            settled.add_new(&self.scanned[&path], facts);
         }
         settled
     }

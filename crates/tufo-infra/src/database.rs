@@ -113,9 +113,9 @@ mod tests {
 
     use super::*;
 
-    async fn insert_audio_file(database: &mut Db) -> AudioFile {
+    async fn insert_audio_file(database: &mut Db, file_name: &str) -> AudioFile {
         toasty::create!(AudioFile {
-            file_path: AudioFilePath::try_new(std::env::temp_dir().join("tavern.mp3")).unwrap(),
+            file_path: AudioFilePath::try_new(std::env::temp_dir().join(file_name)).unwrap(),
             file_identity: FileIdentity::try_new("unix:1:2".to_owned()).unwrap(),
             size_bytes: 1024,
             modified_ns: 0,
@@ -124,6 +124,7 @@ mod tests {
             title: Title::try_new("Tavern".to_owned()).unwrap(),
             missing_since: None,
             created_at: Timestamp::now(),
+            song_source: false,
         })
         .exec(database)
         .await
@@ -131,8 +132,12 @@ mod tests {
     }
 
     async fn insert_manual_playlist(database: &mut Db) -> Collection {
+        insert_manual_collection(database, CollectionKind::Playlist).await
+    }
+
+    async fn insert_manual_collection(database: &mut Db, kind: CollectionKind) -> Collection {
         toasty::create!(Collection {
-            kind: CollectionKind::Playlist,
+            kind,
             title: Title::try_new("Tavern night".to_owned()).unwrap(),
             background_image: None,
             order_key: EntryOrderKey::Title,
@@ -154,7 +159,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join(DATABASE_FILE_NAME);
         let mut database = open_database(&path).await.unwrap();
-        let audio_file = insert_audio_file(&mut database).await;
+        let audio_file = insert_audio_file(&mut database, "tavern.mp3").await;
         drop(database);
 
         let mut reopened = open_database(&path).await.unwrap();
@@ -176,7 +181,7 @@ mod tests {
         let directory = tempfile::tempdir().unwrap();
         let path = directory.path().join(DATABASE_FILE_NAME);
         let mut database = open_database(&path).await.unwrap();
-        let file = insert_audio_file(&mut database).await;
+        let file = insert_audio_file(&mut database, "tavern.mp3").await;
         let collection = insert_manual_playlist(&mut database).await;
         let seeded_at = Timestamp::now();
         AudioFile::update_by_id(file.id)
@@ -212,7 +217,9 @@ mod tests {
             .execute_batch(
                 "ALTER TABLE collections DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN builtin_title;
-             DELETE FROM __toasty_migrations WHERE name = '0006_builtin_titles.sql';",
+             ALTER TABLE audio_files DROP COLUMN song_source;
+             DELETE FROM __toasty_migrations
+             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -236,10 +243,59 @@ mod tests {
         assert_eq!(collection.title.as_str(), "My ambience");
     }
 
+    async fn insert_entry(database: &mut Db, collection: &Collection, audio_file: &AudioFile) {
+        toasty::create!(CollectionEntry {
+            collection_id: collection.id,
+            audio_file_id: audio_file.id,
+            added_at: Timestamp::now(),
+            looping: false,
+            volume: Volume::default(),
+            fade_in: FadeDuration::default(),
+            fade_out: FadeDuration::default(),
+            icon: SoundIcon::default(),
+        })
+        .exec(database)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn files_in_hand_picked_playlists_become_song_sources() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(DATABASE_FILE_NAME);
+        let mut database = open_database(&path).await.unwrap();
+        let song = insert_audio_file(&mut database, "tavern.mp3").await;
+        let sound = insert_audio_file(&mut database, "door.wav").await;
+        let playlist = insert_manual_playlist(&mut database).await;
+        let soundboard = insert_manual_collection(&mut database, CollectionKind::Soundboard).await;
+        insert_entry(&mut database, &playlist, &song).await;
+        insert_entry(&mut database, &soundboard, &sound).await;
+        drop(database);
+        let legacy = rusqlite::Connection::open(&path).unwrap();
+        legacy
+            .execute_batch(
+                "ALTER TABLE audio_files DROP COLUMN song_source;
+             DELETE FROM __toasty_migrations WHERE name = '0007_song_sources.sql';",
+            )
+            .unwrap();
+        drop(legacy);
+
+        let mut migrated = open_database(&path).await.unwrap();
+        let song_sources = AudioFile::all()
+            .exec(&mut migrated)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|file| (file.id, file.song_source))
+            .collect::<std::collections::HashMap<_, _>>();
+        assert!(song_sources[&song.id]);
+        assert!(!song_sources[&sound.id]);
+    }
+
     #[tokio::test]
     async fn deleting_a_collection_deletes_its_entries_but_not_their_files() {
         let (_directory, mut database) = open_temporary_database().await.unwrap();
-        let audio_file = insert_audio_file(&mut database).await;
+        let audio_file = insert_audio_file(&mut database, "tavern.mp3").await;
         let collection = insert_manual_playlist(&mut database).await;
         toasty::create!(CollectionEntry {
             collection_id: collection.id,

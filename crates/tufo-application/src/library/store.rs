@@ -1,6 +1,6 @@
 //! Shared library queries and writes for imports, edits, and reconciliation.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use anyhow::Context as _;
 use jiff::Timestamp;
@@ -97,7 +97,7 @@ pub(super) async fn background_preset_chooser(
     Ok(BackgroundPresetChooser::new(shown, fastrand::Rng::new()))
 }
 
-/// Applies a reconciliation in one transaction, then drops files no collection lists.
+/// Applies a reconciliation in one transaction, then drops the files nothing keeps.
 pub(super) async fn apply_changes(
     database: &mut Db,
     changes: &ReconcileChanges,
@@ -164,7 +164,7 @@ pub(super) async fn apply_changes(
         )
         .await?;
     }
-    delete_unlisted_files(&mut transaction).await?;
+    delete_unkept_files(&mut transaction).await?;
     transaction.commit().await?;
     Ok(())
 }
@@ -287,6 +287,7 @@ pub(super) async fn create_audio_file(
         builtin_title,
         missing_since: None,
         created_at: now,
+        song_source: false,
     })
     .exec(executor)
     .await?)
@@ -358,16 +359,43 @@ pub(super) async fn create_entry(
     .await?)
 }
 
-/// Deletes the files no collection lists: a file lives in the library only through its
-/// entries.
-pub(super) async fn delete_unlisted_files(
+/// Deletes the files nothing keeps in the library. A file stays while a collection lists it,
+/// while it's a song source, or while a library folder holds it and it isn't missing.
+pub(super) async fn delete_unkept_files(
     executor: &mut dyn Executor,
 ) -> Result<(), LibraryStorageError> {
-    toasty::sql::statement(
-        "DELETE FROM audio_files WHERE id NOT IN (SELECT audio_file_id FROM collection_entries)",
-    )
-    .exec(executor)
-    .await
-    .context("deleting unlisted audio files")?;
+    let listed = CollectionEntry::all()
+        .exec(executor)
+        .await?
+        .into_iter()
+        .map(|entry| entry.audio_file_id)
+        .collect::<HashSet<_>>();
+    let library_folders = LibraryFolder::all().exec(executor).await?;
+    let unkept = AudioFile::all()
+        .exec(executor)
+        .await?
+        .into_iter()
+        .filter(|file| {
+            let held_by_folder = file.missing_since.is_none()
+                && holding_folder(&file.file_path, &library_folders).is_some();
+            let kept = listed.contains(&file.id) || file.song_source || held_by_folder;
+            !kept
+        })
+        .map(|file| file.id)
+        .collect::<Vec<_>>();
+    for id in unkept {
+        AudioFile::filter_by_id(id).delete().exec(executor).await?;
+    }
     Ok(())
+}
+
+/// The library folder that holds `path`, the innermost when folders nest.
+pub(super) fn holding_folder<'a>(
+    path: &AudioFilePath,
+    library_folders: impl IntoIterator<Item = &'a LibraryFolder>,
+) -> Option<&'a LibraryFolder> {
+    library_folders
+        .into_iter()
+        .filter(|folder| path.as_ref().starts_with(folder.folder_path.as_ref()))
+        .max_by_key(|folder| folder.folder_path.as_ref().components().count())
 }

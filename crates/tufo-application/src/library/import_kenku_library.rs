@@ -166,7 +166,7 @@ async fn import_collections<F: LibraryFiles>(
             )
             .await?;
             let added =
-                manual_files::add_files(library, created.id, unique_paths(&planned.files)).await?;
+                manual_files::add_files(library, &created, unique_paths(&planned.files)).await?;
             report.files_imported += added.files_added;
             report.unreadable_files.extend(added.unreadable);
             apply_file_settings(&mut database, created.id, &planned.files).await?;

@@ -4,7 +4,10 @@ use jiff::Timestamp;
 use toasty::Db;
 use toasty_core::driver::operation::TransactionMode;
 use tufo_models::{
-    library::{AudioFile, AudioFileId, CollectionEntry, CollectionId, SoundIcon, SoundSettings},
+    library::{
+        AudioFile, AudioFileId, Collection, CollectionEntry, CollectionKind, SoundIcon,
+        SoundSettings,
+    },
     path::LocalPath,
     playback::AudioFilePath,
 };
@@ -59,10 +62,11 @@ pub(super) struct AddedFiles {
 }
 
 /// Lists each file in the collection, creating the files Tufo doesn't know. Files the
-/// collection already lists are skipped. The caller holds the write gate.
+/// collection already lists are skipped. Files added to a playlist become song sources. The
+/// caller holds the write gate.
 pub(super) async fn add_files<F: LibraryFiles>(
     library: &Library<F>,
-    collection_id: CollectionId,
+    collection: &Collection,
     audio_files: Vec<AudioFilePath>,
 ) -> Result<AddedFiles, LibraryStorageError> {
     let mut database = library.database();
@@ -82,7 +86,7 @@ pub(super) async fn add_files<F: LibraryFiles>(
         .mode(TransactionMode::Immediate)
         .begin()
         .await?;
-    let listed = CollectionEntry::filter_by_collection_id(collection_id)
+    let listed = CollectionEntry::filter_by_collection_id(collection.id)
         .exec(&mut transaction)
         .await?
         .into_iter()
@@ -97,10 +101,16 @@ pub(super) async fn add_files<F: LibraryFiles>(
         );
     }
     for audio_file_id in file_ids {
+        if collection.kind == CollectionKind::Playlist {
+            AudioFile::update_by_id(audio_file_id)
+                .song_source(true)
+                .exec(&mut transaction)
+                .await?;
+        }
         if !listed.contains(&audio_file_id) {
             store::create_entry(
                 &mut transaction,
-                collection_id,
+                collection.id,
                 audio_file_id,
                 now,
                 SoundSettings::default(),

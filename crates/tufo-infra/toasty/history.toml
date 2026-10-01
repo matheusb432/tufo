@@ -34,3 +34,8 @@ snapshot_name = "0005_snapshot.toml"
 id = 4763991875893660866
 name = "0006_builtin_titles.sql"
 snapshot_name = "0006_snapshot.toml"
+
+[[migrations]]
+id = 7116584668380935970
+name = "0007_song_sources.sql"
+snapshot_name = "0007_snapshot.toml"

@@ -81,6 +81,7 @@ fn snapshot() -> LibrarySnapshot {
                 vec![entry(13, "Thunder", 4)],
             ),
         ],
+        ..LibrarySnapshot::default()
     }
 }
 
@@ -657,6 +658,7 @@ fn generated_titles_localize_before_filtering_and_natural_ordering() {
     let mut library = LibrarySnapshot {
         revision: 1,
         collections: vec![board],
+        ..LibrarySnapshot::default()
     };
 
     localize_snapshot(&mut library);

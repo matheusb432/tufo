@@ -4,8 +4,9 @@ use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::library::{
-    add_files_to_collection, create_collection, delete_collection, delete_collection_entry,
-    import_kenku_library, import_paths, sync_library, update_collection, update_collection_entry,
+    add_files_to_collection, add_songs_to_playlist, create_collection, delete_collection,
+    delete_collection_entry, delete_library_folder, delete_song, import_kenku_library,
+    import_paths, sync_library, update_collection, update_collection_entry,
 };
 use tufo_infra::kenku::DiskKenkuReader;
 use tufo_wire::{
@@ -131,6 +132,41 @@ impl LibraryService for LibraryGrpcService {
             .await
             .into_grpc()?;
         Ok(Response::new(pb::DeleteCollectionEntryResponse {}))
+    }
+
+    async fn add_songs_to_playlist(
+        &self,
+        request: Request<pb::AddSongsToPlaylistRequest>,
+    ) -> Result<Response<pb::AddSongsToPlaylistResponse>, Status> {
+        let request = proto::library::add_songs_to_playlist_request(request.into_inner())?;
+        let songs_added = add_songs_to_playlist::execute(request, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(
+            proto::library::add_songs_to_playlist_response(songs_added),
+        ))
+    }
+
+    async fn delete_song(
+        &self,
+        request: Request<pb::DeleteSongRequest>,
+    ) -> Result<Response<pb::DeleteSongResponse>, Status> {
+        let id = proto::library::delete_song_request(request.get_ref())?;
+        delete_song::execute(id, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::DeleteSongResponse {}))
+    }
+
+    async fn delete_library_folder(
+        &self,
+        request: Request<pb::DeleteLibraryFolderRequest>,
+    ) -> Result<Response<pb::DeleteLibraryFolderResponse>, Status> {
+        let id = proto::library::delete_library_folder_request(request.get_ref())?;
+        delete_library_folder::execute(id, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::DeleteLibraryFolderResponse {}))
     }
 
     async fn rescan_library(

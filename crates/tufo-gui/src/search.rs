@@ -251,6 +251,7 @@ mod tests {
                 ),
                 collection(3, CollectionKind::Playlist, "Dragons", vec![]),
             ],
+            ..LibrarySnapshot::default()
         }
     }
 

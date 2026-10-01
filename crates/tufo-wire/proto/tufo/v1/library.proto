@@ -5,8 +5,8 @@ package tufo.v1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-// The playlists and soundboards, and the audio files they point at. Tufo never copies, moves,
-// or writes audio files.
+// The playlists and soundboards, the songs, and the audio files they point at. Tufo never
+// copies, moves, or writes audio files.
 service LibraryService {
   // Streams the whole library, then the whole library again after each change. A slow reader
   // skips to the latest snapshot. The stream ends when the server shuts down.
@@ -23,14 +23,23 @@ service LibraryService {
   rpc CreateCollection(CreateCollectionRequest) returns (CreateCollectionResponse);
   // Changes the fields present in the request and leaves the others.
   rpc UpdateCollection(UpdateCollectionRequest) returns (UpdateCollectionResponse);
-  // Deletes a collection. A deleted linked collection stops following its folder until that
-  // folder is imported again.
+  // Deletes a collection; its songs stay in the library. A deleted linked collection stays
+  // deleted until its folder is imported again, while Tufo keeps following the folder.
   rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
   // Changes the fields present in the request and leaves the others.
   rpc UpdateCollectionEntry(UpdateCollectionEntryRequest) returns (UpdateCollectionEntryResponse);
   // Deletes an entry from a manual collection. Linked collections refuse with
   // FAILED_PRECONDITION, since their folder decides their entries.
   rpc DeleteCollectionEntry(DeleteCollectionEntryRequest) returns (DeleteCollectionEntryResponse);
+  // Adds songs to a hand-picked playlist, skipping the songs it already lists. NOT_FOUND names
+  // an unknown playlist or song; linked playlists refuse with FAILED_PRECONDITION.
+  rpc AddSongsToPlaylist(AddSongsToPlaylistRequest) returns (AddSongsToPlaylistResponse);
+  // Removes a song added by its own path from the songs; playlists that list it keep it. A song
+  // a followed folder holds refuses with FAILED_PRECONDITION.
+  rpc DeleteSong(DeleteSongRequest) returns (DeleteSongResponse);
+  // Stops following a folder: deletes its linked collections and forgets the files under it
+  // that nothing else keeps. Hand-picked collections keep listing its files.
+  rpc DeleteLibraryFolder(DeleteLibraryFolderRequest) returns (DeleteLibraryFolderResponse);
   // Rescans every library folder now instead of waiting for the watcher.
   rpc RescanLibrary(RescanLibraryRequest) returns (RescanLibraryResponse);
   // Imports Kenku FM's collections and music settings, and its Discord bot token when the
@@ -50,6 +59,43 @@ message LibrarySnapshot {
   uint64 revision = 1;
   // Playlists, then soundboards, each by title.
   repeated Collection collections = 2;
+  // By title.
+  repeated Song songs = 3;
+  // By path.
+  repeated LibraryFolder library_folders = 4;
+}
+
+// An audio file a song source keeps in the library: a followed music folder, or the file's own
+// path added to a playlist.
+message Song {
+  // A canonical UUID, the audio file's.
+  string audio_file_id = 1;
+  string title = 2;
+  optional BuiltinTitle builtin_title = 3;
+  // The file's absolute path.
+  string path = 4;
+  google.protobuf.Duration duration = 5;
+  // When the file was added to Tufo.
+  google.protobuf.Timestamp added_at = 6;
+  // Whether Tufo last looked for the file and didn't find it.
+  bool missing = 7;
+  // A followed folder wins over the file's own path.
+  oneof source {
+    // A canonical UUID, the library folder holding the file.
+    string library_folder_id = 8;
+    FileSongSource file = 9;
+  }
+}
+
+// The file was added to a playlist by its own path.
+message FileSongSource {}
+
+// A folder Tufo follows.
+message LibraryFolder {
+  // A canonical UUID.
+  string id = 1;
+  CollectionKind kind = 2;
+  string folder_path = 3;
 }
 
 message Collection {
@@ -308,6 +354,29 @@ message DeleteCollectionEntryRequest {
 }
 
 message DeleteCollectionEntryResponse {}
+
+message AddSongsToPlaylistRequest {
+  string playlist_id = 1;
+  // Canonical UUIDs of audio files; at least one.
+  repeated string audio_file_ids = 2;
+}
+
+message AddSongsToPlaylistResponse {
+  // Songs the playlist didn't list before.
+  uint32 songs_added = 1;
+}
+
+message DeleteSongRequest {
+  string audio_file_id = 1;
+}
+
+message DeleteSongResponse {}
+
+message DeleteLibraryFolderRequest {
+  string library_folder_id = 1;
+}
+
+message DeleteLibraryFolderResponse {}
 
 message RescanLibraryRequest {}
 

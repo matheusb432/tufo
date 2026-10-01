@@ -1,27 +1,45 @@
-//! Building the library snapshot: visible collections with their entries in order.
+//! Building the library snapshot: visible collections with their entries in order, the songs,
+//! and the followed folders.
 
 use std::collections::HashMap;
 
 use toasty::Db;
 use tufo_models::library::{
-    AudioFile, Collection, CollectionEntry, CollectionKind, EntryOrder, EntryOrderKey,
-    compare_titles,
+    AudioFile, AudioFileId, Collection, CollectionEntry, CollectionKind, EntryOrder, EntryOrderKey,
+    LibraryFolder, compare_titles,
 };
-use tufo_wire::library::{Background, CollectionSource, CollectionView, EntryView};
+use tufo_wire::library::{
+    Background, CollectionSource, CollectionView, EntryView, LibraryFolderView, LibrarySnapshot,
+    SongSource, SongView,
+};
 
-use super::LibraryStorageError;
+use super::{LibraryStorageError, store};
 
-pub(super) async fn load_collections(
+/// The library as it's stored now, at revision 0; publishing gives it the next revision.
+pub(super) async fn load_snapshot(
     database: &mut Db,
-) -> Result<Vec<CollectionView>, LibraryStorageError> {
-    let collections = Collection::all().exec(database).await?;
-    let entries = CollectionEntry::all().exec(database).await?;
+) -> Result<LibrarySnapshot, LibraryStorageError> {
     let audio_files = AudioFile::all()
         .exec(database)
         .await?
         .into_iter()
         .map(|file| (file.id, file))
         .collect::<HashMap<_, _>>();
+    let library_folders = LibraryFolder::all().exec(database).await?;
+    Ok(LibrarySnapshot {
+        revision: 0,
+        collections: load_collections(database, &audio_files).await?,
+        songs: songs(&audio_files, &library_folders),
+        library_folders: library_folder_views(library_folders),
+    })
+}
+
+async fn load_collections(
+    database: &mut Db,
+    audio_files: &HashMap<AudioFileId, AudioFile>,
+) -> Result<Vec<CollectionView>, LibraryStorageError> {
+    let collections = Collection::all().exec(database).await?;
+    let entries = CollectionEntry::all().exec(database).await?;
     let mut entries_by_collection = HashMap::<_, Vec<_>>::new();
     for entry in entries {
         let Some(file) = audio_files.get(&entry.audio_file_id) else {
@@ -50,6 +68,61 @@ pub(super) async fn load_collections(
             .then_with(|| left.id.cmp(&right.id))
     });
     Ok(views)
+}
+
+/// The files a song source keeps: those a followed music folder holds where they are, and those
+/// added to a playlist by their own path.
+fn songs(
+    audio_files: &HashMap<AudioFileId, AudioFile>,
+    library_folders: &[LibraryFolder],
+) -> Vec<SongView> {
+    let music_folders = library_folders
+        .iter()
+        .filter(|folder| folder.kind == CollectionKind::Playlist)
+        .collect::<Vec<_>>();
+    let mut songs = audio_files
+        .values()
+        .filter_map(|file| {
+            let holding_folder = file
+                .missing_since
+                .is_none()
+                .then(|| store::holding_folder(&file.file_path, music_folders.iter().copied()))
+                .flatten();
+            let source = match holding_folder {
+                Some(folder) => SongSource::Folder(folder.id),
+                None if file.song_source => SongSource::File,
+                None => return None,
+            };
+            Some(SongView {
+                audio_file_id: file.id,
+                title: file.title.clone(),
+                builtin_title: file.builtin_title,
+                path: file.file_path.clone(),
+                duration: file.duration(),
+                added_at: file.created_at,
+                missing: file.missing_since.is_some(),
+                source,
+            })
+        })
+        .collect::<Vec<_>>();
+    songs.sort_by(|left, right| {
+        compare_titles(left.title.as_str(), right.title.as_str())
+            .then_with(|| left.audio_file_id.cmp(&right.audio_file_id))
+    });
+    songs
+}
+
+fn library_folder_views(library_folders: Vec<LibraryFolder>) -> Vec<LibraryFolderView> {
+    let mut views = library_folders
+        .into_iter()
+        .map(|folder| LibraryFolderView {
+            id: folder.id,
+            kind: folder.kind,
+            folder: folder.folder_path,
+        })
+        .collect::<Vec<_>>();
+    views.sort_by(|left, right| left.folder.as_ref().cmp(right.folder.as_ref()));
+    views
 }
 
 fn kind_rank(kind: CollectionKind) -> u8 {
