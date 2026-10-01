@@ -471,23 +471,53 @@ export component Switch inherits Rectangle {
     }
 }
 
-// A thin scrollbar thumb for a Flickable, placed by its parent at the Flickable's right edge. It
-// shows only while the pointer is over the page.
+// A thin scrollbar for a Flickable, placed by its parent at the Flickable's right edge.
 export component ScrollThumb inherits Rectangle {
     in property <length> content-height;
-    in property <length> content-y;
+    in property <length> viewport-height: root.height;
+    in-out property <length> content-y;
     in property <bool> show;
+    property <length> scroll-maximum: max(0px, root.content-height - root.viewport-height);
     width: 10px;
-    visible: self.content-height > self.height;
-    Rectangle {
-        property <length> thumb-height: max(32px, root.height * root.height / max(root.content-height, 1px));
-        y: (root.height - self.thumb-height) * clamp(-root.content-y / max(root.content-height - root.height, 1px), 0, 1);
+    visible: root.scroll-maximum > 0px;
+
+    function drag-to(y: length) {
+        if root.height > thumb.height {
+            root.content-y = -root.scroll-maximum * clamp((y - touch.grab-offset) / (root.height - thumb.height), 0, 1);
+        }
+    }
+
+    thumb := Rectangle {
+        y: (root.height - self.height) * clamp(-root.content-y / max(root.scroll-maximum, 1px), 0, 1);
         width: 6px;
-        height: self.thumb-height;
+        height: min(root.height, max(32px, root.height * root.viewport-height / max(root.content-height, 1px)));
         border-radius: 3px;
         background: Theme.text-faint;
-        opacity: root.show ? 0.8 : 0;
+        opacity: root.show || touch.has-hover || touch.pressed ? 0.8 : 0;
         animate opacity { duration: 200ms; }
+    }
+
+    touch := TouchArea {
+        property <length> grab-offset;
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                self.grab-offset = self.mouse-y >= thumb.y && self.mouse-y <= thumb.y + thumb.height ? self.mouse-y - thumb.y : thumb.height / 2;
+                root.drag-to(self.mouse-y);
+            }
+        }
+        moved => {
+            if self.pressed {
+                root.drag-to(self.mouse-y);
+            }
+        }
+        scroll-event(event) => {
+            if event.delta-y != 0px {
+                root.content-y = clamp(root.content-y + event.delta-y, -root.scroll-maximum, 0px);
+                return accept;
+            }
+            reject
+        }
     }
 }
 

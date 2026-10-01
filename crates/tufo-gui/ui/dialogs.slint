@@ -75,7 +75,8 @@ export component DialogFrame inherits Rectangle {
             y: 12px;
             height: parent.height - 24px;
             content-height: scroll.content-height;
-            content-y: scroll.content-y;
+            viewport-height: scroll.height;
+            content-y <=> scroll.content-y;
             show: scroll.content-height > scroll.height;
         }
     }

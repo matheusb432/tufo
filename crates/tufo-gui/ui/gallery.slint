@@ -267,7 +267,7 @@ export component BackgroundGallery inherits Rectangle {
                     x: parent.width - self.width - 6px;
                     height: parent.height;
                     content-height: flick.content-height;
-                    content-y: flick.content-y;
+                    content-y <=> flick.content-y;
                     show: hover.has-hover;
                 }
             }

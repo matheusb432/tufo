@@ -37,6 +37,9 @@ mod window_state;
 )]
 mod ui {
     slint::include_modules!();
+
+    #[cfg(test)]
+    mod tests;
 }
 
 use std::{cell::OnceCell, rc::Rc, time::Duration};
