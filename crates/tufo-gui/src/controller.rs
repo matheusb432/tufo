@@ -35,6 +35,7 @@ use tufo_models::{
 use crate::{
     autostart,
     i18n::{tr, tr_args},
+    media_controls::MediaState,
     presentation::{self, Navigation, PageKind, PageQueries},
     render,
     search::{self, PaletteResult, PaletteTarget},
@@ -373,6 +374,11 @@ impl Controller {
             (false, false) => TraySounds::Playing,
         };
         TrayPlayback { music, sounds }
+    }
+
+    pub(crate) fn media_state(&self) -> MediaState {
+        let shared = self.lock();
+        MediaState::from_player(&shared.snapshot, &shared.player, SystemTime::now())
     }
 
     fn refresh_palette(&self) {
@@ -1038,10 +1044,58 @@ impl Controller {
                 .next()
                 .map(|music| music.paused)
         };
-        match paused {
-            Some(true) => self.run(|client| async move { client.resume_music().await }),
-            Some(false) => self.run(|client| async move { client.pause_music().await }),
-            None => {}
+        if let Some(paused) = paused {
+            self.set_music_paused(!paused);
+        }
+    }
+
+    pub(crate) fn set_music_paused(&self, paused: bool) {
+        if self.lock().player.music_tracks().next().is_none() {
+            return;
+        }
+        if paused {
+            self.run(|client| async move { client.pause_music().await });
+        } else {
+            self.run(|client| async move { client.resume_music().await });
+        }
+    }
+
+    pub(crate) fn stop_music(&self) {
+        self.run(|client| async move { client.stop_music().await });
+    }
+
+    pub(crate) fn seek_to(&self, position: Duration) {
+        let duration = self
+            .lock()
+            .player
+            .music
+            .as_ref()
+            .and_then(|music| music.duration);
+        let Some(duration) = duration else {
+            return;
+        };
+        if position < duration {
+            self.run(move |client| async move { client.seek_music(position).await });
+        }
+    }
+
+    pub(crate) fn seek_by(&self, forward: bool, offset: Duration) {
+        let target = self.lock().player.music.as_ref().map(|music| {
+            let position = music.position.at(SystemTime::now(), !music.paused);
+            let position = if forward {
+                position.saturating_add(offset)
+            } else {
+                position.saturating_sub(offset)
+            };
+            (position, music.duration)
+        });
+        let Some((position, Some(duration))) = target else {
+            return;
+        };
+        if position >= duration {
+            self.next_track();
+        } else {
+            self.seek_to(position);
         }
     }
 

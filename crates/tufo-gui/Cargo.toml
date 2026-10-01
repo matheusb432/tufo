@@ -24,7 +24,7 @@ serde_json = { workspace = true, optional = true }
 slint = { workspace = true }
 sys-locale = "0.3.2"
 thiserror = { workspace = true }
-tokio = { workspace = true, features = ["process", "rt-multi-thread", "sync", "time"] }
+tokio = { workspace = true, features = ["macros", "process", "rt-multi-thread", "sync", "time"] }
 toml = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
@@ -36,6 +36,7 @@ uuid = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = { workspace = true }
+mpris-server = "0.10.0"
 wayland-backend = { workspace = true }
 wayland-client = { workspace = true }
 ksni = { workspace = true }
@@ -44,9 +45,11 @@ resvg = { workspace = true }
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { workspace = true }
 resvg = { workspace = true }
+souvlaki = { version = "0.8.3", default-features = false }
 tray-icon = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
+souvlaki = { version = "0.8.3", default-features = false }
 tray-icon = { workspace = true }
 windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }
 

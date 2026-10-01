@@ -16,6 +16,7 @@ mod frame;
 mod i18n;
 #[cfg(target_os = "macos")]
 mod macos_reopen;
+mod media_controls;
 mod presentation;
 mod render;
 mod search;
@@ -66,7 +67,7 @@ use tufo_models::library::{CollectionId, CollectionKind};
 
 /// The GUI only waits on RPCs, so two workers are plenty.
 const RUNTIME_WORKER_THREADS: usize = 2;
-/// How often the player bar's clock and the tray's Play/Pause item catch up with the player.
+/// How often the player clock, tray, and desktop media session catch up with the player.
 const PROGRESS_TICK: Duration = Duration::from_millis(250);
 /// How long a launch waits on the running GUI before opening a window of its own.
 const GUI_INSTANCE_PROBE_TIMEOUT: Duration = Duration::from_secs(1);
@@ -135,6 +136,9 @@ fn run_desktop() -> anyhow::Result<()> {
         controller: controller.clone(),
     };
     let tray = show_tray(&requests);
+    let media_updates = media_controls::install(requests.clone())
+        .inspect_err(|error| tracing::warn!(%error, "cannot start desktop media controls"))
+        .ok();
     let hidden_in_tray = launch == Launch::AtLogin && tray.is_some();
     window.window().on_close_requested({
         let controller = controller.clone();
@@ -156,6 +160,9 @@ fn run_desktop() -> anyhow::Result<()> {
             }
             if let Some(tray) = &tray {
                 tray.show_playback(controller.tray_playback());
+            }
+            if let Some(updates) = &media_updates {
+                updates.publish(controller.media_state());
             }
         }
     });
