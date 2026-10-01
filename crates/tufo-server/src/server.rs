@@ -21,6 +21,8 @@ use crate::{
 
 const MAX_CONCURRENT_REQUESTS_PER_CONNECTION: usize = 16;
 const MAX_REQUEST_MESSAGE_SIZE: usize = 64 * 1024;
+/// A large Kenku library can require thousands of explicit collection choices in one request.
+const MAX_LIBRARY_REQUEST_MESSAGE_SIZE: usize = 8 * 1024 * 1024;
 const MAX_RESPONSE_MESSAGE_SIZE: usize = 1024 * 1024;
 /// A library snapshot carries every entry; 64 MiB holds a few hundred thousand of them.
 const MAX_LIBRARY_RESPONSE_MESSAGE_SIZE: usize = 64 * 1024 * 1024;
@@ -54,7 +56,7 @@ pub async fn serve(
             .max_encoding_message_size(MAX_RESPONSE_MESSAGE_SIZE);
     let library_server =
         LibraryServiceServer::new(LibraryGrpcService::new(state.clone(), draining))
-            .max_decoding_message_size(MAX_REQUEST_MESSAGE_SIZE)
+            .max_decoding_message_size(MAX_LIBRARY_REQUEST_MESSAGE_SIZE)
             .max_encoding_message_size(MAX_LIBRARY_RESPONSE_MESSAGE_SIZE);
     let server_control_server =
         ServerServiceServer::new(ServerControlGrpcService::new(state.clone()))
@@ -74,6 +76,11 @@ pub async fn serve(
         }
         publish_health(&health_reporter, tonic_health::ServingStatus::NotServing).await;
         draining_sender.send_replace(true);
+        if let Err(error) =
+            tufo_application::library::import_kenku_library::interrupt(&stop_requests.library).await
+        {
+            tracing::error!(%error, "cannot interrupt the Kenku FM import at shutdown");
+        }
         let _ = drain_started_sender.send(());
     };
     let grpc_server = Server::builder()

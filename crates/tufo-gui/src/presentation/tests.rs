@@ -803,7 +803,7 @@ fn kenku_reports_name_what_came_and_what_stayed_behind() {
         kenku_report_text(&full),
         "Imported 12 collections with 206 files from Kenku FM. 1 collection was already in \
          Tufo. 1 file could not be found or read. Left out 2 web addresses Tufo cannot play. \
-         Restarting so the bot logs in with Kenku FM's token."
+         Discord bot token imported."
     );
     assert_eq!(
         kenku_report_text(&repeated),

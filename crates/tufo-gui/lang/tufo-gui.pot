@@ -537,14 +537,6 @@ msgstr ""
 msgid "Imported {0} with {1} from Kenku FM."
 msgstr ""
 
-#: src/controller.rs
-msgid "Importing Kenku FM's library…"
-msgstr ""
-
-#: ui/dialogs.slint
-msgid "Imports Kenku FM's equivalent settings."
-msgstr ""
-
 #: src/sound_icons.rs
 msgid "Insects"
 msgstr ""
@@ -877,10 +869,6 @@ msgstr ""
 
 #: ui/dock.slint
 msgid "Repeat the track"
-msgstr ""
-
-#: src/presentation.rs
-msgid "Restarting so the bot logs in with Kenku FM's token."
 msgstr ""
 
 #: ui/frame.slint
@@ -1515,4 +1503,96 @@ msgstr ""
 
 #: src/presentation.rs
 msgid "Tufo no longer follows that folder."
+msgstr ""
+
+#: src/presentation.rs
+msgid "A Kenku FM import is already in progress."
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "About {0}%"
+msgstr ""
+
+#: src/render.rs
+msgid "Checking folders…"
+msgstr ""
+
+#: src/presentation.rs
+msgid "Choose Keep or Overwrite for each collection. Overwrite each Tufo collection only once."
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Choose which collections to overwrite."
+msgstr ""
+
+#: src/presentation.rs
+msgid "Close Kenku FM and try again."
+msgstr ""
+
+#: src/presentation.rs
+msgid "Discord bot token imported."
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Files not imported"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Import again"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Import selected"
+msgstr ""
+
+#: src/presentation.rs
+msgid "Import took too long. Retry to continue."
+msgstr ""
+
+#: src/presentation.rs
+msgid "Import was interrupted. Retry to continue."
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Imports your library and settings."
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "In Tufo: {0}"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Keep"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Kenku FM import"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Overwrite"
+msgstr ""
+
+#: src/render.rs
+msgid "Reading Kenku FM’s library…"
+msgstr ""
+
+#: src/render.rs
+msgid "Reading audio files…"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Retry"
+msgstr ""
+
+#: src/render.rs
+msgid "Saving your import…"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "View import"
+msgstr ""
+
+#: ui/kenku-import.slint
+msgid "Web addresses left out"
 msgstr ""

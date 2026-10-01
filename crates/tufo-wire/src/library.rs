@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use jiff::Timestamp;
 use tufo_models::{
+    kenku_import::{ImportProgress, KenkuImportId, KenkuImportState},
     library::{
         AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
         CollectionKind, EntryOrder, LibraryFolderId, SoundIcon, SoundSettings, Title,
@@ -164,6 +165,36 @@ pub struct ImportReport {
 pub struct ImportKenkuLibrary {
     /// `None` for Kenku FM's default folder on the server's system.
     pub kenku_folder: Option<FolderPath>,
+    /// Resume this saved import, including files that were unavailable on the last attempt.
+    pub import_id: Option<KenkuImportId>,
+    /// Every conflict must have an explicit choice before any collections change.
+    pub choices: Vec<KenkuCollectionChoice>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KenkuCollectionChoice {
+    pub source_id: String,
+    pub kind: CollectionKind,
+    pub overwrite: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KenkuImportConflict {
+    pub source_id: String,
+    pub kind: CollectionKind,
+    pub incoming_title: Title,
+    pub existing_title: Title,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KenkuImportStatus {
+    pub id: KenkuImportId,
+    pub state: KenkuImportState,
+    pub progress: ImportProgress,
+    pub conflicts: Vec<KenkuImportConflict>,
+    pub report: KenkuImportReport,
+    /// A stable application reason, translated by the GUI.
+    pub error_reason: Option<String>,
 }
 
 /// What importing Kenku FM's library changed.

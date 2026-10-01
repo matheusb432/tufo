@@ -34,8 +34,9 @@ pub(super) fn collections(persisted: &str) -> Result<Vec<KenkuCollection>, Malfo
     let mut collections = Vec::new();
     if let Some(text) = root.get("playlists") {
         let playlists = parse::<PlaylistsState>("playlists", text)?;
-        collections.extend(ordered(playlists.playlists).map(|playlist| {
+        collections.extend(ordered_with_ids(playlists.playlists).map(|(id, playlist)| {
             KenkuCollection {
+                source_id: id,
                 kind: CollectionKind::Playlist,
                 title: playlist.title,
                 background: background(&playlist.background),
@@ -54,8 +55,9 @@ pub(super) fn collections(persisted: &str) -> Result<Vec<KenkuCollection>, Malfo
     }
     if let Some(text) = root.get("soundboards") {
         let soundboards = parse::<SoundboardsState>("soundboards", text)?;
-        collections.extend(ordered(soundboards.soundboards).map(|soundboard| {
-            KenkuCollection {
+        collections.extend(
+            ordered_with_ids(soundboards.soundboards).map(|(id, soundboard)| KenkuCollection {
+                source_id: id,
                 kind: CollectionKind::Soundboard,
                 title: soundboard.title,
                 background: background(&soundboard.background),
@@ -69,8 +71,8 @@ pub(super) fn collections(persisted: &str) -> Result<Vec<KenkuCollection>, Malfo
                         sound: sound.clamped_settings(),
                     })
                     .collect(),
-            }
-        }));
+            }),
+        );
     }
     Ok(collections)
 }
@@ -119,11 +121,11 @@ struct Normalized<T> {
     all_ids: Vec<String>,
 }
 
-fn ordered<T>(mut normalized: Normalized<T>) -> impl Iterator<Item = T> {
+fn ordered_with_ids<T>(mut normalized: Normalized<T>) -> impl Iterator<Item = (String, T)> {
     normalized
         .all_ids
         .into_iter()
-        .filter_map(move |id| normalized.by_id.remove(&id))
+        .filter_map(move |id| normalized.by_id.remove(&id).map(|value| (id, value)))
 }
 
 #[derive(Deserialize)]

@@ -537,14 +537,6 @@ msgstr "Importados"
 msgid "Imported {0} with {1} from Kenku FM."
 msgstr "Importação do Kenku FM: {0} com {1}."
 
-#: src/controller.rs
-msgid "Importing Kenku FM's library…"
-msgstr "Importando a biblioteca do Kenku FM…"
-
-#: ui/dialogs.slint
-msgid "Imports Kenku FM's equivalent settings."
-msgstr "Importa as configurações equivalentes do Kenku FM."
-
 #: src/sound_icons.rs
 msgid "Insects"
 msgstr "Insetos"
@@ -878,10 +870,6 @@ msgstr "Repetir a fila"
 #: ui/dock.slint
 msgid "Repeat the track"
 msgstr "Repetir a faixa"
-
-#: src/presentation.rs
-msgid "Restarting so the bot logs in with Kenku FM's token."
-msgstr "Reiniciando para conectar o bot com o token do Kenku FM."
 
 #: ui/frame.slint
 msgid "Restore"
@@ -1516,3 +1504,95 @@ msgstr "Uma pasta acompanhada contém esta música. Pare de acompanhar a pasta p
 #: src/presentation.rs
 msgid "Tufo no longer follows that folder."
 msgstr "O Tufo não acompanha mais essa pasta."
+
+#: src/presentation.rs
+msgid "A Kenku FM import is already in progress."
+msgstr "Uma importação do Kenku FM já está em andamento."
+
+#: ui/kenku-import.slint
+msgid "About {0}%"
+msgstr "Cerca de {0}%"
+
+#: src/render.rs
+msgid "Checking folders…"
+msgstr "Verificando pastas…"
+
+#: src/presentation.rs
+msgid "Choose Keep or Overwrite for each collection. Overwrite each Tufo collection only once."
+msgstr "Escolha Manter ou Sobrescrever para cada coleção. Sobrescreva cada coleção do Tufo apenas uma vez."
+
+#: ui/kenku-import.slint
+msgid "Choose which collections to overwrite."
+msgstr "Escolha quais coleções sobrescrever."
+
+#: src/presentation.rs
+msgid "Close Kenku FM and try again."
+msgstr "Feche o Kenku FM e tente novamente."
+
+#: src/presentation.rs
+msgid "Discord bot token imported."
+msgstr "Token do bot do Discord importado."
+
+#: ui/kenku-import.slint
+msgid "Files not imported"
+msgstr "Arquivos não importados"
+
+#: ui/kenku-import.slint
+msgid "Import again"
+msgstr "Importar novamente"
+
+#: ui/kenku-import.slint
+msgid "Import selected"
+msgstr "Importar selecionadas"
+
+#: src/presentation.rs
+msgid "Import took too long. Retry to continue."
+msgstr "A importação demorou demais. Tente novamente para continuar."
+
+#: src/presentation.rs
+msgid "Import was interrupted. Retry to continue."
+msgstr "A importação foi interrompida. Tente novamente para continuar."
+
+#: ui/dialogs.slint
+msgid "Imports your library and settings."
+msgstr "Importa sua biblioteca e configurações."
+
+#: ui/kenku-import.slint
+msgid "In Tufo: {0}"
+msgstr "No Tufo: {0}"
+
+#: ui/kenku-import.slint
+msgid "Keep"
+msgstr "Manter"
+
+#: ui/kenku-import.slint
+msgid "Kenku FM import"
+msgstr "Importação do Kenku FM"
+
+#: ui/kenku-import.slint
+msgid "Overwrite"
+msgstr "Sobrescrever"
+
+#: src/render.rs
+msgid "Reading Kenku FM’s library…"
+msgstr "Lendo a biblioteca do Kenku FM…"
+
+#: src/render.rs
+msgid "Reading audio files…"
+msgstr "Lendo arquivos de áudio…"
+
+#: ui/kenku-import.slint
+msgid "Retry"
+msgstr "Tentar novamente"
+
+#: src/render.rs
+msgid "Saving your import…"
+msgstr "Salvando sua importação…"
+
+#: ui/dialogs.slint
+msgid "View import"
+msgstr "Ver importação"
+
+#: ui/kenku-import.slint
+msgid "Web addresses left out"
+msgstr "Endereços da web não importados"

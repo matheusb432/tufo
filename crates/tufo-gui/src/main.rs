@@ -472,4 +472,8 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
         controller.set_discord_connection_disabled(disabled);
     });
     on!(controller => on_import_kenku_library, | | controller.import_kenku_library());
+    on!(controller => on_start_kenku_import, | | controller.start_kenku_import());
+    on!(controller => on_retry_kenku_import, | | controller.retry_kenku_import());
+    on!(controller => on_choose_kenku_conflict, | index, overwrite | controller.choose_kenku_conflict(index, overwrite));
+    on!(controller => on_confirm_kenku_import, | | controller.confirm_kenku_import());
 }

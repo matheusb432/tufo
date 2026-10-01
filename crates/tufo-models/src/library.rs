@@ -8,12 +8,11 @@ use std::{cmp::Ordering, fmt, time::Duration};
 
 use jiff::Timestamp;
 use nutype::nutype;
-use toasty::stmt::Uuid;
 
 use crate::{
     path::{FolderPath, ImageFilePath},
     playback::AudioFilePath,
-    storage::checked_column,
+    storage::{checked_column, uuid_identifier},
 };
 
 pub mod default_effects;
@@ -31,32 +30,6 @@ pub enum BuiltinTitle {
     Birds,
     SummerNight,
     Fireplace,
-}
-
-macro_rules! uuid_identifier {
-    ($(#[$attribute:meta])* $name:ident) => {
-        $(#[$attribute])*
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, toasty::Embed)]
-        pub struct $name(Uuid);
-
-        impl $name {
-            #[must_use]
-            pub fn from_uuid(uuid: Uuid) -> Self {
-                Self(uuid)
-            }
-
-            #[must_use]
-            pub fn into_uuid(self) -> Uuid {
-                self.0
-            }
-        }
-
-        impl fmt::Display for $name {
-            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                self.0.hyphenated().fmt(formatter)
-            }
-        }
-    };
 }
 
 uuid_identifier!(
@@ -635,7 +608,10 @@ checked_column!(
 
 #[cfg(test)]
 mod tests {
-    use toasty::{schema::Load as _, stmt::Value};
+    use toasty::{
+        schema::Load as _,
+        stmt::{Uuid, Value},
+    };
 
     use super::*;
 

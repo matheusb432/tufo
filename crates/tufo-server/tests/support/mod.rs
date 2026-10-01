@@ -22,6 +22,10 @@ pub struct TestServer {
 impl TestServer {
     pub async fn start() -> anyhow::Result<Self> {
         let directory = tempfile::tempdir()?;
+        Self::start_in(directory).await
+    }
+
+    async fn start_in(directory: tempfile::TempDir) -> anyhow::Result<Self> {
         let endpoint = LocalEndpoint::from_root(directory.path().join("runtime"))?;
         let listener = LocalListener::bind(&endpoint, TEST_TIMEOUT).await?;
         let database = open_database(&directory.path().join("tufo.sqlite3")).await?;
@@ -72,6 +76,18 @@ impl TestServer {
     )]
     pub fn discord_credentials_path(&self) -> std::path::PathBuf {
         self.directory.path().join("discord.toml")
+    }
+
+    #[allow(dead_code, reason = "each test binary uses a subset of the harness")]
+    pub async fn restart(self) -> anyhow::Result<Self> {
+        let _ = self.shutdown.send(());
+        tokio::time::timeout(TEST_TIMEOUT, self.server).await???;
+        Self::start_in(self.directory).await
+    }
+
+    #[allow(dead_code, reason = "each test binary uses a subset of the harness")]
+    pub fn database_path(&self) -> std::path::PathBuf {
+        self.directory.path().join("tufo.sqlite3")
     }
 
     /// Waits for a server that was asked to stop to finish draining.

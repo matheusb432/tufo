@@ -3,8 +3,8 @@
 use std::time::Duration;
 
 use slint::{ComponentHandle as _, Model as _, ModelRc, SharedString, Timer, TimerMode, VecModel};
-use tufo_client::library::{Background, ImportReport};
-use tufo_models::library::SoundIcon;
+use tufo_client::library::{Background, ImportReport, KenkuImportStatus};
+use tufo_models::{kenku_import::KenkuImportState, library::SoundIcon};
 
 use crate::{
     backgrounds,
@@ -18,10 +18,10 @@ use crate::{
     sound_icons,
     ui::{
         AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
-        CollectionBackground, CollectionCard, CurrentOutput, LibraryView, MusicLayer, NavItem,
-        Navigation, OutputRow, OutputRowKind, Page, PlayerView, PlaylistChoice, Search,
-        SearchResult, Session, SongFolder, SongRow, SoundChip, SoundIcons, SoundTile, TrackRow,
-        VoiceBadge,
+        CollectionBackground, CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView,
+        LibraryView, MusicLayer, NavItem, Navigation, OutputRow, OutputRowKind, Page, PlayerView,
+        PlaylistChoice, Search, SearchResult, Session, SongFolder, SongRow, SoundChip, SoundIcons,
+        SoundTile, TrackRow, VoiceBadge,
     },
 };
 
@@ -34,6 +34,108 @@ thread_local! {
 
 fn model<T: Clone + 'static>(items: Vec<T>) -> ModelRc<T> {
     ModelRc::new(VecModel::from(items))
+}
+
+pub(crate) fn open_kenku_import(window: &slint::Weak<AppWindow>) {
+    let _ =
+        window.upgrade_in_event_loop(|window| window.global::<KenkuImportView>().set_open(true));
+}
+
+pub(crate) fn starting_kenku_import(window: &slint::Weak<AppWindow>) {
+    let _ = window.upgrade_in_event_loop(|window| {
+        let view = window.global::<KenkuImportView>();
+        view.set_open(true);
+        view.set_busy(true);
+        view.set_choosing(false);
+        view.set_can_retry(false);
+        view.set_error("".into());
+        view.set_summary("".into());
+        view.set_percent(0);
+        view.set_stage(tr("Reading Kenku FM’s library…").into());
+    });
+}
+
+pub(crate) fn kenku_import_start_error(window: &slint::Weak<AppWindow>, error: String) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let view = window.global::<KenkuImportView>();
+        view.set_busy(false);
+        view.set_error(error.into());
+    });
+}
+
+pub(crate) fn kenku_import(
+    window: &slint::Weak<AppWindow>,
+    status: KenkuImportStatus,
+    choices: Vec<bool>,
+) {
+    let stage = match status.state {
+        KenkuImportState::Reading => tr("Reading Kenku FM’s library…"),
+        KenkuImportState::Importing if status.progress.percent() < 30 => tr("Checking folders…"),
+        KenkuImportState::Importing if status.progress.percent() < 85 => tr("Reading audio files…"),
+        KenkuImportState::Importing => tr("Saving your import…"),
+        _ => "",
+    };
+    let error = status
+        .error_reason
+        .as_deref()
+        .map(presentation::kenku_error_text)
+        .unwrap_or_default();
+    let summary =
+        if status.state == KenkuImportState::Succeeded || status.report.collections_imported > 0 {
+            presentation::kenku_report_text(&status.report)
+        } else {
+            String::new()
+        };
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let view = window.global::<KenkuImportView>();
+        view.set_available(true);
+        view.set_busy(status.state.is_running());
+        view.set_choosing(status.state == KenkuImportState::AwaitingChoices);
+        view.set_can_retry(
+            matches!(
+                status.state,
+                KenkuImportState::Failed | KenkuImportState::Interrupted
+            ) || (status.state == KenkuImportState::Succeeded
+                && !status.report.unreadable_files.is_empty()),
+        );
+        view.set_percent(i32::try_from(status.progress.percent()).unwrap_or(100));
+        view.set_stage(stage.into());
+        view.set_summary(summary.into());
+        view.set_error(error.into());
+        view.set_conflicts(model(
+            status
+                .conflicts
+                .iter()
+                .enumerate()
+                .map(|(index, conflict)| KenkuConflictRow {
+                    incoming: conflict.incoming_title.as_str().into(),
+                    existing: conflict.existing_title.as_str().into(),
+                    kind: match conflict.kind {
+                        tufo_models::library::CollectionKind::Playlist => tr("Playlist"),
+                        tufo_models::library::CollectionKind::Soundboard => tr("Soundboard"),
+                    }
+                    .into(),
+                    overwrite: choices.get(index).copied().unwrap_or(false),
+                })
+                .collect(),
+        ));
+        view.set_unreadable(model(
+            status
+                .report
+                .unreadable_files
+                .iter()
+                .map(|path| path.as_ref().to_string_lossy().into_owned().into())
+                .collect(),
+        ));
+        view.set_unsupported(model(
+            status
+                .report
+                .unsupported_sources
+                .iter()
+                .map(|address| address.as_str().into())
+                .collect(),
+        ));
+    });
 }
 
 fn card(card: &CardView) -> CollectionCard {

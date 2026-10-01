@@ -11,6 +11,7 @@ use tonic::{Request, Streaming, transport::Channel};
 pub use tufo_local_transport::{ConnectError, LocalEndpoint};
 use tufo_models::{
     discord::VoiceChannel,
+    kenku_import::KenkuImportId,
     library::{AudioFileId, CollectionEntryId, CollectionId, LibraryFolderId},
     playback::{OutputTarget, diagnostics::PlayerDiagnostics, player_state::PlayerState},
 };
@@ -19,7 +20,7 @@ pub use tufo_wire::{error, library, player, server};
 use tufo_wire::{
     library::{
         AddFilesToCollection, AddSongsToPlaylist, CreateCollection, ImportKenkuLibrary,
-        ImportPaths, ImportReport, KenkuImportReport, LibrarySnapshot, UpdateCollection,
+        ImportPaths, ImportReport, KenkuImportStatus, LibrarySnapshot, UpdateCollection,
         UpdateCollectionEntry,
     },
     pb::{
@@ -272,19 +273,50 @@ impl TufoClient {
         Ok(())
     }
 
-    /// Imports Kenku FM's library; `NOT_FOUND` means the folder holds none.
+    /// Starts or resumes a saved import; its stream carries progress and the eventual result.
     pub async fn import_kenku_library(
         &self,
         request: &ImportKenkuLibrary,
-    ) -> Result<KenkuImportReport, ClientError> {
+    ) -> Result<KenkuImportId, ClientError> {
         let request = with_timeout(
             proto::library::import_kenku_library_message(request),
-            IMPORT_TIMEOUT,
+            QUICK_REQUEST_TIMEOUT,
         );
         let response = self.library.clone().import_kenku_library(request).await?;
-        Ok(proto::library::kenku_import_report(
-            response.into_inner().report,
+        Ok(proto::library::kenku_import_id(
+            &response.into_inner().import_id,
         )?)
+    }
+
+    pub async fn watch_kenku_import(&self) -> Result<KenkuImportUpdates, ClientError> {
+        let stream = self
+            .library
+            .clone()
+            .watch_kenku_import(pb::WatchKenkuImportRequest {})
+            .await?
+            .into_inner();
+        Ok(KenkuImportUpdates { stream })
+    }
+}
+
+/// The latest saved import and coalesced progress. An initial None means no imports yet.
+pub struct KenkuImportUpdates {
+    stream: Streaming<pb::WatchKenkuImportResponse>,
+}
+
+impl KenkuImportUpdates {
+    pub async fn next(&mut self) -> Option<Result<Option<KenkuImportStatus>, ClientError>> {
+        match self.stream.message().await {
+            Ok(Some(response)) => Some(
+                response
+                    .status
+                    .map(proto::library::kenku_import_status)
+                    .transpose()
+                    .map_err(Into::into),
+            ),
+            Ok(None) => None,
+            Err(error) => Some(Err(error.into())),
+        }
     }
 }
 

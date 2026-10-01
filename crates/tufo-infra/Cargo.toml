@@ -47,12 +47,15 @@ twilight-model = { workspace = true }
 [target.'cfg(target_os = "linux")'.dependencies]
 kira = { workspace = true, features = ["cpal-realtime-dbus"] }
 
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [target.'cfg(windows)'.dependencies]
 windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_Storage_FileSystem", "Win32_System_SystemServices", "Win32_System_Threading"] }
 
 [dev-dependencies]
 uuid = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread"] }
+tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "test-util"] }
 
 [lints]
 workspace = true

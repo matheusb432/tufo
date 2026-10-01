@@ -39,3 +39,8 @@ snapshot_name = "0006_snapshot.toml"
 id = 7116584668380935970
 name = "0007_song_sources.sql"
 snapshot_name = "0007_snapshot.toml"
+
+[[migrations]]
+id = 2619240815652916432
+name = "0008_kenku_import_jobs.sql"
+snapshot_name = "0008_snapshot.toml"

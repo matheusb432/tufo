@@ -1,0 +1,162 @@
+// The saved import stays available after this dialog closes or the GUI reconnects.
+
+import { Theme } from "theme.slint";
+import { ListView } from "std-widgets.slint";
+import { Actions, KenkuImportView } from "state.slint";
+import { DialogFrame } from "dialogs.slint";
+import { Button, ButtonKind, LoadingProgress, Switch } from "widgets.slint";
+
+export component KenkuImportDialog inherits DialogFrame {
+    title: @tr("Kenku FM import");
+    closable: true;
+
+    if KenkuImportView.busy: VerticalLayout {
+        spacing: 12px;
+        Text {
+            text: KenkuImportView.stage;
+            color: Theme.text;
+            font-size: Theme.body;
+            wrap: word-wrap;
+        }
+        LoadingProgress {
+            value: KenkuImportView.percent / 100;
+            label: KenkuImportView.stage;
+        }
+        Text {
+            text: @tr("About {0}%", KenkuImportView.percent);
+            color: Theme.text-secondary;
+            font-size: Theme.caption;
+        }
+    }
+
+    if KenkuImportView.choosing: VerticalLayout {
+        spacing: 12px;
+        Text {
+            text: @tr("Choose which collections to overwrite.");
+            color: Theme.text;
+            font-size: Theme.body;
+            wrap: word-wrap;
+        }
+        ListView {
+            height: min(240px, KenkuImportView.conflicts.length * 100px);
+            for conflict[index] in KenkuImportView.conflicts: Rectangle {
+                width: parent.width;
+                height: max(92px, row.preferred-height + 12px);
+                row := HorizontalLayout {
+                    spacing: 12px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 4px;
+                        Text {
+                            text: conflict.incoming;
+                            color: Theme.text;
+                            font-size: Theme.body-small;
+                            font-weight: 700;
+                            wrap: word-wrap;
+                        }
+                        Text {
+                            text: conflict.kind;
+                            color: Theme.text-secondary;
+                            font-size: Theme.caption;
+                        }
+                        Text {
+                            text: @tr("In Tufo: {0}", conflict.existing);
+                            color: Theme.text-secondary;
+                            font-size: Theme.caption;
+                            wrap: word-wrap;
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 6px;
+                        Switch {
+                            checked: conflict.overwrite;
+                            label: conflict.overwrite ? @tr("Overwrite") : @tr("Keep");
+                            toggled(checked) => { Actions.choose-kenku-conflict(index, checked); }
+                        }
+                        Text {
+                            text: conflict.overwrite ? @tr("Overwrite") : @tr("Keep");
+                            color: Theme.text-secondary;
+                            font-size: Theme.caption;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+        Button {
+            text: @tr("Import selected");
+            kind: ButtonKind.primary;
+            clicked => { Actions.confirm-kenku-import(); }
+        }
+    }
+
+    if KenkuImportView.error != "": Text {
+        text: KenkuImportView.error;
+        color: Theme.text;
+        font-size: Theme.body;
+        wrap: word-wrap;
+    }
+
+    if !KenkuImportView.busy && !KenkuImportView.choosing && KenkuImportView.summary != "": Text {
+        text: KenkuImportView.summary;
+        color: Theme.text;
+        font-size: Theme.body;
+        wrap: word-wrap;
+    }
+
+    if !KenkuImportView.busy && KenkuImportView.unreadable.length > 0: VerticalLayout {
+        spacing: 8px;
+        Text {
+            text: @tr("Files not imported");
+            color: Theme.text-secondary;
+            font-size: Theme.body-small;
+            font-weight: 700;
+        }
+        ListView {
+            height: min(200px, KenkuImportView.unreadable.length * 48px);
+            for path in KenkuImportView.unreadable: Text {
+                width: parent.width;
+                height: max(40px, self.preferred-height + 8px);
+                text: path;
+                color: Theme.text-secondary;
+                font-size: Theme.caption;
+                wrap: char-wrap;
+            }
+        }
+    }
+
+    if !KenkuImportView.busy && KenkuImportView.unsupported.length > 0: VerticalLayout {
+        spacing: 8px;
+        Text {
+            text: @tr("Web addresses left out");
+            color: Theme.text-secondary;
+            font-size: Theme.body-small;
+            font-weight: 700;
+        }
+        ListView {
+            height: min(200px, KenkuImportView.unsupported.length * 48px);
+            for address in KenkuImportView.unsupported: Text {
+                width: parent.width;
+                height: max(40px, self.preferred-height + 8px);
+                text: address;
+                color: Theme.text-secondary;
+                font-size: Theme.caption;
+                wrap: char-wrap;
+            }
+        }
+    }
+
+    if !KenkuImportView.busy && !KenkuImportView.choosing: HorizontalLayout {
+        alignment: end;
+        spacing: 8px;
+        if KenkuImportView.can-retry: Button {
+            text: @tr("Retry");
+            clicked => { Actions.retry-kenku-import(); }
+        }
+        Button {
+            text: @tr("Import again");
+            clicked => { Actions.start-kenku-import(); }
+        }
+    }
+}

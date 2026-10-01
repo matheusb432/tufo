@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use jiff::Timestamp;
 use tonic::Status;
 use tufo_models::{
+    kenku_import::{ImportProgress, KenkuImportId, KenkuImportState},
     library::{
         AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
         CollectionKind, EntryOrder, EntryOrderKey, FadeDuration, LibraryFolderId, SoundIcon,
@@ -19,8 +20,9 @@ use crate::{
     library::{
         AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
         CreateCollection, EntryView, ImportKenkuLibrary, ImportPaths, ImportReport,
-        KenkuImportReport, LibraryFolderView, LibrarySnapshot, SongSource, SongView,
-        UpdateCollection, UpdateCollectionEntry,
+        KenkuCollectionChoice, KenkuImportConflict, KenkuImportReport, KenkuImportStatus,
+        LibraryFolderView, LibrarySnapshot, SongSource, SongView, UpdateCollection,
+        UpdateCollectionEntry,
     },
     pb,
 };
@@ -44,7 +46,33 @@ pub fn import_kenku_library_request(
                 .map_err(|_| invalid("kenku_folder_path", "must be absolute"))
         })
         .transpose()?;
-    Ok(ImportKenkuLibrary { kenku_folder })
+    let import_id = request
+        .import_id
+        .map(|id| {
+            parse_uuid(&id)
+                .map(KenkuImportId::from_uuid)
+                .ok_or_else(|| invalid("import_id", "must be a UUID"))
+        })
+        .transpose()?;
+    let choices = request
+        .choices
+        .into_iter()
+        .map(|choice| {
+            if choice.source_id.is_empty() {
+                return Err(invalid("source_id", "must not be empty"));
+            }
+            Ok(KenkuCollectionChoice {
+                source_id: choice.source_id,
+                kind: collection_kind(choice.kind).map_err(|reason| invalid("kind", reason))?,
+                overwrite: choice.overwrite,
+            })
+        })
+        .collect::<Result<_, Status>>()?;
+    Ok(ImportKenkuLibrary {
+        kenku_folder,
+        import_id,
+        choices,
+    })
 }
 
 pub fn add_files_to_collection_request(
@@ -249,7 +277,101 @@ pub fn import_kenku_library_message(request: &ImportKenkuLibrary) -> pb::ImportK
             .kenku_folder
             .as_ref()
             .map(|folder| path_text(folder.as_ref())),
+        import_id: request.import_id.map(|id| id.to_string()),
+        choices: request
+            .choices
+            .iter()
+            .map(|choice| pb::KenkuCollectionChoice {
+                source_id: choice.source_id.clone(),
+                kind: collection_kind_message(choice.kind).into(),
+                overwrite: choice.overwrite,
+            })
+            .collect(),
     }
+}
+
+#[must_use]
+pub fn kenku_import_status_message(status: &KenkuImportStatus) -> pb::KenkuImportStatus {
+    pb::KenkuImportStatus {
+        import_id: status.id.to_string(),
+        state: match status.state {
+            KenkuImportState::Reading => pb::KenkuImportState::Reading,
+            KenkuImportState::AwaitingChoices => pb::KenkuImportState::AwaitingChoices,
+            KenkuImportState::Importing => pb::KenkuImportState::Importing,
+            KenkuImportState::Succeeded => pb::KenkuImportState::Succeeded,
+            KenkuImportState::Failed => pb::KenkuImportState::Failed,
+            KenkuImportState::Interrupted => pb::KenkuImportState::Interrupted,
+        }
+        .into(),
+        progress_percent: status.progress.percent(),
+        conflicts: status
+            .conflicts
+            .iter()
+            .map(|conflict| pb::KenkuImportConflict {
+                source_id: conflict.source_id.clone(),
+                kind: collection_kind_message(conflict.kind).into(),
+                incoming_title: conflict.incoming_title.as_str().to_owned(),
+                existing_title: conflict.existing_title.as_str().to_owned(),
+            })
+            .collect(),
+        report: Some(kenku_import_report_message(&status.report)),
+        error_reason: status.error_reason.clone(),
+    }
+}
+
+pub fn kenku_import_id(text: &str) -> Result<KenkuImportId, InvalidMessage> {
+    parse_uuid(text)
+        .map(KenkuImportId::from_uuid)
+        .ok_or(InvalidMessage { field: "import_id" })
+}
+
+pub fn kenku_import_status(
+    message: pb::KenkuImportStatus,
+) -> Result<KenkuImportStatus, InvalidMessage> {
+    let state = match pb::KenkuImportState::try_from(message.state) {
+        Ok(pb::KenkuImportState::Reading) => KenkuImportState::Reading,
+        Ok(pb::KenkuImportState::AwaitingChoices) => KenkuImportState::AwaitingChoices,
+        Ok(pb::KenkuImportState::Importing) => KenkuImportState::Importing,
+        Ok(pb::KenkuImportState::Succeeded) => KenkuImportState::Succeeded,
+        Ok(pb::KenkuImportState::Failed) => KenkuImportState::Failed,
+        Ok(pb::KenkuImportState::Interrupted) => KenkuImportState::Interrupted,
+        _ => return Err(InvalidMessage { field: "state" }),
+    };
+    Ok(KenkuImportStatus {
+        id: kenku_import_id(&message.import_id)?,
+        state,
+        progress: ImportProgress::try_new(message.progress_percent).map_err(|_| {
+            InvalidMessage {
+                field: "progress_percent",
+            }
+        })?,
+        conflicts: message
+            .conflicts
+            .into_iter()
+            .map(|conflict| {
+                if conflict.source_id.is_empty() {
+                    return Err(InvalidMessage { field: "source_id" });
+                }
+                Ok(KenkuImportConflict {
+                    source_id: conflict.source_id,
+                    kind: collection_kind(conflict.kind)
+                        .map_err(|_| InvalidMessage { field: "kind" })?,
+                    incoming_title: Title::try_new(conflict.incoming_title).map_err(|_| {
+                        InvalidMessage {
+                            field: "incoming_title",
+                        }
+                    })?,
+                    existing_title: Title::try_new(conflict.existing_title).map_err(|_| {
+                        InvalidMessage {
+                            field: "existing_title",
+                        }
+                    })?,
+                })
+            })
+            .collect::<Result<_, _>>()?,
+        report: kenku_import_report(message.report)?,
+        error_reason: message.error_reason,
+    })
 }
 
 #[must_use]
@@ -1015,6 +1137,7 @@ mod tests {
     fn kenku_imports_survive_the_round_trip() {
         let request = ImportKenkuLibrary {
             kenku_folder: Some(FolderPath::try_new(absolute("Kenku FM")).unwrap()),
+            ..ImportKenkuLibrary::default()
         };
         let report = KenkuImportReport {
             collections_imported: 2,
@@ -1026,6 +1149,7 @@ mod tests {
         };
         let relative_folder = import_kenku_library_request(pb::ImportKenkuLibraryRequest {
             kenku_folder_path: Some("Kenku FM".to_owned()),
+            ..pb::ImportKenkuLibraryRequest::default()
         });
 
         assert_eq!(

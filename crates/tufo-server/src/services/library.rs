@@ -33,6 +33,17 @@ impl LibraryGrpcService {
 #[tonic::async_trait]
 impl LibraryService for LibraryGrpcService {
     type WatchLibraryStream = ReceiverStream<Result<pb::WatchLibraryResponse, Status>>;
+    type WatchKenkuImportStream = ReceiverStream<Result<pb::WatchKenkuImportResponse, Status>>;
+
+    async fn watch_kenku_import(
+        &self,
+        _request: Request<pb::WatchKenkuImportRequest>,
+    ) -> Result<Response<Self::WatchKenkuImportStream>, Status> {
+        let updates = self.state.library.watch_kenku_import();
+        let (sender, receiver) = mpsc::channel(1);
+        tokio::spawn(forward_kenku_import(updates, self.draining.clone(), sender));
+        Ok(Response::new(ReceiverStream::new(receiver)))
+    }
 
     async fn watch_library(
         &self,
@@ -184,18 +195,40 @@ impl LibraryService for LibraryGrpcService {
         request: Request<pb::ImportKenkuLibraryRequest>,
     ) -> Result<Response<pb::ImportKenkuLibraryResponse>, Status> {
         let request = proto::library::import_kenku_library_request(request.into_inner())?;
-        let report = import_kenku_library::execute(
+        let id = import_kenku_library::execute(
             request,
-            &self.state.library,
-            self.state.player.as_ref(),
-            &DiskKenkuReader,
-            &self.state.discord_credentials,
+            Arc::clone(&self.state.library),
+            Arc::clone(&self.state.player),
+            DiskKenkuReader,
+            self.state.discord_credentials.clone(),
         )
         .await
         .into_grpc()?;
         Ok(Response::new(pb::ImportKenkuLibraryResponse {
-            report: Some(proto::library::kenku_import_report_message(&report)),
+            import_id: id.to_string(),
         }))
+    }
+}
+
+async fn forward_kenku_import(
+    mut updates: watch::Receiver<Option<Arc<tufo_wire::library::KenkuImportStatus>>>,
+    mut draining: watch::Receiver<bool>,
+    sender: mpsc::Sender<Result<pb::WatchKenkuImportResponse, Status>>,
+) {
+    loop {
+        let status = updates
+            .borrow_and_update()
+            .as_deref()
+            .map(proto::library::kenku_import_status_message);
+        tokio::select! {
+            sent = sender.send(Ok(pb::WatchKenkuImportResponse { status })) => { if sent.is_err() { return; } }
+            _ = draining.wait_for(|draining| *draining) => return,
+        }
+        tokio::select! {
+            changed = updates.changed() => { if changed.is_err() { return; } }
+            _ = draining.wait_for(|draining| *draining) => return,
+            () = sender.closed() => return,
+        }
     }
 }
 

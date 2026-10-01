@@ -10424,6 +10424,8 @@ dependencies = [
  "fastrand",
  "futures-util",
  "jiff",
+ "serde",
+ "serde_json",
  "thiserror 2.0.21",
  "toasty",
  "toasty-core",
@@ -10431,6 +10433,7 @@ dependencies = [
  "tracing",
  "tufo-models",
  "tufo-wire",
+ "uuid",
 ]
 
 [[package]]
@@ -10521,6 +10524,7 @@ dependencies = [
  "file-id",
  "jiff",
  "kira",
+ "libc",
  "notify",
  "opus2",
  "percent-encoding",
@@ -10606,6 +10610,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "toasty",
  "tokio",
  "tokio-stream",
  "tonic",

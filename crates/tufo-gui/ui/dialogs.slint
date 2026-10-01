@@ -3,7 +3,7 @@
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
-    Navigation, PlaylistChoice, Session, SoundIcons,
+    KenkuImportView, Navigation, PlaylistChoice, Session, SoundIcons,
 } from "state.slint";
 import {
     Button, ButtonKind, Icon, IconButton, Scrim, ScrollThumb, Slider, Switch, TextField, TextLink,
@@ -648,7 +648,7 @@ export component SettingsDialog inherits DialogFrame {
             }
 
             Text {
-                text: @tr("Imports Kenku FM's equivalent settings.");
+                text: @tr("Imports your library and settings.");
                 font-size: Theme.caption;
                 color: Theme.text-secondary;
                 wrap: word-wrap;
@@ -658,7 +658,7 @@ export component SettingsDialog inherits DialogFrame {
         VerticalLayout {
             alignment: center;
             Button {
-                text: @tr("Import");
+                text: KenkuImportView.available ? @tr("View import") : @tr("Import");
                 clicked => {
                     Actions.import-kenku-library();
                     root.cancel();

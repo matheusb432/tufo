@@ -33,6 +33,7 @@ pub fn default_kenku_folder() -> Option<PathBuf> {
 pub fn read_kenku_data(folder: &Path) -> Result<KenkuData, ReadKenkuDataError> {
     let mut storage = LocalStorageCopy::open(folder).map_err(|error| match error {
         OpenLocalStorageError::NotFound => ReadKenkuDataError::NotFound,
+        OpenLocalStorageError::Running => ReadKenkuDataError::Running,
         other => ReadKenkuDataError::Unreadable(anyhow!(other)),
     })?;
     let player_state = storage

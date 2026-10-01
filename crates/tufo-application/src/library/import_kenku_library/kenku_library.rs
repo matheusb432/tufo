@@ -24,6 +24,8 @@ pub struct KenkuPlayerSettings {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct KenkuCollection {
+    /// Kenku FM's stable collection key, scoped by collection kind.
+    pub source_id: String,
     pub kind: CollectionKind,
     /// Untrimmed.
     pub title: String,

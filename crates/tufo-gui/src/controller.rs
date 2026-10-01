@@ -8,13 +8,14 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+mod kenku_import;
+
 use slint::ComponentHandle as _;
 use tufo_client::{
     ClientError, Code, LocalEndpoint, TufoClient,
     library::{
         AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CreateCollection,
-        ImportKenkuLibrary, ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection,
-        UpdateCollectionEntry,
+        ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
     },
     player::UpdatePlayerSettings,
 };
@@ -24,7 +25,7 @@ use tufo_models::{
         AudioFileId, BackgroundPresetChooser, CollectionEntryId, CollectionId, CollectionKind,
         EntryOrder, EntryOrderKey, FadeDuration, LibraryFolderId, SoundIcon, Title, Volume,
     },
-    path::{FolderPath, ImageFilePath, LocalPath},
+    path::{ImageFilePath, LocalPath},
     playback::{
         AUDIO_FILE_EXTENSIONS, OutputTarget,
         player_state::{CrossfadeDuration, PlayerState},
@@ -88,6 +89,7 @@ struct Shared {
     background_draft: Background,
     resume_saved_loops_on_connect: bool,
     quitting: bool,
+    kenku: kenku_import::KenkuImportSession,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -226,6 +228,9 @@ impl Controller {
         let library = self
             .runtime
             .spawn(self.clone().follow_library(client.clone()));
+        let imports = self
+            .runtime
+            .spawn(self.clone().follow_kenku_import(client.clone()));
         let voice_channels = self.runtime.spawn(self.clone().load_voice_channels(client));
         while let Some(result) = states.next().await {
             match result {
@@ -241,6 +246,7 @@ impl Controller {
             }
         }
         library.abort();
+        imports.abort();
         voice_channels.abort();
         {
             let mut shared = self.lock();
@@ -1239,63 +1245,6 @@ impl Controller {
             client.set_discord_bot_token(token).await?;
             client.stop_server().await
         });
-    }
-
-    /// Restarts the server when the bot token came along.
-    pub(crate) fn import_kenku_library(&self) {
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
-            return;
-        };
-        self.toast(tr("Importing Kenku FM's library…").to_owned());
-        self.runtime.spawn(self.clone().run_kenku_import(client));
-    }
-
-    async fn run_kenku_import(self, client: TufoClient) {
-        let result = match client
-            .import_kenku_library(&ImportKenkuLibrary::default())
-            .await
-        {
-            Err(ClientError::Status(status)) if status.code() == Code::NotFound => {
-                let Some(kenku_folder) = self.pick_kenku_folder().await else {
-                    return;
-                };
-                self.toast(tr("Importing Kenku FM's library…").to_owned());
-                client
-                    .import_kenku_library(&ImportKenkuLibrary {
-                        kenku_folder: Some(kenku_folder),
-                    })
-                    .await
-            }
-            other => other,
-        };
-        let report = match result {
-            Ok(report) => report,
-            Err(error) => return self.toast_error(presentation::error_text(&error)),
-        };
-        self.toast(presentation::kenku_report_text(&report));
-        if report.discord_bot_token_imported
-            && let Err(error) = client.stop_server().await
-        {
-            self.toast_error(presentation::error_text(&error));
-        }
-    }
-
-    /// `None` after telling why.
-    async fn pick_kenku_folder(&self) -> Option<FolderPath> {
-        let Some(folder) = rfd::AsyncFileDialog::new()
-            .set_title(tr("Choose Kenku FM's data folder"))
-            .pick_folder()
-            .await
-        else {
-            self.toast(tr("No Kenku FM library imported.").to_owned());
-            return None;
-        };
-        let kenku_folder = FolderPath::try_new(folder.path().to_path_buf()).ok();
-        if kenku_folder.is_none() {
-            self.toast_error(tr("Tufo can't read that folder's path.").to_owned());
-        }
-        kenku_folder
     }
 
     pub(crate) fn set_start_at_login(&self, start_at_login: bool) {

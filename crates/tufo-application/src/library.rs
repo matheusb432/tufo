@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 use toasty::Db;
 use tokio::sync::{Mutex, MutexGuard, watch};
-use tufo_wire::library::LibrarySnapshot;
+use tufo_wire::library::{KenkuImportStatus, LibrarySnapshot};
 
 use self::library_files::LibraryFiles;
 use crate::error::ErrorMeta;
@@ -62,6 +62,7 @@ pub struct Library<F> {
     /// Serializes every change, so reconciliation never plans against rows an edit is changing.
     write_gate: Mutex<()>,
     snapshot: watch::Sender<Arc<LibrarySnapshot>>,
+    kenku_imports: import_kenku_library::journal::KenkuImports,
 }
 
 impl<F: LibraryFiles> Library<F> {
@@ -72,11 +73,13 @@ impl<F: LibraryFiles> Library<F> {
             revision: 1,
             ..snapshot::load_snapshot(&mut reader).await?
         };
+        let kenku_imports = import_kenku_library::journal::KenkuImports::open(&mut reader).await?;
         Ok(Self {
             database,
             files,
             write_gate: Mutex::new(()),
             snapshot: watch::Sender::new(Arc::new(first)),
+            kenku_imports,
         })
     }
 
@@ -90,6 +93,11 @@ impl<F: LibraryFiles> Library<F> {
     #[must_use]
     pub fn database(&self) -> Db {
         self.database.clone()
+    }
+
+    #[must_use]
+    pub fn watch_kenku_import(&self) -> watch::Receiver<Option<Arc<KenkuImportStatus>>> {
+        self.kenku_imports.watch()
     }
 
     fn files(&self) -> &F {

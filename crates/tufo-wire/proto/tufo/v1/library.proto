@@ -42,10 +42,12 @@ service LibraryService {
   rpc DeleteLibraryFolder(DeleteLibraryFolderRequest) returns (DeleteLibraryFolderResponse);
   // Rescans every library folder now instead of waiting for the watcher.
   rpc RescanLibrary(RescanLibraryRequest) returns (RescanLibraryResponse);
-  // Imports Kenku FM's collections and music settings, and its Discord bot token when the
-  // server has none, skipping collections the library already shows. NOT_FOUND means the
-  // folder holds no Kenku FM library; FAILED_PRECONDITION means it can't be read.
+  // Starts or resumes a saved import. Work continues after the request returns and is bounded
+  // to five minutes per attempt. Conflicts require an explicit keep/overwrite choice.
   rpc ImportKenkuLibrary(ImportKenkuLibraryRequest) returns (ImportKenkuLibraryResponse);
+  // Sends the latest saved import immediately, then coalesced progress and its durable result.
+  // Disconnecting a watcher does not cancel the import. Ends when the server shuts down.
+  rpc WatchKenkuImport(WatchKenkuImportRequest) returns (stream WatchKenkuImportResponse);
 }
 
 message WatchLibraryRequest {}
@@ -385,17 +387,60 @@ message RescanLibraryResponse {}
 message ImportKenkuLibraryRequest {
   // Absolute; absent means Kenku FM's default folder on the server's system.
   optional string kenku_folder_path = 1;
+  optional string import_id = 2;
+  repeated KenkuCollectionChoice choices = 3;
 }
 
 message ImportKenkuLibraryResponse {
-  KenkuImportReport report = 1;
+  reserved 1;
+  string import_id = 2;
+}
+
+message KenkuCollectionChoice {
+  string source_id = 1;
+  CollectionKind kind = 2;
+  bool overwrite = 3;
+}
+
+message WatchKenkuImportRequest {}
+
+message WatchKenkuImportResponse {
+  // Absent until the first import.
+  KenkuImportStatus status = 1;
+}
+
+message KenkuImportStatus {
+  string import_id = 1;
+  KenkuImportState state = 2;
+  // Rough estimate from 0 to 100. Updated by stage, rather than by audio packet or file.
+  uint32 progress_percent = 3;
+  repeated KenkuImportConflict conflicts = 4;
+  KenkuImportReport report = 5;
+  optional string error_reason = 6;
+}
+
+enum KenkuImportState {
+  KENKU_IMPORT_STATE_UNSPECIFIED = 0;
+  KENKU_IMPORT_STATE_READING = 1;
+  KENKU_IMPORT_STATE_AWAITING_CHOICES = 2;
+  KENKU_IMPORT_STATE_IMPORTING = 3;
+  KENKU_IMPORT_STATE_SUCCEEDED = 4;
+  KENKU_IMPORT_STATE_FAILED = 5;
+  KENKU_IMPORT_STATE_INTERRUPTED = 6;
+}
+
+message KenkuImportConflict {
+  string source_id = 1;
+  CollectionKind kind = 2;
+  string incoming_title = 3;
+  string existing_title = 4;
 }
 
 // What importing Kenku FM's library changed, for the message the GUI shows.
 message KenkuImportReport {
   uint32 collections_imported = 1;
   uint32 files_imported = 2;
-  // Titles the library already showed.
+  // Collections the user chose to keep.
   repeated string skipped_collection_titles = 3;
   // Audio files that couldn't be found or read.
   repeated string unreadable_paths = 4;

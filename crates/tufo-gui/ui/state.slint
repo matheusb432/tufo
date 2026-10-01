@@ -324,6 +324,28 @@ export global WindowFrame {
     }
 }
 
+export struct KenkuConflictRow {
+    incoming: string,
+    existing: string,
+    kind: string,
+    overwrite: bool,
+}
+
+export global KenkuImportView {
+    in-out property <bool> open;
+    in-out property <bool> available;
+    in-out property <bool> busy;
+    in-out property <bool> choosing;
+    in-out property <bool> can-retry;
+    in-out property <int> percent;
+    in-out property <string> stage;
+    in-out property <string> summary;
+    in-out property <string> error;
+    in-out property <[string]> unreadable;
+    in-out property <[string]> unsupported;
+    in-out property <[KenkuConflictRow]> conflicts;
+}
+
 export global Actions {
     callback open-page(Page, string);
     callback filter-changed(string);
@@ -394,4 +416,8 @@ export global Actions {
     // Logs the bot out of Discord, or back in, without a restart.
     callback set-discord-connection-disabled(bool);
     callback import-kenku-library();
+    callback start-kenku-import();
+    callback retry-kenku-import();
+    callback choose-kenku-conflict(int, bool);
+    callback confirm-kenku-import();
 }

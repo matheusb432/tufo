@@ -32,6 +32,9 @@ impl fmt::Debug for KenkuData {
 
 #[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum ReadKenkuDataError {
+    #[error("close Kenku FM and try again")]
+    #[meta(class = FailedPrecondition, reason = Self::RUNNING)]
+    Running,
     #[error("the folder holds no Kenku FM library")]
     #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
@@ -47,6 +50,7 @@ pub enum ReadKenkuDataError {
 }
 
 impl ReadKenkuDataError {
+    pub const RUNNING: &'static str = "library.kenku_data.running";
     pub const NOT_FOUND: &'static str = "library.kenku_data.not_found";
     pub const UNREADABLE: &'static str = "library.kenku_data.unreadable";
     pub const MALFORMED: &'static str = "library.kenku_data.malformed";

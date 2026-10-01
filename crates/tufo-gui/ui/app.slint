@@ -4,7 +4,8 @@
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
-    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, FormSwitch, LibraryView,
+    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, FormSwitch,
+    KenkuConflictRow, KenkuImportView, LibraryView,
     NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
     WindowFrame,
 } from "state.slint";
@@ -18,14 +19,16 @@ import { BackgroundGallery } from "gallery.slint";
 import { SearchPalette } from "search.slint";
 import { WindowButtons, WindowDragArea } from "frame.slint";
 import { Icon, Presence, Scrim } from "widgets.slint";
+import { KenkuImportDialog } from "kenku-import.slint";
 
 export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
-    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, LibraryView, NavItem,
-    Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, Theme, VoiceBadge, WindowFrame,
+    Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, KenkuConflictRow,
+    KenkuImportView, LibraryView, NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons,
+    SoundTile, Theme, VoiceBadge, WindowFrame,
 }
 
-enum DialogKind { none, add-collection, edit-collection, edit-entry, add-to-playlist, settings }
+enum DialogKind { none, add-collection, edit-collection, edit-entry, add-to-playlist, settings, kenku-import }
 
 export component AppWindow inherits Window {
     title: @tr("Tufo");
@@ -45,6 +48,15 @@ export component AppWindow inherits Window {
     // Keyboard shortcuts see every key first, wherever focus is inside the window.
     forward-focus: shortcuts;
     property <DialogKind> dialog: DialogKind.none;
+    changed dialog => {
+        if root.dialog != DialogKind.kenku-import { KenkuImportView.open = false; }
+    }
+    property <bool> kenku-import-open: KenkuImportView.open;
+    changed kenku-import-open => {
+        if root.kenku-import-open {
+            root.dialog = DialogKind.kenku-import;
+        }
+    }
     property <CollectionKind> add-kind;
     property <string> entry-id;
     property <string> entry-title;
@@ -139,6 +151,7 @@ export component AppWindow inherits Window {
     }
 
     public function close-dialog() {
+        KenkuImportView.open = false;
         if root.dialog == DialogKind.add-to-playlist {
             Actions.adding-song-changed("");
         }
@@ -528,6 +541,14 @@ export component AppWindow inherits Window {
                 cancel => {
                     root.close-dialog();
                 }
+            }
+            kenku-dialog := Presence {
+                open: root.dialog == DialogKind.kenku-import;
+            }
+
+            if kenku-dialog.present: KenkuImportDialog {
+                progress: kenku-dialog.progress;
+                cancel => { root.close-dialog(); }
             }
         }
         if mini-form.present && root.mini-player: MiniPlayer {

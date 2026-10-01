@@ -38,8 +38,6 @@ const KENKU_BACKGROUND_PRESETS: [(&str, BackgroundPreset); 18] = [
 
 pub(super) struct PlanInput {
     pub(super) collections: Vec<KenkuCollection>,
-    /// Shown collections' kinds and titles.
-    pub(super) existing: HashSet<(CollectionKind, Title)>,
     pub(super) shown_presets: Vec<BackgroundPreset>,
     /// Each completely scanned candidate's direct audio files.
     pub(super) folder_audio_files: HashMap<FolderPath, Vec<AudioFilePath>>,
@@ -49,14 +47,13 @@ pub(super) struct PlanInput {
 #[derive(Debug, PartialEq)]
 pub(super) struct ImportPlan {
     pub(super) collections: Vec<PlannedCollection>,
-    /// Titles the library already shows.
-    pub(super) skipped: Vec<Title>,
     /// Web addresses of the imported tracks and sounds.
     pub(super) unsupported_sources: Vec<String>,
 }
 
 #[derive(Debug, PartialEq)]
 pub(super) struct PlannedCollection {
+    pub(super) source_id: String,
     pub(super) kind: CollectionKind,
     pub(super) title: Title,
     pub(super) background: Background,
@@ -89,15 +86,14 @@ pub(super) fn folder_candidate(collection: &KenkuCollection) -> Option<FolderPat
 pub(super) fn plan(input: PlanInput) -> ImportPlan {
     let PlanInput {
         collections,
-        existing,
         shown_presets,
         folder_audio_files,
         rng,
     } = input;
-    let (skipped, imported): (Vec<_>, Vec<_>) = collections
+    let imported: Vec<_> = collections
         .into_iter()
         .map(|collection| (Title::from_name_lossy(&collection.title), collection))
-        .partition(|(title, collection)| existing.contains(&(collection.kind, title.clone())));
+        .collect();
     let named_presets = imported
         .iter()
         .filter_map(|(_, collection)| named_preset(&collection.background));
@@ -106,7 +102,6 @@ pub(super) fn plan(input: PlanInput) -> ImportPlan {
     let mut followed = HashSet::new();
     let mut plan = ImportPlan {
         collections: Vec::with_capacity(imported.len()),
-        skipped: skipped.into_iter().map(|(title, _)| title).collect(),
         unsupported_sources: Vec::new(),
     };
     for (title, collection) in imported {
@@ -130,6 +125,7 @@ pub(super) fn plan(input: PlanInput) -> ImportPlan {
             }
         }
         plan.collections.push(PlannedCollection {
+            source_id: collection.source_id,
             kind: collection.kind,
             title,
             background,
@@ -219,6 +215,7 @@ mod tests {
 
     fn collection(kind: CollectionKind, title: &str, items: Vec<KenkuItem>) -> KenkuCollection {
         KenkuCollection {
+            source_id: title.to_owned(),
             kind,
             title: title.to_owned(),
             background: KenkuBackground::Named("sky".to_owned()),
@@ -229,7 +226,6 @@ mod tests {
     fn input(collections: Vec<KenkuCollection>) -> PlanInput {
         PlanInput {
             collections,
-            existing: HashSet::new(),
             shown_presets: Vec::new(),
             folder_audio_files: HashMap::new(),
             rng: fastrand::Rng::with_seed(7),
@@ -322,23 +318,6 @@ mod tests {
                 Some(folder_path("combat"))
             ]
         );
-    }
-
-    #[test]
-    fn collections_the_library_shows_are_skipped_by_kind_and_title() {
-        let mut input = input(vec![
-            collection(CollectionKind::Playlist, " combat ", Vec::new()),
-            collection(CollectionKind::Soundboard, "combat", Vec::new()),
-        ]);
-        input
-            .existing
-            .insert((CollectionKind::Playlist, title("combat")));
-
-        let plan = plan(input);
-
-        assert_eq!(plan.skipped, [title("combat")]);
-        assert_eq!(plan.collections.len(), 1);
-        assert_eq!(plan.collections[0].kind, CollectionKind::Soundboard);
     }
 
     #[test]

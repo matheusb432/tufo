@@ -29,6 +29,7 @@ uuid = { workspace = true }
 libc = { workspace = true }
 
 [dev-dependencies]
+toasty = { workspace = true }
 serde_json = { workspace = true }
 tufo-infra = { workspace = true, features = ["test-support"] }
 tufo-wire = { workspace = true }

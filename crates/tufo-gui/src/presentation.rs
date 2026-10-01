@@ -1295,18 +1295,26 @@ pub(crate) fn error_text(error: &ClientError) -> String {
 fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
     use tufo_application::{
         library::{
-            LibraryStorageError, add_files_to_collection::AddFilesToCollectionError,
+            LibraryStorageError,
+            add_files_to_collection::AddFilesToCollectionError,
             add_songs_to_playlist::AddSongsToPlaylistError,
             delete_collection::DeleteCollectionError,
             delete_collection_entry::DeleteCollectionEntryError,
-            delete_library_folder::DeleteLibraryFolderError, delete_song::DeleteSongError,
-            import_kenku_library::kenku_data::ReadKenkuDataError,
+            delete_library_folder::DeleteLibraryFolderError,
+            delete_song::DeleteSongError,
+            import_kenku_library::{ImportKenkuLibraryError, kenku_data::ReadKenkuDataError},
             update_collection::UpdateCollectionError,
             update_collection_entry::UpdateCollectionEntryError,
         },
         playback::{play_collection::PlayCollectionError, play_entry_sound::PlayEntrySoundError},
     };
     Some(match (code, reason) {
+        (Code::InvalidArgument, ImportKenkuLibraryError::CHOICES) => tr(
+            "Choose Keep or Overwrite for each collection. Overwrite each Tufo collection only once.",
+        ),
+        (Code::FailedPrecondition, ImportKenkuLibraryError::BUSY) => {
+            tr("A Kenku FM import is already in progress.")
+        }
         (Code::Internal, LibraryStorageError::REASON) => {
             tr("Tufo could not save or read the library. Check the server log.")
         }
@@ -1344,6 +1352,9 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
         }
         (Code::FailedPrecondition, ReadKenkuDataError::UNREADABLE) => {
             tr("Tufo could not read Kenku FM’s library. Check the folder permissions.")
+        }
+        (Code::FailedPrecondition, ReadKenkuDataError::RUNNING) => {
+            tr("Close Kenku FM and try again.")
         }
         (Code::FailedPrecondition, ReadKenkuDataError::MALFORMED) => {
             tr("Kenku FM’s library is invalid. Quit Kenku FM and try again.")
@@ -1473,12 +1484,25 @@ pub(crate) fn kenku_report_text(report: &KenkuImportReport) -> String {
         ));
     }
     if report.discord_bot_token_imported {
-        sentences.push(tr("Restarting so the bot logs in with Kenku FM's token.").to_owned());
+        sentences.push(tr("Discord bot token imported.").to_owned());
     }
     if sentences.is_empty() {
         return tr("Kenku FM's library is empty.").to_owned();
     }
     sentences.join(" ")
+}
+
+pub(crate) fn kenku_error_text(reason: &str) -> String {
+    use tufo_application::library::import_kenku_library::{INTERRUPTED, TIMED_OUT};
+    match reason {
+        INTERRUPTED => tr("Import was interrupted. Retry to continue."),
+        TIMED_OUT => tr("Import took too long. Retry to continue."),
+        _ => library_reason_text(Code::FailedPrecondition, reason)
+            .or_else(|| library_reason_text(Code::NotFound, reason))
+            .or_else(|| reason_text(Code::Internal, reason))
+            .unwrap_or_else(|| tr("Tufo could not complete the request. Check the server log.")),
+    }
+    .to_owned()
 }
 
 #[cfg(test)]

@@ -215,11 +215,12 @@ mod tests {
         let legacy = rusqlite::Connection::open(&path).unwrap();
         legacy
             .execute_batch(
-                "ALTER TABLE collections DROP COLUMN builtin_title;
+                "DROP TABLE kenku_imports;
+             ALTER TABLE collections DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN song_source;
              DELETE FROM __toasty_migrations
-             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql');",
+             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -274,8 +275,9 @@ mod tests {
         let legacy = rusqlite::Connection::open(&path).unwrap();
         legacy
             .execute_batch(
-                "ALTER TABLE audio_files DROP COLUMN song_source;
-             DELETE FROM __toasty_migrations WHERE name = '0007_song_sources.sql';",
+                "DROP TABLE kenku_imports;
+             ALTER TABLE audio_files DROP COLUMN song_source;
+             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql');",
             )
             .unwrap();
         drop(legacy);

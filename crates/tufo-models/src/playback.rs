@@ -22,7 +22,7 @@ pub const AUDIO_FILE_EXTENSIONS: [&str; 10] = [
 /// An absolute, UTF-8 path to an audio file on the server's filesystem.
 #[nutype(
     validate(predicate = crate::path::is_absolute_utf8),
-    derive(Debug, Clone, PartialEq, Eq, AsRef)
+    derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, AsRef)
 )]
 pub struct AudioFilePath(PathBuf);
 

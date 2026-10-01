@@ -1,45 +1,47 @@
-//! Importing Kenku FM's playlists, soundboards, and player settings.
+//! Saved, resumable Kenku FM imports with explicit collection conflict choices.
 
+mod apply;
+mod conflicts;
+mod files;
+pub(super) mod journal;
 pub mod kenku_data;
 mod kenku_library;
 mod kenku_titles;
 mod plan;
 
-use std::collections::{HashMap, HashSet};
+use std::{
+    sync::{Arc, atomic::Ordering},
+    time::Duration,
+};
 
-use toasty::Db;
-use toasty_core::driver::operation::TransactionMode;
+use jiff::Timestamp;
 use tufo_models::{
-    library::{
-        AudioFile, Collection, CollectionEntry, CollectionId, CollectionKind, SoundSettings,
-    },
-    path::FolderPath,
-    playback::{AudioFilePath, queue::RepeatMode},
+    kenku_import::{ImportProgress, KenkuImport, KenkuImportId, KenkuImportState},
+    playback::queue::RepeatMode,
 };
-use tufo_wire::{
-    library::{ImportKenkuLibrary, KenkuImportReport},
-    player::UpdatePlayerSettings,
-};
+use tufo_wire::{library::ImportKenkuLibrary, player::UpdatePlayerSettings};
 
 pub use self::kenku_library::{
     KenkuBackground, KenkuCollection, KenkuItem, KenkuLibrary, KenkuPlayerSettings, KenkuSource,
 };
 use self::{
+    journal::Details,
     kenku_data::{KenkuReader, ReadKenkuDataError},
-    plan::{PlanInput, PlannedCollection, PlannedFile},
 };
-use super::{
-    Library, LibraryStorageError, import_paths, library_files::LibraryFiles, manual_files, store,
-    sync_library,
-};
+use super::{Library, LibraryStorageError, library_files::LibraryFiles};
 use crate::{
     discord::bot_credentials::BotCredentials,
-    error::ErrorMeta,
+    error::{ApplicationError as _, ErrorMeta},
     playback::{
         player::Player,
         update_player_settings::{self, UpdatePlayerSettingsError},
     },
 };
+
+/// A GUI disconnect does not cancel work; every server attempt has its own upper bound.
+pub const IMPORT_TIMEOUT: Duration = Duration::from_mins(5);
+pub const INTERRUPTED: &str = "library.kenku_import.interrupted";
+pub const TIMED_OUT: &str = "library.kenku_import.timed_out";
 
 #[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum ImportKenkuLibraryError {
@@ -52,33 +54,270 @@ pub enum ImportKenkuLibraryError {
     #[error(transparent)]
     #[meta(transparent)]
     PlayerSettings(#[from] UpdatePlayerSettingsError),
+    #[error("another Kenku FM import is in progress")]
+    #[meta(class = FailedPrecondition, reason = Self::BUSY)]
+    Busy,
+    #[error("the saved Kenku FM import does not exist")]
+    #[meta(class = NotFound, reason = Self::NOT_FOUND)]
+    NotFound,
+    #[error("choose Keep or Overwrite for each conflicting collection")]
+    #[meta(class = InvalidArgument, reason = Self::CHOICES)]
+    Choices,
 }
 
-pub async fn execute<F: LibraryFiles>(
-    request: ImportKenkuLibrary,
+impl ImportKenkuLibraryError {
+    pub const BUSY: &'static str = "library.kenku_import.busy";
+    pub const NOT_FOUND: &'static str = "library.kenku_import.not_found";
+    pub const CHOICES: &'static str = "library.kenku_import.choices";
+}
+
+/// Starts or resumes one durable import and returns immediately with its ID. The watch stream
+/// sends progress, conflicts and the saved result. Repeated starts while running reuse the job.
+pub async fn execute<F, P, R, C>(
+    mut request: ImportKenkuLibrary,
+    library: Arc<Library<F>>,
+    player: Arc<P>,
+    reader: R,
+    credentials: C,
+) -> Result<KenkuImportId, ImportKenkuLibraryError>
+where
+    F: LibraryFiles + 'static,
+    P: Player + 'static,
+    R: KenkuReader + 'static,
+    C: BotCredentials + 'static,
+{
+    let _admission = library.kenku_imports.admission.lock().await;
+    if library.kenku_imports.stopping.load(Ordering::Acquire) {
+        return Err(ImportKenkuLibraryError::Busy);
+    }
+    let current = library.kenku_imports.watch().borrow().clone();
+    if let Some(current) = &current
+        && (current.state.is_running() || current.state == KenkuImportState::AwaitingChoices)
+        && request.import_id.is_some_and(|id| id != current.id)
+    {
+        return Err(ImportKenkuLibraryError::Busy);
+    }
+    if let Some(current) = current
+        && (current.state.is_running()
+            || (current.state == KenkuImportState::AwaitingChoices && request.import_id.is_none()))
+    {
+        if let Some(folder) = &request.kenku_folder {
+            let stored = KenkuImport::filter_by_id(current.id)
+                .first()
+                .exec(&mut library.database())
+                .await
+                .map_err(LibraryStorageError::from)?
+                .ok_or(ImportKenkuLibraryError::NotFound)?;
+            if stored.source_folder.as_ref() != Some(folder) {
+                return Err(ImportKenkuLibraryError::Busy);
+            }
+        }
+        return Ok(current.id);
+    }
+    let mut import = prepare_import(&mut request, &library).await?;
+    let id = import.id;
+    if import.state == KenkuImportState::AwaitingChoices {
+        return Ok(id);
+    }
+    let mut database = library.database();
+    import.error_reason = None;
+    import.state = KenkuImportState::Reading;
+    import.progress = ImportProgress::START;
+    journal::save(&mut database, &import).await?;
+    library.kenku_imports.publish(&import)?;
+    let worker_library = Arc::clone(&library);
+    let worker = tokio::spawn(async move {
+        let outcome = tokio::time::timeout(
+            IMPORT_TIMEOUT,
+            run(
+                &request.choices,
+                &worker_library,
+                player.as_ref(),
+                &reader,
+                &credentials,
+                &mut import,
+            ),
+        )
+        .await;
+        let reason = match outcome {
+            Ok(Ok(())) => return,
+            Ok(Err(error)) => {
+                tracing::warn!(import_id = %id, %error, "Kenku FM import failed");
+                error.metadata().reason
+            }
+            Err(_) => TIMED_OUT,
+        };
+        save_failure(&worker_library, id, reason).await;
+    });
+    *library.kenku_imports.worker.lock().await = Some(worker);
+    Ok(id)
+}
+
+async fn prepare_import<F: LibraryFiles>(
+    request: &mut ImportKenkuLibrary,
+    library: &Library<F>,
+) -> Result<KenkuImport, ImportKenkuLibraryError> {
+    let mut database = library.database();
+    if let Some(id) = request.import_id {
+        let mut import = KenkuImport::filter_by_id(id)
+            .first()
+            .exec(&mut database)
+            .await
+            .map_err(LibraryStorageError::from)?
+            .ok_or(ImportKenkuLibraryError::NotFound)?;
+        if request.kenku_folder.is_some() && request.kenku_folder != import.source_folder {
+            return Err(ImportKenkuLibraryError::Choices);
+        }
+        let mut details = Details::read(&import)?;
+        if request.choices.is_empty() && import.state != KenkuImportState::AwaitingChoices {
+            request.choices = details.choices.iter().map(Into::into).collect();
+        }
+        if request.choices.is_empty() && !details.conflicts.is_empty() {
+            import.error_reason = None;
+            journal::advance(
+                &mut database,
+                &library.kenku_imports,
+                &mut import,
+                KenkuImportState::AwaitingChoices,
+                15,
+            )
+            .await?;
+            return Ok(import);
+        }
+        conflicts::validate_choices(&details, &request.choices)?;
+        details.choices = request.choices.iter().map(Into::into).collect();
+        import.details = details.encode()?;
+        import.state = KenkuImportState::Reading;
+        return Ok(import);
+    }
+    if !request.choices.is_empty() {
+        return Err(ImportKenkuLibraryError::Choices);
+    }
+    Ok(toasty::create!(KenkuImport {
+        source_folder: request.kenku_folder.clone(),
+        state: KenkuImportState::Reading,
+        progress: ImportProgress::START,
+        details: Details::default().encode()?,
+        error_reason: None,
+        created_at: Timestamp::now(),
+        updated_at: Timestamp::now(),
+    })
+    .exec(&mut database)
+    .await
+    .map_err(LibraryStorageError::from)?)
+}
+
+async fn save_failure<F: LibraryFiles>(library: &Library<F>, id: KenkuImportId, reason: &str) {
+    // Reload after cancellation: the collection transaction may have committed, and its
+    // journal outcome must survive even if later settings or publication failed.
+    let mut database = library.database();
+    match KenkuImport::filter_by_id(id)
+        .first()
+        .exec(&mut database)
+        .await
+    {
+        Ok(Some(mut stored)) => {
+            stored.state = KenkuImportState::Failed;
+            stored.error_reason = Some(reason.to_owned());
+            if let Err(error) = journal::save(&mut database, &stored)
+                .await
+                .and_then(|()| library.kenku_imports.publish(&stored))
+            {
+                tracing::error!(%error, "cannot save Kenku FM import failure");
+            }
+            let _change = library.begin_change().await;
+            if let Err(error) = library.publish().await {
+                tracing::error!(%error, "cannot publish the library after an import failure");
+            }
+        }
+        other => tracing::error!(?other, "cannot reload the failed Kenku FM import"),
+    }
+}
+
+/// Stops a managed worker before shutdown. A later launch offers a retry of interrupted work.
+pub async fn interrupt<F: LibraryFiles>(library: &Library<F>) -> Result<(), LibraryStorageError> {
+    library
+        .kenku_imports
+        .stopping
+        .store(true, Ordering::Release);
+    let _admission = library.kenku_imports.admission.lock().await;
+    if let Some(worker) = library.kenku_imports.worker.lock().await.take() {
+        worker.abort();
+        let _ = worker.await;
+    }
+    let mut database = library.database();
+    let current = library.kenku_imports.watch().borrow().clone();
+    if let Some(current) = current
+        && current.state.is_running()
+        && let Some(mut import) = KenkuImport::filter_by_id(current.id)
+            .first()
+            .exec(&mut database)
+            .await?
+    {
+        import.state = KenkuImportState::Interrupted;
+        import.error_reason = Some(INTERRUPTED.to_owned());
+        journal::save(&mut database, &import).await?;
+        library.kenku_imports.publish(&import)?;
+    }
+    Ok(())
+}
+
+async fn run<F: LibraryFiles>(
+    choices: &[tufo_wire::library::KenkuCollectionChoice],
     library: &Library<F>,
     player: &impl Player,
     reader: &impl KenkuReader,
     credentials: &impl BotCredentials,
-) -> Result<KenkuImportReport, ImportKenkuLibraryError> {
-    let data = reader.read(request.kenku_folder).await?;
-    let kenku = data.library;
-    let mut report = import_collections(kenku.collections, library).await?;
+    import: &mut KenkuImport,
+) -> Result<(), ImportKenkuLibraryError> {
+    let data = reader.read(import.source_folder.clone()).await?;
+    let mut database = library.database();
+    journal::advance(
+        &mut database,
+        &library.kenku_imports,
+        import,
+        KenkuImportState::Reading,
+        5,
+    )
+    .await?;
+    let mut details = Details::read(import)?;
+    let Some(mut report) = apply::collections(
+        data.library.collections,
+        choices,
+        library,
+        import,
+        &mut details,
+    )
+    .await?
+    else {
+        return Ok(());
+    };
     let songs_queued = !player.watch_player().borrow().queued_entry_ids.is_empty();
-    let update = settings_update(kenku.player_settings, songs_queued);
+    let update = settings_update(data.library.player_settings, songs_queued);
     if update != UpdatePlayerSettings::default() {
         update_player_settings::execute(update, player, library.database()).await?;
     }
     if let Some(token) = data.discord_bot_token {
-        report.discord_bot_token_imported = match credentials.save_unless_present(token).await {
-            Ok(saved) => saved,
-            Err(error) => {
-                tracing::warn!(%error, "cannot save Kenku FM's Discord bot token");
-                false
-            }
-        };
+        report.discord_bot_token_imported |= credentials
+            .save_unless_present(token)
+            .await
+            .map_err(|error| LibraryStorageError(error.into()))?;
     }
-    Ok(report)
+    details.report = (&report).into();
+    let encoded = details.encode()?;
+    if encoded != import.details {
+        import.details = encoded;
+        journal::save(&mut database, import).await?;
+    }
+    journal::advance(
+        &mut database,
+        &library.kenku_imports,
+        import,
+        KenkuImportState::Succeeded,
+        100,
+    )
+    .await?;
+    Ok(())
 }
 
 /// Songs queued now keep Kenku FM's repeat-one out, since repeating one track refuses them.
@@ -96,202 +335,6 @@ fn settings_update(kenku: KenkuPlayerSettings, songs_queued: bool) -> UpdatePlay
         repeat: repeat.filter(|repeat| !(songs_queued && *repeat == RepeatMode::Track)),
         crossfade: None,
     }
-}
-
-async fn import_collections<F: LibraryFiles>(
-    collections: Vec<KenkuCollection>,
-    library: &Library<F>,
-) -> Result<KenkuImportReport, LibraryStorageError> {
-    let _change = library.begin_change().await;
-    let mut database = library.database();
-    let shown = Collection::all()
-        .exec(&mut database)
-        .await?
-        .into_iter()
-        .filter(|collection| collection.hidden_at.is_none())
-        .collect::<Vec<_>>();
-    let folder_audio_files = scan_folder_candidates(library.files(), &collections).await;
-    let plan = plan::plan(PlanInput {
-        existing: shown
-            .iter()
-            .map(|collection| (collection.kind, collection.title.clone()))
-            .collect(),
-        shown_presets: shown
-            .iter()
-            .filter_map(|collection| collection.background_preset)
-            .collect(),
-        collections,
-        folder_audio_files,
-        rng: fastrand::Rng::new(),
-    });
-    let mut report = KenkuImportReport {
-        skipped_collections: plan.skipped,
-        unsupported_sources: plan.unsupported_sources,
-        ..KenkuImportReport::default()
-    };
-
-    let mut followed_any = false;
-    for planned in &plan.collections {
-        if let Some(folder) = &planned.folder {
-            import_paths::follow_folder(
-                &mut database,
-                library.files(),
-                planned.kind,
-                folder.clone(),
-            )
-            .await?;
-            followed_any = true;
-        }
-    }
-    if followed_any {
-        sync_library::sync_while_changing(library).await?;
-    }
-    let mut linked = shown_linked_collections(&mut database).await?;
-    for planned in plan.collections {
-        let linked_id = planned
-            .folder
-            .as_ref()
-            .and_then(|folder| linked.remove(&(planned.kind, folder.clone())));
-        if let Some(id) = linked_id {
-            adopt_linked_collection(&mut database, id, &planned).await?;
-            report.files_imported += planned.files.len();
-            apply_file_settings(&mut database, id, &planned.files).await?;
-        } else {
-            let created = store::create_manual_collection(
-                &mut database,
-                planned.kind,
-                planned.title.clone(),
-                planned.background.clone(),
-                None,
-            )
-            .await?;
-            let added =
-                manual_files::add_files(library, &created, unique_paths(&planned.files)).await?;
-            report.files_imported += added.files_added;
-            report.unreadable_files.extend(added.unreadable);
-            apply_file_settings(&mut database, created.id, &planned.files).await?;
-        }
-        report.collections_imported += 1;
-    }
-    library.publish().await?;
-    Ok(report)
-}
-
-/// Skips folders whose scan was truncated.
-async fn scan_folder_candidates(
-    files: &impl LibraryFiles,
-    collections: &[KenkuCollection],
-) -> HashMap<FolderPath, Vec<AudioFilePath>> {
-    let candidates = collections
-        .iter()
-        .filter_map(plan::folder_candidate)
-        .collect::<HashSet<_>>();
-    let mut scanned = HashMap::with_capacity(candidates.len());
-    for folder in candidates {
-        let Ok(scan) = files.scan_folder(folder.clone()).await else {
-            continue;
-        };
-        if scan.truncated {
-            continue;
-        }
-        if let Some(root) = scan
-            .folders
-            .into_iter()
-            .find(|scanned_folder| scanned_folder.path == folder)
-        {
-            let audio_files = root.audio_files.into_iter().map(|file| file.path).collect();
-            scanned.insert(folder, audio_files);
-        }
-    }
-    scanned
-}
-
-async fn shown_linked_collections(
-    database: &mut Db,
-) -> Result<HashMap<(CollectionKind, FolderPath), CollectionId>, LibraryStorageError> {
-    // Toasty 0.10 can't serialize a filter on an optional UUID column, so this filters in memory.
-    Ok(Collection::all()
-        .exec(database)
-        .await?
-        .into_iter()
-        .filter(|collection| collection.hidden_at.is_none())
-        .filter_map(|collection| {
-            collection.library_folder_id?;
-            Some(((collection.kind, collection.folder_path?), collection.id))
-        })
-        .collect())
-}
-
-async fn adopt_linked_collection(
-    database: &mut Db,
-    id: CollectionId,
-    planned: &PlannedCollection,
-) -> Result<(), LibraryStorageError> {
-    let (background_preset, background_image) = planned.background.clone().into_columns();
-    Collection::update_by_id(id)
-        .title(planned.title.clone())
-        .background_preset(background_preset)
-        .background_image(background_image)
-        .exec(database)
-        .await?;
-    Ok(())
-}
-
-/// Kenku FM lets a playlist list a file twice.
-fn unique_paths(files: &[PlannedFile]) -> Vec<AudioFilePath> {
-    let mut seen = HashSet::with_capacity(files.len());
-    files
-        .iter()
-        .filter(|file| seen.insert(file.path.as_ref().clone()))
-        .map(|file| file.path.clone())
-        .collect()
-}
-
-async fn apply_file_settings(
-    database: &mut Db,
-    collection_id: CollectionId,
-    files: &[PlannedFile],
-) -> Result<(), LibraryStorageError> {
-    let mut transaction = database
-        .transaction_builder()
-        .mode(TransactionMode::Immediate)
-        .begin()
-        .await?;
-    let entries = CollectionEntry::filter_by_collection_id(collection_id)
-        .exec(&mut transaction)
-        .await?;
-    for file in files {
-        let stored = AudioFile::filter_by_file_path(file.path.clone())
-            .first()
-            .exec(&mut transaction)
-            .await?;
-        let Some(stored) = stored else {
-            continue;
-        };
-        if let Some(title) = &file.typed_title {
-            AudioFile::update_by_id(stored.id)
-                .title(title.clone())
-                .exec(&mut transaction)
-                .await?;
-        }
-        if file.sound == SoundSettings::default() {
-            continue;
-        }
-        for entry in entries
-            .iter()
-            .filter(|entry| entry.audio_file_id == stored.id)
-        {
-            CollectionEntry::update_by_id(entry.id)
-                .looping(file.sound.looping)
-                .volume(file.sound.volume)
-                .fade_in(file.sound.fade_in)
-                .fade_out(file.sound.fade_out)
-                .exec(&mut transaction)
-                .await?;
-        }
-    }
-    transaction.commit().await?;
-    Ok(())
 }
 
 #[cfg(test)]

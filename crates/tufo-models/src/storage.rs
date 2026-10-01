@@ -85,3 +85,31 @@ macro_rules! checked_column {
 }
 
 pub(crate) use checked_column;
+
+macro_rules! uuid_identifier {
+    ($(#[$attribute:meta])* $name:ident) => {
+        $(#[$attribute])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, toasty::Embed)]
+        pub struct $name(::toasty::stmt::Uuid);
+
+        impl $name {
+            #[must_use]
+            pub fn from_uuid(uuid: ::toasty::stmt::Uuid) -> Self {
+                Self(uuid)
+            }
+
+            #[must_use]
+            pub fn into_uuid(self) -> ::toasty::stmt::Uuid {
+                self.0
+            }
+        }
+
+        impl ::std::fmt::Display for $name {
+            fn fmt(&self, formatter: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
+                self.0.hyphenated().fmt(formatter)
+            }
+        }
+    };
+}
+
+pub(crate) use uuid_identifier;
