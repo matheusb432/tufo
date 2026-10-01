@@ -10481,6 +10481,7 @@ dependencies = [
  "ksni",
  "libc",
  "nucleo-matcher",
+ "objc2 0.6.4",
  "resvg",
  "rfd",
  "rspolib",

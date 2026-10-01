@@ -41,6 +41,11 @@ wayland-client = { workspace = true }
 ksni = { workspace = true }
 resvg = { workspace = true }
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { workspace = true }
+resvg = { workspace = true }
+tray-icon = { workspace = true }
+
 [target.'cfg(windows)'.dependencies]
 tray-icon = { workspace = true }
 windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }

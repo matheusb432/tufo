@@ -82,6 +82,7 @@ struct Shared {
     /// The background the Add dialog creates its collection with.
     background_draft: Background,
     resume_saved_loops_on_connect: bool,
+    quitting: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1236,21 +1237,35 @@ impl Controller {
     /// Quits Tufo, leaving the server running and, unless the audio should keep playing,
     /// standing it by first.
     pub(crate) fn quit(&self) {
-        let (client, quit_behavior) = {
-            let shared = self.lock();
-            (shared.client.clone(), shared.settings.quit_behavior)
-        };
+        let stand_by_client = self.start_quitting();
         let window = self.window.clone();
         self.runtime.spawn(async move {
-            if quit_behavior == QuitBehavior::StandBy
-                && let Some(client) = client
-            {
+            if let Some(client) = stand_by_client {
                 let _ = client.stand_by().await;
             }
             let _ = window.upgrade_in_event_loop(|_| {
                 let _ = slint::quit_event_loop();
             });
         });
+    }
+
+    /// Stands the server by as [`Self::quit`] does when the event loop ends without it: macOS's
+    /// Quit menu item and logging out end the loop directly. Blocks the UI thread.
+    pub(crate) fn stand_by_on_exit(&self) {
+        if let Some(client) = self.start_quitting() {
+            let _ = self.runtime.block_on(client.stand_by());
+        }
+    }
+
+    /// The client to stand the server by with, the first time Tufo quits.
+    fn start_quitting(&self) -> Option<TufoClient> {
+        let mut shared = self.lock();
+        if std::mem::replace(&mut shared.quitting, true)
+            || shared.settings.quit_behavior != QuitBehavior::StandBy
+        {
+            return None;
+        }
+        shared.client.clone()
     }
 
     // Plumbing.

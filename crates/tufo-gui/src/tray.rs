@@ -1,22 +1,29 @@
 //! The tray icon. A left click shows the window; the menu opens the window or the mini player,
 //! plays or pauses the music, pauses or resumes the sounds, and quits.
 //!
-//! Linux serves a `StatusNotifierItem` over D-Bus with ksni, and Windows uses the notification
-//! area through tray-icon. Both show `icons/tufo-tray.svg` drawn at the size the panel uses, so it
-//! never gets shrunk from a larger image. The tray belongs to the UI thread; clicks and menu events
-//! arrive on any thread.
+//! Linux serves a `StatusNotifierItem` over D-Bus with ksni; Windows and macOS use tray-icon, in
+//! the notification area and the menu bar. Each shows `icons/tufo-tray.svg` drawn at the size the
+//! panel uses, so it never gets shrunk from a larger image. The tray belongs to the UI thread;
+//! clicks and menu events arrive on any thread.
 
 use crate::i18n::tr;
 
+#[cfg(any(windows, target_os = "macos"))]
+mod icon_menu;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(any(windows, target_os = "macos"))]
+pub(crate) use icon_menu::Tray;
 #[cfg(target_os = "linux")]
 pub(crate) use linux::Tray;
-#[cfg(windows)]
-pub(crate) use windows::Tray;
+
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+const TRAY_ICON_SVG: &[u8] = include_bytes!("../icons/tufo-tray.svg");
 
 /// What the tray asks the window to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +73,32 @@ fn pause_sounds_item(sounds: TraySounds) -> (&'static str, bool) {
         TraySounds::Playing => (tr("Pause Sounds"), true),
         TraySounds::Paused => (tr("Resume Sounds"), true),
     }
+}
+
+/// The tray icon drawn `side` pixels square, as straight-alpha colors row by row.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+fn draw_icon(side: u32) -> anyhow::Result<Vec<resvg::tiny_skia::ColorU8>> {
+    use anyhow::Context as _;
+    use resvg::{tiny_skia, usvg};
+
+    let tree = usvg::Tree::from_data(TRAY_ICON_SVG, &usvg::Options::default())
+        .context("parse the tray icon")?;
+    let mut pixmap = tiny_skia::Pixmap::new(side, side).context("allocate a tray pixmap")?;
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "icon sides are far inside f32's exact integer range"
+    )]
+    let scale = side as f32 / tree.size().width();
+    resvg::render(
+        &tree,
+        tiny_skia::Transform::from_scale(scale, scale),
+        &mut pixmap.as_mut(),
+    );
+    Ok(pixmap
+        .pixels()
+        .iter()
+        .map(tiny_skia::PremultipliedColorU8::demultiply)
+        .collect())
 }
 
 #[cfg(test)]

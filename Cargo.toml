@@ -121,8 +121,10 @@ ksni = { version = "0.3.6", default-features = false, features = ["async-io", "b
 # moves to winit 0.31.
 wayland-backend = { version = "0.3.17", features = ["client_system"] }
 wayland-client = "0.31.15"
-# The tray icon on Windows, in the notification area.
+# The tray icon on Windows, in the notification area, and on macOS, in the menu bar.
 tray-icon = { version = "0.25.1", default-features = false }
+# Answers macOS's reopen Apple Event, which winit doesn't expose.
+objc2 = "0.6.4"
 
 [workspace.lints.clippy]
 all = { level = "warn", priority = -2 }

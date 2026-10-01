@@ -1,6 +1,7 @@
 //! Renders Tufo's icon sources in `crates/tufo-gui/icons` into the Windows icons the executable
 //! embeds: `tufo.ico` for Explorer, the Start menu, and the taskbar, and `tufo-tray.ico` for the
-//! notification area. The Linux install renders its fixed-size PNGs from the same sources.
+//! notification area. The Linux install renders its fixed-size PNGs, and the macOS install its app
+//! bundle's `.icns`, from the same sources.
 
 use std::path::Path;
 
@@ -43,11 +44,58 @@ pub(crate) fn render(workspace_root: &Path) -> Result<()> {
     Ok(())
 }
 
+/// The ICNS entry types the Finder and the Dock read, by their side in pixels, each holding a PNG.
+/// Most sides serve one size at 1× and the size half as large at 2×.
+#[cfg(any(target_os = "macos", test))]
+const ICNS_ENTRIES: [(&[u8; 4], u32); 10] = [
+    (b"icp4", 16),
+    (b"icp5", 32),
+    (b"ic11", 32),
+    (b"ic12", 64),
+    (b"ic07", 128),
+    (b"ic13", 256),
+    (b"ic08", 256),
+    (b"ic14", 512),
+    (b"ic09", 512),
+    (b"ic10", 1024),
+];
+/// The small-size art draws sides up to this one.
+#[cfg(any(target_os = "macos", test))]
+const ICNS_SMALL_ART_SIDE_PX_MAX: u32 = 32;
+
 /// A PNG of the SVG at `side` × `side` pixels.
+#[cfg(target_os = "linux")]
 pub(crate) fn png(svg: &[u8], side: u32) -> Result<Vec<u8>> {
     rasterize(&parse(svg)?, side)?
         .encode_png()
         .context("encode the PNG")
+}
+
+/// The macOS icon container: its header, then one PNG entry per size, drawn from the small-size
+/// art at 32 px and below.
+#[cfg(any(target_os = "macos", test))]
+pub(crate) fn icns(app_svg: &[u8], small_svg: &[u8]) -> Result<Vec<u8>> {
+    const HEADER_BYTES: usize = 8;
+    let (app, small) = (parse(app_svg)?, parse(small_svg)?);
+    let mut entries = Vec::new();
+    for (entry_type, side) in ICNS_ENTRIES {
+        let art = if side <= ICNS_SMALL_ART_SIDE_PX_MAX {
+            &small
+        } else {
+            &app
+        };
+        let png = rasterize(art, side)?
+            .encode_png()
+            .context("encode an icon entry")?;
+        entries.extend(entry_type);
+        entries.extend(u32::try_from(HEADER_BYTES + png.len())?.to_be_bytes());
+        entries.extend(png);
+    }
+    let mut icns = Vec::with_capacity(HEADER_BYTES + entries.len());
+    icns.extend(b"icns");
+    icns.extend(u32::try_from(HEADER_BYTES + entries.len())?.to_be_bytes());
+    icns.extend(entries);
+    Ok(icns)
 }
 
 fn parse(svg: &[u8]) -> Result<usvg::Tree> {
@@ -188,6 +236,30 @@ mod tests {
         assert_eq!(u32::from(ico[directory]), side);
         let side = side as usize;
         assert_eq!(length, 40 + side * side * 4 + side.div_ceil(32) * 4 * side);
+    }
+
+    #[test]
+    fn the_icns_holds_a_png_entry_for_every_size() {
+        let read = |name| std::fs::read(icons().join(name)).unwrap();
+
+        let icns = icns(&read("tufo.svg"), &read(SMALL_ICON_SVG)).unwrap();
+
+        assert_eq!(&icns[..4], b"icns");
+        assert_eq!(u32_at_be(&icns, 4), icns.len());
+        let mut offset = 8;
+        for (entry_type, side) in ICNS_ENTRIES {
+            assert_eq!(&icns[offset..offset + 4], entry_type);
+            let length = u32_at_be(&icns, offset + 4);
+            let png = &icns[offset + 8..offset + length];
+            assert_eq!(&png[1..4], b"PNG");
+            assert_eq!(u32_at_be(png, 16), side as usize);
+            offset += length;
+        }
+        assert_eq!(offset, icns.len());
+    }
+
+    fn u32_at_be(bytes: &[u8], offset: usize) -> usize {
+        u32::from_be_bytes(bytes[offset..offset + 4].try_into().unwrap()) as usize
     }
 
     #[test]

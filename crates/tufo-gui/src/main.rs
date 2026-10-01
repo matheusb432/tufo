@@ -14,6 +14,8 @@ mod drops;
 mod files;
 mod frame;
 mod i18n;
+#[cfg(target_os = "macos")]
+mod macos_reopen;
 mod presentation;
 mod render;
 mod search;
@@ -37,7 +39,7 @@ mod ui {
     slint::include_modules!();
 }
 
-use std::time::Duration;
+use std::{cell::OnceCell, rc::Rc, time::Duration};
 
 use autostart::Launch;
 use card_art::Shade;
@@ -45,7 +47,14 @@ use controller::Controller;
 use presentation::PageKind;
 use slint::{
     CloseRequestResponse, ComponentHandle as _, Timer, TimerMode,
-    winit_030::WinitWindowAccessor as _,
+    winit_030::{
+        CustomApplicationHandler, EventResult, WinitWindowAccessor as _,
+        winit::{
+            event::WindowEvent,
+            event_loop::ActiveEventLoop,
+            window::{Window, WindowId},
+        },
+    },
 };
 use tray::{Tray, TrayCommand};
 use tufo_client::library::Background;
@@ -99,7 +108,8 @@ fn run_desktop() -> anyhow::Result<()> {
             None
         }
     };
-    select_backend()?;
+    let exiting_controller = Rc::new(OnceCell::new());
+    select_backend(Rc::clone(&exiting_controller))?;
     let window = ui::AppWindow::new()?;
     frame::install(&window);
     i18n::select_window_language(language)?;
@@ -109,6 +119,7 @@ fn run_desktop() -> anyhow::Result<()> {
     // started.
     slint::set_xdg_app_id(APP_ID)?;
     let controller = Controller::new(runtime.handle().clone(), window.as_weak(), settings_file);
+    let _ = exiting_controller.set(controller.clone());
     bind(&window, &controller);
     backgrounds::install(&window);
     accents::install(&window);
@@ -120,16 +131,7 @@ fn run_desktop() -> anyhow::Result<()> {
         window: window.as_weak(),
         controller: controller.clone(),
     };
-    let tray = match Tray::show({
-        let requests = requests.clone();
-        move |command| requests.send(command)
-    }) {
-        Ok(tray) => Some(tray),
-        Err(error) => {
-            tracing::warn!(%error, "no tray icon, so closing the window quits Tufo");
-            None
-        }
-    };
+    let tray = show_tray(&requests);
     let hidden_in_tray = launch == Launch::AtLogin && tray.is_some();
     window.window().on_close_requested({
         let controller = controller.clone();
@@ -154,6 +156,8 @@ fn run_desktop() -> anyhow::Result<()> {
             }
         }
     });
+    #[cfg(target_os = "macos")]
+    macos_reopen::show_window_on_reopen(requests.clone());
     if let Some(activations) = activations {
         runtime.spawn(requests.follow_activations(activations));
     }
@@ -175,12 +179,59 @@ fn run_desktop() -> anyhow::Result<()> {
 }
 
 /// Selects winit on the window's native platform: Wayland in a Wayland session.
-fn select_backend() -> Result<(), slint::PlatformError> {
-    let backend = slint::BackendSelector::new()
-        .with_winit_custom_application_handler(drops::DropHandler::default());
+fn select_backend(
+    exiting_controller: Rc<OnceCell<Controller>>,
+) -> Result<(), slint::PlatformError> {
+    let backend =
+        slint::BackendSelector::new().with_winit_custom_application_handler(ApplicationEvents {
+            drops: drops::DropHandler::default(),
+            controller: exiting_controller,
+        });
     #[cfg(windows)]
     let backend = backend.with_winit_window_attributes_hook(frame::with_shadow);
     backend.select()
+}
+
+/// The tray icon, or `None` without a tray, where closing the window quits.
+fn show_tray(requests: &WindowRequests) -> Option<Tray> {
+    let requests = requests.clone();
+    Tray::show(move |command| requests.send(command))
+        .inspect_err(
+            |error| tracing::warn!(%error, "no tray icon, so closing the window quits Tufo"),
+        )
+        .ok()
+}
+
+/// The winit events handled here: file drops, and an exit the window didn't ask for.
+struct ApplicationEvents {
+    drops: drops::DropHandler,
+    /// Set once the window has a controller.
+    controller: Rc<OnceCell<Controller>>,
+}
+
+impl CustomApplicationHandler for ApplicationEvents {
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: WindowId,
+        winit_window: Option<&Window>,
+        slint_window: Option<&slint::Window>,
+        event: &WindowEvent,
+    ) -> EventResult {
+        self.drops
+            .window_event(event_loop, window_id, winit_window, slint_window, event)
+    }
+
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) -> EventResult {
+        self.drops.about_to_wait(event_loop)
+    }
+
+    fn exiting(&mut self, _event_loop: &ActiveEventLoop) -> EventResult {
+        if let Some(controller) = self.controller.get() {
+            controller.stand_by_on_exit();
+        }
+        EventResult::Propagate
+    }
 }
 
 async fn claim_gui_instance() -> std::io::Result<GuiInstance> {

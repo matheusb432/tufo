@@ -20,11 +20,13 @@ impl Executable {
         }
     }
 
-    /// Prefers the executable installed beside this one, then searches PATH.
+    /// Prefers the executable installed beside this one, then searches PATH. A linked command,
+    /// such as macOS's `tufo` linked into the app bundle, looks beside the file it links to.
     fn path(self) -> PathBuf {
         let name = format!("{}{}", self.name(), std::env::consts::EXE_SUFFIX);
         std::env::current_exe()
             .ok()
+            .map(|executable| std::fs::canonicalize(&executable).unwrap_or(executable))
             .map(|executable| executable.with_file_name(&name))
             .filter(|sibling| sibling.is_file())
             .unwrap_or_else(|| PathBuf::from(name))

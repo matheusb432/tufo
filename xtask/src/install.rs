@@ -1,6 +1,6 @@
 //! Installs the release build for the current user, with a launcher that desktop search finds: a
-//! desktop entry and icon on Linux, a Start menu shortcut on Windows. Uninstalling keeps the
-//! library, the settings, and the Discord credentials.
+//! desktop entry and icon on Linux, an app bundle on macOS, a Start menu shortcut on Windows.
+//! Uninstalling keeps the library, the settings, and the Discord credentials.
 
 use std::{
     fs,
@@ -12,6 +12,8 @@ use anyhow::{Context as _, Result, ensure};
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
@@ -46,14 +48,19 @@ fn place(workspace_root: &Path, release_dir: &Path) -> Result<PathBuf> {
         linux::stop_session()?;
         linux::install(workspace_root, release_dir)
     };
+    #[cfg(target_os = "macos")]
+    return {
+        macos::stop_session()?;
+        macos::install(workspace_root, release_dir)
+    };
     #[cfg(windows)]
     return {
         let _ = workspace_root;
         windows::stop_session()?;
         windows::install(release_dir)
     };
-    #[cfg(not(any(target_os = "linux", windows)))]
-    anyhow::bail!("installing supports Linux and Windows")
+    #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
+    anyhow::bail!("installing supports Linux, macOS, and Windows")
 }
 
 /// Closes the session's Tufo and its server, then installs the release build over them.
@@ -66,10 +73,12 @@ pub(crate) fn update(workspace_root: &Path, release_dir: &Path) -> Result<()> {
 pub(crate) fn uninstall() -> Result<()> {
     #[cfg(target_os = "linux")]
     return linux::uninstall();
+    #[cfg(target_os = "macos")]
+    return macos::uninstall();
     #[cfg(windows)]
     return windows::uninstall();
-    #[cfg(not(any(target_os = "linux", windows)))]
-    anyhow::bail!("installing supports Linux and Windows")
+    #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
+    anyhow::bail!("installing supports Linux, macOS, and Windows")
 }
 
 /// Copies next to the destination, then renames over it, so a running copy keeps its own file.

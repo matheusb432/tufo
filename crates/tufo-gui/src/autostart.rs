@@ -3,11 +3,15 @@
 
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
 #[cfg(target_os = "linux")]
 pub(crate) use linux::{is_enabled, set_enabled};
+#[cfg(target_os = "macos")]
+pub(crate) use macos::{is_enabled, set_enabled};
 #[cfg(windows)]
 pub(crate) use windows::{is_enabled, set_enabled};
 

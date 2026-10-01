@@ -7,12 +7,12 @@ use std::{cell::Cell, sync::Arc};
 
 use anyhow::{Context as _, anyhow};
 use ksni::blocking::TrayMethods as _;
-use resvg::{tiny_skia, usvg};
 use tufo_local_transport::LocalEndpoint;
 
-use super::{TrayCommand, TrayPlayback, pause_sounds_item, play_pause_item};
+use super::{
+    TRAY_ICON_SVG, TrayCommand, TrayPlayback, draw_icon, pause_sounds_item, play_pause_item,
+};
 
-const TRAY_ICON_SVG: &[u8] = include_bytes!("../../icons/tufo-tray.svg");
 /// The icon's file name, without `.svg`, in the folder the tray publishes.
 const TRAY_ICON_NAME: &str = "tufo-tray";
 /// Panel icon sizes at 100% and 200% scaling.
@@ -155,30 +155,12 @@ fn publish_icon() -> anyhow::Result<String> {
 
 /// The icon at every panel size, as straight-alpha ARGB in network byte order.
 fn pixmaps() -> anyhow::Result<Vec<ksni::Icon>> {
-    let tree = usvg::Tree::from_data(TRAY_ICON_SVG, &usvg::Options::default())
-        .context("parse the tray icon")?;
     PIXMAP_SIDES_PX
         .into_iter()
         .map(|side| {
-            let mut pixmap =
-                tiny_skia::Pixmap::new(side, side).context("allocate a tray pixmap")?;
-            #[expect(
-                clippy::cast_precision_loss,
-                reason = "icon sides are far inside f32's exact integer range"
-            )]
-            let scale = side as f32 / tree.size().width();
-            resvg::render(
-                &tree,
-                tiny_skia::Transform::from_scale(scale, scale),
-                &mut pixmap.as_mut(),
-            );
-            let data = pixmap
-                .pixels()
-                .iter()
-                .flat_map(|pixel| {
-                    let color = pixel.demultiply();
-                    [color.alpha(), color.red(), color.green(), color.blue()]
-                })
+            let data = draw_icon(side)?
+                .into_iter()
+                .flat_map(|color| [color.alpha(), color.red(), color.green(), color.blue()])
                 .collect();
             let side = i32::try_from(side)?;
             Ok(ksni::Icon {
