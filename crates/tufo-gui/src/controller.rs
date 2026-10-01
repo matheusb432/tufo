@@ -12,16 +12,17 @@ use slint::ComponentHandle as _;
 use tufo_client::{
     ClientError, Code, LocalEndpoint, TufoClient,
     library::{
-        AddFilesToCollection, Background, CollectionSource, CreateCollection, ImportKenkuLibrary,
-        ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
+        AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CreateCollection,
+        ImportKenkuLibrary, ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection,
+        UpdateCollectionEntry,
     },
     player::UpdatePlayerSettings,
 };
 use tufo_models::{
     discord::VoiceChannel,
     library::{
-        BackgroundPresetChooser, CollectionEntryId, CollectionId, CollectionKind, EntryOrder,
-        EntryOrderKey, FadeDuration, SoundIcon, Title, Volume,
+        AudioFileId, BackgroundPresetChooser, CollectionEntryId, CollectionId, CollectionKind,
+        EntryOrder, EntryOrderKey, FadeDuration, LibraryFolderId, SoundIcon, Title, Volume,
     },
     path::{FolderPath, ImageFilePath, LocalPath},
     playback::{
@@ -32,8 +33,8 @@ use tufo_models::{
 
 use crate::{
     autostart,
-    i18n::tr,
-    presentation::{self, Navigation, PageKind},
+    i18n::{tr, tr_args},
+    presentation::{self, Navigation, PageKind, PageQueries},
     render,
     search::{self, PaletteResult, PaletteTarget},
     server_process,
@@ -73,6 +74,10 @@ struct Shared {
     output_targets: Vec<OutputTarget>,
     navigation: Navigation,
     filter: String,
+    /// The search for songs to add to the open playlist.
+    song_search: String,
+    /// The song the Add to playlist dialog adds.
+    adding_song: Option<AudioFileId>,
     palette_results: Vec<PaletteResult>,
     /// The newest volume each slider asked for, not yet sent.
     pending_volumes: Vec<(VolumeTarget, Volume)>,
@@ -307,11 +312,16 @@ impl Controller {
     pub(crate) fn render_library(&self) {
         let (view, navigation) = {
             let shared = self.lock();
+            let queries = PageQueries {
+                filter: &shared.filter,
+                song_search: &shared.song_search,
+                adding_song: shared.adding_song,
+            };
             let view = presentation::library_page(
                 &shared.snapshot,
                 &shared.player,
                 shared.navigation,
-                &shared.filter,
+                queries,
                 SystemTime::now(),
             );
             (view, shared.navigation)
@@ -381,13 +391,20 @@ impl Controller {
                 collection_id: parse_uuid(collection_id).map(CollectionId::from_uuid),
             };
             shared.filter.clear();
+            shared.song_search.clear();
         }
         render::clear_filter(&self.window);
+        render::clear_song_search(&self.window);
         self.render_library();
     }
 
     pub(crate) fn filter(&self, text: &str) {
         text.clone_into(&mut self.lock().filter);
+        self.render_library();
+    }
+
+    pub(crate) fn search_songs(&self, query: &str) {
+        query.clone_into(&mut self.lock().song_search);
         self.render_library();
     }
 
@@ -606,6 +623,92 @@ impl Controller {
         });
     }
 
+    // Songs.
+
+    /// Lists the hand-picked playlists for the Add to playlist dialog, marking those that
+    /// already list the song; an empty id stops listing them.
+    pub(crate) fn set_adding_song(&self, song_id: &str) {
+        self.lock().adding_song = audio_file_id(song_id);
+        self.render_library();
+    }
+
+    pub(crate) fn add_song_to_playlist(&self, playlist_id: &str, song_id: &str) {
+        let (Some(playlist_id), Some(song_id)) =
+            (collection_id(playlist_id), audio_file_id(song_id))
+        else {
+            return;
+        };
+        let title = presentation::find_collection(&self.lock().snapshot, playlist_id)
+            .map(|playlist| playlist.title.as_str().to_owned())
+            .unwrap_or_default();
+        let Some(client) = self.client() else {
+            self.toast_error(tr("tufo-server is not connected.").to_owned());
+            return;
+        };
+        let controller = self.clone();
+        self.runtime.spawn(async move {
+            let request = AddSongsToPlaylist {
+                playlist_id,
+                audio_file_ids: vec![song_id],
+            };
+            match client.add_songs_to_playlist(&request).await {
+                Ok(0) => controller.toast(tr_args("{0} already has this song.", &[&title])),
+                Ok(_) => controller.toast(tr_args("Added to {0}.", &[&title])),
+                Err(error) => controller.toast_error(presentation::error_text(&error)),
+            }
+        });
+    }
+
+    /// Creates a playlist on a preset the library shows least, then adds the song to it.
+    pub(crate) fn add_song_to_new_playlist(&self, title: &str, song_id: &str) {
+        let Some(song_id) = audio_file_id(song_id) else {
+            return;
+        };
+        let Ok(title) = Title::try_new(title.to_owned()) else {
+            self.toast_error(tr("A name needs at least one character.").to_owned());
+            return;
+        };
+        let Some(client) = self.client() else {
+            self.toast_error(tr("tufo-server is not connected.").to_owned());
+            return;
+        };
+        let shown = presentation::shown_presets(&self.lock().snapshot);
+        let preset = BackgroundPresetChooser::new(shown, fastrand::Rng::new()).choose();
+        let controller = self.clone();
+        self.runtime.spawn(async move {
+            let created = async {
+                let playlist_id = client
+                    .create_collection(&CreateCollection {
+                        kind: CollectionKind::Playlist,
+                        title: title.clone(),
+                        background: Background::Preset(preset),
+                    })
+                    .await?;
+                let request = AddSongsToPlaylist {
+                    playlist_id,
+                    audio_file_ids: vec![song_id],
+                };
+                client.add_songs_to_playlist(&request).await
+            };
+            match created.await {
+                Ok(_) => controller.toast(tr_args("Added to {0}.", &[&title])),
+                Err(error) => controller.toast_error(presentation::error_text(&error)),
+            }
+        });
+    }
+
+    pub(crate) fn remove_song(&self, song_id: &str) {
+        if let Some(id) = audio_file_id(song_id) {
+            self.run(move |client| async move { client.delete_song(id).await });
+        }
+    }
+
+    pub(crate) fn unfollow_folder(&self, folder_id: &str) {
+        if let Some(id) = parse_uuid(folder_id).map(LibraryFolderId::from_uuid) {
+            self.run(move |client| async move { client.delete_library_folder(id).await });
+        }
+    }
+
     // Drops.
 
     pub(crate) fn show_drop_target(&self, hovering: bool) {
@@ -619,7 +722,9 @@ impl Controller {
         }
         let navigation = self.lock().navigation;
         let label = match navigation.page {
-            PageKind::Playlists => tr("Drop folders of music to follow them").to_owned(),
+            PageKind::Songs | PageKind::Playlists => {
+                tr("Drop folders of music to follow them").to_owned()
+            }
             PageKind::Soundboards => tr("Drop folders of sounds to follow them").to_owned(),
             PageKind::Playlist | PageKind::Soundboard if self.open_collection_is_linked() => {
                 tr("This collection follows its folder; add files there").to_owned()
@@ -666,7 +771,9 @@ impl Controller {
         }
         let navigation = self.lock().navigation;
         match (navigation.page, navigation.collection_id) {
-            (PageKind::Playlists, _) => self.import(CollectionKind::Playlist, paths),
+            (PageKind::Songs | PageKind::Playlists, _) => {
+                self.import(CollectionKind::Playlist, paths);
+            }
             (PageKind::Soundboards, _) => self.import(CollectionKind::Soundboard, paths),
             (PageKind::Playlist | PageKind::Soundboard, Some(id)) => {
                 if self.open_collection_is_linked() {
@@ -1355,4 +1462,8 @@ fn has_extension(path: &Path, extensions: &[&str]) -> bool {
 
 fn entry_id_of(text: &str) -> Option<CollectionEntryId> {
     parse_uuid(text).map(CollectionEntryId::from_uuid)
+}
+
+fn audio_file_id(text: &str) -> Option<AudioFileId> {
+    parse_uuid(text).map(AudioFileId::from_uuid)
 }

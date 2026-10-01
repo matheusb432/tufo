@@ -3,7 +3,7 @@
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, CollectionCard, CollectionKind, LibraryView, Navigation, Page, PlayerView,
-    Search, Session, SoundIcons, SoundTile, TrackRow,
+    Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
 } from "state.slint";
 import {
     Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem as MenuAction, MenuSurface, ScrollThumb, Slider,
@@ -522,7 +522,7 @@ component CollectionTools inherits HorizontalLayout {
                 }
             }
             MenuAction {
-                text: LibraryView.collection-linked ? @tr("Stop following") : @tr("Delete");
+                text: @tr("Delete");
                 destructive: true;
                 activated => {
                     Actions.delete-collection(Navigation.collection-id);
@@ -655,21 +655,29 @@ component CollectionHero inherits HorizontalLayout {
     }
 }
 
-// Slint's built-in MenuItem cannot color destructive actions.
-component EntryContextMenu inherits TouchArea {
-    in property <string> entry-id;
+// A row's right-click menu: a primary action, then optionally a second action, Add to playlist,
+// Edit, and a red Remove. Slint's built-in menu items cannot color destructive actions.
+component RowMenu inherits TouchArea {
     in property <string> primary-action-title;
     in property <bool> primary-action-enabled: true;
     in property <bool> secondary-action-shown;
     in property <string> secondary-action-title;
     in property <bool> secondary-action-enabled: true;
+    in property <bool> add-to-playlist-shown;
+    in property <bool> edit-shown: true;
+    in property <bool> remove-shown;
+    in property <string> remove-title: @tr("Remove");
     callback primary-action();
     callback secondary-action();
+    callback add-to-playlist();
     callback edit();
+    callback remove();
     property <Point> menu-position;
-    property <int> edit-index: root.secondary-action-shown ? 2 : 1;
-    property <int> remove-index: root.edit-index + 1;
-    property <int> action-count: LibraryView.collection-linked ? root.remove-index : root.remove-index + 1;
+    // Where each optional action sits when it shows.
+    property <int> playlist-index: root.secondary-action-shown ? 2 : 1;
+    property <int> edit-index: root.playlist-index + (root.add-to-playlist-shown ? 1 : 0);
+    property <int> remove-index: root.edit-index + (root.edit-shown ? 1 : 0);
+    property <int> action-count: root.remove-index + (root.remove-shown ? 1 : 0);
     mouse-cursor: MouseCursor.pointer;
 
     public function show-menu(position: Point) {
@@ -698,18 +706,17 @@ component EntryContextMenu inherits TouchArea {
         if !root.enabled-at(index) {
             return;
         }
+        menu.close();
         if index == 0 {
-            menu.close();
             root.primary-action();
         } else if index == 1 && root.secondary-action-shown {
-            menu.close();
             root.secondary-action();
-        } else if index == root.edit-index {
-            menu.close();
+        } else if root.add-to-playlist-shown && index == root.playlist-index {
+            root.add-to-playlist();
+        } else if root.edit-shown && index == root.edit-index {
             root.edit();
-        } else if index == root.remove-index && !LibraryView.collection-linked {
-            menu.close();
-            Actions.delete-entry(root.entry-id);
+        } else if root.remove-shown && index == root.remove-index {
+            root.remove();
         }
     }
 
@@ -737,7 +744,8 @@ component EntryContextMenu inherits TouchArea {
                 if event.text == Key.DownArrow || event.text == Key.UpArrow {
                     let down = event.text == Key.DownArrow;
                     self.selected = self.selected < 0 ? (down ? 0 : root.action-count - 1) : root.step(self.selected, down);
-                    // Edit is always enabled, so skipping the two actions before it suffices.
+                    // Only the first two actions can be disabled, and an enabled one follows
+                    // them, so skipping twice suffices.
                     if !root.enabled-at(self.selected) {
                         self.selected = root.step(self.selected, down);
                     }
@@ -771,7 +779,15 @@ component EntryContextMenu inherits TouchArea {
                     }
                     activated => { root.activate(1); }
                 }
-                MenuAction {
+                if root.add-to-playlist-shown: MenuAction {
+                    text: @tr("Add to playlist…");
+                    highlighted: keys.selected == root.playlist-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.playlist-index; }
+                    }
+                    activated => { root.activate(root.playlist-index); }
+                }
+                if root.edit-shown: MenuAction {
                     text: @tr("Edit");
                     highlighted: keys.selected == root.edit-index;
                     changed has-hover => {
@@ -779,8 +795,8 @@ component EntryContextMenu inherits TouchArea {
                     }
                     activated => { root.activate(root.edit-index); }
                 }
-                if !LibraryView.collection-linked: MenuAction {
-                    text: @tr("Remove");
+                if root.remove-shown: MenuAction {
+                    text: root.remove-title;
                     destructive: true;
                     highlighted: keys.selected == root.remove-index;
                     changed has-hover => {
@@ -832,13 +848,13 @@ component TrackItem inherits Rectangle {
     in property <int> number;
     in property <length> available-width;
     callback edit();
+    callback add-to-playlist();
     height: 48px;
     border-radius: Theme.radius-row;
     background: root.track.current ? Theme.current-row : touch.has-hover ? Theme.hover : transparent;
     animate background { duration: Motion.hover; }
     opacity: root.track.missing ? 0.55 : 1;
-    touch := EntryContextMenu {
-        entry-id: root.track.id;
+    touch := RowMenu {
         primary-action-title: PlayerView.can-add-layer ? @tr("Add to mix") : @tr("Mix full (3 songs)");
         primary-action-enabled: PlayerView.can-add-layer && !root.track.missing && !root.track.current;
         primary-action => {
@@ -855,7 +871,11 @@ component TrackItem inherits Rectangle {
                 Actions.add-to-queue(root.track.id);
             }
         }
+        add-to-playlist-shown: true;
+        add-to-playlist => { root.add-to-playlist(); }
         edit => { root.edit(); }
+        remove-shown: !LibraryView.collection-linked;
+        remove => { Actions.delete-entry(root.track.id); }
         double-clicked => {
             Actions.play-track(root.track.id);
         }
@@ -966,12 +986,179 @@ component TrackHeader inherits Rectangle {
     }
 }
 
+// A song outside any playlist's order: its number, or its add button while hovered, then the
+// same columns as a track. `add` adds it somewhere; right-click also offers removing it.
+component SongItem inherits Rectangle {
+    in property <SongRow> song;
+    in property <int> number;
+    in property <length> available-width;
+    // Shows the add button in place of the number even without hover.
+    in property <bool> add-always-shown;
+    in property <string> add-title;
+    callback add();
+    height: 48px;
+    border-radius: Theme.radius-row;
+    background: touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    opacity: root.song.missing ? 0.55 : 1;
+    touch := RowMenu {
+        primary-action-title: root.add-title;
+        primary-action => { root.add(); }
+        edit-shown: false;
+        remove-shown: root.song.removable;
+        remove-title: @tr("Remove from Songs");
+        remove => { Actions.remove-song(root.song.id); }
+        double-clicked => { root.add(); }
+    }
+
+    columns := TrackColumns {
+        available-width: root.available-width;
+        Rectangle {
+            width: 32px;
+            if !root.add-always-shown: Text {
+                text: "\{root.number}";
+                color: Theme.text-faint;
+                font-size: Theme.body-small;
+                opacity: touch.has-hover ? 0 : 1;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            IconButton {
+                size: 32px;
+                icon-size: 18px;
+                icon: @image-url("icons/plus.svg");
+                tint: Theme.text-secondary;
+                opacity: root.add-always-shown || touch.has-hover || self.has-hover ? 1 : 0;
+                tooltip: root.add-title;
+                clicked => {
+                    root.add();
+                }
+                context-menu-requested(position) => { touch.show-menu(position); }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            Text {
+                text: root.song.title;
+                overflow: elide;
+                font-size: Theme.body;
+                font-weight: 500;
+                color: Theme.text;
+            }
+        }
+
+        if root.song.missing: Text {
+            text: @tr("Missing");
+            font-size: Theme.caption;
+            color: Theme.error;
+            vertical-alignment: center;
+        }
+        if columns.source-width > 0px: TrackCell {
+            width: columns.source-width;
+            text: root.song.source;
+        }
+        if columns.date-width > 0px: TrackCell {
+            width: columns.date-width;
+            text: root.song.date-added;
+        }
+        TrackCell {
+            width: 72px;
+            text: root.song.duration;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// A search over the songs, below a hand-picked playlist's tracks, that adds what it finds.
+component SongSearch inherits VerticalLayout {
+    in property <length> available-width;
+    spacing: 10px;
+    Text {
+        text: @tr("Find songs for this playlist");
+        font-size: Theme.subheading;
+        font-weight: 800;
+        color: Theme.text;
+    }
+
+    Rectangle {
+        width: min(root.available-width, 460px);
+        height: 42px;
+        border-radius: self.height / 2;
+        background: Theme.raised;
+        border-width: input.has-focus ? 2px : 1px;
+        border-color: input.has-focus ? Theme.accent : Theme.divider;
+        TouchArea {
+            mouse-cursor: MouseCursor.text;
+            clicked => {
+                input.focus();
+            }
+        }
+
+        HorizontalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            spacing: 10px;
+            Icon {
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+                source: @image-url("icons/search.svg");
+                tint: Theme.text-faint;
+            }
+
+            input := TextInput {
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                font-size: Theme.body;
+                color: Theme.text;
+                single-line: true;
+                text: Search.song-search-text;
+                edited => {
+                    Search.song-search-text = self.text;
+                    Actions.song-search-changed(self.text);
+                }
+                if self.text == "": Text {
+                    text: @tr("Search your songs by title or folder");
+                    color: Theme.text-faint;
+                    font-size: Theme.body;
+                    vertical-alignment: center;
+                    height: parent.height;
+                }
+            }
+        }
+    }
+
+    if Search.song-search-text != "" && LibraryView.song-search-results.length == 0: Text {
+        text: @tr("No song outside this playlist matches.");
+        color: Theme.text-secondary;
+        font-size: Theme.body-small;
+    }
+    VerticalLayout {
+        spacing: 2px;
+        for song in LibraryView.song-search-results: SongItem {
+            song: song;
+            available-width: root.available-width;
+            add-always-shown: true;
+            add-title: @tr("Add to this playlist");
+            add => {
+                Actions.add-song-to-playlist(Navigation.collection-id, song.id);
+            }
+        }
+    }
+}
+
 export component PlaylistPage inherits Rectangle {
     // Hides the plate; the slim header shows either way.
     in property <bool> compact;
     callback edit-collection();
     callback edit-entry(string, string);
     callback add-files();
+    // The song's id and title.
+    callback add-to-playlist(string, string);
     property <bool> this-plays: PlayerView.collection-id == Navigation.collection-id && PlayerView.playing;
     VerticalLayout {
         CollectionBar {
@@ -1041,7 +1228,7 @@ export component PlaylistPage inherits Rectangle {
                         available-width: root.width - 2 * PageMetrics.padding;
                     }
                     if LibraryView.tracks.length == 0: Text {
-                        text: Search.filter-text != "" ? @tr("No track matches the filter.") : LibraryView.collection-linked ? @tr("This folder holds no audio yet.") : @tr("Drop audio files here to add them.");
+                        text: Search.filter-text != "" ? @tr("No track matches the filter.") : LibraryView.collection-linked ? @tr("This folder holds no audio yet.") : @tr("Find songs below, or drop audio files here.");
                         color: Theme.text-secondary;
                     }
                     for track[index] in LibraryView.tracks: TrackItem {
@@ -1051,7 +1238,15 @@ export component PlaylistPage inherits Rectangle {
                         edit => {
                             root.edit-entry(track.id, track.title);
                         }
+                        add-to-playlist => {
+                            root.add-to-playlist(track.song-id, track.title);
+                        }
                     }
+                }
+
+                if !LibraryView.collection-linked: SongSearch {
+                    padding-top: 32px;
+                    available-width: root.width - 2 * PageMetrics.padding;
                 }
             }
         }
@@ -1094,13 +1289,14 @@ component SoundTileView inherits Rectangle {
             Actions.toggle-sound(root.tile.id);
         }
     }
-    toggle := EntryContextMenu {
-        entry-id: root.tile.id;
+    toggle := RowMenu {
         primary-action-title: root.tile.looping ? @tr("Stop Looping") : @tr("Loop");
         primary-action => {
             Actions.set-sound-looping(root.tile.id, !root.tile.looping);
         }
         edit => { root.edit(); }
+        remove-shown: !LibraryView.collection-linked;
+        remove => { Actions.delete-entry(root.tile.id); }
         clicked => {
             if root.playable {
                 Actions.toggle-sound(root.tile.id);
@@ -1248,6 +1444,181 @@ export component SoundboardPage inherits Rectangle {
                     edit(tile) => {
                         root.edit-sound(tile);
                     }
+                }
+            }
+        }
+    }
+
+    BarShadow {
+        shown: scroll.scrolled;
+    }
+}
+
+// A followed folder of music, with a menu to stop following it.
+component SongFolderItem inherits Rectangle {
+    in property <SongFolder> folder;
+    height: 40px;
+    border-radius: Theme.radius-row;
+    background: touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    touch := TouchArea { }
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 4px;
+        spacing: 10px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: @image-url("icons/folder.svg");
+            tint: Theme.text-faint;
+        }
+
+        Text {
+            text: root.folder.path;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            overflow: elide;
+            font-size: Theme.body-small;
+            color: Theme.text;
+        }
+
+        Text {
+            text: root.folder.count-label;
+            vertical-alignment: center;
+            font-size: Theme.caption;
+            color: Theme.text-faint;
+        }
+
+        more := IconButton {
+            y: (parent.height - self.height) / 2;
+            size: 32px;
+            icon-size: 18px;
+            icon: @image-url("icons/ellipsis-vertical.svg");
+            tooltip: @tr("More");
+            clicked => {
+                menu.show();
+            }
+        }
+    }
+
+    menu := PopupWindow {
+        x: root.width - 300px;
+        y: root.height;
+        MenuSurface {
+            width: 296px;
+            MenuAction {
+                text: @tr("Stop following and delete its playlists");
+                destructive: true;
+                activated => {
+                    Actions.unfollow-folder(root.folder.id);
+                    menu.close();
+                }
+            }
+        }
+    }
+}
+
+// Every song the sources keep: the followed folders of music, and the files added to playlists.
+export component SongsPage inherits Rectangle {
+    // The song's id and title.
+    callback add-to-playlist(string, string);
+    property <string> follow-label: @tr("Follow a folder");
+    HorizontalLayout {
+        y: 0;
+        height: Theme.title-row-height;
+        padding-left: PageMetrics.padding;
+        padding-right: 8px;
+        spacing: 8px;
+        Heading {
+            text: @tr("Songs");
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+
+        if root.width >= 520px: Button {
+            y: (parent.height - self.height) / 2;
+            height: 32px;
+            text: root.follow-label;
+            icon: @image-url("icons/folder-plus.svg");
+            enabled: Session.connected;
+            clicked => {
+                Actions.follow-folder(CollectionKind.playlist);
+            }
+        }
+        if root.width < 520px: IconButton {
+            y: (parent.height - self.height) / 2;
+            size: Theme.bar-button-size;
+            icon-size: Theme.bar-icon-size;
+            icon: @image-url("icons/folder-plus.svg");
+            tooltip: root.follow-label;
+            enabled: Session.connected;
+            clicked => {
+                Actions.follow-folder(CollectionKind.playlist);
+            }
+        }
+        WindowButtonsSpace { }
+    }
+
+    scroll := PageScroll {
+        y: Theme.title-row-height;
+        height: parent.height - self.y;
+        content-height: column.preferred-height;
+        column := VerticalLayout {
+            padding: PageMetrics.padding;
+            padding-top: PageMetrics.padding-top;
+            alignment: start;
+            Text {
+                text: LibraryView.songs-summary;
+                font-size: Theme.body-small;
+                color: Theme.text-secondary;
+            }
+
+            if LibraryView.song-folders.length > 0: VerticalLayout {
+                padding-top: 18px;
+                spacing: 2px;
+                Text {
+                    text: @tr("Followed folders");
+                    font-size: Theme.caption;
+                    font-weight: 700;
+                    color: Theme.text-secondary;
+                }
+
+                for folder in LibraryView.song-folders: SongFolderItem {
+                    folder: folder;
+                }
+            }
+            Rectangle {
+                height: 18px;
+            }
+
+            FilterField {
+                space-below: 16px;
+            }
+
+            VerticalLayout {
+                spacing: 2px;
+                if LibraryView.songs.length > 0: TrackHeader {
+                    available-width: root.width - 2 * PageMetrics.padding;
+                }
+                if LibraryView.songs.length == 0: Text {
+                    text: Search.filter-text != "" ? @tr("No song matches the filter.") : @tr("Drop folders of music here to follow them. Their songs show here, ready for any playlist.");
+                    color: Theme.text-secondary;
+                    wrap: word-wrap;
+                }
+                for song[index] in LibraryView.songs: SongItem {
+                    song: song;
+                    number: index + 1;
+                    available-width: root.width - 2 * PageMetrics.padding;
+                    add-title: @tr("Add to playlist…");
+                    add => {
+                        root.add-to-playlist(song.id, song.title);
+                    }
+                }
+                if LibraryView.songs-overflow != "": Text {
+                    text: LibraryView.songs-overflow;
+                    color: Theme.text-faint;
+                    font-size: Theme.body-small;
                 }
             }
         }

@@ -1,6 +1,6 @@
 // State the host pushes into the window, and the actions the window asks the host to run.
 
-export enum Page { home, playlists, playlist, soundboards, soundboard }
+export enum Page { home, songs, playlists, playlist, soundboards, soundboard }
 
 export enum CollectionKind { playlist, soundboard }
 
@@ -62,6 +62,8 @@ export struct NavItem {
 
 export struct TrackRow {
     id: string,
+    // The audio file's id, which Add to playlist adds.
+    song-id: string,
     title: string,
     duration: string,
     date-added: string,
@@ -72,6 +74,36 @@ export struct TrackRow {
     playing: bool,
     // Its place in the queue, from 1, or 0.
     queue-number: int,
+}
+
+// A song on the Songs page or among a playlist's song search results.
+export struct SongRow {
+    // The audio file's id.
+    id: string,
+    title: string,
+    duration: string,
+    date-added: string,
+    source: string,
+    missing: bool,
+    // Added by its own path, so it can leave the songs; a followed folder keeps the others.
+    removable: bool,
+}
+
+// A followed folder of music.
+export struct SongFolder {
+    id: string,
+    path: string,
+    // How many songs it holds, such as "12 songs".
+    count-label: string,
+}
+
+// A hand-picked playlist that Add to playlist offers.
+export struct PlaylistChoice {
+    id: string,
+    title: string,
+    count-label: string,
+    // It lists the song already.
+    holds-song: bool,
 }
 
 export struct SoundTile {
@@ -182,6 +214,16 @@ export global LibraryView {
     in property <bool> order-descending;
     in property <[TrackRow]> tracks;
     in property <[SoundTile]> sounds;
+    // The open hand-picked playlist's song search results.
+    in property <[SongRow]> song-search-results;
+    // The Songs page: how many there are, the followed folders, and the rows the filter matches.
+    in property <string> songs-summary;
+    in property <[SongFolder]> song-folders;
+    in property <[SongRow]> songs;
+    // Says how many matching songs the rows leave out; empty when none.
+    in property <string> songs-overflow;
+    // The hand-picked playlists for the song the Add to playlist dialog adds.
+    in property <[PlaylistChoice]> playlist-choices;
 }
 
 export global PlayerView {
@@ -210,10 +252,12 @@ export global PlayerView {
     out property <bool> something-plays: (self.has-playback && self.playing) || (self.sounds.length > 0 && !self.sounds-paused);
 }
 
-// Ctrl+F filters the open page; Ctrl+Shift+F searches everything.
+// Ctrl+F filters the open page; Ctrl+Shift+F searches everything. A hand-picked playlist also
+// searches the songs to add to it.
 export global Search {
     in-out property <bool> filter-open;
     in-out property <string> filter-text;
+    in-out property <string> song-search-text;
     in-out property <bool> palette-open;
     in-out property <string> palette-query;
     in property <[SearchResult]> results;
@@ -283,6 +327,7 @@ export global WindowFrame {
 export global Actions {
     callback open-page(Page, string);
     callback filter-changed(string);
+    callback song-search-changed(string);
     callback palette-query-changed(string);
     callback palette-activate(int);
 
@@ -307,6 +352,16 @@ export global Actions {
     callback set-music-layer-looping(string, bool);
     callback rename-entry(string, string);
     callback delete-entry(string);
+
+    // The song the Add to playlist dialog adds, for the host to list the playlists, or empty
+    // once the dialog closes.
+    callback adding-song-changed(string);
+    // The playlist, then the song.
+    callback add-song-to-playlist(string, string);
+    // The new playlist's title, then the song.
+    callback add-song-to-new-playlist(string, string);
+    callback remove-song(string);
+    callback unfollow-folder(string);
 
     callback toggle-sound(string);
     callback set-sound-looping(string, bool);

@@ -1029,10 +1029,6 @@ msgstr "Iniciando tufo-server…"
 msgid "Stop Looping"
 msgstr "Parar de repetir"
 
-#: ui/pages.slint
-msgid "Stop following"
-msgstr "Parar de acompanhar"
-
 #: ui/dock.slint
 msgid "Stop keeping on top"
 msgstr "Parar de manter no topo"
@@ -1430,3 +1426,97 @@ msgstr "Origem"
 #: ui/pages.slint
 msgid "Title"
 msgstr "Título"
+
+#: ui/pages.slint ui/sidebar.slint
+msgid "Songs"
+msgstr "Músicas"
+
+#: ui/pages.slint
+msgid "Add to playlist…"
+msgstr "Adicionar à playlist…"
+
+#: ui/pages.slint
+msgid "Remove from Songs"
+msgstr "Remover de Músicas"
+
+#: ui/pages.slint
+msgid "Find songs for this playlist"
+msgstr "Encontre músicas para esta playlist"
+
+#: ui/pages.slint
+msgid "Search your songs by title or folder"
+msgstr "Busque suas músicas por título ou pasta"
+
+#: ui/pages.slint
+msgid "No song outside this playlist matches."
+msgstr "Nenhuma música fora desta playlist corresponde à busca."
+
+#: ui/pages.slint
+msgid "Add to this playlist"
+msgstr "Adicionar a esta playlist"
+
+#: ui/pages.slint
+msgid "Find songs below, or drop audio files here."
+msgstr "Encontre músicas abaixo ou solte arquivos de áudio aqui."
+
+#: ui/pages.slint
+msgid "Stop following and delete its playlists"
+msgstr "Parar de acompanhar e excluir as playlists dela"
+
+#: ui/pages.slint
+msgid "Follow a folder"
+msgstr "Acompanhar uma pasta"
+
+#: ui/pages.slint
+msgid "Followed folders"
+msgstr "Pastas acompanhadas"
+
+#: ui/pages.slint
+msgid "No song matches the filter."
+msgstr "Nenhuma música corresponde ao filtro."
+
+#: ui/pages.slint
+msgid "Drop folders of music here to follow them. Their songs show here, ready for any playlist."
+msgstr "Solte pastas de músicas aqui para acompanhá-las. As músicas delas aparecem aqui, prontas para qualquer playlist."
+
+#: ui/dialogs.slint
+msgid "Add to playlist"
+msgstr "Adicionar à playlist"
+
+#: ui/dialogs.slint
+msgid "New playlist"
+msgstr "Nova playlist"
+
+#: ui/dialogs.slint
+msgid "Create"
+msgstr "Criar"
+
+#: src/presentation.rs
+msgid "{n} song"
+msgid_plural "{n} songs"
+msgstr[0] "{n} música"
+msgstr[1] "{n} músicas"
+
+#: src/presentation.rs
+msgid "Showing {0} of {1}. Filter to find the rest."
+msgstr "Mostrando {0} de {1}. Filtre para encontrar o restante."
+
+#: src/controller.rs
+msgid "{0} already has this song."
+msgstr "{0} já tem esta música."
+
+#: src/controller.rs
+msgid "Added to {0}."
+msgstr "Adicionada a {0}."
+
+#: src/presentation.rs
+msgid "That song is no longer among your songs."
+msgstr "Essa música não está mais entre as suas músicas."
+
+#: src/presentation.rs
+msgid "A followed folder holds this song. Stop following the folder to remove it."
+msgstr "Uma pasta acompanhada contém esta música. Pare de acompanhar a pasta para removê-la."
+
+#: src/presentation.rs
+msgid "Tufo no longer follows that folder."
+msgstr "O Tufo não acompanha mais essa pasta."

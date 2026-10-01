@@ -1029,10 +1029,6 @@ msgstr ""
 msgid "Stop Looping"
 msgstr ""
 
-#: ui/pages.slint
-msgid "Stop following"
-msgstr ""
-
 #: ui/dock.slint
 msgid "Stop keeping on top"
 msgstr ""
@@ -1429,4 +1425,98 @@ msgstr ""
 
 #: ui/pages.slint
 msgid "Title"
+msgstr ""
+
+#: ui/pages.slint ui/sidebar.slint
+msgid "Songs"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Add to playlist…"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Remove from Songs"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Find songs for this playlist"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Search your songs by title or folder"
+msgstr ""
+
+#: ui/pages.slint
+msgid "No song outside this playlist matches."
+msgstr ""
+
+#: ui/pages.slint
+msgid "Add to this playlist"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Find songs below, or drop audio files here."
+msgstr ""
+
+#: ui/pages.slint
+msgid "Stop following and delete its playlists"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Follow a folder"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Followed folders"
+msgstr ""
+
+#: ui/pages.slint
+msgid "No song matches the filter."
+msgstr ""
+
+#: ui/pages.slint
+msgid "Drop folders of music here to follow them. Their songs show here, ready for any playlist."
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Add to playlist"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "New playlist"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Create"
+msgstr ""
+
+#: src/presentation.rs
+msgid "{n} song"
+msgid_plural "{n} songs"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/presentation.rs
+msgid "Showing {0} of {1}. Filter to find the rest."
+msgstr ""
+
+#: src/controller.rs
+msgid "{0} already has this song."
+msgstr ""
+
+#: src/controller.rs
+msgid "Added to {0}."
+msgstr ""
+
+#: src/presentation.rs
+msgid "That song is no longer among your songs."
+msgstr ""
+
+#: src/presentation.rs
+msgid "A followed folder holds this song. Stop following the folder to remove it."
+msgstr ""
+
+#: src/presentation.rs
+msgid "Tufo no longer follows that folder."
 msgstr ""

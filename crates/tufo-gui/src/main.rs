@@ -369,6 +369,7 @@ fn physical_pixels(length: f32, scale: f32) -> u32 {
 fn page(page: ui::Page) -> PageKind {
     match page {
         ui::Page::Home => PageKind::Home,
+        ui::Page::Songs => PageKind::Songs,
         ui::Page::Playlists => PageKind::Playlists,
         ui::Page::Playlist => PageKind::Playlist,
         ui::Page::Soundboards => PageKind::Soundboards,
@@ -392,6 +393,16 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     }
     on!(controller => on_open_page, |target, id| controller.open_page(page(target), &id));
     on!(controller => on_filter_changed, |text| controller.filter(&text));
+    on!(controller => on_song_search_changed, |query| controller.search_songs(&query));
+    on!(controller => on_adding_song_changed, |song_id| controller.set_adding_song(&song_id));
+    on!(controller => on_add_song_to_playlist, |playlist_id, song_id| {
+        controller.add_song_to_playlist(&playlist_id, &song_id);
+    });
+    on!(controller => on_add_song_to_new_playlist, |title, song_id| {
+        controller.add_song_to_new_playlist(&title, &song_id);
+    });
+    on!(controller => on_remove_song, |song_id| controller.remove_song(&song_id));
+    on!(controller => on_unfollow_folder, |folder_id| controller.unfollow_folder(&folder_id));
     on!(controller => on_palette_query_changed, |query| controller.search_palette(&query));
     on!(controller => on_palette_activate, |index| {
         if let Ok(index) = usize::try_from(index) {

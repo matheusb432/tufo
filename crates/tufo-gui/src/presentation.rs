@@ -3,7 +3,7 @@
 //! Everything here is plain data, so it's computed off the UI thread and tested without a window.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap, HashSet},
     path::PathBuf,
     time::{Duration, SystemTime},
 };
@@ -11,14 +11,15 @@ use std::{
 use tufo_client::{
     ClientError, Code,
     library::{
-        Background, CollectionSource, CollectionView, EntryView, KenkuImportReport, LibrarySnapshot,
+        Background, CollectionSource, CollectionView, EntryView, KenkuImportReport,
+        LibraryFolderView, LibrarySnapshot, SongSource, SongView,
     },
 };
 use tufo_models::{
     discord::{VoiceChannel, VoiceChannelTarget},
     library::{
-        BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId, CollectionKind,
-        EntryOrderKey, SoundIcon, Title,
+        AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
+        CollectionKind, EntryOrderKey, LibraryFolderId, SoundIcon, Title,
     },
     path::ImageFilePath,
     playback::{
@@ -32,12 +33,17 @@ use crate::i18n::{tr, tr_args, tr_count};
 
 /// How long the server may still list a sound after it ended; its chip stays full meanwhile.
 const SOUND_END_GRACE: Duration = Duration::from_millis(250);
+/// The Songs page lists at most this many rows; the filter finds the rest.
+pub(crate) const SONG_ROWS_MAX: usize = 200;
+/// A playlist's song search shows at most this many songs.
+pub(crate) const SONG_SEARCH_RESULTS_MAX: usize = 20;
 
 /// Which page is open, mirroring the window's `Page`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum PageKind {
     #[default]
     Home,
+    Songs,
     Playlists,
     Playlist,
     Soundboards,
@@ -74,9 +80,21 @@ pub(crate) struct NavItemView {
     pub(crate) missing: bool,
 }
 
+/// What the library pages ask of the snapshot besides the open page.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct PageQueries<'a> {
+    /// The open page's Ctrl+F filter.
+    pub(crate) filter: &'a str,
+    /// The search for songs to add to the open playlist.
+    pub(crate) song_search: &'a str,
+    /// The song the Add to playlist dialog adds.
+    pub(crate) adding_song: Option<AudioFileId>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct TrackRowView {
     pub(crate) id: CollectionEntryId,
+    pub(crate) song_id: AudioFileId,
     pub(crate) title: String,
     pub(crate) duration: String,
     pub(crate) date_added: String,
@@ -86,6 +104,49 @@ pub(crate) struct TrackRowView {
     pub(crate) playing: bool,
     /// Its place in the queue, from 1.
     pub(crate) queue_number: Option<usize>,
+}
+
+/// A song on the Songs page or among a playlist's song search results.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SongRowView {
+    pub(crate) id: AudioFileId,
+    pub(crate) title: String,
+    pub(crate) duration: String,
+    pub(crate) date_added: String,
+    pub(crate) source: String,
+    pub(crate) missing: bool,
+    /// Added by its own path, so it can leave the songs; a followed folder keeps the others.
+    pub(crate) removable: bool,
+}
+
+/// A followed music folder on the Songs page.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SongFolderView {
+    pub(crate) id: LibraryFolderId,
+    pub(crate) path: String,
+    /// How many songs it holds, such as "12 songs".
+    pub(crate) count_label: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SongsPageView {
+    /// How many songs there are, such as "120 songs".
+    pub(crate) summary: String,
+    pub(crate) folders: Vec<SongFolderView>,
+    /// At most [`SONG_ROWS_MAX`] of the songs the filter matches.
+    pub(crate) rows: Vec<SongRowView>,
+    /// Says how many matching songs the rows leave out; empty when none.
+    pub(crate) overflow: String,
+}
+
+/// A hand-picked playlist the Add to playlist dialog offers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PlaylistChoiceView {
+    pub(crate) id: CollectionId,
+    pub(crate) title: String,
+    pub(crate) count_label: String,
+    /// It lists the song being added already.
+    pub(crate) holds_song: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,6 +177,8 @@ pub(crate) struct CollectionPageView {
     pub(crate) order_descending: bool,
     pub(crate) tracks: Vec<TrackRowView>,
     pub(crate) sounds: Vec<SoundTileView>,
+    /// The songs a hand-picked playlist's song search finds that it doesn't list yet.
+    pub(crate) song_search_results: Vec<SongRowView>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -171,19 +234,23 @@ pub(crate) struct LibraryPageView {
     pub(crate) nav_playlists: Vec<NavItemView>,
     pub(crate) nav_soundboards: Vec<NavItemView>,
     pub(crate) collection: Option<CollectionPageView>,
+    pub(crate) songs: Option<SongsPageView>,
+    /// Empty unless the Add to playlist dialog adds a song.
+    pub(crate) playlist_choices: Vec<PlaylistChoiceView>,
 }
 
 pub(crate) fn library_page(
     snapshot: &LibrarySnapshot,
     player: &PlayerState,
     navigation: Navigation,
-    filter: &str,
+    queries: PageQueries<'_>,
     now: SystemTime,
 ) -> LibraryPageView {
     let card_filter = match navigation.page {
-        PageKind::Home | PageKind::Playlists | PageKind::Soundboards => filter,
-        PageKind::Playlist | PageKind::Soundboard => "",
+        PageKind::Home | PageKind::Playlists | PageKind::Soundboards => queries.filter,
+        PageKind::Songs | PageKind::Playlist | PageKind::Soundboard => "",
     };
+    let songs = SongIndex::new(snapshot);
     let cards = |kind| {
         snapshot
             .collections
@@ -217,8 +284,8 @@ pub(crate) fn library_page(
         PageKind::Playlist | PageKind::Soundboard => navigation
             .collection_id
             .and_then(|id| find_collection(snapshot, id))
-            .map(|collection| collection_page(collection, player, filter, now)),
-        PageKind::Home | PageKind::Playlists | PageKind::Soundboards => None,
+            .map(|collection| collection_page(collection, player, &songs, queries, now)),
+        PageKind::Home | PageKind::Songs | PageKind::Playlists | PageKind::Soundboards => None,
     };
     LibraryPageView {
         playlists: cards(CollectionKind::Playlist),
@@ -228,7 +295,162 @@ pub(crate) fn library_page(
         nav_playlists: nav_items(CollectionKind::Playlist),
         nav_soundboards: nav_items(CollectionKind::Soundboard),
         collection,
+        songs: (navigation.page == PageKind::Songs).then(|| songs_page(&songs, queries.filter)),
+        playlist_choices: queries
+            .adding_song
+            .map(|song_id| playlist_choices(snapshot, song_id))
+            .unwrap_or_default(),
     }
+}
+
+/// The snapshot's songs by id, with the folders their sources name.
+struct SongIndex<'a> {
+    songs: &'a [SongView],
+    by_id: HashMap<AudioFileId, &'a SongView>,
+    folders: HashMap<LibraryFolderId, &'a LibraryFolderView>,
+}
+
+impl<'a> SongIndex<'a> {
+    fn new(snapshot: &'a LibrarySnapshot) -> Self {
+        Self {
+            songs: &snapshot.songs,
+            by_id: snapshot
+                .songs
+                .iter()
+                .map(|song| (song.audio_file_id, song))
+                .collect(),
+            folders: snapshot
+                .library_folders
+                .iter()
+                .map(|folder| (folder.id, folder))
+                .collect(),
+        }
+    }
+
+    /// Where the song comes from: the followed folder, or the file itself; empty when no
+    /// source keeps it.
+    fn source_label(&self, id: AudioFileId) -> String {
+        let Some(song) = self.by_id.get(&id) else {
+            return String::new();
+        };
+        let path = match song.source {
+            SongSource::Folder(folder_id) => match self.folders.get(&folder_id) {
+                Some(folder) => folder.folder.as_ref().as_path(),
+                None => return String::new(),
+            },
+            SongSource::File => song.path.as_ref().as_path(),
+        };
+        path.to_string_lossy().into_owned()
+    }
+
+    fn row(&self, song: &SongView) -> SongRowView {
+        SongRowView {
+            id: song.audio_file_id,
+            title: song.title.as_str().to_owned(),
+            duration: clock(song.duration),
+            date_added: date_added(song.added_at, jiff::tz::TimeZone::system()),
+            source: self.source_label(song.audio_file_id),
+            missing: song.missing,
+            removable: song.source == SongSource::File,
+        }
+    }
+
+    /// The songs whose title or path holds every word of `query`.
+    fn matching<'q>(&'q self, query: &'q str) -> impl Iterator<Item = &'a SongView> + 'q {
+        self.songs.iter().filter(move |song| {
+            query.trim().is_empty()
+                || matches_filter(
+                    &format!("{} {}", song.title, song.path.as_ref().display()),
+                    query,
+                )
+        })
+    }
+}
+
+fn songs_page(songs: &SongIndex<'_>, filter: &str) -> SongsPageView {
+    let mut folder_song_counts = HashMap::<LibraryFolderId, usize>::new();
+    for song in songs.songs {
+        if let SongSource::Folder(id) = song.source {
+            *folder_song_counts.entry(id).or_default() += 1;
+        }
+    }
+    let mut folders = songs
+        .folders
+        .values()
+        .filter(|folder| folder.kind == CollectionKind::Playlist)
+        .map(|folder| SongFolderView {
+            id: folder.id,
+            path: folder.folder.as_ref().to_string_lossy().into_owned(),
+            count_label: song_count_label(folder_song_counts.get(&folder.id).copied().unwrap_or(0)),
+        })
+        .collect::<Vec<_>>();
+    folders.sort_by(|left, right| left.path.cmp(&right.path));
+    let matching = songs.matching(filter).collect::<Vec<_>>();
+    let overflow = matching.len().saturating_sub(SONG_ROWS_MAX);
+    SongsPageView {
+        summary: song_count_label(songs.songs.len()),
+        folders,
+        rows: matching
+            .iter()
+            .take(SONG_ROWS_MAX)
+            .map(|song| songs.row(song))
+            .collect(),
+        overflow: if overflow == 0 {
+            String::new()
+        } else {
+            tr_args(
+                "Showing {0} of {1}. Filter to find the rest.",
+                &[&SONG_ROWS_MAX, &song_count_label(matching.len())],
+            )
+        },
+    }
+}
+
+fn song_count_label(count: usize) -> String {
+    tr_count("{n} song", "{n} songs", count)
+}
+
+/// The hand-picked playlists, each saying whether it lists `song_id` already.
+fn playlist_choices(snapshot: &LibrarySnapshot, song_id: AudioFileId) -> Vec<PlaylistChoiceView> {
+    snapshot
+        .collections
+        .iter()
+        .filter(|collection| {
+            collection.kind == CollectionKind::Playlist
+                && collection.source == CollectionSource::Manual
+        })
+        .map(|collection| PlaylistChoiceView {
+            id: collection.id,
+            title: collection.title.as_str().to_owned(),
+            count_label: entry_count_label(collection.kind, collection.entries.len()),
+            holds_song: collection
+                .entries
+                .iter()
+                .any(|entry| entry.audio_file_id == song_id),
+        })
+        .collect()
+}
+
+/// The playable songs matching `query` that the playlist doesn't list.
+fn song_search_results(
+    collection: &CollectionView,
+    songs: &SongIndex<'_>,
+    query: &str,
+) -> Vec<SongRowView> {
+    if query.trim().is_empty() {
+        return Vec::new();
+    }
+    let listed = collection
+        .entries
+        .iter()
+        .map(|entry| entry.audio_file_id)
+        .collect::<HashSet<_>>();
+    songs
+        .matching(query)
+        .filter(|song| !song.missing && !listed.contains(&song.audio_file_id))
+        .take(SONG_SEARCH_RESULTS_MAX)
+        .map(|song| songs.row(song))
+        .collect()
 }
 
 pub(crate) fn find_collection(
@@ -335,16 +557,19 @@ const SECONDS_PER_MINUTE: u64 = 60;
 fn collection_page(
     collection: &CollectionView,
     player: &PlayerState,
-    filter: &str,
+    songs: &SongIndex<'_>,
+    queries: PageQueries<'_>,
     now: SystemTime,
 ) -> CollectionPageView {
     let entries = collection
         .entries
         .iter()
-        .filter(|entry| matches_filter(entry.title.as_str(), filter));
+        .filter(|entry| matches_filter(entry.title.as_str(), queries.filter));
     let (tracks, sounds) = match collection.kind {
         CollectionKind::Playlist => (
-            entries.map(|entry| track_row(entry, player)).collect(),
+            entries
+                .map(|entry| track_row(entry, player, songs))
+                .collect(),
             Vec::new(),
         ),
         CollectionKind::Soundboard => (
@@ -375,25 +600,26 @@ fn collection_page(
         order_descending: collection.order.descending,
         tracks,
         sounds,
+        song_search_results: match (collection.kind, &collection.source) {
+            (CollectionKind::Playlist, CollectionSource::Manual) => {
+                song_search_results(collection, songs, queries.song_search)
+            }
+            _ => Vec::new(),
+        },
     }
 }
 
-fn track_row(entry: &EntryView, player: &PlayerState) -> TrackRowView {
+fn track_row(entry: &EntryView, player: &PlayerState, songs: &SongIndex<'_>) -> TrackRowView {
     let current = player
         .music_tracks()
         .find(|music| music.entry.entry_id == entry.id);
     TrackRowView {
         id: entry.id,
+        song_id: entry.audio_file_id,
         title: entry.title.as_str().to_owned(),
         duration: clock(entry.duration),
         date_added: date_added(entry.added_at, jiff::tz::TimeZone::system()),
-        // TODO: Use the registered song source once sources are decoupled from playlists.
-        source: entry
-            .path
-            .as_ref()
-            .parent()
-            .map(|folder| folder.to_string_lossy().into_owned())
-            .unwrap_or_default(),
+        source: songs.source_label(entry.audio_file_id),
         missing: entry.missing,
         current: current.is_some(),
         playing: current.is_some_and(|music| !music.paused),
@@ -1011,6 +1237,15 @@ pub(crate) fn localize_snapshot(snapshot: &mut LibrarySnapshot) {
             .then_with(|| compare_titles(left.title.as_str(), right.title.as_str()))
             .then_with(|| left.id.cmp(&right.id))
     });
+    for song in &mut snapshot.songs {
+        if let Some(key) = song.builtin_title {
+            song.title = Title::from_name_lossy(builtin_title(key));
+        }
+    }
+    snapshot.songs.sort_by(|left, right| {
+        compare_titles(left.title.as_str(), right.title.as_str())
+            .then_with(|| left.audio_file_id.cmp(&right.audio_file_id))
+    });
 }
 
 fn builtin_title(key: BuiltinTitle) -> &'static str {
@@ -1061,8 +1296,10 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
     use tufo_application::{
         library::{
             LibraryStorageError, add_files_to_collection::AddFilesToCollectionError,
+            add_songs_to_playlist::AddSongsToPlaylistError,
             delete_collection::DeleteCollectionError,
             delete_collection_entry::DeleteCollectionEntryError,
+            delete_library_folder::DeleteLibraryFolderError, delete_song::DeleteSongError,
             import_kenku_library::kenku_data::ReadKenkuDataError,
             update_collection::UpdateCollectionError,
             update_collection_entry::UpdateCollectionEntryError,
@@ -1076,10 +1313,20 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
         (
             Code::NotFound,
             AddFilesToCollectionError::NOT_FOUND
+            | AddSongsToPlaylistError::PLAYLIST_NOT_FOUND
             | DeleteCollectionError::NOT_FOUND
             | UpdateCollectionError::NOT_FOUND
             | PlayCollectionError::NOT_FOUND,
         ) => tr("That collection no longer exists."),
+        (Code::NotFound, AddSongsToPlaylistError::SONG_NOT_FOUND | DeleteSongError::NOT_FOUND) => {
+            tr("That song is no longer among your songs.")
+        }
+        (Code::FailedPrecondition, DeleteSongError::IN_FOLLOWED_FOLDER) => {
+            tr("A followed folder holds this song. Stop following the folder to remove it.")
+        }
+        (Code::NotFound, DeleteLibraryFolderError::NOT_FOUND) => {
+            tr("Tufo no longer follows that folder.")
+        }
         (
             Code::NotFound,
             DeleteCollectionEntryError::NOT_FOUND
@@ -1088,7 +1335,9 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
         ) => tr("That track or sound no longer exists."),
         (
             Code::FailedPrecondition,
-            AddFilesToCollectionError::LINKED | DeleteCollectionEntryError::LINKED,
+            AddFilesToCollectionError::LINKED
+            | AddSongsToPlaylistError::LINKED
+            | DeleteCollectionEntryError::LINKED,
         ) => tr("This collection follows a folder. Change the files in that folder."),
         (Code::NotFound, ReadKenkuDataError::NOT_FOUND) => {
             tr("No Kenku FM library was found in that folder.")

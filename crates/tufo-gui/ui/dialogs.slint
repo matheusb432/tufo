@@ -1,9 +1,9 @@
-// The add and edit dialogs, and the settings dialog.
+// The add and edit dialogs, Add to playlist, and the settings dialog.
 
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
-    Navigation, Session, SoundIcons,
+    Navigation, PlaylistChoice, Session, SoundIcons,
 } from "state.slint";
 import {
     Button, ButtonKind, Icon, IconButton, Scrim, ScrollThumb, Slider, Switch, TextField, TextLink,
@@ -230,6 +230,132 @@ export component AddCollectionDialog inherits DialogFrame {
             clicked => {
                 Actions.create-collection(root.kind, name.text);
                 root.cancel();
+            }
+        }
+    }
+}
+
+// A playlist to add the song to; one that lists it already shows a check and takes no click.
+component PlaylistChoiceItem inherits Rectangle {
+    in property <PlaylistChoice> choice;
+    callback picked();
+    height: 44px;
+    border-radius: Theme.radius-row;
+    background: touch.has-hover && !root.choice.holds-song ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: root.choice.title;
+    accessible-enabled: !root.choice.holds-song;
+    accessible-action-default => {
+        if !root.choice.holds-song {
+            root.picked();
+        }
+    }
+    touch := TouchArea {
+        enabled: !root.choice.holds-song;
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.picked();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 10px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: @image-url("icons/list-music.svg");
+            tint: Theme.text-faint;
+        }
+
+        Text {
+            text: root.choice.title;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            overflow: elide;
+            font-size: Theme.body-small;
+            font-weight: 700;
+            color: root.choice.holds-song ? Theme.text-secondary : Theme.text;
+        }
+
+        Text {
+            text: root.choice.count-label;
+            vertical-alignment: center;
+            font-size: Theme.caption;
+            color: Theme.text-faint;
+        }
+
+        if root.choice.holds-song: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: @image-url("icons/check.svg");
+            tint: Theme.accent;
+        }
+    }
+}
+
+// Adds one song to a playlist that takes songs by hand, or to a new one named here.
+export component AddToPlaylistDialog inherits DialogFrame {
+    in property <string> song-id;
+    in property <string> song-title;
+    title: @tr("Add to playlist");
+    closable: true;
+    init => {
+        Actions.adding-song-changed(root.song-id);
+    }
+
+    function create() {
+        if name.text != "" {
+            Actions.add-song-to-new-playlist(name.text, root.song-id);
+            root.cancel();
+        }
+    }
+
+    Text {
+        text: root.song-title;
+        font-size: Theme.body-small;
+        color: Theme.text-secondary;
+        overflow: elide;
+    }
+
+    if LibraryView.playlist-choices.length > 0: VerticalLayout {
+        spacing: 2px;
+        for choice in LibraryView.playlist-choices: PlaylistChoiceItem {
+            choice: choice;
+            picked => {
+                Actions.add-song-to-playlist(choice.id, root.song-id);
+                root.cancel();
+            }
+        }
+    }
+    HorizontalLayout {
+        spacing: 8px;
+        alignment: stretch;
+        name := TextField {
+            horizontal-stretch: 1;
+            label: @tr("New playlist");
+            placeholder: @tr("Name");
+            accepted => {
+                root.create();
+            }
+            init => {
+                self.focus();
+            }
+        }
+
+        VerticalLayout {
+            alignment: end;
+            Button {
+                text: @tr("Create");
+                kind: ButtonKind.primary;
+                enabled: name.text != "" && Session.connected;
+                clicked => {
+                    root.create();
+                }
             }
         }
     }

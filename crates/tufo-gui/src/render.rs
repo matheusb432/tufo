@@ -10,8 +10,8 @@ use crate::{
     backgrounds,
     i18n::{tr, tr_args, tr_count},
     presentation::{
-        self, CardView, CurrentOutputView, DrawerView, LibraryPageView, NavItemView, OutputRowView,
-        PageKind, PlayerBarView,
+        self, CardView, CollectionPageView, CurrentOutputView, DrawerView, LibraryPageView,
+        NavItemView, OutputRowView, PageKind, PlayerBarView, SongRowView, SongsPageView,
     },
     search::PaletteResult,
     settings::{DesktopSettings, QuitBehavior},
@@ -19,8 +19,9 @@ use crate::{
     ui::{
         AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
         CollectionBackground, CollectionCard, CurrentOutput, LibraryView, MusicLayer, NavItem,
-        Navigation, OutputRow, OutputRowKind, Page, PlayerView, Search, SearchResult, Session,
-        SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
+        Navigation, OutputRow, OutputRowKind, Page, PlayerView, PlaylistChoice, Search,
+        SearchResult, Session, SongFolder, SongRow, SoundChip, SoundIcons, SoundTile, TrackRow,
+        VoiceBadge,
     },
 };
 
@@ -52,6 +53,18 @@ fn nav_item(item: &NavItemView) -> NavItem {
         title: item.title.as_str().into(),
         playing: item.playing,
         missing: item.missing,
+    }
+}
+
+fn song_row(song: SongRowView) -> SongRow {
+    SongRow {
+        id: song.id.to_string().into(),
+        title: song.title.into(),
+        duration: song.duration.into(),
+        date_added: song.date_added.into(),
+        source: song.source.into(),
+        missing: song.missing,
+        removable: song.removable,
     }
 }
 
@@ -145,8 +158,25 @@ pub(crate) fn library(
         );
         library.set_playlist_count(i32::try_from(view.playlist_count).unwrap_or(i32::MAX));
         library.set_soundboard_count(i32::try_from(view.soundboard_count).unwrap_or(i32::MAX));
+        show_rows(
+            &library.get_playlist_choices(),
+            view.playlist_choices
+                .into_iter()
+                .map(|choice| PlaylistChoice {
+                    id: choice.id.to_string().into(),
+                    title: choice.title.into(),
+                    count_label: choice.count_label.into(),
+                    holds_song: choice.holds_song,
+                })
+                .collect(),
+            |choices| library.set_playlist_choices(choices),
+        );
+        if let Some(songs) = view.songs {
+            songs_page(&library, songs);
+        }
         let page = match navigation.page {
             PageKind::Home => Page::Home,
+            PageKind::Songs => Page::Songs,
             PageKind::Playlists => Page::Playlists,
             PageKind::Playlist => Page::Playlist,
             PageKind::Soundboards => Page::Soundboards,
@@ -167,58 +197,94 @@ pub(crate) fn library(
             (page, _) => page,
         };
         pages.set_page(page);
-        let Some(collection) = view.collection else {
-            return;
-        };
-        library.set_collection_title(collection.title.into());
-        library.set_collection_summary(collection.summary.into());
-        library.set_collection_background(collection_background(&collection.background));
-        library.set_collection_background_label(background_label(&collection.background));
-        library.set_collection_linked(collection.linked_folder.is_some());
-        library.set_collection_folder(collection.linked_folder.unwrap_or_default().into());
-        library.set_collection_missing(collection.missing);
-        library.set_order_key(collection.order_key);
-        library.set_order_descending(collection.order_descending);
-        library.set_tracks(model(
-            collection
-                .tracks
-                .into_iter()
-                .map(|track| TrackRow {
-                    id: track.id.to_string().into(),
-                    title: track.title.into(),
-                    duration: track.duration.into(),
-                    date_added: track.date_added.into(),
-                    source: track.source.into(),
-                    missing: track.missing,
-                    current: track.current,
-                    playing: track.playing,
-                    queue_number: track
-                        .queue_number
-                        .and_then(|number| i32::try_from(number).ok())
-                        .unwrap_or(0),
-                })
-                .collect(),
-        ));
-        let tiles = collection
-            .sounds
-            .into_iter()
-            .map(|sound| SoundTile {
-                id: sound.id.to_string().into(),
-                title: sound.title.into(),
-                icon: i32::try_from(sound.icon.index()).unwrap_or(0),
-                looping: sound.looping,
-                volume: sound.volume,
-                fade_in_ms: i32::try_from(sound.fade_in_ms).unwrap_or(i32::MAX),
-                fade_out_ms: i32::try_from(sound.fade_out_ms).unwrap_or(i32::MAX),
-                playing: sound.playing,
-                progress: sound.progress,
-                missing: sound.missing,
-            })
-            .collect();
-        show_rows(&library.get_sounds(), tiles, |tiles| {
-            library.set_sounds(tiles);
-        });
+        if let Some(collection) = view.collection {
+            collection_page(&library, collection);
+        }
     });
+}
+
+fn songs_page(library: &LibraryView<'_>, songs: SongsPageView) {
+    library.set_songs_summary(songs.summary.into());
+    library.set_songs_overflow(songs.overflow.into());
+    show_rows(
+        &library.get_song_folders(),
+        songs
+            .folders
+            .into_iter()
+            .map(|folder| SongFolder {
+                id: folder.id.to_string().into(),
+                path: folder.path.into(),
+                count_label: folder.count_label.into(),
+            })
+            .collect(),
+        |folders| library.set_song_folders(folders),
+    );
+    show_rows(
+        &library.get_songs(),
+        songs.rows.into_iter().map(song_row).collect(),
+        |rows| library.set_songs(rows),
+    );
+}
+
+fn collection_page(library: &LibraryView<'_>, collection: CollectionPageView) {
+    library.set_collection_title(collection.title.into());
+    library.set_collection_summary(collection.summary.into());
+    library.set_collection_background(collection_background(&collection.background));
+    library.set_collection_background_label(background_label(&collection.background));
+    library.set_collection_linked(collection.linked_folder.is_some());
+    library.set_collection_folder(collection.linked_folder.unwrap_or_default().into());
+    library.set_collection_missing(collection.missing);
+    library.set_order_key(collection.order_key);
+    library.set_order_descending(collection.order_descending);
+    library.set_tracks(model(
+        collection
+            .tracks
+            .into_iter()
+            .map(|track| TrackRow {
+                id: track.id.to_string().into(),
+                song_id: track.song_id.to_string().into(),
+                title: track.title.into(),
+                duration: track.duration.into(),
+                date_added: track.date_added.into(),
+                source: track.source.into(),
+                missing: track.missing,
+                current: track.current,
+                playing: track.playing,
+                queue_number: track
+                    .queue_number
+                    .and_then(|number| i32::try_from(number).ok())
+                    .unwrap_or(0),
+            })
+            .collect(),
+    ));
+    let tiles = collection
+        .sounds
+        .into_iter()
+        .map(|sound| SoundTile {
+            id: sound.id.to_string().into(),
+            title: sound.title.into(),
+            icon: i32::try_from(sound.icon.index()).unwrap_or(0),
+            looping: sound.looping,
+            volume: sound.volume,
+            fade_in_ms: i32::try_from(sound.fade_in_ms).unwrap_or(i32::MAX),
+            fade_out_ms: i32::try_from(sound.fade_out_ms).unwrap_or(i32::MAX),
+            playing: sound.playing,
+            progress: sound.progress,
+            missing: sound.missing,
+        })
+        .collect();
+    show_rows(&library.get_sounds(), tiles, |tiles| {
+        library.set_sounds(tiles);
+    });
+    show_rows(
+        &library.get_song_search_results(),
+        collection
+            .song_search_results
+            .into_iter()
+            .map(song_row)
+            .collect(),
+        |rows| library.set_song_search_results(rows),
+    );
 }
 
 pub(crate) fn player(
@@ -385,6 +451,14 @@ pub(crate) fn palette(window: &slint::Weak<AppWindow>, results: &[PaletteResult]
         let last = i32::try_from(results.len()).unwrap_or(i32::MAX) - 1;
         search.set_selected(search.get_selected().clamp(0, last.max(0)));
         search.set_results(model(results));
+    });
+}
+
+pub(crate) fn clear_song_search(window: &slint::Weak<AppWindow>) {
+    let _ = window.upgrade_in_event_loop(|window| {
+        window
+            .global::<Search>()
+            .set_song_search_text(SharedString::new());
     });
 }
 

@@ -9,10 +9,10 @@ import {
     WindowFrame,
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
-import { ConnectingPage, GridPage, HomePage, PlaylistPage, SoundboardPage } from "pages.slint";
+import { ConnectingPage, GridPage, HomePage, PlaylistPage, SongsPage, SoundboardPage } from "pages.slint";
 import { Dock, MiniPlayer } from "dock.slint";
 import {
-    AddCollectionDialog, EditCollectionDialog, EditEntryDialog, SettingsDialog,
+    AddCollectionDialog, AddToPlaylistDialog, EditCollectionDialog, EditEntryDialog, SettingsDialog,
 } from "dialogs.slint";
 import { BackgroundGallery } from "gallery.slint";
 import { SearchPalette } from "search.slint";
@@ -25,7 +25,7 @@ export {
     Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, Theme, VoiceBadge, WindowFrame,
 }
 
-enum DialogKind { none, add-collection, edit-collection, edit-entry, settings }
+enum DialogKind { none, add-collection, edit-collection, edit-entry, add-to-playlist, settings }
 
 export component AppWindow inherits Window {
     title: @tr("Tufo");
@@ -52,6 +52,9 @@ export component AppWindow inherits Window {
     property <int> entry-fade-in-ms;
     property <int> entry-fade-out-ms;
     property <int> entry-icon;
+    // The song Add to playlist adds.
+    property <string> song-id;
+    property <string> song-title;
     property <bool> any-dialog: root.dialog != DialogKind.none;
     property <bool> any-overlay: root.any-dialog || Search.palette-open || root.sidebar-overlaid;
     property <bool> fills-screen: root.maximized || root.full-screen;
@@ -124,12 +127,21 @@ export component AppWindow inherits Window {
         root.dialog = DialogKind.add-collection;
     }
 
+    function open-add-to-playlist(song-id: string, song-title: string) {
+        root.song-id = song-id;
+        root.song-title = song-title;
+        root.dialog = DialogKind.add-to-playlist;
+    }
+
     public function open-settings() {
         root.sidebar-overlaid = false;
         root.dialog = DialogKind.settings;
     }
 
     public function close-dialog() {
+        if root.dialog == DialogKind.add-to-playlist {
+            Actions.adding-song-changed("");
+        }
         root.dialog = DialogKind.none;
         root.gallery-open = false;
         shortcuts.focus();
@@ -267,6 +279,11 @@ export component AppWindow inherits Window {
                                 root.open-add(kind);
                             }
                         }
+                        if LibraryView.loaded && Navigation.page == Page.songs: SongsPage {
+                            add-to-playlist(id, title) => {
+                                root.open-add-to-playlist(id, title);
+                            }
+                        }
                         if LibraryView.loaded && Navigation.page == Page.playlists: GridPage {
                             kind: CollectionKind.playlist;
                             add(kind) => {
@@ -292,6 +309,9 @@ export component AppWindow inherits Window {
                             }
                             add-files => {
                                 Actions.add-files(Navigation.collection-id);
+                            }
+                            add-to-playlist(id, title) => {
+                                root.open-add-to-playlist(id, title);
                             }
                         }
                         if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
@@ -483,6 +503,18 @@ export component AppWindow inherits Window {
                 fade-in-ms: root.entry-fade-in-ms;
                 fade-out-ms: root.entry-fade-out-ms;
                 icon: root.entry-icon;
+                cancel => {
+                    root.close-dialog();
+                }
+            }
+            add-to-playlist-dialog := Presence {
+                open: root.dialog == DialogKind.add-to-playlist;
+            }
+
+            if add-to-playlist-dialog.present: AddToPlaylistDialog {
+                progress: add-to-playlist-dialog.progress;
+                song-id: root.song-id;
+                song-title: root.song-title;
                 cancel => {
                     root.close-dialog();
                 }

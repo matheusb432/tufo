@@ -1,14 +1,16 @@
 use std::{num::NonZeroU64, path::PathBuf, time::Duration};
 
 use tufo_client::library::{
-    Background, CollectionSource, CollectionView, EntryView, KenkuImportReport, LibrarySnapshot,
+    Background, CollectionSource, CollectionView, EntryView, KenkuImportReport, LibraryFolderView,
+    LibrarySnapshot, SongSource, SongView,
 };
 use tufo_models::{
     discord::{GuildId, VoiceChannel, VoiceChannelId, VoiceChannelTarget},
     library::{
-        AudioFileId, CollectionEntryId, CollectionId, CollectionKind, EntryOrder, SoundSettings,
-        Title,
+        AudioFileId, CollectionEntryId, CollectionId, CollectionKind, EntryOrder, LibraryFolderId,
+        SoundSettings, Title,
     },
+    path::FolderPath,
     playback::{
         AudioFilePath, OutputTarget,
         player_state::{ActiveSound, MusicState, PlayerState, PositionSample},
@@ -55,6 +57,34 @@ fn collection(
     }
 }
 
+fn filtering(filter: &str) -> PageQueries<'_> {
+    PageQueries {
+        filter,
+        ..PageQueries::default()
+    }
+}
+
+fn music_folder(seed: u128, name: &str) -> LibraryFolderView {
+    LibraryFolderView {
+        id: LibraryFolderId::from_uuid(uuid(seed)),
+        kind: CollectionKind::Playlist,
+        folder: FolderPath::try_new(std::env::temp_dir().join(name)).unwrap(),
+    }
+}
+
+fn song(seed: u128, title: &str, source: SongSource) -> SongView {
+    SongView {
+        audio_file_id: AudioFileId::from_uuid(uuid(seed)),
+        title: Title::try_new(title.to_owned()).unwrap(),
+        builtin_title: None,
+        path: AudioFilePath::try_new(std::env::temp_dir().join("RPG music").join(title)).unwrap(),
+        duration: Duration::from_secs(120),
+        added_at: jiff::Timestamp::UNIX_EPOCH,
+        missing: false,
+        source,
+    }
+}
+
 fn snapshot() -> LibrarySnapshot {
     LibrarySnapshot {
         revision: 1,
@@ -86,30 +116,215 @@ fn snapshot() -> LibrarySnapshot {
 }
 
 #[test]
-fn track_metadata_uses_the_file_folder_and_the_date_in_the_local_timezone() {
-    let mut entry = entry(10, "Ancient Dragon", 241);
-    entry.path = AudioFilePath::try_new(
-        std::env::temp_dir()
-            .join("RPG music")
-            .join("Boss fights")
-            .join("dragon.ogg"),
-    )
-    .unwrap();
-    entry.added_at = "2026-01-11T01:30:00Z".parse().unwrap();
-    let row = track_row(&entry, &PlayerState::default());
+fn tracks_name_their_song_source_and_the_date_in_the_local_timezone() {
+    let folder = music_folder(1, "RPG music");
+    let snapshot = LibrarySnapshot {
+        songs: vec![
+            song(10, "Ancient Dragon", SongSource::Folder(folder.id)),
+            song(11, "Lich King", SongSource::File),
+        ],
+        library_folders: vec![folder],
+        ..snapshot()
+    };
+    let songs = SongIndex::new(&snapshot);
+    let mut dragon = entry(10, "Ancient Dragon", 241);
+    dragon.added_at = "2026-01-11T01:30:00Z".parse().unwrap();
+
+    let rows = [&dragon, &entry(11, "Lich King", 60), &entry(12, "Lute", 60)]
+        .map(|entry| track_row(entry, &PlayerState::default(), &songs).source);
+
     assert_eq!(
-        row.source,
-        std::env::temp_dir()
-            .join("RPG music")
-            .join("Boss fights")
-            .to_string_lossy(),
+        rows,
+        [
+            std::env::temp_dir()
+                .join("RPG music")
+                .to_string_lossy()
+                .into_owned(),
+            std::env::temp_dir()
+                .join("RPG music")
+                .join("Lich King")
+                .to_string_lossy()
+                .into_owned(),
+            String::new(),
+        ]
     );
     assert_eq!(
         date_added(
-            entry.added_at,
+            dragon.added_at,
             jiff::tz::TimeZone::fixed(jiff::tz::Offset::constant(-3))
         ),
         "Jan 10, 2026",
+    );
+}
+
+#[test]
+fn the_songs_page_counts_each_music_folder_and_marks_removable_songs() {
+    let music = music_folder(1, "RPG music");
+    let sounds = LibraryFolderView {
+        kind: CollectionKind::Soundboard,
+        ..music_folder(2, "sfx")
+    };
+    let snapshot = LibrarySnapshot {
+        songs: vec![
+            song(10, "Ancient Dragon", SongSource::Folder(music.id)),
+            song(11, "Lich King", SongSource::Folder(music.id)),
+            song(12, "Lute", SongSource::File),
+        ],
+        library_folders: vec![music, sounds],
+        ..snapshot()
+    };
+    let navigation = Navigation {
+        page: PageKind::Songs,
+        collection_id: None,
+    };
+
+    let songs = library_page(
+        &snapshot,
+        &PlayerState::default(),
+        navigation,
+        PageQueries::default(),
+        SystemTime::UNIX_EPOCH,
+    )
+    .songs
+    .unwrap();
+    let filtered = library_page(
+        &snapshot,
+        &PlayerState::default(),
+        navigation,
+        filtering("rpg king"),
+        SystemTime::UNIX_EPOCH,
+    )
+    .songs
+    .unwrap();
+
+    assert_eq!(songs.summary, "3 songs");
+    let folders = songs
+        .folders
+        .iter()
+        .map(|folder| folder.count_label.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(folders, ["2 songs"]);
+    let removable = songs
+        .rows
+        .iter()
+        .map(|row| (row.title.as_str(), row.removable))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        removable,
+        [
+            ("Ancient Dragon", false),
+            ("Lich King", false),
+            ("Lute", true)
+        ]
+    );
+    assert_eq!(filtered.rows.len(), 1);
+    assert!(songs.overflow.is_empty());
+}
+
+#[test]
+fn the_songs_page_shows_a_bounded_number_of_rows() {
+    let snapshot = LibrarySnapshot {
+        songs: (0..SONG_ROWS_MAX + 5)
+            .map(|index| song(index as u128, &format!("Track {index}"), SongSource::File))
+            .collect(),
+        ..LibrarySnapshot::default()
+    };
+
+    let songs = library_page(
+        &snapshot,
+        &PlayerState::default(),
+        Navigation {
+            page: PageKind::Songs,
+            collection_id: None,
+        },
+        PageQueries::default(),
+        SystemTime::UNIX_EPOCH,
+    )
+    .songs
+    .unwrap();
+
+    assert_eq!(songs.rows.len(), SONG_ROWS_MAX);
+    assert_eq!(
+        songs.overflow,
+        "Showing 200 of 205 songs. Filter to find the rest."
+    );
+}
+
+#[test]
+fn a_playlists_song_search_offers_playable_songs_it_lacks() {
+    let mut lair = song(20, "Dragon Lair", SongSource::File);
+    lair.path =
+        AudioFilePath::try_new(std::env::temp_dir().join("Caves").join("lair.ogg")).unwrap();
+    let mut egg = song(21, "Dragon Egg", SongSource::File);
+    egg.missing = true;
+    let mut snapshot = LibrarySnapshot {
+        songs: vec![song(10, "Ancient Dragon", SongSource::File), lair, egg],
+        ..snapshot()
+    };
+    snapshot.collections[1].source = CollectionSource::Linked {
+        folder: FolderPath::try_new(std::env::temp_dir().join("Tavern")).unwrap(),
+        missing: false,
+    };
+    let search = |seed, song_search| {
+        library_page(
+            &snapshot,
+            &PlayerState::default(),
+            Navigation {
+                page: PageKind::Playlist,
+                collection_id: Some(CollectionId::from_uuid(uuid(seed))),
+            },
+            PageQueries {
+                song_search,
+                ..PageQueries::default()
+            },
+            SystemTime::UNIX_EPOCH,
+        )
+        .collection
+        .unwrap()
+        .song_search_results
+        .into_iter()
+        .map(|row| row.title)
+        .collect::<Vec<_>>()
+    };
+
+    assert_eq!(search(1, "dragon"), ["Dragon Lair"]);
+    assert_eq!(search(1, "caves"), ["Dragon Lair"]);
+    assert!(search(1, " ").is_empty());
+    assert!(search(2, "dragon").is_empty());
+}
+
+#[test]
+fn add_to_playlist_offers_hand_picked_playlists_and_marks_those_with_the_song() {
+    let mut snapshot = snapshot();
+    snapshot.collections.push(CollectionView {
+        source: CollectionSource::Linked {
+            folder: FolderPath::try_new(std::env::temp_dir().join("Boss")).unwrap(),
+            missing: false,
+        },
+        ..collection(4, CollectionKind::Playlist, "Boss", Vec::new())
+    });
+
+    let choices = library_page(
+        &snapshot,
+        &PlayerState::default(),
+        Navigation::default(),
+        PageQueries {
+            adding_song: Some(AudioFileId::from_uuid(uuid(10))),
+            ..PageQueries::default()
+        },
+        SystemTime::UNIX_EPOCH,
+    )
+    .playlist_choices
+    .into_iter()
+    .map(|choice| (choice.title, choice.holds_song))
+    .collect::<Vec<_>>();
+
+    assert_eq!(
+        choices,
+        [
+            ("Boss fights".to_owned(), true),
+            ("Tavern".to_owned(), false)
+        ]
     );
 }
 
@@ -159,7 +374,7 @@ fn an_extra_song_keeps_the_playlist_and_player_active_after_the_main_track_stops
             page: PageKind::Playlist,
             collection_id: Some(CollectionId::from_uuid(uuid(1))),
         },
-        "",
+        PageQueries::default(),
         SystemTime::UNIX_EPOCH,
     );
     assert!(page.collection.unwrap().tracks[0].playing);
@@ -180,7 +395,7 @@ fn the_filter_narrows_cards_on_grids_and_entries_on_collection_pages() {
             page: PageKind::Playlists,
             collection_id: None,
         },
-        "tav",
+        filtering("tav"),
         SystemTime::UNIX_EPOCH,
     );
     let page = library_page(
@@ -190,7 +405,7 @@ fn the_filter_narrows_cards_on_grids_and_entries_on_collection_pages() {
             page: PageKind::Playlist,
             collection_id: Some(CollectionId::from_uuid(uuid(1))),
         },
-        "king",
+        filtering("king"),
         SystemTime::UNIX_EPOCH,
     );
 
@@ -221,14 +436,14 @@ fn the_current_track_shows_as_playing_until_paused() {
         &snapshot,
         &playing(10, false),
         navigation,
-        "",
+        PageQueries::default(),
         SystemTime::UNIX_EPOCH,
     );
     let paused = library_page(
         &snapshot,
         &playing(10, true),
         navigation,
-        "",
+        PageQueries::default(),
         SystemTime::UNIX_EPOCH,
     );
 
@@ -256,7 +471,7 @@ fn queued_songs_number_their_rows_in_play_order_on_their_own_pages() {
                 page: PageKind::Playlist,
                 collection_id: Some(CollectionId::from_uuid(uuid(seed))),
             },
-            "",
+            PageQueries::default(),
             SystemTime::UNIX_EPOCH,
         )
         .collection
@@ -300,7 +515,7 @@ fn the_sidebar_lists_every_collection_whatever_the_filter_and_marks_what_plays()
             page: PageKind::Playlists,
             collection_id: None,
         },
-        "tav",
+        filtering("tav"),
         SystemTime::UNIX_EPOCH,
     );
 
@@ -332,7 +547,7 @@ fn a_collection_sums_up_its_tracks_and_minutes_or_its_sounds_and_how_many_play()
             collection_id: Some(CollectionId::from_uuid(uuid(seed))),
         };
         let now = SystemTime::UNIX_EPOCH + Duration::from_secs(1);
-        library_page(&snapshot, &player, navigation, "", now)
+        library_page(&snapshot, &player, navigation, PageQueries::default(), now)
             .collection
             .unwrap()
     };

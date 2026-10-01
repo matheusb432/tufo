@@ -1,6 +1,8 @@
 use slint::{ComponentHandle as _, ModelRc, VecModel};
 use tufo_client::library::Background;
-use tufo_models::library::{BackgroundPreset, CollectionEntryId, CollectionId, SoundIcon};
+use tufo_models::library::{
+    AudioFileId, BackgroundPreset, CollectionEntryId, CollectionId, SoundIcon,
+};
 
 use crate::{
     presentation::{
@@ -73,11 +75,15 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
             tracks: (0..13)
                 .map(|index| TrackRowView {
                     id: CollectionEntryId::from_uuid(uuid::Uuid::from_u128(200 + index)),
+                    song_id: AudioFileId::from_uuid(uuid::Uuid::from_u128(200 + index)),
                     title: format!("Track {index}"),
                     duration: "4:20".to_owned(),
+                    date_added: String::new(),
+                    source: String::new(),
                     missing: false,
                     current: false,
                     playing: false,
+                    queue_number: None,
                 })
                 .collect(),
             sounds: (0..14)
@@ -94,6 +100,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
                     missing: false,
                 })
                 .collect(),
+            song_search_results: Vec::new(),
         });
     LibraryPageView {
         nav_playlists: nav(&playlists),
@@ -103,6 +110,8 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
         playlists,
         soundboards,
         collection,
+        songs: None,
+        playlist_choices: Vec::new(),
     }
 }
 
