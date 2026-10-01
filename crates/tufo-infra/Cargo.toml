@@ -45,6 +45,7 @@ twilight-http = { workspace = true }
 twilight-model = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+cpal = { workspace = true, features = ["pipewire"] }
 kira = { workspace = true, features = ["cpal-realtime-dbus"] }
 
 [target.'cfg(unix)'.dependencies]

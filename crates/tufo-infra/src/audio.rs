@@ -36,12 +36,12 @@ use pull_backend::{PullBackend, PullBackendError, PullBackendSettings};
 use streamed_sound::StreamedSound;
 use tufo_models::playback::music_layers::MUSIC_LAYERS_EXTRA_MAX;
 
-/// ALSA period size for the local device. Two periods of 2048 frames, about 85 ms at 48 kHz,
-/// absorb scheduling delays of cpal's callback thread, which runs at normal priority when ALSA
-/// routes into `PipeWire`.
+/// Requested local callback size: about 43 ms at 48 kHz. ALSA uses two periods; native
+/// `PipeWire` negotiates the graph quantum and promotes its callback through rtkit.
 const LOCAL_PERIOD_FRAMES: u32 = 2048;
 /// How often kira updates clocks and modulators, in frames; kira's default.
 const KIRA_INTERNAL_BUFFER_FRAMES: usize = 128;
+const LOCAL_STREAM_ERRORS_POLL_MAX: usize = 64;
 /// How long a music volume change takes, so moving a slider doesn't click.
 const MUSIC_VOLUME_TWEEN: Duration = Duration::from_millis(50);
 
@@ -49,6 +49,8 @@ const MUSIC_VOLUME_TWEEN: Duration = Duration::from_millis(50);
 pub enum OpenLocalMixerError {
     #[error("no default audio output device")]
     NoDevice,
+    #[error("the PipeWire output target {0:?} does not exist")]
+    TargetNotFound(String),
     #[error("the default audio device reports no usable configuration")]
     DeviceConfiguration(#[source] cpal::Error),
     #[error("the audio output stream cannot start")]
@@ -71,8 +73,8 @@ pub struct MixerFullError;
 
 /// A kira mixer bound to one output, with the sample rate its tracks must be decoded at.
 pub struct Mixer {
-    /// The kira manager, held only so its output stream stops when the mixer drops.
-    _manager: Box<dyn Send>,
+    manager: MixerManager,
+    local_stream_errors: LocalStreamErrors,
     sample_rate: u32,
     music: MusicDeckHandle,
     music_layers: [(MusicDeckHandle, TrackHandle); MUSIC_LAYERS_EXTRA_MAX],
@@ -80,11 +82,31 @@ pub struct Mixer {
     sounds_track: TrackHandle,
 }
 
+enum MixerManager {
+    Local(Box<AudioManager<CpalBackend>>),
+    Pulled {
+        _manager: Box<AudioManager<PullBackend>>,
+    },
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub(crate) struct LocalStreamErrors {
+    pub(crate) reported: u64,
+    pub(crate) discarded: u64,
+}
+
 impl Mixer {
     /// Opens the default audio device at its preferred rate and channel count.
     pub fn open_local() -> Result<Self, OpenLocalMixerError> {
-        let device = cpal::default_host()
-            .default_output_device()
+        #[cfg(target_os = "linux")]
+        let pipewire = pipewire_output_device()?;
+        #[cfg(target_os = "linux")]
+        let device_override = pipewire.as_ref().map(|output| output.device.clone());
+        #[cfg(not(target_os = "linux"))]
+        let device_override: Option<cpal::Device> = None;
+        let device = device_override
+            .clone()
+            .or_else(|| cpal::default_host().default_output_device())
             .ok_or(OpenLocalMixerError::NoDevice)?;
         let supported = device
             .default_output_config()
@@ -94,9 +116,10 @@ impl Mixer {
             sample_rate: supported.sample_rate(),
             buffer_size: BufferSize::Fixed(LOCAL_PERIOD_FRAMES),
         };
+        tracing::info!(device = ?device.id(), sample_rate = config.sample_rate, "opening local audio output");
         let mut manager = AudioManager::<CpalBackend>::new(AudioManagerSettings {
             backend_settings: CpalBackendSettings {
-                device: None,
+                device: device_override,
                 config: Some(config),
             },
             main_track_builder: limited_main_track(),
@@ -105,7 +128,7 @@ impl Mixer {
         .map_err(OpenLocalMixerError::Stream)?;
         let tracks = MixerTracks::add(&mut manager, config.sample_rate)
             .map_err(OpenLocalMixerError::Tracks)?;
-        Ok(tracks.into_mixer(Box::new(manager), config.sample_rate))
+        Ok(tracks.into_mixer(MixerManager::Local(Box::new(manager)), config.sample_rate))
     }
 
     /// Creates a mixer that renders only when the returned renderer is pulled.
@@ -125,7 +148,12 @@ impl Mixer {
         let tracks =
             MixerTracks::add(&mut manager, sample_rate).map_err(OpenPulledMixerError::Tracks)?;
         Ok((
-            tracks.into_mixer(Box::new(manager), sample_rate),
+            tracks.into_mixer(
+                MixerManager::Pulled {
+                    _manager: Box::new(manager),
+                },
+                sample_rate,
+            ),
             renderer_receiver,
         ))
     }
@@ -133,6 +161,30 @@ impl Mixer {
     #[must_use]
     pub fn sample_rate(&self) -> u32 {
         self.sample_rate
+    }
+
+    pub(crate) fn poll_local_stream_errors(&mut self) -> LocalStreamErrors {
+        let MixerManager::Local(manager) = &mut self.manager else {
+            return LocalStreamErrors::default();
+        };
+        let backend = manager.backend_mut();
+        for _ in 0..LOCAL_STREAM_ERRORS_POLL_MAX {
+            let Some(error) = backend.pop_error() else {
+                break;
+            };
+            self.local_stream_errors.reported += 1;
+            tracing::warn!(%error, kind = ?error.kind(), "local audio stream error");
+        }
+        if let Some(discarded) = backend.num_stream_errors_discarded()
+            && discarded > self.local_stream_errors.discarded
+        {
+            tracing::warn!(
+                discarded = discarded - self.local_stream_errors.discarded,
+                "local audio stream errors were lost because an error queue filled"
+            );
+            self.local_stream_errors.discarded = discarded;
+        }
+        self.local_stream_errors
     }
 
     /// The deck that plays music on this mixer.
@@ -178,6 +230,37 @@ impl Mixer {
     ) -> Result<(), MixerFullError> {
         self.sounds_track.play(sound).map_err(|_| MixerFullError)
     }
+}
+
+#[cfg(target_os = "linux")]
+struct PipeWireOutputDevice {
+    device: cpal::Device,
+    // Keep PipeWire initialized between device enumeration and stream creation.
+    _host: cpal::Host,
+}
+
+#[cfg(target_os = "linux")]
+fn pipewire_output_device() -> Result<Option<PipeWireOutputDevice>, OpenLocalMixerError> {
+    let host = match cpal::host_from_id(cpal::HostId::PipeWire) {
+        Ok(host) => host,
+        Err(error) => {
+            tracing::debug!(%error, "PipeWire is unavailable; using the platform audio host");
+            return Ok(None);
+        }
+    };
+    let device = if let Ok(target) = std::env::var("PIPEWIRE_NODE") {
+        let id = cpal::DeviceId::new(cpal::HostId::PipeWire, &target);
+        host.device_by_id(&id)
+            .filter(cpal::traits::DeviceTrait::supports_output)
+            .ok_or(OpenLocalMixerError::TargetNotFound(target))?
+    } else {
+        host.default_output_device()
+            .ok_or(OpenLocalMixerError::NoDevice)?
+    };
+    Ok(Some(PipeWireOutputDevice {
+        device,
+        _host: host,
+    }))
 }
 
 /// Converts a linear gain to kira's decibels, where −60 dB is silence.
@@ -232,9 +315,10 @@ impl MixerTracks {
         })
     }
 
-    fn into_mixer(self, manager: Box<dyn Send>, sample_rate: u32) -> Mixer {
+    fn into_mixer(self, manager: MixerManager, sample_rate: u32) -> Mixer {
         Mixer {
-            _manager: manager,
+            manager,
+            local_stream_errors: LocalStreamErrors::default(),
             sample_rate,
             music: self.music,
             music_layers: self.music_layers,

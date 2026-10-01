@@ -10,7 +10,7 @@ use kira::Frame;
 use tufo_infra::{
     audio::{
         buffered_track::{AudioFile, BufferedTrack, DecodeOptions, TrackReader},
-        sound_cache::STATIC_SOUND_DURATION_MAX,
+        sound_cache::{LoadedSound, STATIC_SOUND_DURATION_MAX, SoundLoadOptions, load_sound},
     },
     default_effects::write_default_effects,
 };
@@ -53,7 +53,7 @@ fn decode(path: &std::path::Path, looping: bool) -> anyhow::Result<TrackReader> 
     Ok(reader)
 }
 
-/// Fireplace is the shortest effect that streams rather than decoding into memory.
+/// Fireplace is the shortest default effect above the one-shot decode limit.
 #[test]
 fn a_streamed_effect_plays_its_second_pass_frame_for_frame_like_its_first() -> anyhow::Result<()> {
     let directory = tempfile::tempdir()?;
@@ -63,6 +63,17 @@ fn a_streamed_effect_plays_its_second_pass_frame_for_frame_like_its_first() -> a
         .context("Fireplace is a default effect")?;
 
     let first_pass = read_frames(&mut decode(fireplace.path.as_ref(), false)?, usize::MAX);
+    let LoadedSound::Decoded(cached) = load_sound(
+        fireplace.path.as_ref(),
+        SoundLoadOptions {
+            looping: true,
+            bytes_max: 64 * 1024 * 1024,
+        },
+    )?
+    else {
+        anyhow::bail!("Fireplace fits the loop cache budget");
+    };
+    assert_eq!(first_mismatch(&cached.frames, &first_pass), None);
     let looped = read_frames(
         &mut decode(fireplace.path.as_ref(), true)?,
         2 * first_pass.len(),

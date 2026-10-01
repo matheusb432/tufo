@@ -55,9 +55,10 @@ use tufo_models::{
 
 use crate::{
     audio::{
+        LocalStreamErrors,
         buffered_track::{BufferedTrack, DecodeOptions},
         music_deck::{DeckState, DeckTrack, MusicDeckHandle},
-        sound_cache::{LoadedSound, SoundCache, SoundKey, load_sound},
+        sound_cache::{LoadedSound, SoundCache, SoundKey, SoundLoadOptions, load_sound},
         streamed_sound::streamed_sound,
     },
     discord::{SongbirdDiscordClient, VoiceAvailability},
@@ -122,6 +123,9 @@ pub struct EnginePlayer<O: AudioOutputs> {
     state: watch::Sender<PlayerState>,
     /// Updated by the tick, so diagnostics never wait for the engine lock.
     music_underrun_frames: AtomicU64,
+    sound_underrun_frames: Arc<AtomicU64>,
+    local_stream_errors: AtomicU64,
+    local_stream_errors_discarded: AtomicU64,
     this: Weak<Self>,
 }
 
@@ -138,6 +142,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     /// tokio runtime.
     #[must_use]
     pub fn with_outputs(outputs: O, timings: EngineTimings) -> Arc<Self> {
+        let sound_underrun_frames = Arc::new(AtomicU64::new(0));
         let engine = Engine {
             target: OutputTarget::Local,
             output: None,
@@ -154,6 +159,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             sounds: BTreeMap::new(),
             sounds_paused_at: None,
             sound_cache: SoundCache::new(SOUND_CACHE_BYTES_MAX),
+            sound_underrun_frames: Arc::clone(&sound_underrun_frames),
+            local_stream_errors_retired: LocalStreamErrors::default(),
             last_token: 0,
             retired_underrun_frames: 0,
             release_at: None,
@@ -165,6 +172,9 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             engine: Mutex::new(engine),
             state,
             music_underrun_frames: AtomicU64::new(0),
+            sound_underrun_frames,
+            local_stream_errors: AtomicU64::new(0),
+            local_stream_errors_discarded: AtomicU64::new(0),
             this: this.clone(),
         });
         tokio::spawn(run_ticks(Arc::downgrade(&player)));
@@ -182,17 +192,26 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         engine.stop_layers();
         engine.sounds.clear();
         engine.output_generation += 1;
-        if let Some(output) = engine.output.take() {
+        if let Some(output) = engine.take_output() {
             self.outputs.close(output).await;
         }
-        self.music_underrun_frames
-            .store(engine.underrun_frames(), Ordering::Relaxed);
+        self.update_diagnostics(&mut engine);
         self.publish(&engine);
         tracing::info!(diagnostics = ?self.diagnostics(), "playback diagnostics at shutdown");
     }
 
     fn publish(&self, engine: &Engine) {
         self.state.send_replace(engine.snapshot());
+    }
+
+    fn update_diagnostics(&self, engine: &mut Engine) {
+        self.music_underrun_frames
+            .store(engine.underrun_frames(), Ordering::Relaxed);
+        let errors = engine.poll_local_stream_errors();
+        self.local_stream_errors
+            .store(errors.reported, Ordering::Relaxed);
+        self.local_stream_errors_discarded
+            .store(errors.discarded, Ordering::Relaxed);
     }
 
     /// Opens the local output when nothing is open yet. A voice output that dropped stays
@@ -250,7 +269,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     /// Closes the output, keeping the music's position and the looping sounds to play again on
     /// the next one.
     async fn suspend_output(&self, engine: &mut Engine) {
-        let Some(output) = engine.output.take() else {
+        let Some(output) = engine.take_output() else {
             return;
         };
         engine.output_generation += 1;
@@ -332,7 +351,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             .collect::<Vec<_>>();
         for cue in cues {
             let entry_id = cue.entry_id;
-            let fired = match self.load_sound_cached(engine, &cue.path).await {
+            let fired = match self.load_sound_cached(engine, &cue).await {
                 Ok(loaded) => fire_sound(engine, cue, loaded).await,
                 Err(error) => Err(error),
             };
@@ -352,13 +371,13 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     async fn load_sound_cached(
         &self,
         engine: &mut Engine,
-        path: &AudioFilePath,
+        cue: &SoundCue,
     ) -> Result<LoadedSound, PlayAudioError> {
-        let key = read_sound_key(path).await?;
+        let key = read_sound_key(&cue.path).await?;
         if let Some(data) = engine.sound_cache.get(&key) {
             return Ok(LoadedSound::Decoded(Box::new(data)));
         }
-        let loaded = load_sound_blocking(path).await?;
+        let loaded = load_sound_blocking(&cue.path, cue.settings.looping).await?;
         if let LoadedSound::Decoded(data) = &loaded {
             engine.sound_cache.insert(key, data.as_ref().clone());
         }
@@ -664,8 +683,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         changed |= self.follow_deck(&mut engine);
         self.arm_if_due(&mut engine);
         changed |= self.release_if_due(&mut engine).await;
-        self.music_underrun_frames
-            .store(engine.underrun_frames(), Ordering::Relaxed);
+        self.update_diagnostics(&mut engine);
         if changed {
             self.publish(&engine);
         }
@@ -765,7 +783,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         engine.release_at = None;
         // Also ends reconnection attempts to a voice channel.
         engine.output_generation += 1;
-        if let Some(output) = engine.output.take() {
+        if let Some(output) = engine.take_output() {
             self.outputs.close(output).await;
         }
         if let OutputTarget::DiscordVoice(_) = engine.target {
@@ -977,7 +995,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         let cached = self.engine.lock().await.sound_cache.get(&key);
         let loaded = match cached {
             Some(data) => LoadedSound::Decoded(Box::new(data)),
-            None => load_sound_blocking(&cue.path).await?,
+            None => load_sound_blocking(&cue.path, cue.settings.looping).await?,
         };
         let mut engine = self.engine.lock().await;
         if let LoadedSound::Decoded(data) = &loaded {
@@ -1127,6 +1145,11 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
     fn diagnostics(&self) -> PlayerDiagnostics {
         PlayerDiagnostics {
             music_underrun_frames: self.music_underrun_frames.load(Ordering::Relaxed),
+            sound_underrun_frames: self.sound_underrun_frames.load(Ordering::Relaxed),
+            local_stream_errors: self.local_stream_errors.load(Ordering::Relaxed),
+            local_stream_errors_discarded: self
+                .local_stream_errors_discarded
+                .load(Ordering::Relaxed),
             voice_pacing: self.outputs.voice_pacing(),
         }
     }
@@ -1181,6 +1204,8 @@ struct Engine {
     sounds: BTreeMap<CollectionEntryId, FiredSound>,
     sounds_paused_at: Option<SystemTime>,
     sound_cache: SoundCache,
+    sound_underrun_frames: Arc<AtomicU64>,
+    local_stream_errors_retired: LocalStreamErrors,
     last_token: u64,
     retired_underrun_frames: u64,
     /// When the tick closes the output and drops the decoded sounds, if nothing plays by then.
@@ -1188,6 +1213,27 @@ struct Engine {
 }
 
 impl Engine {
+    fn take_output(&mut self) -> Option<OpenedOutput> {
+        let mut output = self.output.take()?;
+        let errors = output.mixer.poll_local_stream_errors();
+        self.local_stream_errors_retired.reported += errors.reported;
+        self.local_stream_errors_retired.discarded += errors.discarded;
+        Some(output)
+    }
+
+    fn poll_local_stream_errors(&mut self) -> LocalStreamErrors {
+        let current = self
+            .output
+            .as_mut()
+            .map_or_else(LocalStreamErrors::default, |output| {
+                output.mixer.poll_local_stream_errors()
+            });
+        LocalStreamErrors {
+            reported: self.local_stream_errors_retired.reported + current.reported,
+            discarded: self.local_stream_errors_retired.discarded + current.discarded,
+        }
+    }
+
     fn next_token(&mut self) -> NonZeroU64 {
         self.last_token += 1;
         NonZeroU64::new(self.last_token).unwrap_or(NonZeroU64::MIN)
@@ -1475,12 +1521,15 @@ async fn fire_sound(
                 start_position: Duration::ZERO,
                 looping: cue.settings.looping,
             };
-            let track = tokio::task::spawn_blocking(move || {
+            let mut track = tokio::task::spawn_blocking(move || {
                 BufferedTrack::start(file, sample_rate, options)
             })
             .await
             .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?
             .map_err(play_audio_error)?;
+            track
+                .reader
+                .count_underruns_in(Arc::clone(&engine.sound_underrun_frames));
             let (sound, handle) = streamed_sound(
                 track,
                 cue.settings.volume.into_inner(),
@@ -1510,12 +1559,23 @@ async fn read_sound_key(path: &AudioFilePath) -> Result<SoundKey, PlayAudioError
         })
 }
 
-async fn load_sound_blocking(path: &AudioFilePath) -> Result<LoadedSound, PlayAudioError> {
+async fn load_sound_blocking(
+    path: &AudioFilePath,
+    looping: bool,
+) -> Result<LoadedSound, PlayAudioError> {
     let path = path.as_ref().to_owned();
-    tokio::task::spawn_blocking(move || load_sound(&path))
-        .await
-        .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?
-        .map_err(play_audio_error)
+    tokio::task::spawn_blocking(move || {
+        load_sound(
+            &path,
+            SoundLoadOptions {
+                looping,
+                bytes_max: SOUND_CACHE_BYTES_MAX,
+            },
+        )
+    })
+    .await
+    .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?
+    .map_err(play_audio_error)
 }
 
 async fn run_ticks<O: AudioOutputs>(player: Weak<EnginePlayer<O>>) {

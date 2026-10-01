@@ -1,7 +1,7 @@
 //! Sound effects decoded once and kept in memory, so firing one starts on the next audio period.
 //!
-//! Only sounds up to [`STATIC_SOUND_DURATION_MAX`] decode into memory: a decoded minute of stereo
-//! costs about 23 MB. Longer sounds, such as ambience loops, stream like music instead.
+//! One-shot sounds up to [`STATIC_SOUND_DURATION_MAX`] and loops that fit the byte budget decode
+//! into memory. Larger sounds stream like music instead.
 
 use std::{
     collections::HashMap,
@@ -17,8 +17,14 @@ use kira::{
 
 use super::buffered_track::{AudioFile, OpenTrackError, frames_in};
 
-/// The longest sound kept decoded in memory.
+/// The longest one-shot sound decoded in memory.
 pub const STATIC_SOUND_DURATION_MAX: Duration = Duration::from_secs(20);
+
+#[derive(Debug, Clone, Copy)]
+pub struct SoundLoadOptions {
+    pub looping: bool,
+    pub bytes_max: usize,
+}
 
 /// Identifies one version of a sound file, so an edited file decodes again.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -46,18 +52,24 @@ pub enum LoadedSound {
     Streamed(AudioFile),
 }
 
-/// Reads and decodes the sound at `path`. Blocks the calling thread.
-pub fn load_sound(path: &Path) -> Result<LoadedSound, OpenTrackError> {
+/// Decodes at most `options.bytes_max` bytes of stereo frames. Loops may exceed
+/// [`STATIC_SOUND_DURATION_MAX`]; one-shots may not. Blocks the calling thread.
+pub fn load_sound(path: &Path, options: SoundLoadOptions) -> Result<LoadedSound, OpenTrackError> {
     let file = AudioFile::open(path)?;
+    let sample_rate = file.source_sample_rate();
+    let frames_max = if options.looping {
+        options.bytes_max / size_of::<Frame>()
+    } else {
+        (options.bytes_max / size_of::<Frame>())
+            .min(frames_in(STATIC_SOUND_DURATION_MAX, sample_rate))
+    };
     if file
         .duration()
-        .is_some_and(|duration| duration > STATIC_SOUND_DURATION_MAX)
+        .is_some_and(|duration| frames_in(duration, sample_rate) > frames_max)
     {
         return Ok(LoadedSound::Streamed(file));
     }
-    let sample_rate = file.source_sample_rate();
     let reopened = file.file().clone();
-    let frames_max = frames_in(STATIC_SOUND_DURATION_MAX, sample_rate);
     match file
         .into_probed()
         .decode_whole(frames_max)

@@ -7,6 +7,12 @@ use std::time::Duration;
 pub struct PlayerDiagnostics {
     /// Frames of silence music playback inserted because a decoder fell behind.
     pub music_underrun_frames: u64,
+    /// Frames of silence streamed effects inserted because a decoder fell behind.
+    pub sound_underrun_frames: u64,
+    /// Local output stream errors reported by CPAL, across output changes.
+    pub local_stream_errors: u64,
+    /// Local stream errors lost when CPAL or Kira's error queues filled.
+    pub local_stream_errors_discarded: u64,
     /// How late songbird ran its 20 ms voice ticks, absent without Discord.
     pub voice_pacing: Option<VoicePacing>,
 }

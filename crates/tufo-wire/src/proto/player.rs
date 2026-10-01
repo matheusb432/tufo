@@ -166,6 +166,9 @@ pub fn diagnostics_response(diagnostics: &PlayerDiagnostics) -> pb::GetPlayerDia
     pb::GetPlayerDiagnosticsResponse {
         diagnostics: Some(pb::PlayerDiagnostics {
             music_underrun_frames: diagnostics.music_underrun_frames,
+            sound_underrun_frames: diagnostics.sound_underrun_frames,
+            local_stream_errors: diagnostics.local_stream_errors,
+            local_stream_errors_discarded: diagnostics.local_stream_errors_discarded,
             voice_pacing: diagnostics.voice_pacing.map(|pacing| pb::VoicePacing {
                 ticks: pacing.ticks,
                 late_ticks: pacing.late_ticks,
@@ -327,6 +330,9 @@ pub fn player_diagnostics(
         .transpose()?;
     Ok(PlayerDiagnostics {
         music_underrun_frames: diagnostics.music_underrun_frames,
+        sound_underrun_frames: diagnostics.sound_underrun_frames,
+        local_stream_errors: diagnostics.local_stream_errors,
+        local_stream_errors_discarded: diagnostics.local_stream_errors_discarded,
         voice_pacing,
     })
 }
@@ -509,6 +515,22 @@ mod tests {
     use tufo_models::discord::{GuildId, VoiceChannelId, VoiceChannelTarget};
 
     use super::*;
+
+    #[test]
+    fn diagnostics_preserve_decoder_and_local_stream_failures() {
+        let diagnostics = PlayerDiagnostics {
+            music_underrun_frames: 128,
+            sound_underrun_frames: 256,
+            local_stream_errors: 3,
+            local_stream_errors_discarded: 4,
+            voice_pacing: None,
+        };
+
+        assert_eq!(
+            player_diagnostics(diagnostics_response(&diagnostics)).unwrap(),
+            diagnostics
+        );
+    }
 
     #[test]
     fn player_states_survive_the_round_trip() {

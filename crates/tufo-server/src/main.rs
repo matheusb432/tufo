@@ -35,8 +35,21 @@ enum Command {
     Data(tufo_server::data::DataCommand),
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
+    #[cfg(target_os = "linux")]
+    configure_pipewire_client();
+    tokio::runtime::Runtime::new()?.block_on(run())
+}
+
+#[cfg(target_os = "linux")]
+fn configure_pipewire_client() {
+    if std::env::var_os("PIPEWIRE_CONFIG_NAME").is_none() {
+        // SAFETY: main calls this before starting the runtime or any other threads.
+        unsafe { std::env::set_var("PIPEWIRE_CONFIG_NAME", "client-rt.conf") };
+    }
+}
+
+async fn run() -> anyhow::Result<()> {
     let arguments = Arguments::parse();
     if let Some(Command::Data(command)) = arguments.command {
         return tufo_server::data::run(command).await;

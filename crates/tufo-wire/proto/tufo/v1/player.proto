@@ -291,6 +291,12 @@ message PlayerDiagnostics {
   uint64 music_underrun_frames = 1;
   // Absent without Discord.
   optional VoicePacing voice_pacing = 2;
+  // Frames of silence streamed effects inserted because a decoder fell behind.
+  uint64 sound_underrun_frames = 3;
+  // Local output stream errors reported by CPAL, across output changes.
+  uint64 local_stream_errors = 4;
+  // Local stream errors lost when CPAL or Kira's error queues filled.
+  uint64 local_stream_errors_discarded = 5;
 }
 
 // How late songbird ran its 20 ms voice ticks.

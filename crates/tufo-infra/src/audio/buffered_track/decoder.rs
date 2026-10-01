@@ -21,7 +21,7 @@ use symphonia::core::{
 };
 
 use super::{
-    TrackShared, duration_of_frames,
+    TrackShared, duration_of_frames, frames_in,
     track_file::{TrackFile, TrackFileReader},
 };
 use crate::audio::codecs;
@@ -123,6 +123,7 @@ impl ProbedTrack {
             file,
             track: self,
             resampler,
+            output_sample_rate,
             skip_frames,
             decoded: Vec::new(),
             stereo: Vec::new(),
@@ -134,7 +135,11 @@ impl ProbedTrack {
     pub(crate) fn decode_whole(mut self, frames_max: usize) -> anyhow::Result<Option<Vec<Frame>>> {
         let mut decoded = Vec::new();
         let mut stereo = Vec::new();
-        let mut frames = Vec::new();
+        let frames_expected = self
+            .duration
+            .map_or(0, |duration| frames_in(duration, self.source_sample_rate))
+            .min(frames_max);
+        let mut frames = Vec::with_capacity(frames_expected);
         while let Some(packet) = self.next_packet()? {
             if packet.track_id != self.track_id {
                 continue;
@@ -150,8 +155,17 @@ impl ProbedTrack {
             let channel_count = buffer.spec().channels().count();
             buffer.copy_to_vec_interleaved(&mut decoded);
             downmix_to_stereo(&decoded, channel_count, &mut stereo);
-            if frames.len() + stereo.len() / STEREO > frames_max {
+            let frames_next = frames.len().saturating_add(stereo.len() / STEREO);
+            if frames_next > frames_max {
                 return Ok(None);
+            }
+            if frames_next > frames.capacity() {
+                let capacity = frames
+                    .capacity()
+                    .saturating_mul(2)
+                    .max(frames_next)
+                    .min(frames_max);
+                frames.reserve_exact(capacity - frames.len());
             }
             frames.extend(
                 stereo
@@ -207,6 +221,7 @@ pub(super) struct TrackDecoder {
     file: TrackFile,
     track: ProbedTrack,
     resampler: Option<StereoResampler>,
+    output_sample_rate: u32,
     /// Source frames still to discard after a seek.
     skip_frames: u64,
     decoded: Vec<f32>,
@@ -219,10 +234,41 @@ impl TrackDecoder {
             producer: &mut producer,
             shared,
         };
-        if let Err(error) = self.decode_all(&mut writer) {
+        if let Err(error) = self.decode_until_stopped(&mut writer) {
             tracing::warn!(error = format!("{error:#}"), "decoding stopped early");
         }
         shared.decoding_finished.store(true, Ordering::Release);
+        shared.decoder_stopped.store(true, Ordering::Release);
+    }
+
+    fn decode_until_stopped(&mut self, writer: &mut FrameWriter<'_>) -> anyhow::Result<()> {
+        loop {
+            self.decode_all(writer)?;
+            writer
+                .shared
+                .decoding_finished
+                .store(true, Ordering::Release);
+            while !writer.shared.looping.load(Ordering::Relaxed) && !writer.should_stop() {
+                thread::park_timeout(FULL_BUFFER_WAIT);
+            }
+            if writer.should_stop() {
+                return Ok(());
+            }
+            // Prefill can reach EOF before the caller enables looping. A finished resampler
+            // has flushed its tail, so a later pass needs a fresh resampler as well as a probe.
+            self.track = ProbedTrack::probe(self.file.reader())?;
+            self.skip_frames = 0;
+            if self.resampler.is_some() {
+                self.resampler = Some(StereoResampler::new(
+                    self.track.source_sample_rate,
+                    self.output_sample_rate,
+                )?);
+            }
+            writer
+                .shared
+                .decoding_finished
+                .store(false, Ordering::Release);
+        }
     }
 
     fn decode_all(&mut self, writer: &mut FrameWriter<'_>) -> anyhow::Result<()> {
@@ -336,7 +382,7 @@ impl FrameWriter<'_> {
             }
             let writable = self.producer.slots().min(remaining);
             if writable == 0 {
-                thread::sleep(FULL_BUFFER_WAIT);
+                thread::park_timeout(FULL_BUFFER_WAIT);
                 continue;
             }
             let Ok(chunk) = self.producer.write_chunk_uninit(writable) else {

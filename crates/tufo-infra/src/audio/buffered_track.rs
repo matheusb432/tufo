@@ -10,6 +10,7 @@ mod track_file;
 
 use std::{
     io,
+    num::NonZeroU64,
     path::Path,
     sync::{
         Arc,
@@ -23,8 +24,7 @@ use kira::Frame;
 use rtrb::{Consumer, RingBuffer};
 pub use track_file::TrackFile;
 
-const BUFFER_DURATION: Duration = Duration::from_secs(5);
-const PREFILL_DURATION: Duration = Duration::from_millis(250);
+const BUFFER_DURATION: Duration = Duration::from_secs(30);
 const PREFILL_TIMEOUT: Duration = Duration::from_secs(2);
 const PREFILL_POLL_INTERVAL: Duration = Duration::from_millis(2);
 
@@ -102,15 +102,16 @@ pub struct BufferedTrack {
 }
 
 impl BufferedTrack {
-    /// Starts decoding `file` at `output_sample_rate` and returns once [`PREFILL_DURATION`] of
-    /// audio is buffered or decoding has ended. Blocks the calling thread.
+    /// Starts decoding `file` at `output_sample_rate`, filling up to [`BUFFER_DURATION`] before
+    /// returning. Short files return at EOF; a slow decoder gets at most [`PREFILL_TIMEOUT`] to
+    /// prefill. Blocks the calling thread.
     pub fn start(
         file: AudioFile,
         output_sample_rate: u32,
         options: DecodeOptions,
     ) -> Result<Self, OpenTrackError> {
-        let declared_frames = file
-            .duration()
+        let duration = file.duration();
+        let declared_frames = duration
             .map(|duration| duration.saturating_sub(options.start_position))
             .map(|remaining| frames_in(remaining, output_sample_rate));
         let track_file = file.file().clone();
@@ -123,7 +124,7 @@ impl BufferedTrack {
             looping: AtomicBool::new(options.looping),
             ..TrackShared::default()
         });
-        thread::Builder::new()
+        let decoder_thread = thread::Builder::new()
             .name("tufo-track-decoder".to_owned())
             .spawn({
                 let shared = Arc::clone(&shared);
@@ -136,13 +137,19 @@ impl BufferedTrack {
             shared: Arc::clone(&shared),
             frames_played: 0,
             declared_frames: declared_frames.map(frame_count),
+            underrun_frames_total: None,
         };
-        reader.wait_for_prefill(frames_in(PREFILL_DURATION, output_sample_rate));
+        reader.wait_for_prefill(frames_in(BUFFER_DURATION, output_sample_rate));
         Ok(Self {
             reader,
             handle: TrackHandle {
                 shared,
                 sample_rate: output_sample_rate,
+                decoder_thread: decoder_thread.thread().clone(),
+                first_pass_frames: declared_frames.map(frame_count),
+                loop_frames: duration.and_then(|duration| {
+                    NonZeroU64::new(frame_count(frames_in(duration, output_sample_rate)))
+                }),
             },
         })
     }
@@ -155,6 +162,7 @@ pub struct TrackReader {
     frames_played: u64,
     /// The frames left from the start position, as the container declares its length.
     declared_frames: Option<u64>,
+    underrun_frames_total: Option<Arc<AtomicU64>>,
 }
 
 impl TrackReader {
@@ -162,8 +170,11 @@ impl TrackReader {
     /// A short read while the decoder still runs counts as an underrun.
     pub fn read(&mut self, out: &mut [Frame]) -> usize {
         // Load the flag before counting frames: once it is set, the count includes every frame.
-        let decoding_finished = self.shared.decoding_finished.load(Ordering::Acquire);
-        let count = self.consumer.slots().min(out.len());
+        let decoding_finished = self.decoding_finished();
+        let wanted = out
+            .len()
+            .min(usize::try_from(self.frames_until_loop_end()).unwrap_or(usize::MAX));
+        let count = self.consumer.slots().min(wanted);
         let copied = match self.consumer.read_chunk(count) {
             Ok(chunk) => {
                 let (first, second) = chunk.as_slices();
@@ -178,32 +189,59 @@ impl TrackReader {
         self.shared
             .frames_played
             .store(self.frames_played, Ordering::Relaxed);
-        if copied < out.len() && !decoding_finished {
+        if copied < wanted && !decoding_finished {
+            let missing = frame_count(wanted - copied);
             self.shared
                 .underrun_frames
-                .fetch_add(frame_count(out.len() - copied), Ordering::Relaxed);
+                .fetch_add(missing, Ordering::Relaxed);
+            if let Some(total) = &self.underrun_frames_total {
+                total.fetch_add(missing, Ordering::Relaxed);
+            }
         }
         copied
     }
 
-    /// Whether every decoded frame has been read and the decoder has stopped.
+    pub(crate) fn count_underruns_in(&mut self, total: Arc<AtomicU64>) {
+        self.underrun_frames_total = Some(total);
+    }
+
+    /// Whether playback ended, including a loop turned off with repeats still buffered.
     #[must_use]
     pub fn is_exhausted(&self) -> bool {
-        self.shared.decoding_finished.load(Ordering::Acquire) && self.consumer.is_empty()
+        self.frames_until_loop_end() == 0 || (self.decoding_finished() && self.consumer.is_empty())
     }
 
     /// Frames left to read: exact once decoding has finished, otherwise the container's
     /// declared length minus what played, or `None` when neither is known.
     #[must_use]
     pub fn remaining_frames(&self) -> Option<u64> {
+        if self.shared.looping.load(Ordering::Relaxed)
+            && !self.shared.decoder_stopped.load(Ordering::Acquire)
+        {
+            return None;
+        }
+        let frames_end = self.shared.playback_frames_end.load(Ordering::Acquire);
+        if frames_end != u64::MAX {
+            return Some(frames_end.saturating_sub(self.frames_played));
+        }
         if self.shared.decoding_finished.load(Ordering::Acquire) {
             return Some(frame_count(self.consumer.slots()));
         }
-        if self.shared.looping.load(Ordering::Relaxed) {
-            return None;
-        }
         self.declared_frames
             .map(|frames| frames.saturating_sub(self.frames_played))
+    }
+
+    fn frames_until_loop_end(&self) -> u64 {
+        self.shared
+            .playback_frames_end
+            .load(Ordering::Acquire)
+            .saturating_sub(self.frames_played)
+    }
+
+    fn decoding_finished(&self) -> bool {
+        self.shared.decoding_finished.load(Ordering::Acquire)
+            && (!self.shared.looping.load(Ordering::Relaxed)
+                || self.shared.decoder_stopped.load(Ordering::Acquire))
     }
 
     fn wait_for_prefill(&self, prefill_frames: usize) {
@@ -213,6 +251,15 @@ impl TrackReader {
             && Instant::now() < deadline
         {
             thread::sleep(PREFILL_POLL_INTERVAL);
+        }
+        if self.consumer.slots() < prefill_frames
+            && !self.shared.decoding_finished.load(Ordering::Acquire)
+        {
+            tracing::warn!(
+                buffered_frames = self.consumer.slots(),
+                prefill_frames,
+                "starting playback before the decoder filled its headroom"
+            );
         }
     }
 }
@@ -229,6 +276,9 @@ impl Drop for TrackReader {
 pub struct TrackHandle {
     shared: Arc<TrackShared>,
     sample_rate: u32,
+    decoder_thread: thread::Thread,
+    first_pass_frames: Option<u64>,
+    loop_frames: Option<NonZeroU64>,
 }
 
 impl TrackHandle {
@@ -247,21 +297,56 @@ impl TrackHandle {
         self.shared.underrun_frames.load(Ordering::Relaxed)
     }
 
-    /// Changes whether the decoder wraps around at the end of the file.
+    /// Changes whether the decoder wraps around. Disabling ends the current pass at the
+    /// container's declared duration, discarding prefetched repeats.
     pub fn set_looping(&self, looping: bool) {
+        if looping {
+            self.shared
+                .playback_frames_end
+                .store(u64::MAX, Ordering::Release);
+        } else if self.shared.looping.load(Ordering::Relaxed)
+            && let (Some(first_pass), Some(loop_frames)) =
+                (self.first_pass_frames, self.loop_frames)
+        {
+            let played = self.shared.frames_played.load(Ordering::Relaxed);
+            let passes = played
+                .saturating_sub(first_pass)
+                .div_ceil(loop_frames.get());
+            let end = first_pass.saturating_add(passes.saturating_mul(loop_frames.get()));
+            self.shared
+                .playback_frames_end
+                .store(end, Ordering::Release);
+        }
         self.shared.looping.store(looping, Ordering::Relaxed);
+        self.decoder_thread.unpark();
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct TrackShared {
     stop_requested: AtomicBool,
     looping: AtomicBool,
     /// Set after the decoder pushed its last frame, so a reader that observes it also observes
     /// every frame.
     decoding_finished: AtomicBool,
+    decoder_stopped: AtomicBool,
     frames_played: AtomicU64,
     underrun_frames: AtomicU64,
+    playback_frames_end: AtomicU64,
+}
+
+impl Default for TrackShared {
+    fn default() -> Self {
+        Self {
+            stop_requested: AtomicBool::new(false),
+            looping: AtomicBool::new(false),
+            decoding_finished: AtomicBool::new(false),
+            decoder_stopped: AtomicBool::new(false),
+            frames_played: AtomicU64::new(0),
+            underrun_frames: AtomicU64::new(0),
+            playback_frames_end: AtomicU64::new(u64::MAX),
+        }
+    }
 }
 
 pub(crate) fn frames_in(duration: Duration, sample_rate: u32) -> usize {
@@ -280,4 +365,43 @@ pub(crate) fn duration_of_frames(frames: u64, sample_rate: u32) -> Duration {
 /// Widens a frame count; `usize` never exceeds `u64` on supported targets.
 pub(crate) fn frame_count(frames: usize) -> u64 {
     u64::try_from(frames).unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn underrun_totals_outlive_readers_and_exclude_finished_decoders() {
+        let total = Arc::new(AtomicU64::new(0));
+        for expected in [3, 6] {
+            let (mut producer, consumer) = RingBuffer::new(4);
+            producer.push(Frame::new(0.25, 0.25)).unwrap();
+            let shared = Arc::new(TrackShared::default());
+            let mut reader = TrackReader {
+                consumer,
+                shared: Arc::clone(&shared),
+                frames_played: 0,
+                declared_frames: None,
+                underrun_frames_total: None,
+            };
+            reader.count_underruns_in(Arc::clone(&total));
+            let mut out = [Frame::ZERO; 4];
+
+            assert_eq!(reader.read(&mut out), 1);
+            assert_eq!(out[0], Frame::new(0.25, 0.25));
+            assert_eq!(shared.underrun_frames.load(Ordering::Relaxed), 3);
+            shared.decoding_finished.store(true, Ordering::Release);
+            if expected == 6 {
+                shared.looping.store(true, Ordering::Relaxed);
+                shared.decoder_stopped.store(true, Ordering::Release);
+            }
+            assert_eq!(reader.read(&mut out), 0);
+            assert!(reader.is_exhausted());
+            assert_eq!(reader.remaining_frames(), Some(0));
+            drop(reader);
+
+            assert_eq!(total.load(Ordering::Relaxed), expected);
+        }
+    }
 }

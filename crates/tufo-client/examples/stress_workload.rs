@@ -10,7 +10,9 @@ use anyhow::{Context as _, bail, ensure};
 use clap::Parser;
 use tufo_client::{
     LocalEndpoint, TufoClient,
-    library::{CollectionView, ImportPaths, LibrarySnapshot, UpdateCollectionEntry},
+    library::{
+        CollectionSource, CollectionView, ImportPaths, LibrarySnapshot, UpdateCollectionEntry,
+    },
     player::{UpdateMusicLayer, UpdatePlayerSettings},
 };
 use tufo_models::{
@@ -47,6 +49,8 @@ struct Arguments {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let arguments = Arguments::parse();
+    let sounds_root = std::fs::canonicalize(arguments.sounds.as_ref().unwrap_or(&arguments.music))
+        .context("resolving the sounds folder")?;
     let client = TufoClient::connect_lazy(&LocalEndpoint::from_environment()?)?;
     let snapshot = import(&client, &arguments).await?;
     let playlist = snapshot
@@ -58,8 +62,12 @@ async fn main() -> anyhow::Result<()> {
     let sounds = snapshot
         .collections
         .iter()
-        .find(|collection| collection.kind == CollectionKind::Soundboard)
-        .filter(|soundboard| soundboard.entries.len() >= 2)
+        .find(|collection| {
+            collection.kind == CollectionKind::Soundboard
+                && collection.entries.len() >= 2
+                && matches!(&collection.source, CollectionSource::Linked { folder, .. }
+                    if folder.as_ref().starts_with(&sounds_root))
+        })
         .context("the sounds folder needs at least two audio files")?;
     prepare_sounds(&client, sounds, arguments.silent).await?;
     if let Some(voice) = &arguments.voice {
@@ -96,8 +104,10 @@ async fn main() -> anyhow::Result<()> {
         arguments.minutes
     );
     run_workload(&client, sounds, Duration::from_mins(arguments.minutes)).await?;
+    client.stand_by().await?;
+    // Let the fade, output release, and diagnostics tick finish before reading the totals.
+    tokio::time::sleep(Duration::from_secs(1)).await;
     let diagnostics = client.player_diagnostics().await?;
-    client.stop_music().await?;
     report(&diagnostics)
 }
 
@@ -183,6 +193,21 @@ fn report(diagnostics: &PlayerDiagnostics) -> anyhow::Result<()> {
         diagnostics.music_underrun_frames == 0,
         "music playback fell behind for {} frames",
         diagnostics.music_underrun_frames
+    );
+    println!(
+        "Sound underrun frames: {}; local stream errors: {} ({} discarded)",
+        diagnostics.sound_underrun_frames,
+        diagnostics.local_stream_errors,
+        diagnostics.local_stream_errors_discarded
+    );
+    ensure!(
+        diagnostics.sound_underrun_frames == 0,
+        "sound playback fell behind for {} frames",
+        diagnostics.sound_underrun_frames
+    );
+    ensure!(
+        diagnostics.local_stream_errors == 0 && diagnostics.local_stream_errors_discarded == 0,
+        "the local output reported stream errors"
     );
     let Some(pacing) = diagnostics.voice_pacing else {
         println!("Local output: now check pw-top's ERR column for Tufo's node, then listen back.");
