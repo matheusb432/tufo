@@ -60,7 +60,7 @@ impl Session {
             "{arguments:?}: {}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(output.stderr.is_empty());
+        assert_eq!(output.stderr, Vec::<u8>::new());
         Ok(output)
     }
 
@@ -108,7 +108,7 @@ async fn diagnostics_and_rejected_arguments_do_not_start_a_server() -> anyhow::R
     ] {
         let output = session.run(arguments).await?;
         assert_eq!(output.status.code(), Some(1));
-        assert!(output.stderr.is_empty());
+        assert_eq!(output.stderr, Vec::<u8>::new());
         let report: Value = serde_json::from_slice(&output.stdout)?;
         assert!(report["server"].is_null());
         assert_eq!(report["checks"][0]["status"], "fail");
@@ -116,7 +116,7 @@ async fn diagnostics_and_rejected_arguments_do_not_start_a_server() -> anyhow::R
     }
     let rejected = session.run(&["server", "start", "--unknown"]).await?;
     assert_eq!(rejected.status.code(), Some(2));
-    assert!(rejected.stdout.is_empty());
+    assert_eq!(rejected.stdout, Vec::<u8>::new());
     assert!(String::from_utf8_lossy(&rejected.stderr).starts_with("error:"));
     assert!(!session.path("runtime").exists());
     assert!(!session.path("tufo.sqlite3").exists());
@@ -164,7 +164,7 @@ async fn a_server_without_status_support_is_reported_as_incompatible_not_unreach
     ] {
         let output = session.run(arguments).await?;
         assert_eq!(output.status.code(), Some(1));
-        assert!(output.stderr.is_empty());
+        assert_eq!(output.stderr, Vec::<u8>::new());
         let report: Value = serde_json::from_slice(&output.stdout)?;
         assert_eq!(report["server"]["serving"], true);
         assert!(report["server"]["version"].is_null());
@@ -267,7 +267,7 @@ async fn reports_saved_and_invalid_credentials_without_exposing_the_token() -> a
     // A restart attempts to read the malformed file; the child's error must not enter CLI output.
     let failed = session.run(&["server", "restart"]).await?;
     assert_eq!(failed.status.code(), Some(1));
-    assert!(failed.stdout.is_empty());
+    assert_eq!(failed.stdout, Vec::<u8>::new());
     let stderr = String::from_utf8(failed.stderr)?;
     assert!(!stderr.contains(TOKEN));
     assert!(stderr.starts_with("error:"));
@@ -294,7 +294,7 @@ async fn inaccessible_and_unresponsive_endpoints_are_not_treated_as_stopped() ->
     )?;
     let refused = session.run(&["server", "kill"]).await?;
     assert_eq!(refused.status.code(), Some(1));
-    assert!(refused.stdout.is_empty());
+    assert_eq!(refused.stdout, Vec::<u8>::new());
 
     std::fs::set_permissions(
         session.path("runtime"),
@@ -304,7 +304,7 @@ async fn inaccessible_and_unresponsive_endpoints_are_not_treated_as_stopped() ->
     let listener = tokio::net::UnixListener::bind(endpoint.path())?;
     let unresponsive = session.run(&["server", "start"]).await?;
     assert_eq!(unresponsive.status.code(), Some(1));
-    assert!(unresponsive.stdout.is_empty());
+    assert_eq!(unresponsive.stdout, Vec::<u8>::new());
     assert!(!session.path("tufo.sqlite3").exists());
     drop(listener);
     Ok(())

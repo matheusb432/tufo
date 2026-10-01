@@ -40,7 +40,10 @@ async fn an_imported_folder_streams_as_a_linked_playlist() {
         .unwrap()
         .unwrap();
 
-    assert!(empty.collections.is_empty());
+    assert_eq!(
+        empty.collections,
+        Vec::<tufo_wire::library::CollectionView>::new()
+    );
     assert_eq!((report.collections_created, report.files_added), (1, 1));
     assert!(imported.revision > empty.revision);
     let boss = &imported.collections[0];

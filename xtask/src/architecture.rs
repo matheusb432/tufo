@@ -227,7 +227,7 @@ mod tests {
         );
         generate_lockfile(workspace.path());
 
-        assert!(read_violations(workspace.path()).is_empty());
+        assert_eq!(read_violations(workspace.path()), Vec::<String>::new());
     }
 
     #[test]

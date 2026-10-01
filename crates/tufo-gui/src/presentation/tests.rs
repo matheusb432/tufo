@@ -218,7 +218,7 @@ fn the_songs_page_counts_each_music_folder_and_marks_removable_songs() {
         ]
     );
     assert_eq!(filtered.rows.len(), 1);
-    assert!(songs.overflow.is_empty());
+    assert_eq!(songs.overflow, "");
 }
 
 #[test]
@@ -289,8 +289,8 @@ fn a_playlists_song_search_offers_playable_songs_it_lacks() {
 
     assert_eq!(search(1, "dragon"), ["Dragon Lair"]);
     assert_eq!(search(1, "caves"), ["Dragon Lair"]);
-    assert!(search(1, " ").is_empty());
-    assert!(search(2, "dragon").is_empty());
+    assert_eq!(search(1, " "), Vec::<String>::new());
+    assert_eq!(search(2, "dragon"), Vec::<String>::new());
 }
 
 #[test]

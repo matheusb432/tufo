@@ -166,7 +166,6 @@ impl MusicQueue {
     }
 
     /// The queued songs in the order they play.
-    #[must_use]
     pub fn queued(&self) -> impl ExactSizeIterator<Item = &QueuedEntry> {
         self.queued.iter()
     }

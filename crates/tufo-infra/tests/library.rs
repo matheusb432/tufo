@@ -285,7 +285,10 @@ async fn a_deleted_linked_playlist_stays_deleted_until_its_folder_is_dropped_aga
     fixture.write_track("rpg/boss/lich.wav", 450.0).unwrap();
     sync_library::execute(&fixture.library).await.unwrap();
     let deleted = fixture.snapshot();
-    assert!(deleted.collections.is_empty());
+    assert_eq!(
+        deleted.collections,
+        Vec::<tufo_wire::library::CollectionView>::new()
+    );
     assert_eq!(song_titles(&deleted), ["dragon", "lich"]);
 
     import_paths::execute(import(), &fixture.library)
@@ -316,7 +319,10 @@ async fn a_deleted_hand_picked_playlist_leaves_its_songs() {
         .unwrap();
 
     let snapshot = fixture.snapshot();
-    assert!(snapshot.collections.is_empty());
+    assert_eq!(
+        snapshot.collections,
+        Vec::<tufo_wire::library::CollectionView>::new()
+    );
     assert_eq!(song_titles(&snapshot), ["ambush", "chase"]);
     assert_eq!(song(&snapshot, "ambush").unwrap().source, SongSource::File);
 }
@@ -432,8 +438,11 @@ async fn an_unfollowed_folder_takes_its_playlists_but_not_hand_picked_entries() 
         .collect::<Vec<_>>();
     assert_eq!(titles, ["Session 12"]);
     assert_eq!(entry_titles(&snapshot.collections[0]), ["dragon"]);
-    assert!(snapshot.songs.is_empty());
-    assert!(snapshot.library_folders.is_empty());
+    assert_eq!(snapshot.songs, Vec::<tufo_wire::library::SongView>::new());
+    assert_eq!(
+        snapshot.library_folders,
+        Vec::<tufo_wire::library::LibraryFolderView>::new()
+    );
 }
 
 #[tokio::test]
@@ -669,7 +678,10 @@ async fn unreadable_effects_leave_the_soundboard_for_a_later_start() {
             unreadable: vec![rain.path]
         }
     );
-    assert!(before.collections.is_empty());
+    assert_eq!(
+        before.collections,
+        Vec::<tufo_wire::library::CollectionView>::new()
+    );
     assert_eq!(retried, SeedDefaultEffectsOutcome::Seeded);
     assert!(titled(&fixture.snapshot(), "Effects").is_some());
 }

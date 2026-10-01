@@ -156,7 +156,7 @@ fn an_unchanged_library_changes_nothing() {
 
     let pending = plan(input);
 
-    assert!(pending.inspections_needed().is_empty());
+    assert_eq!(pending.inspections_needed(), Vec::<AudioFilePath>::new());
     assert!(pending.finish(&HashMap::new()).is_empty());
 }
 
@@ -185,8 +185,11 @@ fn a_renamed_file_keeps_its_row_and_entry_without_rereading_it() {
             facts: None,
         }]
     );
-    assert!(changes.entries_added.is_empty());
-    assert!(changes.entries_removed.is_empty());
+    assert_eq!(
+        changes.entries_added,
+        Vec::<(CollectionRef, FileRef)>::new()
+    );
+    assert_eq!(changes.entries_removed, Vec::<CollectionEntryId>::new());
 }
 
 #[test]
@@ -246,7 +249,7 @@ fn a_file_a_tagger_rewrote_in_place_is_read_again() {
             facts: Some(facts('a')),
         }]
     );
-    assert!(changes.new_files.is_empty());
+    assert_eq!(changes.new_files, Vec::<NewFile>::new());
 }
 
 #[test]
@@ -366,7 +369,7 @@ fn a_renamed_folder_keeps_its_collection_and_retitles_a_derived_title() {
             title: Some(Title::try_new("calm".to_owned()).unwrap()),
         }]
     );
-    assert!(changes.new_collections.is_empty());
+    assert_eq!(changes.new_collections, Vec::<NewLinkedCollection>::new());
     assert!(changes.entries_added.is_empty() && changes.entries_removed.is_empty());
 }
 
@@ -395,7 +398,7 @@ fn a_vanished_library_folder_marks_everything_missing_but_keeps_entries() {
             id: CollectionId::from_uuid(id(20))
         }]
     );
-    assert!(changes.entries_removed.is_empty());
+    assert_eq!(changes.entries_removed, Vec::<CollectionEntryId>::new());
 }
 
 #[test]
@@ -431,8 +434,11 @@ fn a_hidden_collection_stays_empty_while_its_folder_keeps_adding_files() {
     let changes = reconcile(input, &[("rpg/boss/dragon.mp3", facts('a'))]);
 
     assert_eq!(changes.new_files.len(), 1);
-    assert!(changes.new_collections.is_empty());
-    assert!(changes.entries_added.is_empty());
+    assert_eq!(changes.new_collections, Vec::<NewLinkedCollection>::new());
+    assert_eq!(
+        changes.entries_added,
+        Vec::<(CollectionRef, FileRef)>::new()
+    );
 }
 
 #[test]

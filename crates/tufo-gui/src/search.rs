@@ -337,6 +337,6 @@ mod tests {
 
     #[test]
     fn a_blank_query_finds_nothing() {
-        assert!(search(&library(), "  ").is_empty());
+        assert_eq!(search(&library(), "  "), Vec::<PaletteResult>::new());
     }
 }

@@ -12,7 +12,7 @@ fn returns_verified_field_names_to_an_external_consumer() {
         age: 42,
     };
 
-    assert!(user.name.is_empty());
+    assert_eq!(user.name, "");
     assert_eq!(user.age, 42);
     assert_eq!(field!(name @ User), "name");
     assert_eq!(field!(age @ User), "age");

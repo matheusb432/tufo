@@ -47,7 +47,9 @@ use tufo_models::{
     playback::{
         AudioFilePath, OutputTarget,
         diagnostics::VoicePacing,
-        player_state::{CrossfadeDuration, PlayerState, SoundCue, VoiceConnectionState},
+        player_state::{
+            ActiveSound, CrossfadeDuration, PlayerState, SoundCue, VoiceConnectionState,
+        },
         queue::{QueueEntry, QueueStart, QueuedEntry, RepeatMode},
     },
 };
@@ -657,7 +659,10 @@ async fn a_queued_song_plays_between_two_tracks_without_a_gap() -> anyhow::Resul
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     assert_eq!(queued_ids, [boss.entry.entry_id]);
-    assert!(during_boss.queued_entry_ids.is_empty());
+    assert_eq!(
+        during_boss.queued_entry_ids,
+        Vec::<CollectionEntryId>::new()
+    );
     assert_eq!(
         during_boss.music.map(|music| music.collection_id),
         Some(boss.collection_id)
@@ -697,7 +702,10 @@ async fn queued_songs_and_repeating_one_track_exclude_each_other() -> anyhow::Re
     ));
     assert_eq!(repeat_while_queued, RepeatMode::Playlist);
     assert_eq!(while_repeating_track, Err(QueueSongError::RepeatingTrack));
-    assert!(rig.state().queued_entry_ids.is_empty());
+    assert_eq!(
+        rig.state().queued_entry_ids,
+        Vec::<CollectionEntryId>::new()
+    );
     Ok(())
 }
 
@@ -740,7 +748,7 @@ async fn queuing_with_nothing_playing_starts_the_song_in_its_playlist() -> anyho
     let music = state.music.context("the song plays")?;
     assert_eq!(music.entry.entry_id, boss);
     assert_eq!(music.collection_id, playlist.id);
-    assert!(state.queued_entry_ids.is_empty());
+    assert_eq!(state.queued_entry_ids, Vec::<CollectionEntryId>::new());
     Ok(())
 }
 
@@ -911,7 +919,7 @@ async fn one_shot_sounds_end_while_looping_sounds_follow_the_output() -> anyhow:
         0.2,
         0.05
     ));
-    assert!(rig.state().sounds.is_empty());
+    assert_eq!(rig.state().sounds, Vec::<ActiveSound>::new());
     Ok(())
 }
 
@@ -1126,7 +1134,7 @@ async fn paused_sounds_stay_paused_on_a_new_output_until_another_fires() -> anyh
     let fired = rig.state();
 
     assert!(!nothing_to_pause.sounds_paused);
-    assert!(!on_voice.is_empty());
+    assert_ne!(on_voice, Vec::<f32>::new());
     assert!(within(&on_voice, 0.0, 1e-4));
     assert!(!fired.sounds_paused);
     assert_eq!(fired.sounds.len(), 2);
@@ -1200,7 +1208,7 @@ async fn a_login_resumes_the_loops_left_playing_unless_they_were_paused() -> any
     assert_eq!(playing_after_resume.len(), 1);
     assert_eq!(playing_after_resume[0].entry_id, rain);
     assert_eq!(left_paused, ResumeSavedLoopsOutcome::LeftPaused);
-    assert!(playing_after_paused.is_empty());
+    assert_eq!(playing_after_paused, Vec::<ActiveSound>::new());
     assert_eq!(stopped, ResumeSavedLoopsOutcome::NothingSaved);
     Ok(())
 }
