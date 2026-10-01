@@ -221,7 +221,7 @@ msgstr ""
 msgid "Clock"
 msgstr ""
 
-#: ui/dialogs.slint ui/dock.slint ui/frame.slint ui/gallery.slint
+#: ui/dialogs.slint ui/dock.slint ui/frame.slint ui/gallery.slint src/tray/linux.rs src/tray/icon_menu.rs
 msgid "Close"
 msgstr ""
 
@@ -747,16 +747,16 @@ msgstr ""
 msgid "Oldest first"
 msgstr ""
 
+#: src/tray/linux.rs src/tray/icon_menu.rs
+msgid "Open"
+msgstr ""
+
 #: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders"
 msgstr ""
 
 #: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders there."
-msgstr ""
-
-#: src/tray/linux.rs src/tray/windows.rs
-msgid "Open Tufo"
 msgstr ""
 
 #: ui/gallery.slint
@@ -841,10 +841,6 @@ msgstr ""
 
 #: ui/dock.slint
 msgid "Previous"
-msgstr ""
-
-#: src/tray/linux.rs src/tray/windows.rs
-msgid "Quit Tufo"
 msgstr ""
 
 #: src/sound_icons.rs

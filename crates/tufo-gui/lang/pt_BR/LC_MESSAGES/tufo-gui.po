@@ -221,7 +221,7 @@ msgstr "Claude-Joseph Vernet, 1772"
 msgid "Clock"
 msgstr "Relógio"
 
-#: ui/dialogs.slint ui/dock.slint ui/frame.slint ui/gallery.slint
+#: ui/dialogs.slint ui/dock.slint ui/frame.slint ui/gallery.slint src/tray/linux.rs src/tray/icon_menu.rs
 msgid "Close"
 msgstr "Fechar"
 
@@ -747,6 +747,10 @@ msgstr "Nada tocando"
 msgid "Oldest first"
 msgstr "Mais antigas"
 
+#: src/tray/linux.rs src/tray/icon_menu.rs
+msgid "Open"
+msgstr "Abrir"
+
 #: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders"
 msgstr "Abra Playlists ou Painéis de sons para soltar pastas"
@@ -754,10 +758,6 @@ msgstr "Abra Playlists ou Painéis de sons para soltar pastas"
 #: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders there."
 msgstr "Abra Playlists ou Painéis de sons para soltar pastas lá."
-
-#: src/tray/linux.rs src/tray/windows.rs
-msgid "Open Tufo"
-msgstr "Abrir Tufo"
 
 #: ui/gallery.slint
 msgid "Or drop one on this window"
@@ -842,10 +842,6 @@ msgstr "Playlists"
 #: ui/dock.slint
 msgid "Previous"
 msgstr "Anterior"
-
-#: src/tray/linux.rs src/tray/windows.rs
-msgid "Quit Tufo"
-msgstr "Sair do Tufo"
 
 #: src/sound_icons.rs
 msgid "Rabbit"

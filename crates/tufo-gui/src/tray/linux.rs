@@ -68,7 +68,7 @@ impl ksni::Tray for StatusNotifier {
         let (play_pause_label, play_pause_enabled) = play_pause_item(self.playback.music);
         let (pause_sounds_label, pause_sounds_enabled) = pause_sounds_item(self.playback.sounds);
         vec![
-            menu_item(crate::i18n::tr("Open Tufo"), true, TrayCommand::ShowWindow),
+            menu_item(crate::i18n::tr("Open"), true, TrayCommand::ShowWindow),
             menu_item(
                 crate::i18n::tr("Mini Player"),
                 true,
@@ -85,7 +85,7 @@ impl ksni::Tray for StatusNotifier {
                 TrayCommand::ToggleSoundsPaused,
             ),
             ksni::MenuItem::Separator,
-            menu_item(crate::i18n::tr("Quit Tufo"), true, TrayCommand::Quit),
+            menu_item(crate::i18n::tr("Close"), true, TrayCommand::Quit),
         ]
     }
 }
@@ -228,11 +228,11 @@ mod tests {
         assert_eq!(
             labels(&status_notifier(TrayMusic::Playing, TraySounds::Paused)),
             [
-                ("Open Tufo".to_owned(), true),
+                ("Open".to_owned(), true),
                 ("Mini Player".to_owned(), true),
                 ("Pause".to_owned(), true),
                 ("Resume Sounds".to_owned(), true),
-                ("Quit Tufo".to_owned(), true)
+                ("Close".to_owned(), true)
             ]
         );
         assert_eq!(

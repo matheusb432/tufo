@@ -36,7 +36,7 @@ impl Tray {
     pub(crate) fn show(
         on_command: impl Fn(TrayCommand) + Clone + Send + Sync + 'static,
     ) -> anyhow::Result<Self> {
-        let open = MenuItem::with_id(OPEN_ITEM_ID, crate::i18n::tr("Open Tufo"), true, None);
+        let open = MenuItem::with_id(OPEN_ITEM_ID, crate::i18n::tr("Open"), true, None);
         let mini_player = MenuItem::with_id(
             MINI_PLAYER_ITEM_ID,
             crate::i18n::tr("Mini Player"),
@@ -58,7 +58,7 @@ impl Tray {
             pause_sounds_enabled,
             None,
         );
-        let quit = MenuItem::with_id(QUIT_ITEM_ID, crate::i18n::tr("Quit Tufo"), true, None);
+        let quit = MenuItem::with_id(QUIT_ITEM_ID, crate::i18n::tr("Close"), true, None);
         let menu = Menu::with_items(&[
             &open,
             &mini_player,
