@@ -4,6 +4,13 @@ windows-provision:
     "${WINVM_RS:-winvm-rs}" script --elevated --timeout 5400 scripts/windows/provision-machine.cmd
     "${WINVM_RS:-winvm-rs}" script --timeout 3600 scripts/windows/provision-user.cmd
 
+# Lint the Windows code from Linux: clippy for x86-64 Windows through cargo-xwin.
+[group('quality')]
+windows-lint:
+    # Clippy never links, so pointing libopus_sys at a library folder skips building Opus.
+    LIBOPUS_LIB_DIR="${CARGO_TARGET_DIR:-target}/windows-lint" CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}/windows-lint" \
+        mise exec -- cargo xwin clippy --locked --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings
+
 # Build Tufo on the winvm-rs Windows VM and run its portable tests there
 [group('quality')]
 windows-check:

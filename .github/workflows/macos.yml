@@ -1,0 +1,70 @@
+name: macos
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: Mac architecture to build and test on
+        type: choice
+        default: macos-15
+        options:
+          - macos-15
+          - macos-15-intel
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}-${{ inputs.runner }}
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    defaults:
+      run:
+        # The workspace reaches error-meta at shared, as on the development machine.
+        working-directory: tools/tufo
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools/tufo
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.8
+          working_directory: tools/tufo
+          install_args: rust just buf cargo-binstall cargo:cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/tufo
+          cache-on-failure: true
+      - name: Build and install Tufo.app
+        id: install
+        run: just install
+      - name: Smoke-test the installed executables
+        run: just smoke "$HOME/Applications/Tufo.app/Contents/MacOS"
+      - name: Check the bundle's signature
+        run: codesign --verify --deep --strict "$HOME/Applications/Tufo.app"
+      - name: Pack the bundle
+        run: mkdir -p .artifacts && ditto -c -k --keepParent "$HOME/Applications/Tufo.app" .artifacts/Tufo.app.zip
+      - name: Upload the bundle
+        uses: actions/upload-artifact@v7
+        with:
+          name: tufo-${{ inputs.runner }}-${{ github.sha }}
+          path: tools/tufo/.artifacts/Tufo.app.zip
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop the installed server
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: '"$HOME/.local/bin/tufo" server kill'
+      - name: Uninstall
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: just uninstall
+      - name: Test the workspace
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: just test
+      - name: Lint macOS-specific code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings

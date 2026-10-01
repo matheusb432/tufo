@@ -1,0 +1,61 @@
+name: windows
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  install:
+    runs-on: windows-2025
+    timeout-minutes: 120
+    defaults:
+      run:
+        shell: bash
+        # The workspace reaches error-meta at shared, as on the development machine.
+        working-directory: tools/tufo
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: tools/tufo
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.8
+          working_directory: tools/tufo
+          install_args: rust just buf cargo-binstall cargo:cargo-nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tools/tufo
+          cache-on-failure: true
+      - name: Build and install Tufo
+        id: install
+        run: just install
+      - name: Smoke-test the installed executables
+        run: just smoke "$LOCALAPPDATA/Programs/Tufo"
+      - name: Collect the installed executables
+        run: mkdir -p .artifacts/windows && cp "$LOCALAPPDATA"/Programs/Tufo/*.exe .artifacts/windows/
+      - name: Upload the installed executables
+        uses: actions/upload-artifact@v7
+        with:
+          name: tufo-windows-${{ github.sha }}
+          path: tools/tufo/.artifacts/windows/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Stop the installed server
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: '"$LOCALAPPDATA/Programs/Tufo/tufo" server kill'
+      - name: Uninstall
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: just uninstall
+      - name: Test the workspace
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: just test
+      - name: Lint Windows-specific code
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings

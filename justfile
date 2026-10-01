@@ -56,5 +56,6 @@ migration-generate name:
 
 import 'just/development.justfile'
 import 'just/quality.justfile'
+import 'just/macos.justfile'
 import 'just/windows.justfile'
 import 'just/audio.justfile'

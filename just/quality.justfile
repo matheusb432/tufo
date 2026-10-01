@@ -50,3 +50,25 @@ check:
 [group('quality')]
 test *args:
     cargo nextest run {{ args }}
+
+# Start, check, restart, and stop an isolated server with the executables in `bin_directory`.
+[group('quality')]
+[script('bash')]
+smoke bin_directory:
+    set -euo pipefail
+    tufo={{ quote(bin_directory / "tufo") }}
+    state="$(mktemp -d)"
+    # Windows executables need a Windows path.
+    if command -v cygpath >/dev/null; then state="$(cygpath -m "$state")"; fi
+    export TUFO_RUNTIME_DIR="$state/runtime" TUFO_DATABASE_PATH="$state/tufo.sqlite3"
+    export XDG_CONFIG_HOME="$state/config" XDG_DATA_HOME="$state/data" XDG_STATE_HOME="$state/state"
+    unset TUFO_DISCORD_CREDENTIALS
+    trap '"$tufo" server kill >/dev/null 2>&1 || true; rm -rf "$state"' EXIT
+    "$tufo" --version
+    "$tufo" server start
+    "$tufo" doctor
+    "$tufo" server restart
+    "$tufo" server kill
+    # `status` exits 1 once the server has stopped.
+    if "$tufo" server status >/dev/null; then echo "the server still runs after kill" >&2; exit 1; fi
+    echo "the isolated server started, restarted, and stopped"

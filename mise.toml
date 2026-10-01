@@ -3,7 +3,7 @@ auto_install = false
 lockfile = true
 
 [tools]
-rust = { version = "stable", profile = "minimal", components = ["clippy", "rustfmt"], targets = ["x86_64-pc-windows-msvc"] }
+rust = { version = "stable", profile = "minimal", components = ["clippy", "rustfmt"], targets = ["aarch64-apple-darwin", "x86_64-pc-windows-msvc"] }
 just = "1.56.0"
 rumdl = "0.2.41"
 ast-grep = "0.44.1"
@@ -15,6 +15,9 @@ protoc = "35.1"
 # Cross-build the Windows executables for the installer; cargo-xwin builds Opus with CMake and Ninja.
 "cargo:cargo-xwin" = { version = "0.22.0", depends = ["rust", "cargo-binstall"] }
 ninja = "1.13.2"
+# Lint the macOS code from Linux; zig supplies the C compiler and headers the C dependencies need.
+"cargo:cargo-zigbuild" = { version = "0.23.4", depends = ["rust", "cargo-binstall"] }
+zig = "0.16.0"
 
 # Compiles the Windows installer.
 [bootstrap.packages]

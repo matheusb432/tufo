@@ -137,28 +137,33 @@ impl FileSecurity {
             if u32::from(header.AceFlags) & INHERIT_ONLY_ACE != 0 {
                 continue;
             }
-            match u32::from(header.AceType) {
-                ACCESS_DENIED_ACE_TYPE => {}
+            let exposes = match u32::from(header.AceType) {
+                ACCESS_DENIED_ACE_TYPE => false,
                 ACCESS_ALLOWED_ACE_TYPE => {
                     // SAFETY: the header's type says this entry is an ACCESS_ALLOWED_ACE.
                     let allowed = unsafe { &*entry.cast::<ACCESS_ALLOWED_ACE>() };
-                    if allowed.Mask & READ_ACCESS_RIGHTS == 0 {
-                        continue;
-                    }
-                    let reader: PSID = (&raw const allowed.SidStart).cast_mut().cast();
-                    let trusted = trusted_readers
-                        .iter()
-                        // SAFETY: both SIDs are valid for the duration of the comparison.
-                        .any(|trusted_reader| unsafe { EqualSid(reader, *trusted_reader) } != 0);
-                    if !trusted {
-                        return Ok(true);
-                    }
+                    grants_read_outside(allowed, trusted_readers)
                 }
-                _ => return Ok(true),
+                _ => true,
+            };
+            if exposes {
+                return Ok(true);
             }
         }
         Ok(false)
     }
+}
+
+/// Whether `allowed` lets a reader outside `trusted_readers` read the file.
+fn grants_read_outside(allowed: &ACCESS_ALLOWED_ACE, trusted_readers: &[PSID]) -> bool {
+    if allowed.Mask & READ_ACCESS_RIGHTS == 0 {
+        return false;
+    }
+    let reader: PSID = (&raw const allowed.SidStart).cast_mut().cast();
+    !trusted_readers
+        .iter()
+        // SAFETY: both SIDs are valid for the duration of the comparison.
+        .any(|trusted_reader| unsafe { EqualSid(reader, *trusted_reader) } != 0)
 }
 
 impl Drop for FileSecurity {
