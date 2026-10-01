@@ -32,13 +32,13 @@ component NavRow inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 10px;
+        padding-left: Theme.sidebar-icon-padding;
         padding-right: 4px;
-        spacing: 11px;
+        spacing: Theme.sidebar-icon-spacing;
         Icon {
             y: (parent.height - self.height) / 2;
-            width: 18px;
-            height: 18px;
+            width: Theme.bar-icon-size;
+            height: Theme.bar-icon-size;
             source: root.icon;
             tint: root.active ? Theme.accent : Theme.text-secondary;
         }
@@ -85,7 +85,7 @@ component CollectionLink inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 39px;
+        padding-left: Theme.sidebar-label-padding;
         padding-right: 10px;
         spacing: 8px;
         Text {
@@ -268,13 +268,13 @@ component OutputButton inherits Rectangle {
         tint: Theme.accent;
     }
     if !root.compact: HorizontalLayout {
-        padding-left: 12px;
+        padding-left: Theme.sidebar-icon-padding;
         padding-right: 10px;
-        spacing: 10px;
+        spacing: Theme.sidebar-icon-spacing;
         Icon {
             y: (parent.height - self.height) / 2;
-            width: 20px;
-            height: 20px;
+            width: Theme.bar-icon-size;
+            height: Theme.bar-icon-size;
             source: root.channel ? @image-url("icons/volume-2.svg") : @image-url("icons/monitor.svg");
             tint: Theme.accent;
         }
@@ -307,7 +307,7 @@ component OutputButton inherits Rectangle {
         }
     }
     if Session.voice-badge != VoiceBadge.none: Rectangle {
-        x: root.compact ? parent.width - 13px : 26px;
+        x: root.compact ? parent.width - 13px : Theme.sidebar-icon-padding + Theme.bar-icon-size - 6px;
         y: root.compact ? 6px : 10px;
         width: 9px;
         height: 9px;
@@ -362,8 +362,8 @@ component FullSidebar inherits SidebarForm {
         }
 
         HorizontalLayout {
-            padding-left: 12px;
-            padding-right: 12px;
+            padding-left: Theme.sidebar-row-padding;
+            padding-right: Theme.sidebar-row-padding;
             padding-bottom: 8px;
             search := Rectangle {
                 height: 34px;
@@ -380,13 +380,13 @@ component FullSidebar inherits SidebarForm {
                 }
 
                 HorizontalLayout {
-                    padding-left: 12px;
+                    padding-left: Theme.sidebar-icon-padding;
                     padding-right: 12px;
-                    spacing: 9px;
+                    spacing: Theme.sidebar-icon-spacing;
                     Icon {
                         y: (parent.height - self.height) / 2;
-                        width: 16px;
-                        height: 16px;
+                        width: Theme.bar-icon-size;
+                        height: Theme.bar-icon-size;
                         source: @image-url("icons/search.svg");
                         tint: Theme.text-faint;
                     }
@@ -414,8 +414,8 @@ component FullSidebar inherits SidebarForm {
             vertical-stretch: 1;
             content-height: nav.preferred-height;
             nav := VerticalLayout {
-                padding-left: 8px;
-                padding-right: 8px;
+                padding-left: Theme.sidebar-row-padding;
+                padding-right: Theme.sidebar-row-padding;
                 padding-bottom: 8px;
                 spacing: 2px;
                 alignment: start;
@@ -487,8 +487,8 @@ component FullSidebar inherits SidebarForm {
         }
 
         VerticalLayout {
-            padding-left: 10px;
-            padding-right: 10px;
+            padding-left: Theme.sidebar-row-padding;
+            padding-right: Theme.sidebar-row-padding;
             padding-top: 6px;
             padding-bottom: 6px;
             spacing: 4px;
@@ -500,19 +500,22 @@ component FullSidebar inherits SidebarForm {
             }
 
             HorizontalLayout {
-                padding-left: 6px;
-                spacing: 8px;
+                padding-left: Theme.sidebar-icon-padding - (Theme.bar-button-size - Theme.bar-icon-size) / 2;
+                spacing: Theme.sidebar-icon-spacing - (Theme.bar-button-size - Theme.bar-icon-size) / 2;
+                IconButton {
+                    size: Theme.bar-button-size;
+                    icon-size: Theme.bar-icon-size;
+                    icon: @image-url("icons/settings.svg");
+                    tooltip: @tr("Settings");
+                    tooltip-enabled: root.shown;
+                    clicked => {
+                        root.open-settings();
+                    }
+                }
+
                 HorizontalLayout {
                     horizontal-stretch: 1;
                     spacing: 8px;
-                    if !Session.connected: Rectangle {
-                        y: (parent.height - self.height) / 2;
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 4px;
-                        background: Theme.warning;
-                    }
-
                     if !Session.connected: Text {
                         text: Session.connection-text;
                         vertical-alignment: center;
@@ -521,16 +524,13 @@ component FullSidebar inherits SidebarForm {
                         font-size: Theme.caption;
                         color: Theme.text-faint;
                     }
-                }
 
-                IconButton {
-                    size: 32px;
-                    icon-size: 18px;
-                    icon: @image-url("icons/settings.svg");
-                    tooltip: @tr("Settings");
-                    tooltip-enabled: root.shown;
-                    clicked => {
-                        root.open-settings();
+                    if !Session.connected: Rectangle {
+                        y: (parent.height - self.height) / 2;
+                        width: 8px;
+                        height: 8px;
+                        border-radius: 4px;
+                        background: Theme.warning;
                     }
                 }
             }

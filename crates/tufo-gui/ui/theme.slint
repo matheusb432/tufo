@@ -83,6 +83,10 @@ export global Theme {
     out property <length> title-row-height: 44px;
     out property <length> bar-button-size: 36px;
     out property <length> bar-icon-size: 20px;
+    out property <length> sidebar-row-padding: 8px;
+    out property <length> sidebar-icon-padding: (Theme.rail-width - Theme.bar-icon-size) / 2 - Theme.sidebar-row-padding;
+    out property <length> sidebar-icon-spacing: 10px;
+    out property <length> sidebar-label-padding: Theme.sidebar-icon-padding + Theme.bar-icon-size + Theme.sidebar-icon-spacing;
     // Three bar buttons, 2 px apart.
     out property <length> window-buttons-width: 112px;
 
