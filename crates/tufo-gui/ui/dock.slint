@@ -380,6 +380,7 @@ component SeekRow inherits HorizontalLayout {
     }
 
     SeekBar {
+        y: (parent.height - self.height) / 2;
         horizontal-stretch: 1;
     }
 
@@ -573,13 +574,13 @@ export component Dock inherits Rectangle {
             }
         }
         if !root.wide && !root.collapsed: HorizontalLayout {
-            spacing: 16px;
+            spacing: 8px;
             SeekRow {
                 horizontal-stretch: 1;
             }
 
             VolumeControl {
-                width: 146px;
+                width: 140px;
             }
 
             MiniPlayerButton {
