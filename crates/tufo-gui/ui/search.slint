@@ -67,8 +67,10 @@ export component SearchPalette inherits Rectangle {
 
     function reveal-selected() {
         if Search.results.length > 0 {
-            let top = Search.selected * 50px;
-            results.content-y = clamp(results.content-y, -top, min(0px, results.height - top - 48px));
+            let stride = (results.content-height + rows.spacing) / Search.results.length;
+            let top = Search.selected * stride;
+            let bottom = top + stride - rows.spacing;
+            results.content-y = clamp(results.content-y, -top, min(0px, results.height - bottom));
         } else {
             results.content-y = 0px;
         }

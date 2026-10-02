@@ -6,7 +6,7 @@ use tokio::sync::watch;
 use tufo_client::library::LibrarySnapshot;
 use tufo_models::{
     library::{CollectionEntryId, Volume},
-    playback::player_state::PlayerState,
+    playback::player_state::{PlayerState, PositionSample},
 };
 
 use crate::{WindowRequests, presentation};
@@ -32,6 +32,22 @@ struct MediaTrack {
     metadata: TrackMetadata,
     paused: bool,
     position: Duration,
+    position_sample: PositionSample,
+}
+
+#[cfg(target_os = "linux")]
+impl MediaTrack {
+    fn position_jumped_since(&self, previous: Option<&Self>) -> bool {
+        let expected = previous
+            .filter(|previous| self.metadata.entry_id == previous.metadata.entry_id)
+            .map_or(Duration::ZERO, |previous| {
+                previous
+                    .position_sample
+                    .at(self.position_sample.sampled_at, !previous.paused)
+            });
+        // Audio callback granularity can move a fresh sample by tens of milliseconds.
+        self.position_sample.position.abs_diff(expected) > Duration::from_millis(100)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +80,7 @@ impl MediaState {
                 },
                 paused: music.paused,
                 position: duration.map_or(position, |duration| position.min(duration)),
+                position_sample: music.position,
             }
         });
         Self {

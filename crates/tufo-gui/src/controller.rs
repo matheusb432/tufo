@@ -1119,7 +1119,7 @@ impl Controller {
             let position = duration
                 .mul_f32(fraction.clamp(0.0, 1.0))
                 .min(duration.saturating_sub(SEEK_END_MARGIN));
-            self.run(move |client| async move { client.seek_music(position).await });
+            self.seek_to(position);
         }
     }
 

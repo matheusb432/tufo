@@ -69,8 +69,13 @@ async fn follow_state(
     player: &Player,
     mut receiver: watch::Receiver<MediaState>,
 ) -> anyhow::Result<()> {
+    let mut previous = None;
     loop {
         let state = receiver.borrow_and_update().clone();
+        let position_jumped = state
+            .track
+            .as_ref()
+            .is_some_and(|track| track.position_jumped_since(previous.as_ref()));
         let has_music = state.track.is_some();
         player.set_can_play(has_music).await?;
         player.set_can_pause(has_music).await?;
@@ -112,6 +117,10 @@ async fn follow_state(
         player.set_metadata(metadata).await?;
         player.set_position(position);
         player.set_playback_status(status).await?;
+        if position_jumped {
+            player.seeked(position).await?;
+        }
+        previous = state.track;
         if receiver.changed().await.is_err() {
             return Ok(());
         }

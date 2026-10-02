@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use souvlaki::{
     MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition, PlatformConfig,
     SeekDirection,
@@ -84,6 +86,12 @@ fn handle_event(requests: &WindowRequests, event: &MediaControlEvent) {
         MediaControlEvent::Next => controller.next_track(),
         MediaControlEvent::Previous => controller.previous_track(),
         MediaControlEvent::Stop => controller.stop_music(),
+        MediaControlEvent::Seek(direction) => {
+            controller.seek_by(
+                *direction == SeekDirection::Forward,
+                Duration::from_secs(10),
+            );
+        }
         MediaControlEvent::SeekBy(direction, offset) => {
             controller.seek_by(*direction == SeekDirection::Forward, *offset);
         }

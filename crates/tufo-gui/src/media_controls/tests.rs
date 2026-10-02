@@ -50,10 +50,12 @@ fn paused_music_remains_resumable_and_its_position_stays_put() {
         playing.track.as_ref().unwrap().position,
         Duration::from_secs(15)
     );
-    assert_eq!(
-        playing.track.unwrap().metadata,
-        paused.track.unwrap().metadata
+    let ended = MediaState::from_player(
+        &snapshot,
+        &player,
+        SystemTime::UNIX_EPOCH + Duration::from_secs(200),
     );
+    assert_eq!(ended.track.unwrap().position, Duration::from_secs(120));
 }
 
 #[test]
@@ -91,21 +93,47 @@ fn library_duration_does_not_advertise_seeking_before_the_player_knows_the_lengt
     assert!(!state.can_seek);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
-fn stopping_music_clears_metadata_and_position_never_exceeds_the_track() {
-    let mut player = PlayerState {
-        music: Some(music(false)),
-        ..PlayerState::default()
+fn seeks_are_distinguished_from_clock_updates_pause_and_track_changes() {
+    let track = |music| {
+        MediaState::from_player(
+            &LibrarySnapshot::default(),
+            &PlayerState {
+                music: Some(music),
+                ..PlayerState::default()
+            },
+            SystemTime::UNIX_EPOCH + Duration::from_secs(5),
+        )
+        .track
+        .unwrap()
     };
-    let snapshot = LibrarySnapshot::default();
-    let state = MediaState::from_player(
-        &snapshot,
-        &player,
-        SystemTime::UNIX_EPOCH + Duration::from_secs(200),
-    );
-    assert_eq!(state.track.unwrap().position, Duration::from_secs(120));
-    player.music = None;
-    let stopped = MediaState::from_player(&snapshot, &player, SystemTime::UNIX_EPOCH);
-    assert!(stopped.track.is_none());
-    assert!(!stopped.can_skip);
+    let previous = track(music(false));
+    let mut current = music(false);
+    current.position.sampled_at += Duration::from_secs(5);
+    for (position_ms, jumped) in [
+        (15_000, false),
+        (15_040, false),
+        (30_000, true),
+        (5_000, true),
+    ] {
+        current.position.position = Duration::from_millis(position_ms);
+        assert_eq!(
+            track(current.clone()).position_jumped_since(Some(&previous)),
+            jumped
+        );
+    }
+    current.paused = true;
+    current.position.position = Duration::from_secs(15);
+    assert!(!track(current.clone()).position_jumped_since(Some(&previous)));
+    current.position.position = Duration::from_secs(5);
+    assert!(track(current.clone()).position_jumped_since(Some(&previous)));
+    let paused = track(music(true));
+    assert!(track(current.clone()).position_jumped_since(Some(&paused)));
+    current.entry.entry_id = CollectionEntryId::from_uuid(uuid::Uuid::from_u128(3));
+    assert!(track(current.clone()).position_jumped_since(Some(&paused)));
+    assert!(track(current.clone()).position_jumped_since(None));
+    current.position.position = Duration::ZERO;
+    assert!(!track(current.clone()).position_jumped_since(Some(&paused)));
+    assert!(!track(current).position_jumped_since(None));
 }
