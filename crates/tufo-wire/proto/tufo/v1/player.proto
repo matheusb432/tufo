@@ -86,6 +86,8 @@ message PlayerState {
   // The songs added to the queue, in the order they play. With repeat on, a queued song that
   // plays now is last, since it comes around again.
   repeated string queued_collection_entry_ids = 12;
+  // Multiplies every effect's individual volume, independently of music volume and mute.
+  float effects_volume = 13;
 }
 
 message MusicLayerState {
@@ -242,6 +244,8 @@ message UpdatePlayerSettingsRequest {
   optional RepeatMode repeat = 4;
   // At most 10 s; 0 plays gaplessly.
   optional google.protobuf.Duration crossfade = 5;
+  // A linear multiplier from 0 to 1 for every effect's individual volume.
+  optional float effects_volume = 6;
 }
 
 message UpdatePlayerSettingsResponse {}

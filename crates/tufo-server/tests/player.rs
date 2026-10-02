@@ -4,11 +4,11 @@ use tonic::Code;
 use tufo_client::ClientError;
 use tufo_models::{
     discord::{GuildId, VoiceChannelId, VoiceChannelTarget},
-    library::{CollectionEntryId, CollectionKind},
+    library::{CollectionEntryId, CollectionKind, Volume},
     path::LocalPath,
     playback::{OutputTarget, player_state::PlayerState},
 };
-use tufo_wire::library::ImportPaths;
+use tufo_wire::{library::ImportPaths, player::UpdatePlayerSettings};
 
 mod support;
 
@@ -26,6 +26,69 @@ fn some_voice_channel() -> VoiceChannelTarget {
         guild_id: GuildId::new(std::num::NonZeroU64::MIN),
         channel_id: VoiceChannelId::new(std::num::NonZeroU64::MIN),
     }
+}
+
+#[tokio::test]
+async fn effects_volume_updates_are_partial_and_invalid_values_leave_settings_unchanged()
+-> anyhow::Result<()> {
+    use tufo_wire::pb;
+
+    let server = TestServer::start().await?;
+    let client = server.client()?;
+    client
+        .update_player_settings(&UpdatePlayerSettings {
+            volume: Some(Volume::try_new(0.25)?),
+            effects_volume: Some(Volume::try_new(0.5)?),
+            muted: Some(true),
+            ..UpdatePlayerSettings::default()
+        })
+        .await?;
+    let mut raw = pb::player_service_client::PlayerServiceClient::new(server.channel().await?);
+    for volume in [-0.1, 1.1, f32::NAN, f32::INFINITY] {
+        assert_eq!(
+            raw.update_player_settings(pb::UpdatePlayerSettingsRequest {
+                effects_volume: Some(volume),
+                volume: Some(0.75),
+                ..pb::UpdatePlayerSettingsRequest::default()
+            })
+            .await
+            .unwrap_err()
+            .code(),
+            Code::InvalidArgument
+        );
+    }
+    let state = client
+        .watch_player()
+        .await?
+        .next()
+        .await
+        .transpose()?
+        .unwrap();
+    assert_eq!(state.effects_volume, Volume::try_new(0.5)?);
+    assert_eq!(state.volume, Volume::try_new(0.25)?);
+    assert!(state.muted);
+
+    client
+        .update_player_settings(&UpdatePlayerSettings {
+            effects_volume: Some(Volume::try_new(0.0)?),
+            ..UpdatePlayerSettings::default()
+        })
+        .await?;
+    client
+        .update_player_settings(&UpdatePlayerSettings::default())
+        .await?;
+    let state = client
+        .watch_player()
+        .await?
+        .next()
+        .await
+        .transpose()?
+        .unwrap();
+    assert_eq!(state.effects_volume, Volume::try_new(0.0)?);
+    assert_eq!(state.volume, Volume::try_new(0.25)?);
+    assert!(state.muted);
+    server.stop().await?;
+    Ok(())
 }
 
 #[tokio::test]

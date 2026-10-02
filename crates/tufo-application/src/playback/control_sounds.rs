@@ -1,16 +1,18 @@
-//! Pausing or resuming every sound together, leaving the music alone.
+//! Controlling every sound together, leaving the music alone.
 
 use toasty::Db;
+use tufo_models::library::Volume;
 
 use super::{player::Player, saved_loops};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SoundsCommand {
     Pause,
     Resume,
+    SetVolume(Volume),
 }
 
-/// Succeeds with nothing to pause or resume, so repeating it is harmless.
+/// Applies with or without playing sounds. Repeating a command is harmless.
 pub async fn execute(command: SoundsCommand, player: &impl Player, mut database: Db) {
     player.control_sounds(command).await;
     let paused = player.watch_player().borrow().sounds_paused;

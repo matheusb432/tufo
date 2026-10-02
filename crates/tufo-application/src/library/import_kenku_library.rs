@@ -330,6 +330,7 @@ fn settings_update(kenku: KenkuPlayerSettings, songs_queued: bool) -> UpdatePlay
     } = kenku;
     UpdatePlayerSettings {
         volume,
+        effects_volume: None,
         muted,
         shuffle,
         repeat: repeat.filter(|repeat| !(songs_queued && *repeat == RepeatMode::Track)),

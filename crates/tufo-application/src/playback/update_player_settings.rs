@@ -6,6 +6,7 @@ use tufo_wire::player::UpdatePlayerSettings;
 
 use super::{
     control_music::{self, ControlMusicError, MusicCommand},
+    control_sounds::SoundsCommand,
     player::Player,
 };
 use crate::{error::ErrorMeta, library::LibraryStorageError};
@@ -37,6 +38,7 @@ pub async fn execute(
     let result = if saved.is_some() {
         SavedPlayerSettings::update_by_id(PLAYER_SETTINGS_ID)
             .volume(state.volume)
+            .effects_volume(state.effects_volume)
             .muted(state.muted)
             .shuffle(state.modes.shuffle)
             .repeat(state.modes.repeat)
@@ -47,6 +49,7 @@ pub async fn execute(
         toasty::create!(SavedPlayerSettings {
             id: PLAYER_SETTINGS_ID,
             volume: state.volume,
+            effects_volume: state.effects_volume,
             muted: state.muted,
             shuffle: state.modes.shuffle,
             repeat: state.modes.repeat,
@@ -76,6 +79,7 @@ pub async fn restore(
     apply(
         UpdatePlayerSettings {
             volume: Some(saved.volume),
+            effects_volume: Some(saved.effects_volume),
             muted: Some(saved.muted),
             shuffle: Some(saved.shuffle),
             repeat: Some(saved.repeat),
@@ -93,6 +97,7 @@ async fn apply(
 ) -> Result<(), ControlMusicError> {
     let UpdatePlayerSettings {
         volume,
+        effects_volume,
         muted,
         shuffle,
         repeat,
@@ -107,6 +112,11 @@ async fn apply(
     ];
     for command in commands.into_iter().flatten() {
         control_music::execute(command, player).await?;
+    }
+    if let Some(volume) = effects_volume {
+        player
+            .control_sounds(SoundsCommand::SetVolume(volume))
+            .await;
     }
     Ok(())
 }

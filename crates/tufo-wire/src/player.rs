@@ -9,6 +9,7 @@ use tufo_models::{
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct UpdatePlayerSettings {
     pub volume: Option<Volume>,
+    pub effects_volume: Option<Volume>,
     pub muted: Option<bool>,
     pub shuffle: Option<bool>,
     pub repeat: Option<RepeatMode>,

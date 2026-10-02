@@ -153,6 +153,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             music_generation: 0,
             planned_queue: None,
             volume: Volume::default(),
+            effects_volume: Volume::default(),
             muted: false,
             modes: QueueModes::default(),
             crossfade: CrossfadeDuration::default(),
@@ -229,7 +230,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         }
         let opened = self
             .outputs
-            .open(OutputTarget::Local)
+            .open(OutputTarget::Local, engine.effects_volume)
             .await
             .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?;
         self.install_output(engine, opened).await;
@@ -831,7 +832,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             }
             engine.voice = VoiceConnectionState::Reconnecting { attempt };
             self.publish(&engine);
-            match self.outputs.open(engine.target).await {
+            match self
+                .outputs
+                .open(engine.target, engine.effects_volume)
+                .await
+            {
                 Ok(opened) => {
                     engine.voice = VoiceConnectionState::Connected;
                     self.install_output(&mut engine, opened).await;
@@ -1033,6 +1038,12 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             SoundsCommand::Pause if !engine.sounds.is_empty() => engine.set_sounds_paused(true),
             SoundsCommand::Pause => {}
             SoundsCommand::Resume => engine.set_sounds_paused(false),
+            SoundsCommand::SetVolume(volume) => {
+                engine.effects_volume = volume;
+                if let Some(output) = &mut engine.output {
+                    output.mixer.set_effects_volume(volume.into_inner());
+                }
+            }
         }
         self.publish(&engine);
     }
@@ -1084,7 +1095,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         }
         let needs_output = matches!(target, OutputTarget::DiscordVoice(_)) || engine.has_audio();
         let opened = if needs_output {
-            match self.outputs.open(target).await {
+            match self.outputs.open(target, engine.effects_volume).await {
                 Ok(opened) => Some(opened),
                 Err(error) => {
                     self.recover_from_failed_switch(
@@ -1173,7 +1184,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         engine.target = OutputTarget::Local;
         engine.voice = idle_voice(self.outputs.voice_availability(), Some(error_chain(error)));
         if engine.has_audio() {
-            match self.outputs.open(OutputTarget::Local).await {
+            match self
+                .outputs
+                .open(OutputTarget::Local, engine.effects_volume)
+                .await
+            {
                 Ok(opened) => self.install_output(engine, opened).await,
                 Err(error) => {
                     tracing::warn!(error = error_chain(&error), "the local output cannot open");
@@ -1198,6 +1213,7 @@ struct Engine {
     music_generation: u64,
     planned_queue: Option<PlannedQueue>,
     volume: Volume,
+    effects_volume: Volume,
     muted: bool,
     modes: QueueModes,
     crossfade: CrossfadeDuration,
@@ -1456,6 +1472,7 @@ impl Engine {
                 .unwrap_or_default(),
             music_layers: self.music_layers.map(|layer| layer.snapshot(sampled_at)),
             volume: self.volume,
+            effects_volume: self.effects_volume,
             muted: self.muted,
             modes: self.modes,
             crossfade: self.crossfade,

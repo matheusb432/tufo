@@ -96,6 +96,7 @@ struct Shared {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum VolumeTarget {
     Player,
+    Effects,
     Sound(CollectionEntryId),
 }
 
@@ -1127,6 +1128,10 @@ impl Controller {
         self.queue_volume(VolumeTarget::Player, volume);
     }
 
+    pub(crate) fn set_effects_volume(&self, volume: f32) {
+        self.queue_volume(VolumeTarget::Effects, volume);
+    }
+
     /// Keeps one request in flight and only each slider's newest volume waiting.
     fn queue_volume(&self, target: VolumeTarget, volume: f32) {
         let Ok(volume) = Volume::try_new(volume.clamp(0.0, 1.0)) else {
@@ -1174,6 +1179,14 @@ impl Controller {
                     ..UpdatePlayerSettings::default()
                 };
                 client.update_player_settings(&update).await
+            }
+            VolumeTarget::Effects => {
+                client
+                    .update_player_settings(&UpdatePlayerSettings {
+                        effects_volume: Some(volume),
+                        ..UpdatePlayerSettings::default()
+                    })
+                    .await
             }
             VolumeTarget::Sound(id) => {
                 match self.sound_update(id, None, None, |sound| sound.volume = volume) {

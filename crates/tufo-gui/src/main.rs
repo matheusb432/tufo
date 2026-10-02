@@ -462,6 +462,7 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_previous_track, | | controller.previous_track());
     on!(controller => on_seek, |fraction| controller.seek(fraction));
     on!(controller => on_set_volume, |volume| controller.set_volume(volume));
+    on!(controller => on_set_effects_volume, |volume| controller.set_effects_volume(volume));
     on!(controller => on_toggle_mute, | | controller.toggle_mute());
     on!(controller => on_toggle_shuffle, | | controller.toggle_shuffle());
     on!(controller => on_cycle_repeat, | | controller.cycle_repeat());

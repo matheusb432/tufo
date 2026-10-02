@@ -92,6 +92,13 @@ pub fn update_player_settings_request(
     request: pb::UpdatePlayerSettingsRequest,
 ) -> Result<UpdatePlayerSettings, Status> {
     Ok(UpdatePlayerSettings {
+        effects_volume: request
+            .effects_volume
+            .map(|volume| {
+                Volume::try_new(volume)
+                    .map_err(|_| invalid("effects_volume", "must be between 0 and 1"))
+            })
+            .transpose()?,
         volume: request
             .volume
             .map(|volume| {
@@ -151,6 +158,7 @@ pub fn watch_player_response(state: &PlayerState) -> pb::WatchPlayerResponse {
                 })
                 .collect(),
             volume: state.volume.into_inner(),
+            effects_volume: state.effects_volume.into_inner(),
             muted: state.muted,
             shuffle: state.modes.shuffle,
             repeat: repeat_mode_message(state.modes.repeat).into(),
@@ -208,6 +216,7 @@ pub fn update_player_settings_message(
 ) -> pb::UpdatePlayerSettingsRequest {
     pb::UpdatePlayerSettingsRequest {
         volume: update.volume.map(Volume::into_inner),
+        effects_volume: update.effects_volume.map(Volume::into_inner),
         muted: update.muted,
         shuffle: update.shuffle,
         repeat: update
@@ -285,6 +294,8 @@ pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, In
             .collect::<Result<_, _>>()?,
         music_layers: music_layers_state(state.music_layers)?,
         volume: Volume::try_new(state.volume).map_err(|_| invalid("volume"))?,
+        effects_volume: Volume::try_new(state.effects_volume)
+            .map_err(|_| invalid("effects_volume"))?,
         muted: state.muted,
         modes: QueueModes {
             shuffle: state.shuffle,
@@ -557,6 +568,7 @@ mod tests {
                 paused: true,
             }),
             volume: Volume::try_new(0.75).unwrap(),
+            effects_volume: Volume::try_new(0.5).unwrap(),
             muted: true,
             modes: QueueModes {
                 shuffle: true,

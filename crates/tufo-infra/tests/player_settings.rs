@@ -18,6 +18,7 @@ async fn saved_settings_survive_a_restart() {
         .unwrap();
     let update = UpdatePlayerSettings {
         volume: Some(Volume::try_new(0.25).unwrap()),
+        effects_volume: Some(Volume::try_new(0.5).unwrap()),
         muted: Some(true),
         shuffle: Some(true),
         repeat: Some(RepeatMode::Track),
@@ -35,7 +36,50 @@ async fn saved_settings_survive_a_restart() {
 
     let state = after.watch_player().borrow().clone();
     assert_eq!(state.volume, Volume::try_new(0.25).unwrap());
+    assert_eq!(state.effects_volume, Volume::try_new(0.5).unwrap());
     assert!(state.muted && state.modes.shuffle);
     assert_eq!(state.modes.repeat, RepeatMode::Track);
     assert_eq!(state.crossfade.into_inner(), Duration::from_millis(500));
+}
+
+#[tokio::test]
+async fn existing_player_settings_default_effects_to_full_volume() -> anyhow::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("tufo.sqlite3");
+    let database = open_database(&path).await?;
+    let before = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    update_player_settings::execute(
+        UpdatePlayerSettings {
+            volume: Some(Volume::try_new(0.25)?),
+            muted: Some(true),
+            ..UpdatePlayerSettings::default()
+        },
+        before.as_ref(),
+        database,
+    )
+    .await?;
+    let legacy = rusqlite::Connection::open(&path)?;
+    legacy.execute_batch(
+        "ALTER TABLE player_settings DROP COLUMN effects_volume;
+         DELETE FROM __toasty_migrations WHERE name = '0009_effects_volume.sql';",
+    )?;
+    drop(legacy);
+
+    let migrated = open_database(&path).await?;
+    let after = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    update_player_settings::restore(after.as_ref(), migrated).await?;
+    let state = after.watch_player().borrow().clone();
+    assert_eq!(state.effects_volume, Volume::default());
+    assert_eq!(state.volume, Volume::try_new(0.25)?);
+    assert!(state.muted);
+
+    let connection = rusqlite::Connection::open(&path)?;
+    for volume in [-0.1, 1.1, f64::NAN] {
+        assert!(
+            connection
+                .execute("UPDATE player_settings SET effects_volume = ?1", [volume])
+                .is_err()
+        );
+    }
+    Ok(())
 }

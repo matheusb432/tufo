@@ -432,6 +432,7 @@ pub(crate) fn player(
         view.set_collection_background(collection_background(&bar.collection_background));
         view.set_playing(bar.playing);
         view.set_volume(bar.volume);
+        view.set_effects_volume(bar.effects_volume);
         view.set_muted(bar.muted);
         view.set_shuffle(bar.shuffle);
         view.set_repeat(bar.repeat);

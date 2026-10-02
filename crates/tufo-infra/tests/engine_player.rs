@@ -42,7 +42,7 @@ use tufo_infra::{
 };
 use tufo_models::{
     discord::{GuildId, VoiceChannelId, VoiceChannelTarget},
-    library::{CollectionEntryId, CollectionId, CollectionKind, SoundSettings},
+    library::{CollectionEntryId, CollectionId, CollectionKind, SoundSettings, Volume},
     path::LocalPath,
     playback::{
         AudioFilePath, OutputTarget,
@@ -101,12 +101,16 @@ struct TestOutputs {
 }
 
 impl TestOutputs {
-    fn open_pulled(&self, target: OutputTarget) -> anyhow::Result<OpenedOutput> {
+    fn open_pulled(
+        &self,
+        target: OutputTarget,
+        effects_volume: Volume,
+    ) -> anyhow::Result<OpenedOutput> {
         let sample_rate = match target {
             OutputTarget::Local => LOCAL_SAMPLE_RATE,
             OutputTarget::DiscordVoice(_) => SAMPLE_RATE,
         };
-        let (mixer, renderer_receiver) = Mixer::open_pulled(sample_rate)?;
+        let (mixer, renderer_receiver) = Mixer::open_pulled(sample_rate, effects_volume)?;
         self.renderers
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -140,13 +144,14 @@ impl AudioOutputs for TestOutputs {
     fn open(
         &self,
         target: OutputTarget,
+        effects_volume: Volume,
     ) -> impl Future<Output = Result<OpenedOutput, SelectOutputError>> + Send {
         let refused = matches!(target, OutputTarget::DiscordVoice(_))
             && self.controls.fail_voice_opens.load(Ordering::Relaxed);
         let opened = if refused {
             Err(anyhow::anyhow!("the test refused the connection"))
         } else {
-            self.open_pulled(target)
+            self.open_pulled(target, effects_volume)
         };
         std::future::ready(opened.map_err(SelectOutputError::VoiceConnection))
     }
@@ -392,6 +397,115 @@ async fn recorded_level(rig: &Rig, output: usize) -> anyhow::Result<f32> {
     let captures = rig.sound_card.captures();
     let capture = &captures[output];
     Ok(capture[capture.len() - 100..].iter().sum::<f32>() / 100.0)
+}
+
+#[tokio::test]
+async fn effects_volume_multiplies_decoded_and_streamed_sounds_independently_of_music()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let main = rig.file("music.wav", &constant(0.1, SAMPLE_RATE as usize * 12))?;
+    let mut decoded = sound(
+        rig.file("decoded.wav", &constant(0.5, SAMPLE_RATE as usize * 2))?,
+        true,
+    );
+    decoded.settings.volume = Volume::try_new(0.4)?;
+    let mut streamed = sound(
+        rig.file("streamed.wav", &constant(0.25, SAMPLE_RATE as usize * 21))?,
+        false,
+    );
+    streamed.settings.volume = Volume::try_new(0.8)?;
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.5)?))
+        .await;
+    rig.play_once(entry(main, "Music")).await?;
+    rig.player.play_sound(decoded.clone()).await?;
+    rig.player.play_sound(streamed).await?;
+    assert!((recorded_level(&rig, 0).await? - 0.3).abs() < 0.002);
+
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.25)?))
+        .await;
+    assert!((recorded_level(&rig, 0).await? - 0.2).abs() < 0.002);
+    decoded.settings.volume = Volume::try_new(0.8)?;
+    rig.player
+        .update_sound(decoded.entry_id, decoded.settings)
+        .await;
+    assert!((recorded_level(&rig, 0).await? - 0.25).abs() < 0.002);
+
+    rig.control(MusicCommand::SetVolume(Volume::try_new(0.5)?))
+        .await?;
+    assert!((recorded_level(&rig, 0).await? - 0.2).abs() < 0.002);
+    rig.control(MusicCommand::SetMuted(true)).await?;
+    assert!((recorded_level(&rig, 0).await? - 0.15).abs() < 0.002);
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.0)?))
+        .await;
+    assert!(recorded_level(&rig, 0).await?.abs() < 0.002);
+    rig.control(MusicCommand::SetMuted(false)).await?;
+    assert!((recorded_level(&rig, 0).await? - 0.05).abs() < 0.002);
+
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::default()))
+        .await;
+    assert!((recorded_level(&rig, 0).await? - 0.65).abs() < 0.002);
+    assert_eq!(rig.state().effects_volume, Volume::default());
+    Ok(())
+}
+
+#[tokio::test]
+async fn muted_effects_are_silent_from_the_first_frame_of_a_new_output() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.0)?))
+        .await;
+    let mut rain = sound(
+        rig.file("rain.wav", &constant(0.5, SAMPLE_RATE as usize * 2))?,
+        true,
+    );
+    rain.settings.fade_in = tufo_models::library::FadeDuration::try_new(Duration::ZERO)?;
+    rig.player.play_sound(rain).await?;
+    rig.wait_for_recorded_frames(0, 11_025).await?;
+    let peak = rig.sound_card.captures()[0]
+        .iter()
+        .map(|sample| sample.abs())
+        .fold(0.0_f32, f32::max);
+    assert!(peak < 0.000_001, "muted output peaked at {peak}");
+    rig.player.select_output(voice_channel()).await?;
+    rig.wait_for_recorded_frames(1, 12_000).await?;
+    assert!(within(&rig.sound_card.captures()[1], 0.0, 0.000_001));
+    Ok(())
+}
+
+#[tokio::test]
+async fn effects_volume_survives_output_changes_pause_and_standby() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let mut rain = sound(
+        rig.file("rain.wav", &constant(0.5, SAMPLE_RATE as usize * 2))?,
+        true,
+    );
+    rain.settings.volume = Volume::try_new(0.4)?;
+    rig.player.play_sound(rain.clone()).await?;
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.5)?))
+        .await;
+    assert!((recorded_level(&rig, 0).await? - 0.1).abs() < 0.002);
+    rig.player.control_sounds(SoundsCommand::Pause).await;
+    rig.player.select_output(voice_channel()).await?;
+    assert!(recorded_level(&rig, 1).await?.abs() < 0.002);
+    rig.player
+        .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.25)?))
+        .await;
+    assert!(rig.state().sounds_paused);
+    rig.player.control_sounds(SoundsCommand::Resume).await;
+    assert!((recorded_level(&rig, 1).await? - 0.05).abs() < 0.002);
+
+    let closes = rig.closes();
+    rig.player.stand_by().await;
+    rig.wait_for_closes(closes + 1).await?;
+    rig.player.play_sound(rain).await?;
+    assert!((recorded_level(&rig, 2).await? - 0.05).abs() < 0.002);
+    assert_eq!(rig.state().effects_volume, Volume::try_new(0.25)?);
+    Ok(())
 }
 
 #[tokio::test]

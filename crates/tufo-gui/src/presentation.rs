@@ -897,6 +897,7 @@ pub(crate) struct PlayerBarView {
     pub(crate) remaining: String,
     pub(crate) volume: f32,
     pub(crate) muted: bool,
+    pub(crate) effects_volume: f32,
     pub(crate) shuffle: bool,
     pub(crate) repeat: i32,
     pub(crate) songs_queued: bool,
@@ -997,6 +998,7 @@ pub(crate) fn player_bar(
         elapsed: clock(elapsed),
         remaining,
         volume: player.volume.into_inner(),
+        effects_volume: player.effects_volume.into_inner(),
         muted: player.muted,
         shuffle: player.modes.shuffle,
         repeat: match player.modes.repeat {

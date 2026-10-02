@@ -393,6 +393,52 @@ component SeekRow inherits HorizontalLayout {
     }
 }
 
+component EffectsVolumeButton inherits IconButton {
+    size: 32px;
+    icon-size: 18px;
+    icon: @image-url("../icons/sounds/audio-lines.svg");
+    tooltip: @tr("Effects volume");
+    tint: PlayerView.effects-volume == 0 ? Theme.text-faint : Theme.text-secondary;
+    clicked => { effects.show(); }
+    effects := PopupWindow {
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        width: 240px;
+        height: layout.preferred-height;
+        x: root.width - self.width;
+        y: -self.height - 8px;
+        Rectangle {
+            background: Theme.raised;
+            border-radius: Theme.radius-row;
+            border-width: 1px;
+            border-color: Theme.raised-edge;
+            layout := VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                HorizontalLayout {
+                    Text {
+                        text: @tr("Effects volume");
+                        color: Theme.text;
+                        font-size: Theme.body-small;
+                        font-weight: 700;
+                        horizontal-stretch: 1;
+                    }
+                    Text {
+                        text: round(volume.shown-value * 100) + "%";
+                        color: Theme.text-secondary;
+                        font-size: Theme.caption;
+                        vertical-alignment: center;
+                    }
+                }
+                volume := Slider {
+                    value: PlayerView.effects-volume;
+                    accessible-label: @tr("Effects volume");
+                    changed(value) => { Actions.set-effects-volume(value); }
+                }
+            }
+        }
+    }
+}
+
 component VolumeControl inherits HorizontalLayout {
     spacing: 4px;
     IconButton {
@@ -410,9 +456,13 @@ component VolumeControl inherits HorizontalLayout {
         y: (parent.height - self.height) / 2;
         horizontal-stretch: 1;
         value: PlayerView.muted ? 0 : PlayerView.volume;
+        accessible-label: @tr("Music volume");
         changed(value) => {
             Actions.set-volume(value);
         }
+    }
+    EffectsVolumeButton {
+        y: (parent.height - self.height) / 2;
     }
 }
 
@@ -529,7 +579,7 @@ export component Dock inherits Rectangle {
             }
 
             VolumeControl {
-                width: 110px;
+                width: 146px;
             }
 
             MiniPlayerButton {
@@ -642,7 +692,7 @@ export component MiniPlayer inherits Rectangle {
                 horizontal-stretch: 1;
             }
             VolumeControl {
-                width: 120px;
+                width: 156px;
             }
         }
     }

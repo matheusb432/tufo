@@ -5,7 +5,10 @@ use std::future::Future;
 
 use tokio::sync::oneshot;
 use tufo_application::playback::select_output::SelectOutputError;
-use tufo_models::playback::{OutputTarget, diagnostics::VoicePacing};
+use tufo_models::{
+    library::Volume,
+    playback::{OutputTarget, diagnostics::VoicePacing},
+};
 
 use crate::{
     audio::Mixer,
@@ -19,9 +22,11 @@ pub trait AudioOutputs: Send + Sync + 'static {
     fn voice_availability(&self) -> VoiceAvailability;
 
     /// Opens a mixer for `target`, joining its voice channel when it is one.
+    /// Effects start at `effects_volume` from the first rendered frame.
     fn open(
         &self,
         target: OutputTarget,
+        effects_volume: Volume,
     ) -> impl Future<Output = Result<OpenedOutput, SelectOutputError>> + Send;
 
     /// Closes an output the engine no longer uses, leaving its voice channel.
@@ -71,10 +76,14 @@ impl AudioOutputs for DeviceOutputs {
         self.discord.voice_availability()
     }
 
-    async fn open(&self, target: OutputTarget) -> Result<OpenedOutput, SelectOutputError> {
+    async fn open(
+        &self,
+        target: OutputTarget,
+        effects_volume: Volume,
+    ) -> Result<OpenedOutput, SelectOutputError> {
         match target {
             OutputTarget::Local => {
-                let mixer = tokio::task::spawn_blocking(Mixer::open_local)
+                let mixer = tokio::task::spawn_blocking(move || Mixer::open_local(effects_volume))
                     .await
                     .map_err(|error| SelectOutputError::LocalDevice(error.into()))?
                     .map_err(|error| SelectOutputError::LocalDevice(error.into()))?;
@@ -85,8 +94,9 @@ impl AudioOutputs for DeviceOutputs {
                 Ok(OpenedOutput::new(mixer, None))
             }
             OutputTarget::DiscordVoice(voice_target) => {
-                let (mixer, renderer_receiver) = Mixer::open_pulled(DISCORD_SAMPLE_RATE)
-                    .map_err(|error| SelectOutputError::VoiceConnection(error.into()))?;
+                let (mixer, renderer_receiver) =
+                    Mixer::open_pulled(DISCORD_SAMPLE_RATE, effects_volume)
+                        .map_err(|error| SelectOutputError::VoiceConnection(error.into()))?;
                 let mut session = self
                     .discord
                     .join(voice_target, renderer_receiver)

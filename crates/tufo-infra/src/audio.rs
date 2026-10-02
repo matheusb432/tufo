@@ -34,7 +34,7 @@ use limiter::LimiterBuilder;
 use music_deck::MusicDeckHandle;
 use pull_backend::{PullBackend, PullBackendError, PullBackendSettings};
 use streamed_sound::StreamedSound;
-use tufo_models::playback::music_layers::MUSIC_LAYERS_EXTRA_MAX;
+use tufo_models::{library::Volume, playback::music_layers::MUSIC_LAYERS_EXTRA_MAX};
 
 /// Requested local callback size: about 43 ms at 48 kHz. ALSA uses two periods; native
 /// `PipeWire` negotiates the graph quantum and promotes its callback through rtkit.
@@ -42,8 +42,8 @@ const LOCAL_PERIOD_FRAMES: u32 = 2048;
 /// How often kira updates clocks and modulators, in frames; kira's default.
 const KIRA_INTERNAL_BUFFER_FRAMES: usize = 128;
 const LOCAL_STREAM_ERRORS_POLL_MAX: usize = 64;
-/// How long a music volume change takes, so moving a slider doesn't click.
-const MUSIC_VOLUME_TWEEN: Duration = Duration::from_millis(50);
+/// How long a volume change takes, so moving a slider doesn't click.
+const VOLUME_TWEEN: Duration = Duration::from_millis(50);
 
 #[derive(Debug, thiserror::Error)]
 pub enum OpenLocalMixerError {
@@ -97,7 +97,7 @@ pub(crate) struct LocalStreamErrors {
 
 impl Mixer {
     /// Opens the default audio device at its preferred rate and channel count.
-    pub fn open_local() -> Result<Self, OpenLocalMixerError> {
+    pub fn open_local(effects_volume: Volume) -> Result<Self, OpenLocalMixerError> {
         #[cfg(target_os = "linux")]
         let pipewire = pipewire_output_device()?;
         #[cfg(target_os = "linux")]
@@ -126,7 +126,7 @@ impl Mixer {
             ..AudioManagerSettings::default()
         })
         .map_err(OpenLocalMixerError::Stream)?;
-        let tracks = MixerTracks::add(&mut manager, config.sample_rate)
+        let tracks = MixerTracks::add(&mut manager, config.sample_rate, effects_volume)
             .map_err(OpenLocalMixerError::Tracks)?;
         Ok(tracks.into_mixer(MixerManager::Local(Box::new(manager)), config.sample_rate))
     }
@@ -134,6 +134,7 @@ impl Mixer {
     /// Creates a mixer that renders only when the returned renderer is pulled.
     pub fn open_pulled(
         sample_rate: u32,
+        effects_volume: Volume,
     ) -> Result<(Self, Receiver<Renderer>), OpenPulledMixerError> {
         let (renderer_sender, renderer_receiver) = sync_channel(1);
         let mut manager = AudioManager::<PullBackend>::new(AudioManagerSettings {
@@ -145,8 +146,8 @@ impl Mixer {
             main_track_builder: limited_main_track(),
             internal_buffer_size: KIRA_INTERNAL_BUFFER_FRAMES,
         })?;
-        let tracks =
-            MixerTracks::add(&mut manager, sample_rate).map_err(OpenPulledMixerError::Tracks)?;
+        let tracks = MixerTracks::add(&mut manager, sample_rate, effects_volume)
+            .map_err(OpenPulledMixerError::Tracks)?;
         Ok((
             tracks.into_mixer(
                 MixerManager::Pulled {
@@ -198,14 +199,20 @@ impl Mixer {
 
     pub(crate) fn set_music_layer_volume(&mut self, slot: usize, volume: f32) {
         if let Some((_, track)) = self.music_layers.get_mut(slot) {
-            track.set_volume(decibels(volume), linear_tween(MUSIC_VOLUME_TWEEN));
+            track.set_volume(decibels(volume), linear_tween(VOLUME_TWEEN));
         }
     }
 
     /// Sets the music's gain, a linear value from silence (0) to full level (1).
     pub fn set_music_volume(&mut self, volume: f32) {
         self.music_track
-            .set_volume(decibels(volume), linear_tween(MUSIC_VOLUME_TWEEN));
+            .set_volume(decibels(volume), linear_tween(VOLUME_TWEEN));
+    }
+
+    /// Multiplies every effect's own gain without changing its settings or playback.
+    pub(crate) fn set_effects_volume(&mut self, volume: f32) {
+        self.sounds_track
+            .set_volume(decibels(volume), linear_tween(VOLUME_TWEEN));
     }
 
     /// Fades every sound out over `fade` and holds it where it is.
@@ -295,9 +302,12 @@ impl MixerTracks {
     fn add<B: Backend>(
         manager: &mut AudioManager<B>,
         sample_rate: u32,
+        effects_volume: Volume,
     ) -> Result<Self, ResourceLimitReached> {
         let mut music_track = manager.add_sub_track(TrackBuilder::new())?;
-        let sounds_track = manager.add_sub_track(TrackBuilder::new())?;
+        // Setting gain after construction interpolates from full volume for one buffer.
+        let sounds_track = manager
+            .add_sub_track(TrackBuilder::new().volume(decibels(effects_volume.into_inner())))?;
         let (deck, music) = music_deck::music_deck(sample_rate);
         music_track.play(deck).map_err(|_| ResourceLimitReached)?;
         let mut add_layer = || {

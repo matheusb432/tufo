@@ -390,6 +390,14 @@ msgid "Expand (Ctrl+B)"
 msgstr ""
 
 #: ui/dock.slint
+msgid "Effects volume"
+msgstr ""
+
+#: ui/dock.slint
+msgid "Music volume"
+msgstr ""
+
+#: ui/dock.slint
 msgid "Expand the player"
 msgstr ""
 

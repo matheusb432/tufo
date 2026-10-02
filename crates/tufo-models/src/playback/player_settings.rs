@@ -11,7 +11,7 @@ use crate::{
 /// The one row of saved player settings.
 pub const PLAYER_SETTINGS_ID: i64 = 1;
 
-/// Volume, mute, shuffle, repeat, and crossfade, as the player last had them. The table holds
+/// Music and effects volume, mute, shuffle, repeat, and crossfade. The table holds
 /// at most one row, with id [`PLAYER_SETTINGS_ID`].
 #[derive(Debug, toasty::Model)]
 #[table = "player_settings"]
@@ -19,6 +19,7 @@ pub struct SavedPlayerSettings {
     #[key]
     pub id: i64,
     pub volume: Volume,
+    pub effects_volume: Volume,
     pub muted: bool,
     pub shuffle: bool,
     pub repeat: RepeatMode,

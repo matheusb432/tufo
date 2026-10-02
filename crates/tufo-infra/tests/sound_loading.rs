@@ -3,6 +3,7 @@ use tufo_infra::audio::{
     Mixer,
     sound_cache::{LoadedSound, SoundLoadOptions, load_sound},
 };
+use tufo_models::library::Volume;
 
 mod support;
 
@@ -81,7 +82,7 @@ fn a_cached_loop_keeps_its_pitch_and_seam_at_another_output_rate() -> anyhow::Re
         anyhow::bail!("the loop fits in the byte budget");
     };
     std::fs::remove_file(&path)?;
-    let (mut mixer, renderer) = Mixer::open_pulled(SAMPLE_RATE)?;
+    let (mut mixer, renderer) = Mixer::open_pulled(SAMPLE_RATE, Volume::default())?;
     let mut renderer = renderer.recv()?;
     mixer.play_decoded_sound(data.loop_region(..))?;
     let loop_frame = 21 * SAMPLE_RATE as usize;

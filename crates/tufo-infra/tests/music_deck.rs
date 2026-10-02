@@ -16,6 +16,7 @@ use tufo_infra::audio::{
     limiter::LIMITER_CEILING,
     music_deck::{DeckState, DeckTrack},
 };
+use tufo_models::library::Volume;
 
 mod support;
 
@@ -33,7 +34,7 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> anyhow::Result<Self> {
-        let (mixer, renderer_receiver) = Mixer::open_pulled(SAMPLE_RATE)?;
+        let (mixer, renderer_receiver) = Mixer::open_pulled(SAMPLE_RATE, Volume::default())?;
         Ok(Self {
             mixer,
             renderer: renderer_receiver.recv()?,
