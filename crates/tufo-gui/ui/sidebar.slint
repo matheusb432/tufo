@@ -17,6 +17,8 @@ component NavRow inherits Rectangle {
     in property <image> icon;
     in property <string> text;
     in property <bool> active;
+    in property <bool> collapsible;
+    in property <bool> expanded;
     in property <bool> can-add;
     in property <string> add-label;
     callback clicked();
@@ -56,6 +58,14 @@ component NavRow inherits Rectangle {
             color: root.active ? Theme.text : Theme.text-secondary;
         }
 
+        if root.collapsible: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 12px;
+            height: 12px;
+            source: root.expanded ? @image-url("icons/chevron-up.svg") : @image-url("icons/chevron-down.svg");
+            tint: Theme.text-faint;
+        }
+
         if root.can-add: IconButton {
             y: (parent.height - self.height) / 2;
             size: 28px;
@@ -68,6 +78,11 @@ component NavRow inherits Rectangle {
             }
         }
     }
+}
+
+component SectionRow inherits NavRow {
+    collapsible: true;
+    accessible-expanded: root.expanded;
 }
 
 component CollectionLink inherits Rectangle {
@@ -356,6 +371,8 @@ component FullSidebar inherits SidebarForm {
     callback open-outputs();
     callback add(CollectionKind);
     property <Page> page: Navigation.page;
+    property <bool> playlists-expanded: true;
+    property <bool> soundboards-expanded: true;
     width: Theme.sidebar-width;
     VerticalLayout {
         HorizontalLayout {
@@ -451,21 +468,27 @@ component FullSidebar inherits SidebarForm {
                     }
                 }
 
-                NavRow {
+                SectionRow {
                     icon: @image-url("icons/list-music.svg");
                     text: @tr("Playlists");
                     active: root.page == Page.playlists;
+                    expanded: root.playlists-expanded;
                     can-add: Session.connected;
                     add-label: @tr("Add Playlist");
                     clicked => {
-                        root.open-page(Page.playlists, "");
+                        if root.page == Page.playlists {
+                            root.playlists-expanded = !root.playlists-expanded;
+                        } else {
+                            root.playlists-expanded = true;
+                            root.open-page(Page.playlists, "");
+                        }
                     }
                     add => {
                         root.add(CollectionKind.playlist);
                     }
                 }
 
-                for item in LibraryView.nav-playlists: CollectionLink {
+                for item in (root.playlists-expanded ? LibraryView.nav-playlists : []): CollectionLink {
                     item: item;
                     active: root.page == Page.playlist && Navigation.collection-id == item.id;
                     clicked => {
@@ -476,21 +499,27 @@ component FullSidebar inherits SidebarForm {
                     height: 6px;
                 }
 
-                NavRow {
+                SectionRow {
                     icon: @image-url("icons/layout-grid.svg");
                     text: @tr("Soundboards");
                     active: root.page == Page.soundboards;
+                    expanded: root.soundboards-expanded;
                     can-add: Session.connected;
                     add-label: @tr("Add Soundboard");
                     clicked => {
-                        root.open-page(Page.soundboards, "");
+                        if root.page == Page.soundboards {
+                            root.soundboards-expanded = !root.soundboards-expanded;
+                        } else {
+                            root.soundboards-expanded = true;
+                            root.open-page(Page.soundboards, "");
+                        }
                     }
                     add => {
                         root.add(CollectionKind.soundboard);
                     }
                 }
 
-                for item in LibraryView.nav-soundboards: CollectionLink {
+                for item in (root.soundboards-expanded ? LibraryView.nav-soundboards : []): CollectionLink {
                     item: item;
                     active: root.page == Page.soundboard && Navigation.collection-id == item.id;
                     clicked => {
