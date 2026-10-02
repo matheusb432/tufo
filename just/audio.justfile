@@ -1,4 +1,4 @@
-# Load the audio path under CPU pressure; not a routine check, see docs/agents/verification.md.
+# Load the audio path under CPU pressure; not a routine check, see wiki/development.md.
 [group('performance')]
 stress voice="" minutes="10" music="" sounds="":
     #!/usr/bin/env bash

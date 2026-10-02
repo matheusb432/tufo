@@ -1,0 +1,5 @@
+error: ErrorMeta can only be derived for enums and structs
+ --> tests/error_meta_ui/unsupported_data.rs:4:7
+  |
+4 | union Unsupported {
+  |       ^^^^^^^^^^^

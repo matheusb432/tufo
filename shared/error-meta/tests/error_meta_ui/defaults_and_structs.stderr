@@ -1,0 +1,59 @@
+error: each item takes at most one #[meta(...)] attribute
+ --> tests/error_meta_ui/defaults_and_structs.rs:5:1
+  |
+5 | #[meta(private(Unavailable))]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `#[meta(transparent)]` requires a variant with exactly one field
+  --> tests/error_meta_ui/defaults_and_structs.rs:14:5
+   |
+14 |     Unit,
+   |     ^^^^
+
+error: `#[meta(transparent)]` requires a variant with exactly one field
+  --> tests/error_meta_ui/defaults_and_structs.rs:15:5
+   |
+15 |     Multiple(u8, u8),
+   |     ^^^^^^^^
+
+error: variant `Missing` has no named field `source`
+  --> tests/error_meta_ui/defaults_and_structs.rs:19:28
+   |
+19 | #[meta(transparent(field = source))]
+   |                            ^^^^^^
+
+error: variant `Tuple` has no named field `source`
+  --> tests/error_meta_ui/defaults_and_structs.rs:19:28
+   |
+19 | #[meta(transparent(field = source))]
+   |                            ^^^^^^
+
+error: struct `Missing` needs a classification: expected `#[meta(failure)]`, `#[meta(failure = reason)]`, `#[meta(transparent)]`, or `#[meta(private(Class))]`
+  --> tests/error_meta_ui/defaults_and_structs.rs:26:8
+   |
+26 | struct Missing;
+   |        ^^^^^^^
+
+error: `#[meta(failure)]` requires a struct with exactly one field
+  --> tests/error_meta_ui/defaults_and_structs.rs:30:8
+   |
+30 | struct NoField;
+   |        ^^^^^^^
+
+error: struct `WrongField` has no named field `missing`
+  --> tests/error_meta_ui/defaults_and_structs.rs:33:28
+   |
+33 | #[meta(transparent(field = missing))]
+   |                            ^^^^^^^
+
+error: classification attributes belong on enum variants or structs, not fields
+  --> tests/error_meta_ui/defaults_and_structs.rs:40:22
+   |
+40 | struct FieldMetadata(#[meta(transparent)] u8);
+   |                      ^^^^^^^^^^^^^^^^^^^^
+
+error: unknown error class `Unknown`; expected one of Cancelled, InvalidArgument, DeadlineExceeded, NotFound, AlreadyExists, PermissionDenied, ResourceExhausted, FailedPrecondition, Aborted, OutOfRange, Unimplemented, Internal, Unavailable, DataLoss, Unauthenticated; custom classes require a qualified path
+  --> tests/error_meta_ui/defaults_and_structs.rs:43:16
+   |
+43 | #[meta(private(Unknown))]
+   |                ^^^^^^^

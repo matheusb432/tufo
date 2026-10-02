@@ -1,0 +1,35 @@
+error: unknown application error class `Cancelled`; expected one of InvalidArgument, NotFound, FailedPrecondition, Unavailable, Internal; custom classes require a qualified path
+ --> tests/application_error_meta_ui/classes_and_incomplete.rs:9:20
+  |
+9 |     #[meta(class = Cancelled, reason = "wrong vocabulary")]
+  |                    ^^^^^^^^^
+
+error: fixed metadata requires both class and reason
+  --> tests/application_error_meta_ui/classes_and_incomplete.rs:11:5
+   |
+11 |     #[meta(class = Internal)]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fixed metadata requires both class and reason
+  --> tests/application_error_meta_ui/classes_and_incomplete.rs:13:5
+   |
+13 |     #[meta(reason = "missing class")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fixed metadata requires both class and reason
+  --> tests/application_error_meta_ui/classes_and_incomplete.rs:15:5
+   |
+15 |     #[meta()]
+   |     ^^^^^^^^^
+
+error: expected class, reason, or transparent metadata
+  --> tests/application_error_meta_ui/classes_and_incomplete.rs:17:12
+   |
+17 |     #[meta(other)]
+   |            ^^^^^
+
+error: expected class, reason, or transparent metadata
+  --> tests/application_error_meta_ui/classes_and_incomplete.rs:19:12
+   |
+19 |     #[meta(private(Internal))]
+   |            ^^^^^^^

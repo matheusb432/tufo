@@ -3,6 +3,8 @@ name = "tufo-migrator"
 version = "0.1.0"
 description = "Authors Tufo's SQLite migrations from its Toasty models"
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
 publish.workspace = true
 
 [dependencies]

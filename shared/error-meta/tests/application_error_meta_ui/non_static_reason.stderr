@@ -1,0 +1,8 @@
+error: lifetime may not live long enough
+ --> tests/application_error_meta_ui/non_static_reason.rs:8:35
+  |
+6 | #[derive(Debug, thiserror::Error, ApplicationErrorMeta)]
+  |                                   - let's call the lifetime of this reference `'1`
+7 | #[meta(crate = crate::application_support)]
+8 | #[meta(class = Internal, reason = self.reason.as_str())]
+  |                                   ^^^^^^^^^^^^^^^^^^^^ this usage requires that `'1` must outlive `'static`

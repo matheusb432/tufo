@@ -1,0 +1,17 @@
+error: classification attributes belong on enum variants or structs, not fields
+ --> tests/error_meta_ui/misplaced_meta.rs:8:9
+  |
+8 |         #[meta(failure)]
+  |         ^^^^^^^^^^^^^^^^
+
+error: classification attributes belong on enum variants or structs, not fields
+  --> tests/error_meta_ui/misplaced_meta.rs:10:9
+   |
+10 |         #[meta(unknown)]
+   |         ^^^^^^^^^^^^^^^^
+
+error: classification attributes belong on enum variants or structs, not fields
+  --> tests/error_meta_ui/misplaced_meta.rs:14:11
+   |
+14 |     Tuple(#[meta(transparent)] String),
+   |           ^^^^^^^^^^^^^^^^^^^^

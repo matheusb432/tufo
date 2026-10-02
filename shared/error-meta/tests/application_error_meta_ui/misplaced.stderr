@@ -1,0 +1,11 @@
+error: metadata belongs on variants or structs, not fields
+  --> tests/application_error_meta_ui/misplaced.rs:11:11
+   |
+11 |     Field(#[meta(transparent)] u8),
+   |           ^^^^^^^^^^^^^^^^^^^^
+
+error: expected class, reason, or transparent metadata
+  --> tests/application_error_meta_ui/misplaced.rs:12:12
+   |
+12 |     #[meta(crate = crate::application_support)]
+   |            ^^^^^

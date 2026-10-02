@@ -1,0 +1,29 @@
+error: unknown error class `Teapot`; expected one of Cancelled, InvalidArgument, DeadlineExceeded, NotFound, AlreadyExists, PermissionDenied, ResourceExhausted, FailedPrecondition, Aborted, OutOfRange, Unimplemented, Internal, Unavailable, DataLoss, Unauthenticated; custom classes require a qualified path
+ --> tests/error_meta_ui/invalid_meta.rs:5:20
+  |
+5 |     #[meta(private(Teapot))]
+  |                    ^^^^^^
+
+error: `#[meta(failure)]` requires a variant with exactly one field
+ --> tests/error_meta_ui/invalid_meta.rs:8:5
+  |
+8 |     FailureWithoutField,
+  |     ^^^^^^^^^^^^^^^^^^^
+
+error: `#[meta(transparent)]` requires a variant with exactly one field
+  --> tests/error_meta_ui/invalid_meta.rs:10:5
+   |
+10 |     TransparentWithTwoFields(u8, u8),
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: expected `#[meta(failure)]`, `#[meta(failure = reason)]`, `#[meta(transparent)]`, or `#[meta(private(Class))]`
+  --> tests/error_meta_ui/invalid_meta.rs:11:12
+   |
+11 |     #[meta(public)]
+   |            ^^^^^^
+
+error: each variant takes at most one #[meta(...)] attribute
+  --> tests/error_meta_ui/invalid_meta.rs:14:5
+   |
+14 |     #[meta(private(Internal))]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^

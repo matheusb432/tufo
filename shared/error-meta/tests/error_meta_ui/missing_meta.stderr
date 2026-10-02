@@ -1,0 +1,11 @@
+error: variant `Unclassified` needs a classification: expected `#[meta(failure)]`, `#[meta(failure = reason)]`, `#[meta(transparent)]`, or `#[meta(private(Class))]`
+ --> tests/error_meta_ui/missing_meta.rs:5:5
+  |
+5 |     Unclassified,
+  |     ^^^^^^^^^^^^
+
+error: variant `AlsoUnclassified` needs a classification: expected `#[meta(failure)]`, `#[meta(failure = reason)]`, `#[meta(transparent)]`, or `#[meta(private(Class))]`
+ --> tests/error_meta_ui/missing_meta.rs:6:5
+  |
+6 |     AlsoUnclassified(u8),
+  |     ^^^^^^^^^^^^^^^^

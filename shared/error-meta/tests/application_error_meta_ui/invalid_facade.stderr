@@ -1,0 +1,11 @@
+error: expected identifier
+ --> tests/application_error_meta_ui/invalid_facade.rs:7:16
+  |
+7 | #[meta(crate = "invalid")]
+  |                ^^^^^^^^^
+
+error: facade metadata only supports #[meta(crate = path)]
+  --> tests/application_error_meta_ui/invalid_facade.rs:12:44
+   |
+12 | #[meta(crate = crate::application_support, class = Internal)]
+   |                                            ^^^^^

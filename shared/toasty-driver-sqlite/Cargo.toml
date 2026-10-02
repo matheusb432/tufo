@@ -13,6 +13,7 @@
 edition = "2024"
 rust-version = "1.95"
 name = "toasty-driver-sqlite"
+publish = false
 version = "0.10.0"
 authors = ["Carl Lerche <me@carllerche.com>"]
 build = false

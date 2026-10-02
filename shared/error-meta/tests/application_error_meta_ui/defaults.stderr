@@ -1,0 +1,47 @@
+error: each enum, variant, or struct takes at most one metadata declaration
+ --> tests/application_error_meta_ui/defaults.rs:5:1
+  |
+5 | #[meta(reason = "duplicate")]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: fixed metadata requires both class and reason
+  --> tests/application_error_meta_ui/defaults.rs:14:5
+   |
+14 |     Inherited,
+   |     ^^^^^^^^^
+
+error: fixed metadata requires both class and reason
+  --> tests/application_error_meta_ui/defaults.rs:20:5
+   |
+20 |     Inherited,
+   |     ^^^^^^^^^
+
+error: #[meta(transparent)] requires exactly one field; select a field with #[meta(transparent(field = name))] or field = index
+  --> tests/application_error_meta_ui/defaults.rs:26:5
+   |
+26 |     Unit,
+   |     ^^^^
+
+error: #[meta(transparent)] requires exactly one field; select a field with #[meta(transparent(field = name))] or field = index
+  --> tests/application_error_meta_ui/defaults.rs:27:5
+   |
+27 |     Multiple(u8, u8),
+   |     ^^^^^^^^
+
+error: fixed metadata requires both class and reason
+  --> tests/application_error_meta_ui/defaults.rs:28:5
+   |
+28 |     #[meta(reason = "cannot inherit a class from transparent")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: `Inherited` has no selected field `source`
+  --> tests/application_error_meta_ui/defaults.rs:33:28
+   |
+33 | #[meta(transparent(field = source))]
+   |                            ^^^^^^
+
+error: unknown application error class `Unknown`; expected one of InvalidArgument, NotFound, FailedPrecondition, Unavailable, Internal; custom classes require a qualified path
+  --> tests/application_error_meta_ui/defaults.rs:39:16
+   |
+39 | #[meta(class = Unknown)]
+   |                ^^^^^^^

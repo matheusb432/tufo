@@ -1,0 +1,41 @@
+error: each item takes at most one #[meta(crate = path)] attribute
+ --> tests/application_error_meta_ui/duplicate_conflicting.rs:8:1
+  |
+8 | #[meta(crate = crate::application_support)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: each enum, variant, or struct takes at most one metadata declaration
+  --> tests/application_error_meta_ui/duplicate_conflicting.rs:11:5
+   |
+11 |     #[meta(transparent)]
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+error: duplicate or conflicting class metadata
+  --> tests/application_error_meta_ui/duplicate_conflicting.rs:13:30
+   |
+13 |     #[meta(class = Internal, class = NotFound, reason = "duplicate")]
+   |                              ^^^^^
+
+error: duplicate or conflicting reason metadata
+  --> tests/application_error_meta_ui/duplicate_conflicting.rs:15:28
+   |
+15 |     #[meta(reason = "one", reason = "two", class = Internal)]
+   |                            ^^^^^^
+
+error: duplicate or conflicting class metadata
+  --> tests/application_error_meta_ui/duplicate_conflicting.rs:17:25
+   |
+17 |     #[meta(transparent, class = Internal, reason = "conflict")]
+   |                         ^^^^^
+
+error: duplicate or conflicting transparent metadata
+  --> tests/application_error_meta_ui/duplicate_conflicting.rs:19:51
+   |
+19 |     #[meta(class = Internal, reason = "conflict", transparent)]
+   |                                                   ^^^^^^^^^^^
+
+error: duplicate or conflicting transparent metadata
+  --> tests/application_error_meta_ui/duplicate_conflicting.rs:21:25
+   |
+21 |     #[meta(transparent, transparent)]
+   |                         ^^^^^^^^^^^

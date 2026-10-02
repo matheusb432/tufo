@@ -1,0 +1,23 @@
+error: each item takes at most one #[meta(crate = path)] attribute
+ --> tests/error_meta_ui/invalid_facade.rs:5:1
+  |
+5 | #[meta(crate = gtl_models)]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: facade metadata only supports #[meta(crate = path)]
+  --> tests/error_meta_ui/invalid_facade.rs:12:28
+   |
+12 | #[meta(crate = gtl_models, crate = gtl_models)]
+   |                            ^^^^^
+
+error: unexpected end of input, expected identifier
+  --> tests/error_meta_ui/invalid_facade.rs:19:15
+   |
+19 | #[meta(crate =)]
+   |               ^
+
+error: expected `#[meta(failure)]`, `#[meta(failure = reason)]`, `#[meta(transparent)]`, or `#[meta(private(Class))]`
+  --> tests/error_meta_ui/invalid_facade.rs:27:12
+   |
+27 |     #[meta(crate = gtl_models)]
+   |            ^^^^^

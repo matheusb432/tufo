@@ -14,11 +14,13 @@ members = [
     "shared/field",
     "xtask",
 ]
-exclude = ["shared/toasty-driver-sqlite"]
+exclude = ["shared/error-meta", "shared/toasty-driver-sqlite"]
 
 [workspace.package]
 edition = "2024"
 publish = false
+license = "MIT"
+repository = "https://github.com/matheusb432/tufo"
 
 [workspace.dependencies]
 # Shared utilities.

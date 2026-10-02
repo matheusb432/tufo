@@ -11,11 +11,9 @@ _default:
 bootstrap *args:
     mise bootstrap --yes {{ args }}
 
-# Check out the preset paintings, fetch the Rust dependencies, and check that the protobufs build.
+# Fetch Rust dependencies and check that the protobufs build.
 [group('build')]
 setup *args:
-    git lfs version >/dev/null 2>&1 || { echo "setup needs Git LFS: the preset paintings in the bundled-assets submodule are LFS files" >&2; exit 1; }
-    git submodule update --init
     cargo fetch {{ args }}
     mise exec -- buf build >/dev/null
 

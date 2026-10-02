@@ -1,0 +1,5 @@
+error: automatic facade discovery is disabled; specify #[meta(crate = path)] or enable the `crate-discovery` feature
+ --> tests/error_meta_ui_no_discovery/missing_application_facade.rs:5:8
+  |
+5 | struct MissingFacade;
+  |        ^^^^^^^^^^^^^

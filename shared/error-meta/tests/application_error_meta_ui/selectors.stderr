@@ -1,0 +1,53 @@
+error: #[meta(transparent)] requires exactly one field; select a field with #[meta(transparent(field = name))] or field = index
+  --> tests/application_error_meta_ui/selectors.rs:10:5
+   |
+10 |     Empty,
+   |     ^^^^^
+
+error: #[meta(transparent)] requires exactly one field; select a field with #[meta(transparent(field = name))] or field = index
+  --> tests/application_error_meta_ui/selectors.rs:12:5
+   |
+12 |     Multiple(u8, u8),
+   |     ^^^^^^^^
+
+error: `Missing` has no selected field `absent`
+  --> tests/application_error_meta_ui/selectors.rs:13:32
+   |
+13 |     #[meta(transparent(field = absent))]
+   |                                ^^^^^^
+
+error: `OutOfRange` has no selected field `2`
+  --> tests/application_error_meta_ui/selectors.rs:15:32
+   |
+15 |     #[meta(transparent(field = 2))]
+   |                                ^
+
+error: `WrongKind` has no selected field `source`
+  --> tests/application_error_meta_ui/selectors.rs:17:32
+   |
+17 |     #[meta(transparent(field = source))]
+   |                                ^^^^^^
+
+error: `Named` has no selected field `0`
+  --> tests/application_error_meta_ui/selectors.rs:19:32
+   |
+19 |     #[meta(transparent(field = 0))]
+   |                                ^
+
+error: unexpected end of input, expected nested attribute
+  --> tests/application_error_meta_ui/selectors.rs:21:24
+   |
+21 |     #[meta(transparent())]
+   |                        ^
+
+error: expected one field = name or field = index selection
+  --> tests/application_error_meta_ui/selectors.rs:23:35
+   |
+23 |     #[meta(transparent(field = 0, field = 1))]
+   |                                   ^^^^^
+
+error: `StructSelection` has no selected field `absent`
+  --> tests/application_error_meta_ui/selectors.rs:29:28
+   |
+29 | #[meta(transparent(field = absent))]
+   |                            ^^^^^^

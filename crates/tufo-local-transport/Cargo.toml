@@ -3,6 +3,8 @@ name = "tufo-local-transport"
 version = "0.1.0"
 description = "Private local IPC between the Tufo process roots"
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
 publish.workspace = true
 
 [dependencies]

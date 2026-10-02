@@ -1,0 +1,47 @@
+error: variant `Missing` has no named field `missing`
+ --> tests/error_meta_ui/invalid_field_selection.rs:7:28
+  |
+7 |     #[meta(failure(field = missing))]
+  |                            ^^^^^^^
+
+error: variant `OutOfBounds` has no tuple field at index 2
+ --> tests/error_meta_ui/invalid_field_selection.rs:9:32
+  |
+9 |     #[meta(transparent(field = 2))]
+  |                                ^
+
+error: variant `NamedOnTuple` has no named field `reason`
+  --> tests/error_meta_ui/invalid_field_selection.rs:11:28
+   |
+11 |     #[meta(failure(field = reason))]
+   |                            ^^^^^^
+
+error: variant `TupleOnNamed` has no tuple field at index 0
+  --> tests/error_meta_ui/invalid_field_selection.rs:13:28
+   |
+13 |     #[meta(failure(field = 0))]
+   |                            ^
+
+error: variant `Unit` has no tuple field at index 0
+  --> tests/error_meta_ui/invalid_field_selection.rs:15:28
+   |
+15 |     #[meta(failure(field = 0))]
+   |                            ^
+
+error: expected one `field = name` or `field = index` selection
+  --> tests/error_meta_ui/invalid_field_selection.rs:17:36
+   |
+17 |     #[meta(failure(field = reason, field = reason))]
+   |                                    ^^^^^
+
+error: expected one `field = name` or `field = index` selection
+  --> tests/error_meta_ui/invalid_field_selection.rs:19:24
+   |
+19 |     #[meta(transparent(unknown = reason))]
+   |                        ^^^^^^^
+
+error: unexpected end of input, expected nested attribute
+  --> tests/error_meta_ui/invalid_field_selection.rs:21:20
+   |
+21 |     #[meta(failure())]
+   |                    ^

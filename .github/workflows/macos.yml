@@ -24,7 +24,6 @@ jobs:
     timeout-minutes: 120
     defaults:
       run:
-        # The workspace reaches error-meta at shared, as on the development machine.
         working-directory: tools/tufo
     steps:
       - uses: actions/checkout@v7

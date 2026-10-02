@@ -1,0 +1,17 @@
+error: missing metadata; expected #[meta(class = Class, reason = expression)] or #[meta(transparent)]
+ --> tests/application_error_meta_ui/missing.rs:9:5
+  |
+9 |     First,
+  |     ^^^^^
+
+error: missing metadata; expected #[meta(class = Class, reason = expression)] or #[meta(transparent)]
+  --> tests/application_error_meta_ui/missing.rs:10:5
+   |
+10 |     Second(u8),
+   |     ^^^^^^
+
+error: missing metadata; expected #[meta(class = Class, reason = expression)] or #[meta(transparent)]
+  --> tests/application_error_meta_ui/missing.rs:15:8
+   |
+15 | struct MissingStruct;
+   |        ^^^^^^^^^^^^^

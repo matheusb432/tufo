@@ -1,0 +1,25 @@
+error[E0308]: mismatched types
+  --> tests/error_meta_ui/invalid_class_path.rs:13:16
+   |
+11 | #[derive(ErrorMeta)]
+   |          --------- arguments to this enum variant are incorrect
+12 | #[meta(crate = crate::support)]
+13 | #[meta(private(Policy::CLASS))]
+   |                ^^^^^^^^^^^^^ expected `ErrorClass`, found `u8`
+   |
+note: tuple variant defined here
+  --> tests/error_meta_ui/../support/mod.rs
+   |
+   |         Private(ErrorClass),
+   |         ^^^^^^^
+
+error[E0599]: no variant, associated function, or constant named `Typo` found for enum `ErrorClass` in the current scope
+  --> tests/error_meta_ui/invalid_class_path.rs:18:53
+   |
+18 | #[meta(private(crate::support::failure::ErrorClass::Typo))]
+   |                                                     ^^^^ variant, associated function, or constant not found in `ErrorClass`
+   |
+  ::: tests/error_meta_ui/../support/mod.rs
+   |
+   |     pub enum ErrorClass {
+   |     ------------------- variant, associated function, or constant `Typo` not found for this enum

@@ -1,0 +1,16 @@
+error[E0308]: mismatched types
+  --> tests/application_error_meta_ui/invalid_class_path.rs:13:16
+   |
+13 | #[meta(class = Policy::CLASS, reason = "wrong")]
+   |                ^^^^^^^^^^^^^ expected `ErrorClass`, found `u8`
+
+error[E0599]: no variant, associated function, or constant named `Typo` found for enum `ErrorClass` in the current scope
+  --> tests/application_error_meta_ui/invalid_class_path.rs:19:63
+   |
+19 | #[meta(class = crate::application_support::error::ErrorClass::Typo, reason = "missing")]
+   |                                                               ^^^^ variant, associated function, or constant not found in `ErrorClass`
+   |
+  ::: tests/application_error_meta_ui/../application_support/mod.rs
+   |
+   |     pub enum ErrorClass {
+   |     ------------------- variant, associated function, or constant `Typo` not found for this enum

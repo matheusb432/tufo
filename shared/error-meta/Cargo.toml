@@ -1,0 +1,51 @@
+[package]
+name = "error-meta"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+publish = false
+license = "MIT"
+description = "Derive public and private error classifications"
+
+[lib]
+proc-macro = true
+
+[features]
+default = ["crate-discovery"]
+crate-discovery = ["dep:proc-macro-crate"]
+
+[dependencies]
+proc-macro-crate = { version = "3.5.0", optional = true }
+proc-macro2 = "1.0.106"
+quote = "1.0.46"
+syn = { version = "3.0.6", default-features = false, features = [
+  "derive",
+  "full",
+  "parsing",
+  "printing",
+  "proc-macro",
+] }
+
+[dev-dependencies]
+thiserror = "2.0.18"
+trybuild = "1.0.121"
+
+[workspace]
+resolver = "3"
+[workspace.lints.clippy]
+all = { level = "warn", priority = -2 }
+pedantic = { level = "warn", priority = -2 }
+correctness = { level = "deny", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+dbg_macro = "warn"
+disallowed_methods = "deny"
+collection_is_never_read = "warn"
+struct_field_names = "allow"
+
+[lints]
+workspace = true

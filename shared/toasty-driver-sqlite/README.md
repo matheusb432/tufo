@@ -8,3 +8,6 @@ columns as BLOB, but the published driver omits these two codec cases.
 The workspace patches this crate until an upstream release supports UUID BLOBs.
 The upstream source and documentation are at
 [github.com/tokio-rs/toasty](https://github.com/tokio-rs/toasty).
+
+The upstream release is from commit `f3411327b6b57fb03deac9e49f7021d1448176be`.
+Its [MIT license](LICENSE) is retained. This local copy is not published.

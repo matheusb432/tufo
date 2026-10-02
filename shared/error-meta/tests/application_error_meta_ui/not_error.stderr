@@ -1,0 +1,12 @@
+error[E0277]: the trait bound `NotAnError: std::error::Error` is not satisfied
+ --> tests/application_error_meta_ui/not_error.rs:6:10
+  |
+6 | #[derive(ApplicationErrorMeta)]
+  |          ^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+  |
+help: the trait `std::error::Error` is not implemented for `NotAnError`
+ --> tests/application_error_meta_ui/not_error.rs:9:1
+  |
+9 | struct NotAnError;
+  | ^^^^^^^^^^^^^^^^^
+  = note: this error originates in the derive macro `ApplicationErrorMeta` (in Nightly builds, run with -Z macro-backtrace for more info)
