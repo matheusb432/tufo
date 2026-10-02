@@ -1,0 +1,30 @@
+import { Tour, TourId } from "state.slint";
+import { PlaybackTour } from "playback.slint";
+
+export global HomeTour {
+    out property <string> home-playlists: "home.home-playlists";
+    out property <string> home-soundboards: "home.home-soundboards";
+    out property <string> navigation: "home.navigation";
+    out property <Tour> guide: { id: TourId.home, steps: [
+        {
+            anchor: HomeTour.home-playlists,
+            title: @tr("Music for your session"),
+            body: @tr("Open a playlist card to browse its songs. The play button on a card starts that playlist; opening the card leaves playback alone."),
+        },
+        {
+            anchor: HomeTour.home-soundboards,
+            title: @tr("Sounds beside your music"),
+            body: @tr("Open a soundboard for effects and ambience. See all opens the full shelf; empty shelves offer Add and Kenku FM import."),
+        },
+        {
+            anchor: HomeTour.navigation,
+            title: @tr("Find your way"),
+            body: @tr("The sidebar opens Home, Songs, Playlists and Soundboards. Ctrl+B switches between the sidebar and its narrow rail."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.seek-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+        PlaybackTour.mini-step,
+    ] };
+}

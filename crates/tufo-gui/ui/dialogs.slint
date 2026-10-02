@@ -1,5 +1,12 @@
 // The add and edit dialogs, Add to playlist, and the settings dialog.
 
+import { CollectionFormTour } from "tours/collection-form.slint";
+import { AddToPlaylistTour } from "tours/add-to-playlist.slint";
+import { EntryTour } from "tours/entry.slint";
+import { SettingsTour } from "tours/settings.slint";
+import { GuidedTours, Tour, TourRect, TourScroll } from "tours/state.slint";
+import { TourButton } from "tours/button.slint";
+import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
@@ -12,6 +19,8 @@ import {
 // A modal card over a dimmed window. Clicking the dimmed area cancels.
 export component DialogFrame inherits Rectangle {
     in property <string> title;
+    in property <Tour> guide;
+    out property <TourRect> card-bounds: GuidedTours.bounds(surface.absolute-position, surface.width, surface.height);
     // Shows a close button beside the title, for a dialog without a Cancel button.
     in property <bool> closable;
     // A `Presence`'s progress, which fades the dialog in and out.
@@ -25,7 +34,7 @@ export component DialogFrame inherits Rectangle {
     }
 
     // Clear of the title row, whose buttons stay above every dialog.
-    Rectangle {
+    surface := Rectangle {
         y: max(Theme.title-row-height, (root.height - self.height) / 2) + Motion.presence-sink(root.progress);
         opacity: root.progress;
         width: min(parent.width - 48px, 440px);
@@ -37,7 +46,8 @@ export component DialogFrame inherits Rectangle {
         clip: true;
         // Swallows clicks so they don't reach the dimmed area.
         TouchArea { }
-        scroll := Flickable {
+        scroll := TourScrollArea {
+            tour-scroll: TourScroll.dialog;
             mouse-drag-pan-enabled: false;
             content-width: self.width;
             content-height: layout.preferred-height;
@@ -53,6 +63,12 @@ export component DialogFrame inherits Rectangle {
                         font-size: Theme.heading;
                         font-weight: Theme.display-weight;
                         color: Theme.text;
+                    }
+                    TourButton {
+                        y: (parent.height - self.height) / 2;
+                        guide: root.guide;
+                        label: root.title;
+                        available: root.progress == 1;
                     }
 
                     if root.closable: IconButton {
@@ -93,6 +109,11 @@ component Actions-Row inherits HorizontalLayout {
 // The collection's card as the grid will show it, with its title and background, over the
 // background's name and a way to change it.
 component BackgroundPreview inherits VerticalLayout {
+    TourTarget {
+        anchor: CollectionFormTour.background;
+        scroll: TourScroll.dialog;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     // The collection whose gradient the card shows; empty shows Tufo's own.
     in property <string> collection-id;
     in property <string> title;
@@ -169,6 +190,7 @@ component BackgroundPreview inherits VerticalLayout {
 }
 
 export component AddCollectionDialog inherits DialogFrame {
+    guide: CollectionFormTour.new-collection;
     in property <CollectionKind> kind;
     title: root.kind == CollectionKind.playlist ? @tr("Add Playlist") : @tr("Add Soundboard");
     callback change-background(string);
@@ -176,6 +198,11 @@ export component AddCollectionDialog inherits DialogFrame {
         Actions.start-new-collection();
     }
     name := TextField {
+        TourTarget {
+            anchor: CollectionFormTour.collection-name;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         label: @tr("Name");
         accepted => {
             if self.text != "" {
@@ -192,6 +219,11 @@ export component AddCollectionDialog inherits DialogFrame {
         spacing: 4px;
         TextLink {
             text: @tr("Or follow a folder");
+            TourTarget {
+                anchor: CollectionFormTour.collection-folder;
+                scroll: TourScroll.dialog;
+                bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+            }
             clicked => {
                 Actions.follow-folder(root.kind);
                 root.cancel();
@@ -238,6 +270,11 @@ export component AddCollectionDialog inherits DialogFrame {
 
 // A playlist to add the song to; one that lists it already shows a check and takes no click.
 component PlaylistChoiceItem inherits Rectangle {
+    TourTarget {
+        anchor: AddToPlaylistTour.playlist-choices;
+        scroll: TourScroll.dialog;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <PlaylistChoice> choice;
     callback picked();
     height: 44px;
@@ -301,6 +338,7 @@ component PlaylistChoiceItem inherits Rectangle {
 
 // Adds one song to a playlist that takes songs by hand, or to a new one named here.
 export component AddToPlaylistDialog inherits DialogFrame {
+    guide: AddToPlaylistTour.guide;
     in property <string> song-id;
     in property <string> song-title;
     title: @tr("Add to playlist");
@@ -337,6 +375,11 @@ export component AddToPlaylistDialog inherits DialogFrame {
         spacing: 8px;
         alignment: stretch;
         name := TextField {
+            TourTarget {
+                anchor: CollectionFormTour.collection-name;
+                scroll: TourScroll.dialog;
+                bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+            }
             horizontal-stretch: 1;
             label: @tr("New playlist");
             placeholder: @tr("Name");
@@ -363,9 +406,15 @@ export component AddToPlaylistDialog inherits DialogFrame {
 }
 
 export component EditCollectionDialog inherits DialogFrame {
+    guide: CollectionFormTour.edit-collection;
     title: @tr("Edit");
     callback change-background(string);
     name := TextField {
+        TourTarget {
+            anchor: CollectionFormTour.collection-name;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         label: @tr("Name");
         text: LibraryView.collection-title;
         accepted => {
@@ -406,6 +455,11 @@ export component EditCollectionDialog inherits DialogFrame {
 }
 
 component SoundIconPicker inherits VerticalLayout {
+    TourTarget {
+        anchor: EntryTour.sound-icons;
+        scroll: TourScroll.dialog;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in-out property <int> selected;
     property <int> columns: 10;
     property <length> cell: grid.width / root.columns;
@@ -449,6 +503,7 @@ component SoundIconPicker inherits VerticalLayout {
 
 // Edits a track's title, or a sound's title, icon, and fades.
 export component EditEntryDialog inherits DialogFrame {
+    guide: root.sound ? EntryTour.edit-sound : EntryTour.edit-track;
     in property <string> entry-id;
     in property <string> entry-title;
     in property <bool> sound;
@@ -459,6 +514,11 @@ export component EditEntryDialog inherits DialogFrame {
     property <int> chosen-icon: root.icon;
     title: root.sound ? @tr("Edit Sound") : @tr("Edit Track");
     name := TextField {
+        TourTarget {
+            anchor: EntryTour.entry-name;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         label: @tr("Name");
         text: root.entry-title;
     }
@@ -470,6 +530,12 @@ export component EditEntryDialog inherits DialogFrame {
     HorizontalLayout {
         spacing: 12px;
         visible: root.sound;
+        TourTarget {
+            anchor: EntryTour.sound-fades;
+            available: root.sound;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         height: root.sound ? 66px : 0px;
         fade-in := TextField {
             label: @tr("Fade In (ms)");
@@ -508,6 +574,13 @@ export component EditEntryDialog inherits DialogFrame {
 }
 
 component SwitchSetting inherits HorizontalLayout {
+    in property <string> tour-anchor;
+    TourTarget {
+        anchor: root.tour-anchor;
+        available: root.tour-anchor != "";
+        scroll: TourScroll.dialog;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <string> title;
     in property <string> description;
     in-out property <bool> checked;
@@ -546,6 +619,7 @@ component SwitchSetting inherits HorizontalLayout {
 // Each setting saves as it changes; only a new bot token waits for its button, since saving it
 // restarts tufo-server.
 export component SettingsDialog inherits DialogFrame {
+    guide: SettingsTour.guide;
     property <float> crossfade: Session.crossfade-ms / 10000;
     title: @tr("Settings");
     closable: true;
@@ -567,6 +641,11 @@ export component SettingsDialog inherits DialogFrame {
     HorizontalLayout {
         spacing: 8px;
         token := TextField {
+            TourTarget {
+                anchor: SettingsTour.discord-token;
+                scroll: TourScroll.dialog;
+                bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+            }
             horizontal-stretch: 1;
             label: @tr("Bot token");
             password: true;
@@ -592,6 +671,7 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     if Session.discord-configured: SwitchSetting {
+        tour-anchor: SettingsTour.discord-disable;
         title: @tr("Disable Discord connection");
         description: @tr("Logs the bot out.");
         checked: Session.discord-disabled;
@@ -608,6 +688,11 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     Slider {
+        TourTarget {
+            anchor: SettingsTour.crossfade;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         value: root.crossfade;
         step: 0.05;
         changed(value) => {
@@ -619,6 +704,7 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     SwitchSetting {
+        tour-anchor: SettingsTour.quit-behavior;
         title: @tr("Keep playing after quitting");
         description: @tr("Audio keeps playing after the GUI closes.");
         checked: Session.keep-playing-after-quit;
@@ -628,6 +714,7 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     SwitchSetting {
+        tour-anchor: SettingsTour.startup;
         title: @tr("Run at startup");
         description: @tr("Automatically start Tufo when you log in.");
         checked: Session.start-at-login;
@@ -637,6 +724,11 @@ export component SettingsDialog inherits DialogFrame {
     }
 
     HorizontalLayout {
+        TourTarget {
+            anchor: SettingsTour.kenku-launch;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         spacing: 16px;
         VerticalLayout {
             spacing: 4px;

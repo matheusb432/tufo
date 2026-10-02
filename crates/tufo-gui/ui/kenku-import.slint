@@ -1,5 +1,8 @@
 // The saved import stays available after this dialog closes or the GUI reconnects.
 
+import { KenkuTour } from "tours/kenku.slint";
+import { GuidedTours, TourScroll } from "tours/state.slint";
+import { TourTarget } from "tours/target.slint";
 import { Theme } from "theme.slint";
 import { ListView } from "std-widgets.slint";
 import { Actions, KenkuImportView } from "state.slint";
@@ -7,6 +10,8 @@ import { DialogFrame } from "dialogs.slint";
 import { Button, ButtonKind, LoadingProgress, Switch } from "widgets.slint";
 
 export component KenkuImportDialog inherits DialogFrame {
+    guide: KenkuTour.guide;
+    TourTarget { anchor: KenkuTour.kenku-status; bounds: root.card-bounds; }
     title: @tr("Kenku FM import");
     closable: true;
 
@@ -30,6 +35,11 @@ export component KenkuImportDialog inherits DialogFrame {
     }
 
     if KenkuImportView.choosing: VerticalLayout {
+        TourTarget {
+            anchor: KenkuTour.kenku-conflicts;
+            scroll: TourScroll.dialog;
+            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+        }
         spacing: 12px;
         Text {
             text: @tr("Choose which collections to overwrite.");

@@ -1,6 +1,10 @@
 // The sidebar: the logo, search, the pages, every collection, the output, and the connection.
 // It collapses to a rail of icons.
 
+import { HomeTour } from "tours/home.slint";
+import { PlaybackTour } from "tours/playback.slint";
+import { GuidedTours } from "tours/state.slint";
+import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, CollectionKind, CurrentOutput, LibraryView, NavItem, Navigation, OutputRow,
@@ -230,6 +234,11 @@ component OutputPicker inherits MenuSurface {
 
 // The output the audio goes to now, which opens the picker.
 component OutputButton inherits Rectangle {
+    TourTarget {
+        anchor: PlaybackTour.output;
+        available: root.tooltip-enabled;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <bool> compact;
     in property <bool> tooltip-enabled: true;
     callback clicked();
@@ -335,6 +344,11 @@ component SidebarForm inherits Rectangle {
 }
 
 component FullSidebar inherits SidebarForm {
+    TourTarget {
+        anchor: HomeTour.navigation;
+        available: root.shown;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     callback open-page(Page, string);
     callback collapse();
     callback open-search();
@@ -548,6 +562,11 @@ component RailButton inherits IconButton {
 }
 
 component Rail inherits SidebarForm {
+    TourTarget {
+        anchor: HomeTour.navigation;
+        available: root.shown;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     callback open-page(Page, string);
     callback expand();
     callback open-search();

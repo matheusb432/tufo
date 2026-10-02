@@ -1,0 +1,23 @@
+import { Tour, TourId } from "state.slint";
+
+export global SearchTour {
+    out property <string> search-query: "search.search-query";
+    out property <string> search-results: "search.search-results";
+    out property <Tour> guide: { id: TourId.search, steps: [
+        {
+            anchor: SearchTour.search-query,
+            title: @tr("Search the whole library"),
+            body: @tr("Ctrl+Shift+F or the sidebar's search opens this palette. Search titles across tracks, sounds, playlists and soundboards."),
+        },
+        {
+            anchor: SearchTour.search-results,
+            title: @tr("Choose a result"),
+            body: @tr("Up and Down select a result. Enter plays a track or sound, or opens a collection. Escape closes the palette. This guide only explains those actions."),
+        },
+        {
+            anchor: "",
+            title: @tr("Filter the current page"),
+            body: @tr("Ctrl+F opens a local filter on the current page. Close this guide and palette to use it; Escape clears and closes the filter."),
+        },
+    ] };
+}

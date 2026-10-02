@@ -1,0 +1,31 @@
+import { Tour, TourId } from "state.slint";
+
+export global EntryTour {
+    out property <string> entry-name: "entry.entry-name";
+    out property <string> sound-fades: "entry.sound-fades";
+    out property <string> sound-icons: "entry.sound-icons";
+    out property <Tour> edit-track: { id: TourId.edit-track, steps: [
+        {
+            anchor: EntryTour.entry-name,
+            title: @tr("Name this track"),
+            body: @tr("Change the library title here. Save applies it; Cancel leaves the title as it was. Your audio file keeps its name."),
+        },
+    ] };
+    out property <Tour> edit-sound: { id: TourId.edit-sound, steps: [
+        {
+            anchor: EntryTour.entry-name,
+            title: @tr("Name this sound"),
+            body: @tr("Change the library title here. Save applies it; Cancel leaves the title as it was. Your audio file keeps its name."),
+        },
+        {
+            anchor: EntryTour.sound-fades,
+            title: @tr("Fade sounds in and out"),
+            body: @tr("Set fade-in and fade-out in milliseconds. These values shape the start and stop of this sound; the tile and overall effects sliders still control volume."),
+        },
+        {
+            anchor: EntryTour.sound-icons,
+            title: @tr("Choose a sound icon"),
+            body: @tr("Pick an icon for this sound tile, then Save to apply the title, fades and icon together."),
+        },
+    ] };
+}

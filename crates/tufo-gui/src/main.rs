@@ -13,6 +13,7 @@ mod controller;
 mod drops;
 mod files;
 mod frame;
+mod guided_tours;
 mod i18n;
 #[cfg(target_os = "macos")]
 mod macos_reopen;
@@ -117,6 +118,7 @@ fn run_desktop() -> anyhow::Result<()> {
     let window = ui::AppWindow::new()?;
     frame::install(&window);
     i18n::select_window_language(language)?;
+    guided_tours::install(&window);
     let window_state_file = window_state::WindowStateFile::from_environment();
     window_state::install(&window, runtime.handle(), window_state_file);
     // The window picks this up when it first shows; setting it needs the platform the window
@@ -140,16 +142,7 @@ fn run_desktop() -> anyhow::Result<()> {
         .inspect_err(|error| tracing::warn!(%error, "cannot start desktop media controls"))
         .ok();
     let hidden_in_tray = launch == Launch::AtLogin && tray.is_some();
-    window.window().on_close_requested({
-        let controller = controller.clone();
-        let hides_to_tray = tray.is_some();
-        move || {
-            if !hides_to_tray {
-                controller.quit();
-            }
-            CloseRequestResponse::HideWindow
-        }
-    });
+    bind_close_request(&window, controller.clone(), tray.is_some());
     let ticker = Timer::default();
     ticker.start(TimerMode::Repeated, PROGRESS_TICK, {
         let controller = controller.clone();
@@ -186,6 +179,19 @@ fn run_desktop() -> anyhow::Result<()> {
     // Hiding the window doesn't end the loop; quitting does, once the server has stopped.
     slint::run_event_loop_until_quit()?;
     Ok(())
+}
+
+fn bind_close_request(window: &ui::AppWindow, controller: Controller, hides_to_tray: bool) {
+    let weak = window.as_weak();
+    window.window().on_close_requested(move || {
+        if let Some(window) = weak.upgrade() {
+            window.global::<ui::GuidedTours>().invoke_close();
+        }
+        if !hides_to_tray {
+            controller.quit();
+        }
+        CloseRequestResponse::HideWindow
+    });
 }
 
 /// Selects winit on the window's native platform: Wayland in a Wayland session.

@@ -1,0 +1,257 @@
+import { Motion, Theme } from "../theme.slint";
+import { Button, ButtonKind, IconButton, Presence, ScrollThumb } from "../widgets.slint";
+import { GuidedTours } from "state.slint";
+
+export component TourOverlay inherits Rectangle {
+    presence := Presence { open: GuidedTours.active; }
+    visible: presence.present;
+    property <bool> interactive: GuidedTours.active && presence.progress == 1;
+    property <bool> active: GuidedTours.active;
+    forward-focus: next-keys;
+    init => { if root.active { next-keys.focus(); } }
+    changed active => {
+        if root.active { copy.content-y = 0px; next-keys.focus(); }
+    }
+    property <int> step: GuidedTours.step;
+    changed step => { copy.content-y = 0px; next-keys.focus(); }
+    accessible-role: groupbox;
+    accessible-label: @tr("Guide: {0}", GuidedTours.title);
+    accessible-description: GuidedTours.body;
+    accessible-live-region: polite;
+    property <length> spot-x: GuidedTours.layout.spotlight.x;
+    property <length> spot-y: GuidedTours.layout.spotlight.y - root.y;
+    property <length> spot-width: GuidedTours.layout.spotlight.width;
+    property <length> spot-height: GuidedTours.layout.spotlight.height;
+    animate spot-x, spot-y, spot-width, spot-height {
+        duration: Motion.tour-travel;
+        easing: Motion.presence-easing;
+        enabled: presence.progress > 0;
+    }
+    property <float> spotlight-progress: GuidedTours.layout.spotlight-visible ? 1 : 0;
+    animate spotlight-progress { duration: Motion.presence-enter; }
+    property <brush> shade: Theme.scrim.transparentize(1 - presence.progress);
+    FocusScope {
+        focus-on-click: false;
+        capture-key-pressed(event) => { root.handle-key(event) }
+        TouchArea { }
+        Rectangle {
+            x: 0; y: 0;
+            width: parent.width;
+            height: max(0px, root.spot-y);
+            background: root.shade;
+        }
+        Rectangle {
+            x: 0; y: root.spot-y;
+            width: root.spot-x;
+            height: root.spot-height;
+            background: root.shade;
+        }
+        Rectangle {
+            x: root.spot-x + root.spot-width; y: root.spot-y;
+            width: max(0px, parent.width - self.x);
+            height: root.spot-height;
+            background: root.shade;
+        }
+        Rectangle {
+            x: 0; y: root.spot-y + root.spot-height;
+            width: parent.width;
+            height: max(0px, parent.height - self.y);
+            background: root.shade;
+        }
+        Rectangle {
+            x: root.spot-x; y: root.spot-y;
+            width: root.spot-width; height: root.spot-height;
+            background: Theme.scrim;
+            opacity: presence.progress * (1 - root.spotlight-progress);
+        }
+        spotlight := Rectangle {
+            x: root.spot-x; y: root.spot-y;
+            width: root.spot-width; height: root.spot-height;
+            opacity: presence.progress * root.spotlight-progress;
+            border-width: 2px;
+            border-color: Theme.accent;
+            border-radius: Theme.radius-small;
+        }
+        card := Rectangle {
+            x: GuidedTours.layout.card.x;
+            property <length> position-y: GuidedTours.layout.card.y - root.y;
+            y: self.position-y + Motion.presence-sink(presence.progress);
+            opacity: presence.progress;
+            animate x, position-y, width, height {
+                duration: Motion.tour-travel;
+                easing: Motion.presence-easing;
+                enabled: presence.progress > 0;
+            }
+            width: GuidedTours.layout.card.width;
+            height: GuidedTours.layout.card.height;
+            background: Theme.raised;
+            border-radius: Theme.radius-panel;
+            border-width: 1px;
+            border-color: Theme.accent.with-alpha(0.5);
+            TouchArea { }
+            VerticalLayout {
+                padding: root.height < 200px ? 8px : 16px;
+                spacing: root.height < 200px ? 4px : 8px;
+                HorizontalLayout {
+                    Text {
+                        text: @tr("Step {0} of {1}", GuidedTours.step + 1, GuidedTours.count);
+                        color: Theme.accent;
+                        font-size: Theme.caption;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    close-button := IconButton {
+                        size: 28px;
+                        icon-size: 18px;
+                        icon: @image-url("../icons/x.svg");
+                        tooltip: @tr("Close guide");
+                        tooltip-enabled: root.active;
+                        clicked => { close-keys.focus(); GuidedTours.close(); }
+                        forward-focus: close-keys;
+                        close-keys := FocusScope {
+                            focus-on-click: false;
+                            focus-on-tab-navigation: true;
+                            key-pressed(event) => {
+                                if event.text == Key.Return || event.text == " " {
+                                    GuidedTours.close(); return accept;
+                                }
+                                reject
+                            }
+                        }
+                        Rectangle {
+                            border-radius: Theme.radius-small;
+                            border-color: Theme.accent;
+                            border-width: close-keys.has-focus ? 1px : 0px;
+                        }
+                    }
+                }
+                Rectangle {
+                    vertical-stretch: 1;
+                    border-radius: Theme.radius-small;
+                    border-color: Theme.accent;
+                    border-width: copy-keys.has-focus ? 1px : 0px;
+                    copy := Flickable {
+                        mouse-drag-pan-enabled: false;
+                        content-width: self.width;
+                        content-height: text-layout.preferred-height;
+                        vertical-stretch: 1;
+                        forward-focus: copy-keys;
+                        copy-keys := FocusScope {
+                            focus-on-tab-navigation: true;
+                            key-pressed(event) => {
+                                if event.text == Key.DownArrow || event.text == Key.PageDown {
+                                    copy.content-y = max(min(0px, copy.height - copy.content-height), copy.content-y - 40px);
+                                    return accept;
+                                }
+                                if event.text == Key.UpArrow || event.text == Key.PageUp {
+                                    copy.content-y = min(0px, copy.content-y + 40px); return accept;
+                                }
+                                reject
+                            }
+                        }
+                        text-layout := VerticalLayout {
+                            padding-right: 8px;
+                            spacing: 8px;
+                            alignment: start;
+                            Text {
+                                text: GuidedTours.title;
+                                font-size: root.height < 200px ? Theme.body : Theme.subheading;
+                                font-weight: Theme.display-weight;
+                                color: Theme.text;
+                                wrap: word-wrap;
+                            }
+                            Text {
+                                text: GuidedTours.body;
+                                font-size: Theme.body-small;
+                                color: Theme.text-secondary;
+                                wrap: word-wrap;
+                            }
+                        }
+                    }
+                    ScrollThumb {
+                        x: parent.width - self.width;
+                        height: copy.height;
+                        content-height: copy.content-height;
+                        viewport-height: copy.height;
+                        content-y <=> copy.content-y;
+                        show: copy.content-height > copy.height;
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 8px;
+                    previous := Button {
+                        height: root.height < 200px ? 30px : 36px;
+                        text: @tr("Previous");
+                        kind: ButtonKind.quiet;
+                        enabled: GuidedTours.step > 0;
+                        clicked => { previous-keys.focus(); GuidedTours.previous(); }
+                        forward-focus: previous-keys;
+                        previous-keys := FocusScope {
+                            focus-on-click: false;
+                            enabled: previous.enabled;
+                            focus-on-tab-navigation: true;
+                            key-pressed(event) => {
+                                if event.text == Key.Return || event.text == " " {
+                                    GuidedTours.previous(); return accept;
+                                }
+                                reject
+                            }
+                        }
+                        Rectangle {
+                            border-radius: Theme.radius-small;
+                            border-color: Theme.accent;
+                            border-width: previous.enabled && previous-keys.has-focus ? 1px : 0px;
+                        }
+                    }
+                    Rectangle { horizontal-stretch: 1; }
+                    next := Button {
+                        height: root.height < 200px ? 30px : 36px;
+                        text: GuidedTours.step + 1 == GuidedTours.count ? @tr("Finish") : @tr("Next");
+                        kind: ButtonKind.primary;
+                        clicked => { next-keys.focus(); GuidedTours.next(); }
+                        forward-focus: next-keys;
+                        next-keys := FocusScope {
+                            focus-on-click: false;
+                            focus-on-tab-navigation: true;
+                            key-pressed(event) => {
+                                if event.text == Key.Return || event.text == " " {
+                                    GuidedTours.next(); return accept;
+                                }
+                                reject
+                            }
+                        }
+                        Rectangle {
+                            border-radius: Theme.radius-small;
+                            border-color: Theme.accent;
+                            border-width: next-keys.has-focus ? 2px : 0px;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if !root.interactive: TouchArea { }
+
+    public function handle-key(event: KeyEvent) -> EventResult {
+        if !root.interactive { return accept; }
+        if event.text == Key.Escape { GuidedTours.close(); return accept; }
+        if event.text == Key.LeftArrow { GuidedTours.previous(); return accept; }
+        if event.text == Key.RightArrow { GuidedTours.next(); return accept; }
+        if event.text == Key.Tab {
+            if event.modifiers.shift {
+                if next-keys.has-focus && previous.enabled { previous-keys.focus(); }
+                else if next-keys.has-focus || previous-keys.has-focus { copy-keys.focus(); }
+                else if copy-keys.has-focus { close-keys.focus(); }
+                else { next-keys.focus(); }
+            } else {
+                if next-keys.has-focus { close-keys.focus(); }
+                else if close-keys.has-focus { copy-keys.focus(); }
+                else if copy-keys.has-focus && previous.enabled { previous-keys.focus(); }
+                else { next-keys.focus(); }
+            }
+            return accept;
+        }
+        if event.modifiers.control || event.modifiers.alt || event.modifiers.meta { return accept; }
+        reject
+    }
+}

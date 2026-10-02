@@ -1,0 +1,46 @@
+import { TourStep } from "state.slint";
+
+export global PlaybackTour {
+    out property <string> transport: "playback.transport";
+    out property <string> seek: "playback.seek";
+    out property <string> volume: "playback.volume";
+    out property <string> mix: "playback.mix";
+    out property <string> playing-sounds: "playback.playing-sounds";
+    out property <string> mini-switch: "playback.mini-switch";
+    out property <string> output: "playback.output";
+    out property <TourStep> transport-step: {
+        anchor: PlaybackTour.transport,
+        title: @tr("Control your music"),
+        body: @tr("Play or pause, move to the previous or next track, shuffle, and cycle Repeat. A queue takes priority over the playlist; repeat-one is unavailable while songs are queued."),
+    };
+    out property <TourStep> seek-step: {
+        anchor: PlaybackTour.seek,
+        title: @tr("Move through a track"),
+        body: @tr("Drag the seek slider to change position. The time labels show the current position and duration. Desktop media controls use the same music session."),
+    };
+    out property <TourStep> mix-step: {
+        anchor: PlaybackTour.mix,
+        title: @tr("Mix up to three songs"),
+        body: @tr("Add to mix from a track's right-click menu. Mix appears beside the title when extra layers exist; it controls their volume, looping and stop actions."),
+    };
+    out property <TourStep> volume-step: {
+        anchor: PlaybackTour.volume,
+        title: @tr("Music and effects volumes"),
+        body: @tr("Music volume and mute affect music. The waveform opens the overall effects volume, which multiplies each sound's level: 40% on a sound and 50% here gives 20%."),
+    };
+    out property <TourStep> sounds-step: {
+        anchor: PlaybackTour.playing-sounds,
+        title: @tr("Control active sounds"),
+        body: @tr("Playing sounds appear as chips with Loop and Stop. Pause sounds pauses or resumes them together, independently of music."),
+    };
+    out property <TourStep> mini-step: {
+        anchor: PlaybackTour.mini-switch,
+        title: @tr("A smaller player"),
+        body: @tr("Use Mini player or Ctrl+Shift+M for the compact window. In narrow full windows, the chevron collapses the player to one row. The tray also offers player and pause controls where available."),
+    };
+    out property <TourStep> output-step: {
+        anchor: PlaybackTour.output,
+        title: @tr("Choose where audio goes"),
+        body: @tr("The output picker sends audio to this machine or one Discord voice channel. Refresh updates voice channels. A channel change switches the output when you select it."),
+    };
+}

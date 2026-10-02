@@ -1,6 +1,8 @@
 // The window: the backdrop, the sidebar, the page with the player docked under it, and the
 // overlays, with keyboard search.
 
+import { GuidedTours, Tour, TourId, TourStep, TourLayout, TourRect, TourScroll } from "tours/state.slint";
+import { TourOverlay } from "tours/overlay.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
@@ -25,7 +27,7 @@ export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, KenkuConflictRow,
     KenkuImportView, LibraryView, NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons,
-    SoundTile, Theme, VoiceBadge, WindowFrame,
+    SoundTile, Theme, VoiceBadge, WindowFrame, GuidedTours, TourId, TourLayout, TourRect, TourScroll, Tour, TourStep,
 }
 
 enum DialogKind { none, add-collection, edit-collection, edit-entry, add-to-playlist, settings, kenku-import }
@@ -49,6 +51,8 @@ export component AppWindow inherits Window {
     forward-focus: shortcuts;
     property <DialogKind> dialog: DialogKind.none;
     changed dialog => {
+        GuidedTours.close();
+        shortcuts.focus();
         if root.dialog != DialogKind.kenku-import { KenkuImportView.open = false; }
     }
     property <bool> kenku-import-open: KenkuImportView.open;
@@ -68,7 +72,20 @@ export component AppWindow inherits Window {
     property <string> song-id;
     property <string> song-title;
     property <bool> any-dialog: root.dialog != DialogKind.none;
-    property <bool> any-overlay: root.any-dialog || Search.palette-open || root.sidebar-overlaid;
+    property <bool> any-overlay: root.any-dialog || Search.palette-open || root.sidebar-overlaid || GuidedTours.active;
+    property <bool> guide-active: GuidedTours.active;
+    changed guide-active => {
+        if !root.guide-active {
+            shortcuts.focus();
+            GuidedTours.restore-revision += 1;
+        }
+    }
+    property <Page> guide-page: Navigation.page;
+    changed guide-page => { GuidedTours.close(); }
+    property <bool> guide-palette: Search.palette-open;
+    changed guide-palette => { GuidedTours.close(); }
+    property <FormSwitch> guide-form-switch: WindowFrame.form-switch;
+    changed guide-form-switch => { GuidedTours.close(); }
     property <bool> fills-screen: root.maximized || root.full-screen;
     property <bool> sidebar-fits: root.width >= Theme.sidebar-width + Theme.page-width-min;
     property <bool> sidebar-expanded: Session.drawer-pinned && root.sidebar-fits;
@@ -89,6 +106,10 @@ export component AppWindow inherits Window {
     }
     // The background gallery, over the Add or Edit dialog that opened it.
     property <bool> gallery-open;
+    changed gallery-open => {
+        GuidedTours.close();
+        if !root.gallery-open { shortcuts.focus(); }
+    }
     property <string> gallery-title;
     property <bool> mini-player: Session.mini-player;
     full-form := Presence {
@@ -100,6 +121,7 @@ export component AppWindow inherits Window {
     }
 
     changed mini-player => {
+        GuidedTours.close();
         if self.mini-player {
             root.sidebar-overlaid = false;
             root.gallery-open = false;
@@ -242,6 +264,9 @@ export component AppWindow inherits Window {
 
     shortcuts := FocusScope {
         capture-key-pressed(event) => {
+            if GuidedTours.active {
+                return event.modifiers.control || event.modifiers.alt || event.modifiers.meta ? accept : reject;
+            }
             if event.modifiers.control && !event.modifiers.alt && (event.text == "f" || event.text == "F") {
                 if event.modifiers.shift {
                     root.open-palette();
@@ -556,6 +581,10 @@ export component AppWindow inherits Window {
             close => {
                 root.close();
             }
+        }
+        TourOverlay {
+            y: root.mini-player ? 0px : Theme.title-row-height;
+            height: parent.height - self.y;
         }
     }
 

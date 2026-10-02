@@ -1,0 +1,46 @@
+import { Tour, TourId } from "state.slint";
+import { PlaybackTour } from "playback.slint";
+
+export global ShelfTour {
+    out property <string> grid: "shelves.grid";
+    out property <Tour> playlists: { id: TourId.playlists, steps: [
+        {
+            anchor: ShelfTour.grid,
+            title: @tr("Browse your playlists"),
+            body: @tr("Open a card to browse its tracks. Its play button starts music immediately. Use Add Playlist for a hand-picked collection or a followed folder."),
+        },
+        {
+            anchor: ShelfTour.grid,
+            title: @tr("Follow folders or pick files"),
+            body: @tr("Drop folders here to follow them: each folder with audio becomes a collection. Hand-picked collections take the files you choose instead of following a folder."),
+        },
+        {
+            anchor: ShelfTour.grid,
+            title: @tr("Search this shelf"),
+            body: @tr("Ctrl+F filters the current shelf. Ctrl+Shift+F opens Search everything, including songs and sounds inside collections."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+    ] };
+    out property <Tour> soundboards: { id: TourId.soundboards, steps: [
+        {
+            anchor: ShelfTour.grid,
+            title: @tr("Browse your soundboards"),
+            body: @tr("Open a card to reach its sound tiles. Use Add Soundboard for a hand-picked collection or a followed folder of effects and ambience."),
+        },
+        {
+            anchor: ShelfTour.grid,
+            title: @tr("Follow folders or pick files"),
+            body: @tr("Drop folders here to follow them: each folder with audio becomes a collection. Hand-picked collections take the files you choose instead of following a folder."),
+        },
+        {
+            anchor: ShelfTour.grid,
+            title: @tr("Search this shelf"),
+            body: @tr("Ctrl+F filters the current shelf. Ctrl+Shift+F opens Search everything, including songs and sounds inside collections."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+    ] };
+}

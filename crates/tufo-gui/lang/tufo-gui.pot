@@ -1604,3 +1604,519 @@ msgstr ""
 #: ui/kenku-import.slint
 msgid "Web addresses left out"
 msgstr ""
+
+#: ui/tours/artwork.slint
+msgid "A gradient or your own image"
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "A name or folder conflict offers Keep or Overwrite for each collection. Keep is the default. Import selected applies your choices; the guide never chooses for you."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "A playlist that follows a folder"
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "A saved import report"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "A smaller player"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "A sound's Edit menu changes its title, icon and fade-in or fade-out in milliseconds. Sounds can play alongside music and other sounds."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "A soundboard that follows a folder"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Add files from the More menu or drop audio here. Find songs below the tracks adds songs from your library with one click."
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Add to mix from a track's right-click menu. Mix appears beside the title when extra layers exist; it controls their volume, looping and stop actions."
+msgstr ""
+
+#: ui/gallery.slint
+msgid "Artwork"
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "Before importing Kenku FM"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Blend consecutive songs"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Bring your Kenku FM library"
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Browse your playlists"
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Browse your soundboards"
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Build playlists from Songs"
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Change background opens preset paintings, a gradient, or your own image. The Add button creates the named collection with your choice."
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Change background opens the gallery. Artwork choices apply when selected; closing this dialog does not undo them. A missing image falls back to the gradient."
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Change the library title here. Save applies it; Cancel leaves the title as it was. Your audio file keeps its name."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Change the window layout"
+msgstr ""
+
+#: ui/tours/add-to-playlist.slint
+msgid "Choose a playlist to add this song and close the dialog. Playlists that already contain it show a check. Only hand-picked playlists accept songs here; followed folders manage their own playlists."
+msgstr ""
+
+#: ui/tours/artwork.slint
+msgid "Choose a preset painting to apply it. Its label includes the artwork and artist. The selected painting is outlined."
+msgstr ""
+
+#: ui/tours/search.slint
+msgid "Choose a result"
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Choose a sound icon"
+msgstr ""
+
+#: ui/tours/add-to-playlist.slint
+msgid "Choose hand-picked playlists"
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Choose its artwork"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Choose what quitting does"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Choose where audio goes"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Click a sound tile to start or stop it. Right-click Loop to repeat ambience. Each tile has its own volume slider."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Click a track to play it. Right-click Add to queue to schedule it; its lit number shows its queue position. Repeat-one disables the queue, and queued songs make Repeat skip repeat-one."
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "Close Kenku FM so Tufo can read its saved library. Import brings collections, local audio references and supported settings; it can adopt the bot token only when Tufo has none."
+msgstr ""
+
+#: ui/tours/overlay.slint
+msgid "Close guide"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Connect your Discord bot"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Control active sounds"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Control your music"
+msgstr ""
+
+#: ui/tours/add-to-playlist.slint
+msgid "Create a playlist with this song"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Crossfade sets how long consecutive songs overlap, up to 10 seconds. The value saves when you release the slider."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Ctrl+B toggles the sidebar. Ctrl+Shift+M switches between the full window and mini player. Your saved layout changes only when you choose those controls."
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Ctrl+F filters the current shelf. Ctrl+Shift+F opens Search everything, including songs and sounds inside collections."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Ctrl+F filters the open page. Ctrl+Shift+F searches the whole library. In Search everything, Up and Down choose results and Enter activates them."
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Ctrl+F filters this page by title or path. Up to 200 matching songs appear. Ctrl+Shift+F searches across the whole library."
+msgstr ""
+
+#: ui/tours/search.slint
+msgid "Ctrl+F opens a local filter on the current page. Close this guide and palette to use it; Escape clears and closes the filter."
+msgstr ""
+
+#: ui/tours/search.slint
+msgid "Ctrl+Shift+F or the sidebar's search opens this palette. Search titles across tracks, sounds, playlists and soundboards."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Disable Discord connection logs the bot out while keeping its configuration. Turn it off again to reconnect. This control appears after a bot token is configured."
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Drag the seek slider to change position. The time labels show the current position and duration. Desktop media controls use the same music session."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Drop audio files here or use Add files in More. Remove in a sound's menu removes its reference, leaving your file on disk."
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Drop folders here to follow them: each folder with audio becomes a collection. Hand-picked collections take the files you choose instead of following a folder."
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Edit the name and choose Done to save it. Editing a collection does not rename its audio files or its followed folder."
+msgstr ""
+
+#: ui/tours/add-to-playlist.slint
+msgid "Enter a new playlist name and choose Create. You can add more songs from Songs or Find songs on its page."
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Fade sounds in and out"
+msgstr ""
+
+#: ui/tours/search.slint
+msgid "Filter the current page"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Find and arrange sounds"
+msgstr ""
+
+#: ui/tours/home.slint
+msgid "Find your way"
+msgstr ""
+
+#: ui/tours/overlay.slint
+msgid "Finish"
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Follow a music folder or drop it on Songs. Tufo watches its audio and subfolders. A followed folder's menu can stop following it and delete its playlists."
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Follow folders or pick files"
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Give the playlist or soundboard a name and choose Add. Add files or drop audio on its page later. Naming it here does not follow a folder."
+msgstr ""
+
+#: ui/tours/overlay.slint
+msgid "Guide: {0}"
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "Keep or overwrite collections"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Keep playing after quitting leaves audio running on the server after the GUI exits. Otherwise quitting fades audio out and releases the output."
+msgstr ""
+
+#: ui/tours/mini-player.slint
+msgid "Keep the player handy"
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Keep your audio files"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Layer music"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to its question mark."
+msgstr ""
+
+#: ui/dock.slint
+msgid "Mini player"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Mix up to three songs"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Move through a track"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Music and effects volumes"
+msgstr ""
+
+#: ui/tours/home.slint
+msgid "Music for your session"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Music volume and mute affect music. The waveform opens the overall effects volume, which multiplies each sound's level: 40% on a sound and 50% here gives 20%."
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Name this sound"
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Name this track"
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Name your collection"
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Narrow the song list"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Navigate a guide"
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Open a card to browse its tracks. Its play button starts music immediately. Use Add Playlist for a hand-picked collection or a followed folder."
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Open a card to reach its sound tiles. Use Add Soundboard for a hand-picked collection or a followed folder of effects and ambience."
+msgstr ""
+
+#: ui/tours/home.slint
+msgid "Open a playlist card to browse its songs. The play button on a card starts that playlist; opening the card leaves playback alone."
+msgstr ""
+
+#: ui/tours/home.slint
+msgid "Open a soundboard for effects and ambience. See all opens the full shelf; empty shelves offer Add and Kenku FM import."
+msgstr ""
+
+#: ui/tours/artwork.slint
+msgid "Paintings for your collections"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Paste a bot token, then choose Save and restart. That button stores the credential and restarts the server. Starting or advancing this guide never saves a token."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Pause the Discord connection"
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Pick an icon for this sound tile, then Save to apply the title, fades and icon together."
+msgstr ""
+
+#: ui/tours/mini-player.slint
+msgid "Pin keeps this window above others when the platform supports it. On Wayland, use the desktop window menu's Always on Top instead."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Play effects and ambience"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Play or pause, move to the previous or next track, shuffle, and cycle Repeat. A queue takes priority over the playlist; repeat-one is unavailable while songs are queued."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Play tracks and build a queue"
+msgstr ""
+
+#: ui/dock.slint
+msgid "Player"
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Playing sounds appear as chips with Loop and Stop. Pause sounds pauses or resumes them together, independently of music."
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Remove from Songs is available for songs added by their own path. Tufo removes library references and never moves or deletes your audio files."
+msgstr ""
+
+#: ui/tours/mini-player.slint
+msgid "Return to the full window"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Right-click Add to mix for another music layer. The mix holds three songs including the main track. The player's Mix button offers each layer's volume, loop and stop controls."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Run at startup opens Tufo when you log in. Settings save as you change them; a new Discord token has its own Save and restart button."
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Search from the keyboard"
+msgstr ""
+
+#: ui/tours/search.slint
+msgid "Search the whole library"
+msgstr ""
+
+#: ui/tours/shelves.slint
+msgid "Search this shelf"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Search titles and folder paths here. Up to 20 playable songs not already in this playlist appear, each with an Add button."
+msgstr ""
+
+#: ui/tours/entry.slint
+msgid "Set fade-in and fade-out in milliseconds. These values shape the start and stop of this sound; the tile and overall effects sliders still control volume."
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Set the background"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Shape a sound"
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Songs does not play audio. Use a song's plus button or right-click Add to playlist to choose hand-picked playlists or create one with that song."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Songs lets you reuse this folder's songs in hand-picked playlists. Find songs is available only in a hand-picked playlist; this guide keeps your collection as it is."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Sort by name, duration or date added. Ctrl+F filters this playlist. More opens collection editing and artwork; track menus offer Edit and, in hand-picked playlists, Remove."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Sort from the header and filter this soundboard with Ctrl+F. More opens collection editing and artwork. The player's waveform button controls the overall effects volume."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Sort, filter and edit"
+msgstr ""
+
+#: ui/tours/home.slint
+msgid "Sounds beside your music"
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "Start a hand-picked collection"
+msgstr ""
+
+#: ui/tours/button.slint
+msgid "Start guide: {0}"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Start with your desktop"
+msgstr ""
+
+#: ui/tours/overlay.slint
+msgid "Step {0} of {1}"
+msgstr ""
+
+#: ui/tours/collection-form.slint
+msgid "The folder picker follows audio and subfolders automatically. Tufo keeps references to your files; it never copies or moves them."
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "The job continues if you close its dialog. View import reopens progress and results. Retry uses the same saved job when missing files return; Import again starts a fresh import."
+msgstr ""
+
+#: ui/tours/mini-player.slint
+msgid "The mini player keeps transport, seeking, music volume and effects volume close. Drag outside its controls to move the window."
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "The output picker sends audio to this machine or one Discord voice channel. Refresh updates voice channels. A channel change switches the output when you select it."
+msgstr ""
+
+#: ui/tours/home.slint
+msgid "The sidebar opens Home, Songs, Playlists and Soundboards. Ctrl+B switches between the sidebar and its narrow rail."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Tufo keeps this playlist in sync with its folder. The folder and any missing state appear in the large header. Folder-followed playlists do not take individual additions or removals."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Tufo watches the folder and updates its sounds. Folder-followed soundboards do not take individual additions or removals."
+msgstr ""
+
+#: ui/tours/search.slint
+msgid "Up and Down select a result. Enter plays a track or sound, or opens a collection. Escape closes the palette. This guide only explains those actions."
+msgstr ""
+
+#: ui/tours/mini-player.slint
+msgid "Use Full window or Ctrl+Shift+M. Tufo remembers each window size and the pinned state. This guide leaves those choices alone."
+msgstr ""
+
+#: ui/tours/playback.slint
+msgid "Use Mini player or Ctrl+Shift+M for the compact window. In narrow full windows, the chevron collapses the player to one row. The tray also offers player and pause controls where available."
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Use Songs for other playlists"
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "Web addresses, bookmarks, hand-arranged order, and Kenku FM's remote and streaming settings are left out. The report lists unavailable files and skipped web addresses."
+msgstr ""
+
+#: ui/tours/kenku.slint
+msgid "What stays outside Tufo"
+msgstr ""
+
+#: ui/tours/mini-player.slint
+msgid "Your compact player"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Your hand-picked playlist"
+msgstr ""
+
+#: ui/tours/collection.slint
+msgid "Your hand-picked soundboard"
+msgstr ""
+
+#: ui/tours/artwork.slint
+msgid "Your own offers the collection's gradient, its current image, and Choose an image file. You can also drop an image onto this window. Tufo points at that image file."
+msgstr ""
+
+#: ui/tours/songs.slint
+msgid "Your song library"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Close Kenku FM before importing. Import brings collections, local audio references and supported settings. View import reopens its saved progress and report."
+msgstr ""

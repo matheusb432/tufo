@@ -1,0 +1,36 @@
+import { Tour, TourId } from "state.slint";
+
+export global CollectionFormTour {
+    out property <string> collection-name: "collection-form.collection-name";
+    out property <string> collection-folder: "collection-form.collection-folder";
+    out property <string> background: "collection-form.background";
+    out property <Tour> new-collection: { id: TourId.new-collection, steps: [
+        {
+            anchor: CollectionFormTour.collection-name,
+            title: @tr("Start a hand-picked collection"),
+            body: @tr("Give the playlist or soundboard a name and choose Add. Add files or drop audio on its page later. Naming it here does not follow a folder."),
+        },
+        {
+            anchor: CollectionFormTour.collection-folder,
+            title: @tr("Or follow a folder"),
+            body: @tr("The folder picker follows audio and subfolders automatically. Tufo keeps references to your files; it never copies or moves them."),
+        },
+        {
+            anchor: CollectionFormTour.background,
+            title: @tr("Choose its artwork"),
+            body: @tr("Change background opens preset paintings, a gradient, or your own image. The Add button creates the named collection with your choice."),
+        },
+    ] };
+    out property <Tour> edit-collection: { id: TourId.edit-collection, steps: [
+        {
+            anchor: CollectionFormTour.collection-name,
+            title: @tr("Name your collection"),
+            body: @tr("Edit the name and choose Done to save it. Editing a collection does not rename its audio files or its followed folder."),
+        },
+        {
+            anchor: CollectionFormTour.background,
+            title: @tr("Set the background"),
+            body: @tr("Change background opens the gallery. Artwork choices apply when selected; closing this dialog does not undo them. A missing image falls back to the gradient."),
+        },
+    ] };
+}

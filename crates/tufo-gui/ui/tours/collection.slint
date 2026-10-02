@@ -1,0 +1,68 @@
+import { Tour, TourId } from "state.slint";
+import { LibraryView } from "../state.slint";
+import { PlaybackTour } from "playback.slint";
+
+export global CollectionTour {
+    out property <string> collection-tools: "collection.collection-tools";
+    out property <string> tracks: "collection.tracks";
+    out property <string> find-songs: "collection.find-songs";
+    out property <string> sounds: "collection.sounds";
+    out property <Tour> playlist: { id: TourId.playlist, steps: [
+        {
+            anchor: CollectionTour.collection-tools,
+            title: LibraryView.collection-linked ? @tr("A playlist that follows a folder") : @tr("Your hand-picked playlist"),
+            body: LibraryView.collection-linked ? @tr("Tufo keeps this playlist in sync with its folder. The folder and any missing state appear in the large header. Folder-followed playlists do not take individual additions or removals.") : @tr("Add files from the More menu or drop audio here. Find songs below the tracks adds songs from your library with one click."),
+        },
+        {
+            anchor: CollectionTour.tracks,
+            title: @tr("Play tracks and build a queue"),
+            body: @tr("Click a track to play it. Right-click Add to queue to schedule it; its lit number shows its queue position. Repeat-one disables the queue, and queued songs make Repeat skip repeat-one."),
+        },
+        {
+            anchor: CollectionTour.tracks,
+            title: @tr("Layer music"),
+            body: @tr("Right-click Add to mix for another music layer. The mix holds three songs including the main track. The player's Mix button offers each layer's volume, loop and stop controls."),
+        },
+        {
+            anchor: CollectionTour.collection-tools,
+            title: @tr("Sort, filter and edit"),
+            body: @tr("Sort by name, duration or date added. Ctrl+F filters this playlist. More opens collection editing and artwork; track menus offer Edit and, in hand-picked playlists, Remove."),
+        },
+        {
+            anchor: CollectionTour.find-songs,
+            title: LibraryView.collection-linked ? @tr("Use Songs for other playlists") : @tr("Find songs for this playlist"),
+            body: LibraryView.collection-linked ? @tr("Songs lets you reuse this folder's songs in hand-picked playlists. Find songs is available only in a hand-picked playlist; this guide keeps your collection as it is.") : @tr("Search titles and folder paths here. Up to 20 playable songs not already in this playlist appear, each with an Add button."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+        PlaybackTour.seek-step,
+        PlaybackTour.mix-step,
+    ] };
+    out property <Tour> soundboard: { id: TourId.soundboard, steps: [
+        {
+            anchor: CollectionTour.collection-tools,
+            title: LibraryView.collection-linked ? @tr("A soundboard that follows a folder") : @tr("Your hand-picked soundboard"),
+            body: LibraryView.collection-linked ? @tr("Tufo watches the folder and updates its sounds. Folder-followed soundboards do not take individual additions or removals.") : @tr("Drop audio files here or use Add files in More. Remove in a sound's menu removes its reference, leaving your file on disk."),
+        },
+        {
+            anchor: CollectionTour.sounds,
+            title: @tr("Play effects and ambience"),
+            body: @tr("Click a sound tile to start or stop it. Right-click Loop to repeat ambience. Each tile has its own volume slider."),
+        },
+        {
+            anchor: CollectionTour.sounds,
+            title: @tr("Shape a sound"),
+            body: @tr("A sound's Edit menu changes its title, icon and fade-in or fade-out in milliseconds. Sounds can play alongside music and other sounds."),
+        },
+        {
+            anchor: CollectionTour.collection-tools,
+            title: @tr("Find and arrange sounds"),
+            body: @tr("Sort from the header and filter this soundboard with Ctrl+F. More opens collection editing and artwork. The player's waveform button controls the overall effects volume."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+        PlaybackTour.sounds-step,
+    ] };
+}

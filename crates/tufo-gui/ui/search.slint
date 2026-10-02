@@ -1,5 +1,9 @@
 // The Ctrl+Shift+F palette: search every track, sound, and collection, then Enter to play.
 
+import { SearchTour } from "tours/search.slint";
+import { GuidedTours, TourScroll } from "tours/state.slint";
+import { TourButton } from "tours/button.slint";
+import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import { Actions, Search, SearchResult } from "state.slint";
 import { Icon, Presence, Scrim, TextField } from "widgets.slint";
@@ -128,16 +132,26 @@ export component SearchPalette inherits Rectangle {
             layout := VerticalLayout {
                 padding: 16px;
                 spacing: 8px;
-                query := TextField {
-                    label: @tr("Search everything");
-                    placeholder: @tr("Tracks, sounds, playlists, soundboards");
-                    text: Search.palette-query;
-                    edited(text) => {
-                        Search.palette-query = text;
-                        Search.selected = 0;
-                        results.content-y = 0px;
-                        Actions.palette-query-changed(text);
+                HorizontalLayout {
+                    spacing: 8px;
+                    query := TextField {
+                        horizontal-stretch: 1;
+                        TourTarget {
+                            anchor: SearchTour.search-query;
+                            available: root.open;
+                            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+                        }
+                        label: @tr("Search everything");
+                        placeholder: @tr("Tracks, sounds, playlists, soundboards");
+                        text: Search.palette-query;
+                        edited(text) => {
+                            Search.palette-query = text;
+                            Search.selected = 0;
+                            results.content-y = 0px;
+                            Actions.palette-query-changed(text);
+                        }
                     }
+                    TourButton { y: (parent.height - self.height) / 2; guide: SearchTour.guide; label: @tr("Search everything"); available: root.open; }
                 }
 
                 if Search.palette-query != "" && Search.results.length == 0: Text {
@@ -145,7 +159,13 @@ export component SearchPalette inherits Rectangle {
                     color: Theme.text-secondary;
                     horizontal-alignment: center;
                 }
-                results := Flickable {
+                results := TourScrollArea {
+                    tour-scroll: TourScroll.search;
+                    TourTarget {
+                        anchor: SearchTour.search-results;
+                        available: root.open && Search.results.length > 0;
+                        bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+                    }
                     mouse-drag-pan-enabled: false;
                     content-width: self.width;
                     content-height: rows.preferred-height;

@@ -1,5 +1,12 @@
 // Home, the playlist and soundboard grids, one playlist or soundboard, and the wait for the server.
 
+import { HomeTour } from "tours/home.slint";
+import { SongsTour } from "tours/songs.slint";
+import { ShelfTour } from "tours/shelves.slint";
+import { CollectionTour } from "tours/collection.slint";
+import { GuidedTours, TourId, TourScroll } from "tours/state.slint";
+import { TourButton } from "tours/button.slint";
+import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, CollectionCard, CollectionKind, LibraryView, Navigation, Page, PlayerView,
@@ -114,6 +121,13 @@ component CardView inherits Rectangle {
 component CardGrid inherits Rectangle {
     in property <[CollectionCard]> cards;
     in property <CollectionKind> kind;
+    in property <TourScroll> tour-scroll;
+    TourTarget {
+        anchor: ShelfTour.grid;
+        scroll: root.tour-scroll;
+        available: GuidedTours.tour == (root.kind == CollectionKind.playlist ? TourId.playlists : TourId.soundboards);
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     // Shows at most this many rows; -1 shows every card.
     in property <int> rows-max: -1;
     property <int> columns: root.width < 500px ? 2 : root.width < 680px ? 3 : 4;
@@ -192,9 +206,11 @@ component FilterField inherits Rectangle {
 // Scrolls a page's content, with a thumb that shows while the pointer is over it.
 component PageScroll inherits Rectangle {
     in property <length> content-height;
+    in property <TourScroll> tour-scroll;
     out property <bool> scrolled: flick.content-y < 0;
     hover := TouchArea {
-        flick := Flickable {
+        flick := TourScrollArea {
+            tour-scroll: root.tour-scroll;
             mouse-drag-pan-enabled: false;
             content-height: max(root.content-height, root.height);
             @children
@@ -286,6 +302,11 @@ component HomeShelf inherits VerticalLayout {
     in property <CollectionKind> kind;
     callback add();
     callback see-all();
+    TourTarget {
+        anchor: root.kind == CollectionKind.playlist ? HomeTour.home-playlists : HomeTour.home-soundboards;
+        scroll: TourScroll.home;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     spacing: 14px;
     HorizontalLayout {
         spacing: 12px;
@@ -310,6 +331,7 @@ component HomeShelf inherits VerticalLayout {
         }
     }
     CardGrid {
+        tour-scroll: TourScroll.home;
         cards: root.cards;
         kind: root.kind;
         rows-max: 1;
@@ -318,7 +340,19 @@ component HomeShelf inherits VerticalLayout {
 
 export component HomePage inherits Rectangle {
     callback add(CollectionKind);
+    HorizontalLayout {
+        y: 0;
+        height: Theme.title-row-height;
+        padding-left: PageMetrics.padding;
+        padding-right: 8px;
+        spacing: 8px;
+        Heading { text: @tr("Home"); }
+        TourButton { y: (parent.height - self.height) / 2; guide: HomeTour.guide; label: @tr("Home"); }
+        Rectangle { horizontal-stretch: 1; }
+        WindowButtonsSpace { }
+    }
     scroll := PageScroll {
+        tour-scroll: TourScroll.home;
         y: Theme.title-row-height;
         height: parent.height - self.y;
         content-height: column.preferred-height;
@@ -387,6 +421,11 @@ export component GridPage inherits Rectangle {
             horizontal-stretch: 1;
             overflow: elide;
         }
+        TourButton {
+            y: (parent.height - self.height) / 2;
+            guide: root.kind == CollectionKind.playlist ? ShelfTour.playlists : ShelfTour.soundboards;
+            label: root.kind == CollectionKind.playlist ? @tr("Playlists") : @tr("Soundboards");
+        }
 
         if root.width >= 520px: Button {
             y: (parent.height - self.height) / 2;
@@ -413,6 +452,7 @@ export component GridPage inherits Rectangle {
     }
 
     scroll := PageScroll {
+        tour-scroll: TourScroll.grid;
         y: Theme.title-row-height;
         height: parent.height - self.y;
         content-height: column.preferred-height;
@@ -430,6 +470,7 @@ export component GridPage inherits Rectangle {
                 wrap: word-wrap;
             }
             CardGrid {
+                tour-scroll: TourScroll.grid;
                 cards: root.kind == CollectionKind.playlist ? LibraryView.playlists : LibraryView.soundboards;
                 kind: root.kind;
             }
@@ -443,6 +484,11 @@ export component GridPage inherits Rectangle {
 
 // Sorting and the ⋮ menu of a playlist or soundboard page.
 component CollectionTools inherits HorizontalLayout {
+    TourTarget {
+        anchor: CollectionTour.collection-tools;
+        scroll: root.compact ? TourScroll.none : TourScroll.collection;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     // Shows sorting as an icon, without the order's name.
     in property <bool> compact;
     callback edit();
@@ -565,6 +611,11 @@ component CollectionBar inherits Rectangle {
             font-size: Theme.heading;
             font-weight: Theme.display-weight;
             color: Theme.text;
+        }
+        TourButton {
+            y: (parent.height - self.height) / 2;
+            guide: root.kind == CollectionKind.playlist ? CollectionTour.playlist : CollectionTour.soundboard;
+            label: LibraryView.collection-title;
         }
 
         @children
@@ -844,6 +895,11 @@ component TrackCell inherits Text {
 }
 
 component TrackItem inherits Rectangle {
+    TourTarget {
+        anchor: CollectionTour.tracks;
+        scroll: TourScroll.collection;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <TrackRow> track;
     in property <int> number;
     in property <length> available-width;
@@ -989,6 +1045,11 @@ component TrackHeader inherits Rectangle {
 // A song outside any playlist's order: its number, or its add button while hovered, then the
 // same columns as a track. `add` adds it somewhere; right-click also offers removing it.
 component SongItem inherits Rectangle {
+    TourTarget {
+        anchor: SongsTour.songs;
+        scroll: TourScroll.songs;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <SongRow> song;
     in property <int> number;
     in property <length> available-width;
@@ -1075,6 +1136,11 @@ component SongItem inherits Rectangle {
 
 // A search over the songs, below a hand-picked playlist's tracks, that adds what it finds.
 component SongSearch inherits VerticalLayout {
+    TourTarget {
+        anchor: CollectionTour.find-songs;
+        scroll: TourScroll.collection;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <length> available-width;
     spacing: 10px;
     Text {
@@ -1184,6 +1250,7 @@ export component PlaylistPage inherits Rectangle {
             }
         }
         scroll := PageScroll {
+            tour-scroll: TourScroll.collection;
             vertical-stretch: 1;
             content-height: column.preferred-height;
             column := VerticalLayout {
@@ -1272,6 +1339,11 @@ component ProgressRing inherits Path {
 // A sound as a pad: an icon in a disc that the sun lights while it plays, its title, and its
 // volume. Clicking the pad plays or stops it.
 component SoundTileView inherits Rectangle {
+    TourTarget {
+        anchor: CollectionTour.sounds;
+        scroll: TourScroll.collection;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <SoundTile> tile;
     callback edit();
     property <bool> playable: !root.tile.missing;
@@ -1414,6 +1486,7 @@ export component SoundboardPage inherits Rectangle {
             }
         }
         scroll := PageScroll {
+            tour-scroll: TourScroll.collection;
             vertical-stretch: 1;
             content-height: column.preferred-height;
             column := VerticalLayout {
@@ -1535,6 +1608,7 @@ export component SongsPage inherits Rectangle {
             horizontal-stretch: 1;
             overflow: elide;
         }
+        TourButton { y: (parent.height - self.height) / 2; guide: SongsTour.guide; label: @tr("Songs"); }
 
         if root.width >= 520px: Button {
             y: (parent.height - self.height) / 2;
@@ -1561,6 +1635,7 @@ export component SongsPage inherits Rectangle {
     }
 
     scroll := PageScroll {
+        tour-scroll: TourScroll.songs;
         y: Theme.title-row-height;
         height: parent.height - self.y;
         content-height: column.preferred-height;
@@ -1575,6 +1650,11 @@ export component SongsPage inherits Rectangle {
             }
 
             if LibraryView.song-folders.length > 0: VerticalLayout {
+                TourTarget {
+                    anchor: SongsTour.song-folders;
+                    scroll: TourScroll.songs;
+                    bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+                }
                 padding-top: 18px;
                 spacing: 2px;
                 Text {

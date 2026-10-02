@@ -1,0 +1,42 @@
+export enum TourId {
+    home, songs, playlists, soundboards, playlist, soundboard, new-collection, add-to-playlist, edit-collection, edit-track, edit-sound,
+    artwork, search, settings, kenku, mini-player,
+}
+
+export struct TourStep {
+    anchor: string,
+    title: string,
+    body: string,
+}
+export struct Tour { id: TourId, steps: [TourStep] }
+
+export enum TourScroll { none, home, grid, songs, collection, dialog, artwork, search }
+export struct TourRect { x: length, y: length, width: length, height: length }
+export struct TourLayout { card: TourRect, spotlight: TourRect, spotlight-visible: bool }
+
+export global GuidedTours {
+    in-out property <bool> ready;
+    in-out property <bool> active;
+    in-out property <TourId> tour;
+    in-out property <string> anchor;
+    in-out property <int> step;
+    in-out property <int> count;
+    in-out property <string> title;
+    in-out property <string> body;
+    in-out property <TourLayout> layout;
+    in-out property <int> measurement;
+    in-out property <TourScroll> reveal-scroll;
+    in-out property <TourRect> reveal-target;
+    in-out property <int> reveal-revision;
+    in-out property <int> restore-revision;
+    pure callback seen(TourId) -> bool;
+    callback start(Tour);
+    callback previous();
+    callback next();
+    callback close();
+    callback report-target(TourScroll, TourRect);
+    callback report-viewport(TourScroll, TourRect);
+    public pure function bounds(position: Point, width: length, height: length) -> TourRect {
+        { x: position.x, y: position.y, width: width, height: height }
+    }
+}

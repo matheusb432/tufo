@@ -1,0 +1,67 @@
+import { Theme } from "../theme.slint";
+import { IconButton } from "../widgets.slint";
+import { GuidedTours, Tour } from "state.slint";
+
+export component TourButton inherits IconButton {
+    in property <Tour> guide;
+    in property <string> label;
+    in property <bool> available: true;
+    property <bool> unseen: true;
+    property <bool> initialized;
+    property <bool> ready: GuidedTours.ready;
+    property <bool> started: GuidedTours.active && GuidedTours.tour == root.guide.id;
+    property <int> restoration: GuidedTours.restore-revision;
+    size: 28px;
+    icon-size: 18px;
+    icon: @image-url("../icons/circle-help.svg");
+    tooltip: @tr("Start guide: {0}", root.label);
+    tooltip-enabled: root.available && !GuidedTours.active;
+    enabled: root.available && !GuidedTours.active;
+    accessible-enabled: root.enabled;
+    forward-focus: keys;
+    function read-seen() {
+        if root.ready && !root.initialized {
+            root.unseen = !GuidedTours.seen(root.guide.id);
+            root.initialized = true;
+        }
+    }
+    init => { root.read-seen(); }
+    changed ready => { root.read-seen(); }
+    changed started => { if root.started { root.unseen = false; } }
+    changed restoration => {
+        if root.available && GuidedTours.tour == root.guide.id { keys.focus(); }
+    }
+    clicked => {
+        if root.available && !GuidedTours.active {
+            keys.focus();
+            root.unseen = false;
+            GuidedTours.start(root.guide);
+        }
+    }
+    unseen-marker := Rectangle {
+        x: parent.width - 7px;
+        y: 3px;
+        width: 5px;
+        height: 5px;
+        border-radius: 3px;
+        background: Theme.accent;
+        visible: root.unseen;
+    }
+    Rectangle {
+        border-radius: Theme.radius-small;
+        border-width: root.enabled && keys.has-focus ? 1px : 0px;
+        border-color: Theme.accent;
+    }
+    keys := FocusScope {
+        focus-on-click: false;
+        enabled: root.available && !GuidedTours.active;
+        focus-on-tab-navigation: true;
+        key-pressed(event) => {
+            if event.text == Key.Return || event.text == " " {
+                root.clicked();
+                return accept;
+            }
+            reject
+        }
+    }
+}

@@ -1,0 +1,53 @@
+import { Motion } from "../theme.slint";
+import { GuidedTours, TourRect, TourScroll } from "state.slint";
+
+// Native views map tour targets to their rendered bounds; no debug tree is needed.
+export component TourTarget {
+    in property <string> anchor;
+    in property <TourScroll> scroll;
+    in property <bool> available: true;
+    in property <TourRect> bounds;
+    property <int> measurement: GuidedTours.measurement;
+    changed measurement => {
+        if GuidedTours.active && root.available && root.anchor != "" && GuidedTours.anchor == root.anchor {
+            GuidedTours.report-target(root.scroll, root.bounds);
+        }
+    }
+}
+
+export component TourViewport {
+    in property <TourScroll> scroll;
+    in property <TourRect> bounds;
+    property <int> measurement: GuidedTours.measurement;
+    changed measurement => {
+        if GuidedTours.active && root.scroll != TourScroll.none {
+            GuidedTours.report-viewport(root.scroll, root.bounds);
+        }
+    }
+}
+
+export component TourScrollArea inherits Flickable {
+    in property <TourScroll> tour-scroll;
+    mouse-drag-pan-enabled: false;
+    animate content-y {
+        duration: Motion.tour-travel;
+        easing: Motion.presence-easing;
+        enabled: GuidedTours.active;
+    }
+    property <int> reveal-revision: GuidedTours.reveal-revision;
+    changed reveal-revision => {
+        if GuidedTours.active && GuidedTours.reveal-scroll == root.tour-scroll {
+            let target = GuidedTours.reveal-target;
+            let top = root.absolute-position.y;
+            let bottom = top + root.height;
+            let offset = target.y < top ? top - target.y
+                : target.y + min(target.height, root.height) > bottom
+                    ? bottom - target.y - min(target.height, root.height) : 0px;
+            root.content-y = clamp(root.content-y + offset, min(0px, root.height - root.content-height), 0px);
+        }
+    }
+    TourViewport {
+        scroll: root.tour-scroll;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
+}

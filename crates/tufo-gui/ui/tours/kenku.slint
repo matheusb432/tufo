@@ -1,0 +1,29 @@
+import { Tour, TourId } from "state.slint";
+import { SettingsTour } from "settings.slint";
+
+export global KenkuTour {
+    out property <string> kenku-status: "kenku.kenku-status";
+    out property <string> kenku-conflicts: "kenku.kenku-conflicts";
+    out property <Tour> guide: { id: TourId.kenku, steps: [
+        {
+            anchor: SettingsTour.kenku-launch,
+            title: @tr("Before importing Kenku FM"),
+            body: @tr("Close Kenku FM so Tufo can read its saved library. Import brings collections, local audio references and supported settings; it can adopt the bot token only when Tufo has none."),
+        },
+        {
+            anchor: KenkuTour.kenku-conflicts,
+            title: @tr("Keep or overwrite collections"),
+            body: @tr("A name or folder conflict offers Keep or Overwrite for each collection. Keep is the default. Import selected applies your choices; the guide never chooses for you."),
+        },
+        {
+            anchor: KenkuTour.kenku-status,
+            title: @tr("A saved import report"),
+            body: @tr("The job continues if you close its dialog. View import reopens progress and results. Retry uses the same saved job when missing files return; Import again starts a fresh import."),
+        },
+        {
+            anchor: "",
+            title: @tr("What stays outside Tufo"),
+            body: @tr("Web addresses, bookmarks, hand-arranged order, and Kenku FM's remote and streaming settings are left out. The report lists unavailable files and skipped web addresses."),
+        },
+    ] };
+}

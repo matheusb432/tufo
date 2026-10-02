@@ -139,6 +139,10 @@ export component IconButton inherits Rectangle {
     in property <bool> enabled: true;
     in property <string> tooltip;
     in property <bool> tooltip-enabled: true;
+    changed tooltip-enabled => {
+        if !root.tooltip-enabled { root.tooltip-dismissed = true; }
+        else if !root.has-hover { root.tooltip-dismissed = false; }
+    }
     out property <bool> has-hover: touch.has-hover;
     callback clicked();
     callback context-menu-requested(Point);

@@ -1,6 +1,10 @@
 // The background gallery: the preset paintings hung on a wall by the kind of scene they set, the
 // chosen one framed in gilt, with the collection's own gradient and image files after them.
 
+import { ArtworkTour } from "tours/artwork.slint";
+import { GuidedTours, TourScroll } from "tours/state.slint";
+import { TourButton } from "tours/button.slint";
+import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, BackgroundTarget, Backgrounds, CollectionBackground,
@@ -82,6 +86,11 @@ component GalleryTile inherits Rectangle {
 
 // A heading over a group of tiles on the wall.
 component WallSection inherits VerticalLayout {
+    TourTarget {
+        anchor: ArtworkTour.artwork-presets;
+        scroll: TourScroll.artwork;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <string> title;
     in property <int> tile-count;
     in property <int> columns;
@@ -157,6 +166,7 @@ export component BackgroundGallery inherits Rectangle {
                     overflow: elide;
                     horizontal-stretch: 1;
                 }
+                TourButton { y: (parent.height - self.height) / 2; guide: ArtworkTour.guide; label: @tr("Artwork"); available: root.progress == 1; }
 
                 IconButton {
                     icon: @image-url("icons/x.svg");
@@ -170,7 +180,8 @@ export component BackgroundGallery inherits Rectangle {
 
             hover := TouchArea {
                 vertical-stretch: 1;
-                flick := Flickable {
+                flick := TourScrollArea {
+                    tour-scroll: TourScroll.artwork;
                     mouse-drag-pan-enabled: false;
                     content-height: sections.preferred-height;
                     sections := VerticalLayout {
@@ -200,6 +211,11 @@ export component BackgroundGallery inherits Rectangle {
 
                         WallSection {
                             title: @tr("Your own");
+                            TourTarget {
+                                anchor: ArtworkTour.artwork-file;
+                                scroll: TourScroll.artwork;
+                                bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+                            }
                             tile-count: root.has-image ? 3 : 2;
                             columns: root.columns;
                             tile-height: root.tile-height;

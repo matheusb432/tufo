@@ -1,0 +1,18 @@
+import { Tour, TourId } from "state.slint";
+
+export global ArtworkTour {
+    out property <string> artwork-presets: "artwork.artwork-presets";
+    out property <string> artwork-file: "artwork.artwork-file";
+    out property <Tour> guide: { id: TourId.artwork, steps: [
+        {
+            anchor: ArtworkTour.artwork-presets,
+            title: @tr("Paintings for your collections"),
+            body: @tr("Choose a preset painting to apply it. Its label includes the artwork and artist. The selected painting is outlined."),
+        },
+        {
+            anchor: ArtworkTour.artwork-file,
+            title: @tr("A gradient or your own image"),
+            body: @tr("Your own offers the collection's gradient, its current image, and Choose an image file. You can also drop an image onto this window. Tufo points at that image file."),
+        },
+    ] };
+}

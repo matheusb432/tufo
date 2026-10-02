@@ -2,6 +2,11 @@
 // with its seek bar, and the volume. In a narrow window it collapses into one slim row, and the
 // mini player shows it alone in a small window.
 
+import { PlaybackTour } from "tours/playback.slint";
+import { MiniPlayerTour } from "tours/mini-player.slint";
+import { GuidedTours } from "tours/state.slint";
+import { TourButton } from "tours/button.slint";
+import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import { Actions, Art, PlayerView, Session, SoundChip, WindowFrame, MusicLayer } from "state.slint";
 import { Button, ButtonKind, Icon, IconButton, Slider } from "widgets.slint";
@@ -114,6 +119,10 @@ component MusicLayerRow inherits VerticalLayout {
 }
 
 component MixButton inherits Button {
+    TourTarget {
+        anchor: PlaybackTour.mix;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     text: @tr("Mix · {0}", PlayerView.layer-count);
     kind: ButtonKind.quiet;
     height: 22px;
@@ -265,6 +274,10 @@ component SoundsPauseButton inherits IconButton {
 }
 
 component Transport inherits HorizontalLayout {
+    TourTarget {
+        anchor: PlaybackTour.transport;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     in property <length> button-size: 40px;
     in property <length> icon-size: 22px;
     in property <length> play-size: 46px;
@@ -370,6 +383,10 @@ component SeekBar inherits Rectangle {
 }
 
 component SeekRow inherits HorizontalLayout {
+    TourTarget {
+        anchor: PlaybackTour.seek;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     spacing: 10px;
     Text {
         text: PlayerView.elapsed;
@@ -441,6 +458,10 @@ component EffectsVolumeButton inherits IconButton {
 }
 
 component VolumeControl inherits HorizontalLayout {
+    TourTarget {
+        anchor: PlaybackTour.volume;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     spacing: 4px;
     IconButton {
         y: (parent.height - self.height) / 2;
@@ -469,6 +490,10 @@ component VolumeControl inherits HorizontalLayout {
 
 // The pause button for every sound, and a chip for each playing sound, scrolling sideways.
 component PlayingSounds inherits HorizontalLayout {
+    TourTarget {
+        anchor: PlaybackTour.playing-sounds;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     spacing: 8px;
     SoundsPauseButton {
         y: (parent.height - self.height) / 2;
@@ -490,6 +515,10 @@ component PlayingSounds inherits HorizontalLayout {
 }
 
 component MiniPlayerButton inherits IconButton {
+    TourTarget {
+        anchor: PlaybackTour.mini-switch;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
     size: 32px;
     icon-size: 18px;
     icon: @image-url("icons/picture-in-picture-2.svg");
@@ -637,8 +666,13 @@ export component MiniPlayer inherits Rectangle {
                 art-size: 40px;
                 horizontal-stretch: 1;
             }
+            TourButton { y: (parent.height - self.height) / 2; guide: MiniPlayerTour.guide; label: @tr("Mini player"); }
 
             if Session.always-on-top-supported: IconButton {
+                TourTarget {
+                    anchor: MiniPlayerTour.mini-pin;
+                    bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+                }
                 y: (parent.height - self.height) / 2;
                 size: 32px;
                 icon-size: 18px;
@@ -656,6 +690,10 @@ export component MiniPlayer inherits Rectangle {
                 icon-size: 18px;
                 icon: @image-url("icons/maximize-2.svg");
                 tooltip: @tr("Full window (Ctrl+Shift+M)");
+                TourTarget {
+                    anchor: PlaybackTour.mini-switch;
+                    bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
+                }
                 clicked => {
                     WindowFrame.switch-form();
                 }

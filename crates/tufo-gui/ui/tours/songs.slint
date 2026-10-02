@@ -1,0 +1,32 @@
+import { Tour, TourId } from "state.slint";
+import { PlaybackTour } from "playback.slint";
+
+export global SongsTour {
+    out property <string> song-folders: "songs.song-folders";
+    out property <string> songs: "songs.songs";
+    out property <Tour> guide: { id: TourId.songs, steps: [
+        {
+            anchor: SongsTour.song-folders,
+            title: @tr("Your song library"),
+            body: @tr("Follow a music folder or drop it on Songs. Tufo watches its audio and subfolders. A followed folder's menu can stop following it and delete its playlists."),
+        },
+        {
+            anchor: SongsTour.songs,
+            title: @tr("Build playlists from Songs"),
+            body: @tr("Songs does not play audio. Use a song's plus button or right-click Add to playlist to choose hand-picked playlists or create one with that song."),
+        },
+        {
+            anchor: SongsTour.songs,
+            title: @tr("Narrow the song list"),
+            body: @tr("Ctrl+F filters this page by title or path. Up to 200 matching songs appear. Ctrl+Shift+F searches across the whole library."),
+        },
+        {
+            anchor: SongsTour.songs,
+            title: @tr("Keep your audio files"),
+            body: @tr("Remove from Songs is available for songs added by their own path. Tufo removes library references and never moves or deletes your audio files."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+    ] };
+}

@@ -1,0 +1,57 @@
+import { Tour, TourId } from "state.slint";
+
+export global SettingsTour {
+    out property <string> crossfade: "settings.crossfade";
+    out property <string> quit-behavior: "settings.quit-behavior";
+    out property <string> startup: "settings.startup";
+    out property <string> kenku-launch: "settings.kenku-launch";
+    out property <string> discord-token: "settings.discord-token";
+    out property <string> discord-disable: "settings.discord-disable";
+    out property <Tour> guide: { id: TourId.settings, steps: [
+        {
+            anchor: SettingsTour.discord-token,
+            title: @tr("Connect your Discord bot"),
+            body: @tr("Paste a bot token, then choose Save and restart. That button stores the credential and restarts the server. Starting or advancing this guide never saves a token."),
+        },
+        {
+            anchor: SettingsTour.discord-disable,
+            title: @tr("Pause the Discord connection"),
+            body: @tr("Disable Discord connection logs the bot out while keeping its configuration. Turn it off again to reconnect. This control appears after a bot token is configured."),
+        },
+        {
+            anchor: SettingsTour.crossfade,
+            title: @tr("Blend consecutive songs"),
+            body: @tr("Crossfade sets how long consecutive songs overlap, up to 10 seconds. The value saves when you release the slider."),
+        },
+        {
+            anchor: SettingsTour.quit-behavior,
+            title: @tr("Choose what quitting does"),
+            body: @tr("Keep playing after quitting leaves audio running on the server after the GUI exits. Otherwise quitting fades audio out and releases the output."),
+        },
+        {
+            anchor: SettingsTour.startup,
+            title: @tr("Start with your desktop"),
+            body: @tr("Run at startup opens Tufo when you log in. Settings save as you change them; a new Discord token has its own Save and restart button."),
+        },
+        {
+            anchor: SettingsTour.kenku-launch,
+            title: @tr("Bring your Kenku FM library"),
+            body: @tr("Close Kenku FM before importing. Import brings collections, local audio references and supported settings. View import reopens its saved progress and report."),
+        },
+        {
+            anchor: "",
+            title: @tr("Search from the keyboard"),
+            body: @tr("Ctrl+F filters the open page. Ctrl+Shift+F searches the whole library. In Search everything, Up and Down choose results and Enter activates them."),
+        },
+        {
+            anchor: "",
+            title: @tr("Change the window layout"),
+            body: @tr("Ctrl+B toggles the sidebar. Ctrl+Shift+M switches between the full window and mini player. Your saved layout changes only when you choose those controls."),
+        },
+        {
+            anchor: "",
+            title: @tr("Navigate a guide"),
+            body: @tr("Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to its question mark."),
+        },
+    ] };
+}

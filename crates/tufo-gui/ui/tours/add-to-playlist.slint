@@ -1,0 +1,18 @@
+import { Tour, TourId } from "state.slint";
+import { CollectionFormTour } from "collection-form.slint";
+
+export global AddToPlaylistTour {
+    out property <string> playlist-choices: "add-to-playlist.playlist-choices";
+    out property <Tour> guide: { id: TourId.add-to-playlist, steps: [
+        {
+            anchor: AddToPlaylistTour.playlist-choices,
+            title: @tr("Choose hand-picked playlists"),
+            body: @tr("Choose a playlist to add this song and close the dialog. Playlists that already contain it show a check. Only hand-picked playlists accept songs here; followed folders manage their own playlists."),
+        },
+        {
+            anchor: CollectionFormTour.collection-name,
+            title: @tr("Create a playlist with this song"),
+            body: @tr("Enter a new playlist name and choose Create. You can add more songs from Songs or Find songs on its page."),
+        },
+    ] };
+}
