@@ -54,11 +54,26 @@ component ResultRow inherits Rectangle {
 export component SearchPalette inherits Rectangle {
     callback close();
     property <bool> open: Search.palette-open;
+    property <int> selected: Search.selected;
+    changed selected => {
+        root.reveal-selected();
+    }
     changed open => {
         if self.open {
+            results.content-y = 0px;
             query.focus();
         }
     }
+
+    function reveal-selected() {
+        if Search.results.length > 0 {
+            let top = Search.selected * 50px;
+            results.content-y = clamp(results.content-y, -top, min(0px, results.height - top - 48px));
+        } else {
+            results.content-y = 0px;
+        }
+    }
+
     visible: presence.present;
     presence := Presence {
         open: root.open;
@@ -78,11 +93,13 @@ export component SearchPalette inherits Rectangle {
                 return accept;
             }
             if event.text == Key.DownArrow {
-                Search.selected = min(Search.selected + 1, Search.results.length - 1);
+                Search.selected = min(Search.selected + 1, max(0, Search.results.length - 1));
+                root.reveal-selected();
                 return accept;
             }
             if event.text == Key.UpArrow {
                 Search.selected = max(Search.selected - 1, 0);
+                root.reveal-selected();
                 return accept;
             }
             if event.text == Key.Return {
@@ -116,6 +133,7 @@ export component SearchPalette inherits Rectangle {
                     edited(text) => {
                         Search.palette-query = text;
                         Search.selected = 0;
+                        results.content-y = 0px;
                         Actions.palette-query-changed(text);
                     }
                 }
@@ -127,10 +145,18 @@ export component SearchPalette inherits Rectangle {
                 }
                 results := Flickable {
                     mouse-drag-pan-enabled: false;
+                    content-width: self.width;
                     content-height: rows.preferred-height;
-                    height: min(rows.preferred-height, 480px);
-                    // Keeps the selected row in view as the arrows move it.
-                    content-y: min(0px, max(-Search.selected * 50px + self.height - 100px, self.height - self.content-height));
+                    preferred-height: min(rows.preferred-height, 480px);
+                    max-height: 480px;
+                    min-height: 0px;
+                    vertical-stretch: 1;
+                    changed height => {
+                        root.reveal-selected();
+                    }
+                    changed content-height => {
+                        root.reveal-selected();
+                    }
                     rows := VerticalLayout {
                         spacing: 2px;
                         for result[index] in Search.results: ResultRow {
