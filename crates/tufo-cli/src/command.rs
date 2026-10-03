@@ -33,6 +33,33 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: DataCommand,
     },
+    /// Export or import songs' saved playback starts and loop regions as JSON.
+    SongLoops {
+        #[command(subcommand)]
+        command: SongLoopsCommand,
+    },
+}
+
+#[derive(Subcommand)]
+pub(crate) enum SongLoopsCommand {
+    /// Print every saved song loop as JSON, naming the audio each was saved against.
+    Export,
+    /// Match each loop in a JSON document to a song by fingerprint, or by path and SHA-256, and
+    /// save it. Exits 1 when a loop matches no song or fails its checks.
+    Import {
+        /// A document written by `tufo song-loops export`.
+        #[arg(value_name = "FILE")]
+        from: PathBuf,
+        /// Report what importing would change without saving anything.
+        #[arg(long)]
+        dry_run: bool,
+        /// Overwrite different saved loops instead of reporting them as conflicts.
+        #[arg(long)]
+        replace: bool,
+        /// Print a machine-readable report without terminal styling.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]

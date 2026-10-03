@@ -383,3 +383,53 @@ async fn opening_the_gui_reports_a_new_window_a_raised_one_or_a_failed_start() -
     assert!(String::from_utf8_lossy(&opened.stdout).contains("Opened"));
     Ok(())
 }
+
+#[tokio::test]
+async fn song_loops_export_as_json_and_imports_report_unmatched_songs() -> anyhow::Result<()> {
+    let session = Session::new()?;
+    let without_server = session.run(&["song-loops", "export"]).await?;
+    session.success(&["server", "start"]).await?;
+    let exported = session.success(&["song-loops", "export"]).await?;
+    let document = session.path("loops.json");
+    std::fs::write(
+        &document,
+        serde_json::json!({
+            "format": "song-loops",
+            "version": 1,
+            "songs": [{
+                "path": session.path("music/boss.ogg"),
+                "fingerprint": "ab".repeat(32),
+                "sample_rate": 48_000,
+                "frame_count": 96_000,
+                "playback_start_frame": 0,
+                "loop_start_frame": 48_000,
+                "loop_end_frame": 96_000,
+                "crossfade_frames": 0
+            }]
+        })
+        .to_string(),
+    )?;
+
+    let imported = session
+        .run(&[
+            "song-loops",
+            "import",
+            &document.to_string_lossy(),
+            "--dry-run",
+            "--json",
+        ])
+        .await?;
+
+    assert_eq!(without_server.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&without_server.stderr).contains("tufo server start"));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&exported.stdout)?,
+        serde_json::json!({"format": "song-loops", "version": 1, "songs": []})
+    );
+    assert_eq!(imported.status.code(), Some(1));
+    assert_eq!(
+        serde_json::from_slice::<Value>(&imported.stdout)?[0]["outcome"],
+        "no_match"
+    );
+    Ok(())
+}
