@@ -19,7 +19,7 @@ use std::{
 
 use clru::{CLruCache, CLruCacheConfig, WeightScale};
 use image::{DynamicImage, ImageFormat, ImageReader, imageops::FilterType};
-use slint::{ComponentHandle as _, Image, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer};
+use slint::{ComponentHandle as _, Image, PhysicalSize, Rgb8Pixel, Rgba8Pixel, SharedPixelBuffer};
 use tufo_client::library::Background;
 use tufo_models::library::{BackgroundPreset, CollectionId};
 
@@ -40,8 +40,8 @@ const PICTURE_SIDE_MAX: u32 = 800;
 const MEBIBYTE: usize = 1024 * 1024;
 /// About a dozen small renditions or image files; the worker decodes any other again.
 const CARD_PICTURES_BYTES_MAX: usize = 16 * MEBIBYTE;
-/// A few window sizes of a few dozen cards.
-const CARD_ART_BYTES_MAX: usize = 24 * MEBIBYTE;
+const CARD_ART_BYTES_MIN: usize = 24 * MEBIBYTE;
+const CARD_ART_BYTES_MAX: usize = 256 * MEBIBYTE;
 /// Tufo's own gradient, for a card without a collection yet.
 const DEFAULT_GRADIENT: (Rgb, Rgb) = (Rgb(45, 106, 79), Rgb(1, 50, 32));
 
@@ -120,7 +120,7 @@ thread_local! {
     static WINDOW: RefCell<Option<slint::Weak<AppWindow>>> = const { RefCell::new(None) };
     static JOBS: RefCell<Option<mpsc::Sender<Job>>> = const { RefCell::new(None) };
     static CARDS: RefCell<ByteBudgetCache<CardKey, Image>> =
-        RefCell::new(byte_budget_cache(CARD_ART_BYTES_MAX));
+        RefCell::new(byte_budget_cache(CARD_ART_BYTES_MIN));
     /// The looks the worker is drawing, with the size the window wants each at now.
     static DRAWING: RefCell<HashMap<CardLook, (u32, u32)>> = RefCell::new(HashMap::new());
     /// Pictures that failed to decode, whose cards show the gradient.
@@ -214,7 +214,22 @@ pub(crate) fn card(
         width,
         height,
     };
-    if let Some(art) = CARDS.with(|cards| cards.borrow_mut().get(&key).cloned()) {
+    if let Some(art) = CARDS.with(|cards| {
+        let mut cards = cards.borrow_mut();
+        if let Some(size) = WINDOW.with(|window| {
+            window
+                .borrow()
+                .as_ref()
+                .and_then(slint::Weak::upgrade)
+                .map(|window| window.window().size())
+        }) {
+            let budget = card_cache_budget(size);
+            if cards.capacity() != budget.get() {
+                cards.resize(budget);
+            }
+        }
+        cards.get(&key).cloned()
+    }) {
         return art;
     }
     #[cfg(feature = "benchmark")]
@@ -240,6 +255,16 @@ pub(crate) fn card(
     let placeholder = cached.unwrap_or_else(|| gradient_card(&key));
     request_card(key);
     placeholder
+}
+
+fn card_cache_budget(size: PhysicalSize) -> NonZeroUsize {
+    // Keep two framebuffers of artwork: a fixed small cache continually evicts large visible cards.
+    let pixels = u64::from(size.width) * u64::from(size.height);
+    let bytes = pixels
+        .saturating_mul(8)
+        .clamp(CARD_ART_BYTES_MIN as u64, CARD_ART_BYTES_MAX as u64);
+    NonZeroUsize::new(usize::try_from(bytes).unwrap_or(CARD_ART_BYTES_MAX))
+        .unwrap_or(NonZeroUsize::MIN)
 }
 
 /// Whether the background's image file failed to decode, so its gradient shows instead.
@@ -489,6 +514,22 @@ fn preset_webp(preset: BackgroundPreset) -> &'static [u8] {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn card_cache_budget_follows_physical_size_with_bounded_memory() {
+        for (width, height, bytes) in [
+            (0, 0, CARD_ART_BYTES_MIN),
+            (1000, 700, CARD_ART_BYTES_MIN),
+            (3840, 2160, 3840 * 2160 * 8),
+            (7680, 4320, 7680 * 4320 * 8),
+            (u32::MAX, u32::MAX, CARD_ART_BYTES_MAX),
+        ] {
+            assert_eq!(
+                card_cache_budget(PhysicalSize::new(width, height)).get(),
+                bytes
+            );
+        }
+    }
 
     fn card_key(picture: Option<Picture>) -> CardKey {
         CardKey {

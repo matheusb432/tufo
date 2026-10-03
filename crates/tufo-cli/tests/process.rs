@@ -2,6 +2,7 @@
 //! runs need `cargo build -p tufo-server` first.
 
 use std::{
+    io::{Read as _, Seek as _},
     path::{Path, PathBuf},
     process::{Output, Stdio},
     time::Duration,
@@ -89,14 +90,36 @@ impl Drop for Session {
 }
 
 async fn output(command: std::process::Command) -> anyhow::Result<Output> {
-    Ok(tokio::time::timeout(
+    let arguments = command
+        .get_args()
+        .map(|argument| argument.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let mut command = tokio::process::Command::from(command);
+    // Files avoid both full pipes and EOF waits on handles inherited by a detached server.
+    let mut stdout = tempfile::tempfile()?;
+    let mut stderr = tempfile::tempfile()?;
+    let status = tokio::time::timeout(
         Duration::from_secs(30),
-        tokio::process::Command::from(command)
+        command
             .kill_on_drop(true)
-            .output(),
+            .stdout(stdout.try_clone()?)
+            .stderr(stderr.try_clone()?)
+            .status(),
     )
     .await
-    .context("CLI exceeded 30 seconds")??)
+    .with_context(|| format!("CLI `{arguments}` exceeded 30 seconds"))??;
+    stdout.rewind()?;
+    stderr.rewind()?;
+    let mut stdout_bytes = Vec::new();
+    let mut stderr_bytes = Vec::new();
+    stdout.read_to_end(&mut stdout_bytes)?;
+    stderr.read_to_end(&mut stderr_bytes)?;
+    Ok(Output {
+        status,
+        stdout: stdout_bytes,
+        stderr: stderr_bytes,
+    })
 }
 
 #[tokio::test]
@@ -271,7 +294,8 @@ async fn reports_saved_and_invalid_credentials_without_exposing_the_token() -> a
     let stderr = String::from_utf8(failed.stderr)?;
     assert!(!stderr.contains(TOKEN));
     assert!(stderr.starts_with("error:"));
-    assert!(stderr.contains("Usage: tufo server restart"));
+    let expected_usage = format!("Usage: tufo{} server restart", std::env::consts::EXE_SUFFIX);
+    assert!(stderr.contains(&expected_usage), "{stderr}");
     assert!(
         !LocalEndpoint::from_root(session.path("runtime"))?
             .is_listening(Duration::from_secs(1))

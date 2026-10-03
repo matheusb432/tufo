@@ -9,6 +9,12 @@ SetCompressor /SOLID lzma
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
 
+!ifdef NSIS_WIN32_MAKENSIS
+  !define SOURCE_SEPARATOR "\"
+!else
+  !define SOURCE_SEPARATOR "/"
+!endif
+
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Tufo"
 ; Holds the GUI's *Start at login* entry.
 !define RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
@@ -58,13 +64,13 @@ VIAddVersionKey "FileDescription" "Tufo Setup"
 Section
   ; The new CLI stops whichever server runs, even one this installer didn't place.
   InitPluginsDir
-  File "/oname=$PLUGINSDIR\tufo.exe" "${BINARIES_DIR}/tufo.exe"
+  File "/oname=$PLUGINSDIR\tufo.exe" "${BINARIES_DIR}${SOURCE_SEPARATOR}tufo.exe"
   !insertmacro STOP_TUFO "$PLUGINSDIR\tufo.exe"
 
   ; Both clients start the server from their own folder, so all three sit side by side.
   SetOutPath "$INSTDIR"
-  File "${BINARIES_DIR}/tufo-gui.exe"
-  File "${BINARIES_DIR}/tufo-server.exe"
+  File "${BINARIES_DIR}${SOURCE_SEPARATOR}tufo-gui.exe"
+  File "${BINARIES_DIR}${SOURCE_SEPARATOR}tufo-server.exe"
   CopyFiles /SILENT "$PLUGINSDIR\tufo.exe" "$INSTDIR"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 

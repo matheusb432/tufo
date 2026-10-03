@@ -1,6 +1,18 @@
 import { Motion, Theme } from "../theme.slint";
 import { Button, ButtonKind, IconButton, Presence, ScrollThumb } from "../widgets.slint";
 import { GuidedTours } from "state.slint";
+import { TourScrim } from "scrim.slint";
+
+component RedrawMargin inherits Rectangle {
+    in property <float> progress;
+    property <color> repaint: #00000000;
+    x: -1phx; y: -1phx;
+    // Retain a drawable transparent item so rounded redraw bounds include edge pixels.
+    background: root.repaint;
+    changed progress => {
+        root.repaint = root.repaint == #00000000 ? #01000000 : #00000000;
+    }
+}
 
 export component TourOverlay inherits Rectangle {
     presence := Presence { open: GuidedTours.active; }
@@ -34,29 +46,13 @@ export component TourOverlay inherits Rectangle {
         focus-on-click: false;
         capture-key-pressed(event) => { root.handle-key(event) }
         TouchArea { }
-        Rectangle {
-            x: 0; y: 0;
-            width: parent.width;
-            height: max(0px, root.spot-y);
-            background: root.shade;
-        }
-        Rectangle {
-            x: 0; y: root.spot-y;
-            width: root.spot-x;
-            height: root.spot-height;
-            background: root.shade;
-        }
-        Rectangle {
-            x: root.spot-x + root.spot-width; y: root.spot-y;
-            width: max(0px, parent.width - self.x);
-            height: root.spot-height;
-            background: root.shade;
-        }
-        Rectangle {
-            x: 0; y: root.spot-y + root.spot-height;
-            width: parent.width;
-            height: max(0px, parent.height - self.y);
-            background: root.shade;
+        TourScrim {
+            present: presence.present;
+            shade: root.shade;
+            hole-x: root.spot-x;
+            hole-y: root.spot-y;
+            hole-width: root.spot-width;
+            hole-height: root.spot-height;
         }
         Rectangle {
             x: root.spot-x; y: root.spot-y;
@@ -71,6 +67,11 @@ export component TourOverlay inherits Rectangle {
             border-width: 2px;
             border-color: Theme.accent;
             border-radius: Theme.radius-small;
+            // Fractional scales need edge padding; integer scales retain the original layer.
+            if (1px / 1phx) != floor(1px / 1phx): RedrawMargin {
+                width: spotlight.width + 2phx; height: spotlight.height + 2phx;
+                progress: spotlight.opacity;
+            }
         }
         card := Rectangle {
             x: GuidedTours.layout.card.x;

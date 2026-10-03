@@ -37,6 +37,15 @@ pub(crate) fn install(window: &AppWindow) {
                 .ok()
         })
         .unwrap_or_default();
+    install_runtime(window, seen, file);
+}
+
+#[cfg(feature = "benchmark")]
+pub(crate) fn install_ephemeral(window: &AppWindow) {
+    install_runtime(window, SeenTours::default(), None);
+}
+
+fn install_runtime(window: &AppWindow, seen: SeenTours, file: Option<SeenFile>) {
     let runtime = Rc::new(TourRuntime {
         window: window.as_weak(),
         active: RefCell::new(None),

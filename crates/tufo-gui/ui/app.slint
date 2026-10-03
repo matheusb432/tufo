@@ -3,6 +3,8 @@
 
 import { GuidedTours, Tour, TourId, TourStep, TourLayout, TourRect, TourScroll } from "tours/state.slint";
 import { TourOverlay } from "tours/overlay.slint";
+import { HomeTour } from "tours/home.slint";
+import { SettingsTour } from "tours/settings.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
@@ -28,6 +30,7 @@ export {
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, KenkuConflictRow,
     KenkuImportView, LibraryView, NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons,
     SoundTile, Theme, VoiceBadge, WindowFrame, GuidedTours, TourId, TourLayout, TourRect, TourScroll, Tour, TourStep,
+    HomeTour, SettingsTour,
 }
 
 enum DialogKind { none, add-collection, edit-collection, edit-entry, add-to-playlist, settings, kenku-import }

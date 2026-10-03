@@ -1,0 +1,77 @@
+import { TourRect } from "state.slint";
+
+component ScrimTile inherits Rectangle {
+    in property <brush> shade;
+    in property <TourRect> hole;
+    property <length> left;
+    property <length> right;
+    property <length> top;
+    property <length> bottom;
+    property <color> repaint: #00000000;
+    background: root.repaint;
+    function apply-cut(left: length, right: length, top: length, bottom: length) {
+        if root.left != left || root.right != right || root.top != top || root.bottom != bottom {
+            root.left = left; root.right = right;
+            root.top = top; root.bottom = bottom;
+            // Redraw the whole strip so image clipping cannot leave an old edge pixel.
+            root.repaint = root.repaint == #00000000 ? #01000000 : #00000000;
+        }
+    }
+    // Assign only changed cuts: reactive bindings would dirty every tile on every frame.
+    function update-cut() {
+        let left = clamp(root.hole.x - root.x, 0px, root.width);
+        let right = clamp(root.hole.x + root.hole.width - root.x, 0px, root.width);
+        let top = clamp(root.hole.y - root.y, 0px, root.height);
+        let bottom = clamp(root.hole.y + root.hole.height - root.y, 0px, root.height);
+        if right <= left || bottom <= top {
+            root.apply-cut(0px, 0px, root.height, root.height);
+        } else {
+            root.apply-cut(left, right, top, bottom);
+        }
+    }
+    init => { root.update-cut(); }
+    changed hole => { root.update-cut(); }
+    changed x => { root.update-cut(); }
+    changed y => { root.update-cut(); }
+    changed width => { root.update-cut(); }
+    changed height => { root.update-cut(); }
+    Rectangle {
+        x: 0; y: 0;
+        width: root.width; height: root.top;
+        background: root.shade;
+    }
+    Rectangle {
+        x: 0; y: root.top;
+        width: root.left; height: root.bottom - root.top;
+        background: root.shade;
+    }
+    Rectangle {
+        x: root.right; y: root.top;
+        width: root.width - root.right; height: root.bottom - root.top;
+        background: root.shade;
+    }
+    Rectangle {
+        x: 0; y: root.bottom;
+        width: root.width; height: root.height - root.bottom;
+        background: root.shade;
+    }
+}
+
+export component TourScrim inherits Rectangle {
+    in property <bool> present;
+    in property <brush> shade;
+    in property <length> hole-x;
+    in property <length> hole-y;
+    in property <length> hole-width;
+    in property <length> hole-height;
+    // Full-width strips avoid clipping rounded image cards at a horizontal dirty boundary.
+    property <length> tile-height: 64phx;
+    property <int> rows: max(1, ceil(root.height / root.tile-height));
+    for tile in (root.present ? root.rows : 0): ScrimTile {
+        y: tile * root.tile-height;
+        width: root.width;
+        height: min(root.tile-height, root.height - self.y);
+        shade: root.shade;
+        hole: { x: root.hole-x, y: root.hole-y, width: root.hole-width, height: root.hole-height };
+    }
+}

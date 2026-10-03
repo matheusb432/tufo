@@ -6,10 +6,7 @@ use std::{
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
 
-use super::{
-    BATCHES, FRAME_STEP_NS,
-    platform::{HEIGHT, WIDTH},
-};
+use super::{BATCHES, Configuration, FRAME_STEP_NS};
 use crate::{backgrounds::metrics::Counters, files};
 
 pub(super) const SCREENSHOTS: [&str; 4] = ["expanded", "collapsed", "settings", "playlist"];
@@ -26,15 +23,17 @@ pub(super) struct Compatibility {
     cpu_affinity: String,
     width: u32,
     height: u32,
+    #[serde(default = "scale_default")]
+    scale_percent: u32,
     frame_step_ns: u64,
     batches: u32,
 }
 
 impl Compatibility {
-    pub(super) fn current() -> Self {
+    pub(super) fn current(configuration: &Configuration) -> Self {
         Self {
             schema: 1,
-            workload: 1,
+            workload: if configuration.tours { 2 } else { 1 },
             renderer: "software/swapped-buffers/rgba8".to_owned(),
             slint: "1.18.1".to_owned(),
             profile: "release".to_owned(),
@@ -55,12 +54,25 @@ impl Compatibility {
                     })
                 })
                 .unwrap_or_default(),
-            width: WIDTH,
-            height: HEIGHT,
+            width: configuration.width,
+            height: configuration.height,
+            scale_percent: configuration.scale_percent,
             frame_step_ns: FRAME_STEP_NS,
             batches: BATCHES,
         }
     }
+
+    fn screenshots(&self) -> &[&str] {
+        if self.workload == 2 {
+            super::tours::SCREENSHOTS
+        } else {
+            &SCREENSHOTS
+        }
+    }
+}
+
+fn scale_default() -> u32 {
+    100
 }
 
 #[derive(Deserialize, Serialize)]
@@ -82,8 +94,24 @@ pub(super) struct Report {
     pub(super) samples: Vec<Sample>,
 }
 
-pub(super) fn directory() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.artifacts/benchmarks/gui")
+pub(super) fn directory(configuration: &Configuration) -> PathBuf {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../.artifacts/benchmarks/gui");
+    if configuration.tours {
+        root.join(format!(
+            "tours/{}x{}-{}pct",
+            configuration.width, configuration.height, configuration.scale_percent
+        ))
+    } else if configuration.width != super::platform::WIDTH
+        || configuration.height != super::platform::HEIGHT
+        || configuration.scale_percent != 100
+    {
+        root.join(format!(
+            "{}x{}-{}pct",
+            configuration.width, configuration.height, configuration.scale_percent
+        ))
+    } else {
+        root
+    }
 }
 
 pub(super) fn baseline(
@@ -95,7 +123,7 @@ pub(super) fn baseline(
     if !path.exists() {
         anyhow::ensure!(
             update,
-            "no GUI baseline; run `just gui-bench --update` first"
+            "no GUI baseline; rerun this command with --update first"
         );
         return Ok(None);
     }
@@ -146,11 +174,27 @@ pub(super) fn save(
     update: bool,
 ) -> anyhow::Result<()> {
     if baseline.is_some() {
-        compare_screenshots(root)?;
+        compare_screenshots(
+            root,
+            report.compatibility.screenshots(),
+            report.compatibility.workload == 2,
+        )?;
     }
     let json = serde_json::to_string_pretty(report)?;
     files::write_atomically(&root.join("current.json"), &json)?;
-    for scenario in ["cold", "sidebar", "settings", "pages"] {
+    let scenarios: &[&str] = if report.compatibility.workload == 2 {
+        &[
+            "tour-open",
+            "tour-step",
+            "tour-reverse",
+            "tour-close",
+            "tour-idle",
+            "tour-live",
+        ]
+    } else {
+        &["cold", "sidebar", "settings", "pages"]
+    };
+    for scenario in scenarios {
         print_scenario(scenario, report, baseline);
     }
     println!(
@@ -164,7 +208,7 @@ pub(super) fn save(
     );
     if update {
         std::fs::create_dir_all(root.join("baseline"))?;
-        for name in SCREENSHOTS {
+        for name in report.compatibility.screenshots() {
             std::fs::copy(
                 root.join("current").join(format!("{name}.png")),
                 root.join("baseline").join(format!("{name}.png")),
@@ -176,24 +220,74 @@ pub(super) fn save(
     Ok(())
 }
 
-fn compare_screenshots(root: &Path) -> anyhow::Result<()> {
-    for name in SCREENSHOTS {
+fn compare_screenshots(root: &Path, screenshots: &[&str], tours: bool) -> anyhow::Result<()> {
+    for name in screenshots {
         let previous = image::open(root.join("baseline").join(format!("{name}.png")))?.into_rgb8();
         let current = image::open(root.join("current").join(format!("{name}.png")))?.into_rgb8();
         anyhow::ensure!(
             previous.dimensions() == current.dimensions(),
             "{name} dimensions changed"
         );
-        let delta_max = previous
+        let reference = if tours {
+            let image =
+                image::open(root.join("current").join(format!("{name}.full.png")))?.into_rgb8();
+            anyhow::ensure!(
+                image.dimensions() == current.dimensions(),
+                "{name} full redraw dimensions changed"
+            );
+            Some(image)
+        } else {
+            None
+        };
+        // Timer rounding can shift an animated pose by a frame; check its redraw at the same pose.
+        let moving = tours && *name == "home-moving";
+        let comparison = if moving {
+            reference
+                .as_ref()
+                .context("missing moving-frame reference")?
+        } else {
+            &previous
+        };
+        let delta_max = comparison
             .as_raw()
             .iter()
             .zip(current.as_raw())
             .map(|(a, b)| a.abs_diff(*b))
             .max()
             .context("empty screenshot")?;
+        let mut outliers = 0;
+        let mut corrected = 0;
+        let mut corrected_row = None;
+        let mut corrected_rows_match = true;
+        for (index, (a, b)) in comparison.pixels().zip(current.pixels()).enumerate() {
+            if a.0.iter().zip(b.0).all(|(a, b)| a.abs_diff(b) <= 2) {
+                continue;
+            }
+            if reference.as_ref().is_some_and(|image| {
+                b.0.iter()
+                    .zip(&image.as_raw()[index * 3..index * 3 + 3])
+                    .all(|(a, b)| a.abs_diff(*b) <= 2)
+            }) {
+                let row = index / current.width() as usize;
+                corrected_rows_match &= corrected_row.is_none_or(|previous| previous == row);
+                corrected_row = Some(row);
+                corrected += 1;
+            } else {
+                outliers += 1;
+            }
+        }
+        // Fractional rounded borders can leave individual pixels in software partial redraws.
         anyhow::ensure!(
-            delta_max <= 2,
-            "{name} appearance changed (channel delta {delta_max}); inspect current and baseline screenshots"
+            outliers <= if tours && !moving { 3 } else { 0 }
+                && corrected_rows_match
+                && corrected <= current.width() as usize,
+            "{name} appearance changed ({outliers} pixels, channel delta {delta_max}); inspect current and baseline screenshots"
+        );
+        if moving {
+            println!("{name}: checked against the full redraw at the current animation pose");
+        }
+        println!(
+            "{name}: {outliers} pixel exceptions, {corrected} corrected trail pixels; maximum delta {delta_max}"
         );
     }
     Ok(())
@@ -263,9 +357,47 @@ mod tests {
     use super::*;
 
     #[test]
+    fn tour_comparisons_accept_corrected_trails_and_reject_new_or_wider_changes() {
+        let directory = tempfile::tempdir().unwrap();
+        let root = directory.path();
+        std::fs::create_dir(root.join("baseline")).unwrap();
+        std::fs::create_dir(root.join("current")).unwrap();
+        let clean = image::RgbImage::from_pixel(8, 4, image::Rgb([0, 0, 0]));
+        let mut trail = clean.clone();
+        for x in 0..8 {
+            trail.put_pixel(x, 1, image::Rgb([20, 0, 0]));
+        }
+        trail.save(root.join("baseline/tour.png")).unwrap();
+        clean.save(root.join("current/tour.png")).unwrap();
+        clean.save(root.join("current/tour.full.png")).unwrap();
+        assert!(compare_screenshots(root, &["tour"], true).is_ok());
+        assert!(compare_screenshots(root, &["tour"], false).is_err());
+
+        clean.save(root.join("baseline/tour.png")).unwrap();
+        trail.save(root.join("current/tour.png")).unwrap();
+        assert!(compare_screenshots(root, &["tour"], true).is_err());
+
+        trail.save(root.join("baseline/home-moving.png")).unwrap();
+        clean.save(root.join("current/home-moving.png")).unwrap();
+        clean
+            .save(root.join("current/home-moving.full.png"))
+            .unwrap();
+        assert!(compare_screenshots(root, &["home-moving"], true).is_ok());
+        trail.save(root.join("current/home-moving.png")).unwrap();
+        assert!(compare_screenshots(root, &["home-moving"], true).is_err());
+
+        for x in 0..8 {
+            trail.put_pixel(x, 2, image::Rgb([20, 0, 0]));
+        }
+        trail.save(root.join("baseline/tour.png")).unwrap();
+        clean.save(root.join("current/tour.png")).unwrap();
+        assert!(compare_screenshots(root, &["tour"], true).is_err());
+    }
+
+    #[test]
     fn a_missing_baseline_requires_explicit_update_before_measurement() {
         let directory = tempfile::tempdir().unwrap();
-        let compatibility = Compatibility::current();
+        let compatibility = Compatibility::current(&Configuration::default());
         assert!(baseline(directory.path(), &compatibility, false).is_err());
         assert!(
             baseline(directory.path(), &compatibility, true)
@@ -278,7 +410,7 @@ mod tests {
     #[test]
     fn an_incompatible_runner_is_not_compared_or_overwritten() {
         let directory = tempfile::tempdir().unwrap();
-        let mut compatibility = Compatibility::current();
+        let mut compatibility = Compatibility::current(&Configuration::default());
         compatibility.width += 1;
         let report = Report {
             compatibility,
@@ -291,11 +423,22 @@ mod tests {
         let original = serde_json::to_string(&report).unwrap();
         let path = directory.path().join("baseline.json");
         std::fs::write(&path, &original).unwrap();
-        assert!(baseline(directory.path(), &Compatibility::current(), false).is_err());
         assert!(
-            baseline(directory.path(), &Compatibility::current(), true)
-                .unwrap()
-                .is_none()
+            baseline(
+                directory.path(),
+                &Compatibility::current(&Configuration::default()),
+                false
+            )
+            .is_err()
+        );
+        assert!(
+            baseline(
+                directory.path(),
+                &Compatibility::current(&Configuration::default()),
+                true
+            )
+            .unwrap()
+            .is_none()
         );
         assert_eq!(std::fs::read_to_string(path).unwrap(), original);
     }

@@ -1,6 +1,5 @@
-# Opus's CMake treats clang-cl as MSVC, which compiles SIMD intrinsics without target flags and
-# finds headers whatever their case. clang-cl on Linux does neither, so once Opus has declared
-# its sources, this adds the flags a GCC or Clang build gets and a correctly cased SDK header.
+# Opus treats clang-cl as MSVC, but Clang needs target flags on SIMD sources.
+# Cross-building from Linux also needs the SDK header's exact case.
 cmake_language(DEFER CALL _opus_clang_cl_fix_sources)
 
 function(_opus_clang_cl_fix_sources)
@@ -11,6 +10,10 @@ function(_opus_clang_cl_fix_sources)
   set(avx2_sources ${celt_sources_avx2} ${silk_sources_avx2} ${silk_sources_float_avx2} ${dnn_sources_avx2})
   if(avx2_sources)
     set_property(SOURCE ${avx2_sources} APPEND PROPERTY COMPILE_OPTIONS -mavx2 -mfma -mavx)
+  endif()
+
+  if(CMAKE_HOST_WIN32)
+    return()
   endif()
 
   # silk/x86/NSQ_del_dec_avx2.c includes <Intsafe.h>; the SDK ships intsafe.h.

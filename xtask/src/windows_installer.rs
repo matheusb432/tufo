@@ -13,7 +13,7 @@ const INSTALLER_VERSION_PACKAGE: &str = "tufo-gui";
 const INSTALLER_SCRIPT: &str = "packaging/windows/tufo.nsi";
 const CMAKE_TOOLCHAIN: &str = "packaging/windows/cross-toolchain.cmake";
 const OPUS_CMAKE_FILES: [&str; 2] = [CMAKE_TOOLCHAIN, "packaging/windows/opus-clang-cl.cmake"];
-/// A copy of the files that configured the cross-built Opus.
+/// A copy of the files and C flags that configured the cross-built Opus.
 const OPUS_CMAKE_STAMP: &str = "xwin-opus-cmake.stamp";
 const OUTPUT_DIR: &str = "dist";
 /// `libopus_sys` links libm whenever its build script runs on Unix, whatever the target.
@@ -46,7 +46,7 @@ pub(crate) fn build(workspace_root: &Path, metadata: &Metadata) -> Result<()> {
     }
     let output_dir = workspace_root.join(OUTPUT_DIR);
     fs::create_dir_all(&output_dir).with_context(|| format!("create {}", output_dir.display()))?;
-    let installer = output_dir.join(format!("Tufo_{version}_x64-setup.exe"));
+    let installer = output_dir.join(format!("tufo-{version}-windows-x86_64-setup.exe"));
     pack(workspace_root, &binaries, version, &installer)?;
     println!("built the installer {}", installer.display());
     Ok(())
@@ -59,6 +59,7 @@ fn clean_opus_after_cmake_changes(workspace_root: &Path, target_dir: &Path) -> R
         let path = workspace_root.join(file);
         cmake_files.extend(fs::read(&path).with_context(|| format!("read {}", path.display()))?);
     }
+    cmake_files.extend(cross_cflags()?.as_bytes());
     let stamp = target_dir.join(OPUS_CMAKE_STAMP);
     if fs::read(&stamp).is_ok_and(|built_from| built_from == cmake_files) {
         return Ok(());
@@ -91,8 +92,9 @@ fn cross_build(workspace_root: &Path, target_dir: &Path) -> Result<()> {
         .with_context(|| format!("create {}", libm_stub_dir.display()))?;
     fs::write(libm_stub_dir.join("m.lib"), EMPTY_ARCHIVE).context("write the empty m.lib")?;
     let rustflags = format!(
-        "{STATIC_CRT_FLAG} {IGNORE_MISSING_PDB_FLAG} -L native={}",
-        libm_stub_dir.display()
+        "{STATIC_CRT_FLAG} {IGNORE_MISSING_PDB_FLAG} -L native={} --remap-path-prefix={}=/usr/src/tufo",
+        libm_stub_dir.display(),
+        std::env::var("HOME").context("the cross-build needs HOME for private-path remapping")?
     );
 
     let mut command = Command::new("cargo");
@@ -102,12 +104,19 @@ fn cross_build(workspace_root: &Path, target_dir: &Path) -> Result<()> {
         .args(PACKAGES.into_iter().flat_map(|package| ["-p", package]))
         // cargo-xwin merges its own flags into these.
         .env("CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS", rustflags)
+        .env("CFLAGS", cross_cflags()?)
         // The cmake crate prefers this spelling over cargo-xwin's underscored one, which it wraps.
         .env(
             format!("CMAKE_TOOLCHAIN_FILE_{TARGET}"),
             workspace_root.join(CMAKE_TOOLCHAIN),
         );
     run(&mut command, "cargo-xwin")
+}
+
+fn cross_cflags() -> Result<String> {
+    let home =
+        std::env::var("HOME").context("the cross-build needs HOME for private-path remapping")?;
+    Ok(format!("/clang:-ffile-prefix-map={home}=/usr/src/tufo"))
 }
 
 fn pack(workspace_root: &Path, binaries: &Path, version: &Version, installer: &Path) -> Result<()> {

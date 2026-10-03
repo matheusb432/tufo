@@ -1,6 +1,7 @@
 mod fixture;
 mod platform;
 mod report;
+mod tours;
 
 use std::time::Instant;
 
@@ -32,36 +33,81 @@ enum Command {
         /// Capture or replace the compatible performance baseline.
         #[arg(long)]
         update: bool,
+        #[command(flatten)]
+        configuration: Configuration,
     },
+}
+
+#[derive(clap::Args)]
+struct Configuration {
+    /// Measure guided tour entry, steps, reversals, exit, and idle tracking.
+    #[arg(long)]
+    tours: bool,
+    /// Capture tour screenshots and check interaction state without timing the workload.
+    #[arg(long, requires = "tours", conflicts_with = "update")]
+    verify_only: bool,
+    /// Physical framebuffer width in pixels.
+    #[arg(long, default_value_t = platform::WIDTH, value_parser = clap::value_parser!(u32).range(1..=16384))]
+    width: u32,
+    /// Physical framebuffer height in pixels.
+    #[arg(long, default_value_t = platform::HEIGHT, value_parser = clap::value_parser!(u32).range(1..=16384))]
+    height: u32,
+    /// Display scale as a percentage; 125 represents 1.25 physical pixels per logical pixel.
+    #[arg(long, default_value_t = 100, value_parser = clap::value_parser!(u32).range(50..=400))]
+    scale_percent: u32,
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            tours: false,
+            verify_only: false,
+            width: platform::WIDTH,
+            height: platform::HEIGHT,
+            scale_percent: 100,
+        }
+    }
 }
 
 pub(super) fn run() -> anyhow::Result<()> {
     let Arguments {
-        command: Command::Benchmark { update },
+        command: Command::Benchmark {
+            update,
+            configuration,
+        },
     } = Arguments::parse();
     anyhow::ensure!(
-        !cfg!(debug_assertions),
+        !cfg!(debug_assertions) || configuration.verify_only,
         "GUI benchmarking requires --release"
     );
     anyhow::ensure!(
         std::env::var_os("SLINT_DEBUG_PERFORMANCE").is_none(),
         "unset SLINT_DEBUG_PERFORMANCE to preserve partial rendering"
     );
-    let compatibility = Compatibility::current();
-    let root = report::directory();
-    let baseline = report::baseline(&root, &compatibility, update)?;
+    anyhow::ensure!(
+        u64::from(configuration.width) * u64::from(configuration.height) <= 64_000_000,
+        "GUI benchmark framebuffer exceeds 64 million pixels"
+    );
+    let compatibility = Compatibility::current(&configuration);
+    let root = report::directory(&configuration);
+    let baseline = if configuration.verify_only {
+        None
+    } else {
+        report::baseline(&root, &compatibility, update)?
+    };
     std::fs::create_dir_all(root.join("current"))?;
-    crate::i18n::initialize(crate::i18n::Language::English)?;
-    let mut renderer = Renderer::new()?;
-    let window = AppWindow::new()?;
-    crate::i18n::select_window_language(crate::i18n::Language::English)?;
-    crate::bind_art(&window);
-    backgrounds::install(&window);
-    render::sound_icons(&window);
-    fixture::playback(&window, false);
-    window.global::<Session>().set_drawer_pinned(true);
-    page(&window, PageKind::Soundboards);
-    Renderer::show(&window)?;
+    let (window, mut renderer) = create_window(&configuration)?;
+    if configuration.tours {
+        return tours::run(
+            &window,
+            &mut renderer,
+            &root,
+            compatibility,
+            baseline.as_ref(),
+            update,
+            configuration.verify_only,
+        );
+    }
     let started = Instant::now();
     let counters = backgrounds::metrics::snapshot();
     let mut samples = Vec::new();
@@ -96,9 +142,26 @@ pub(super) fn run() -> anyhow::Result<()> {
     let elapsed_ms = u64::try_from(started.elapsed().as_millis())?;
     let artwork = backgrounds::metrics::snapshot().since(counters);
     let rss_peak_kib = report::rss_peak_kib();
-    fixture::playback(&window, false);
+    capture(&window, &mut renderer, &root)?;
+    let report = Report {
+        compatibility,
+        revision: report::revision()?,
+        elapsed_ms,
+        rss_peak_kib,
+        artwork,
+        samples,
+    };
+    report::save(&root, &report, baseline.as_ref(), update)
+}
+
+fn capture(
+    window: &AppWindow,
+    renderer: &mut Renderer,
+    root: &std::path::Path,
+) -> anyhow::Result<()> {
+    fixture::playback(window, false);
     window.global::<Clock>().set_seconds(0.75);
-    page(&window, PageKind::Soundboards);
+    page(window, PageKind::Soundboards);
     for (name, expanded) in [("expanded", true), ("collapsed", false)] {
         window.global::<Session>().set_drawer_pinned(expanded);
         renderer.settle()?;
@@ -110,22 +173,29 @@ pub(super) fn run() -> anyhow::Result<()> {
     renderer.settle()?;
     renderer.screenshot(&root.join("current/settings.png"))?;
     window.invoke_close_dialog();
-    page(&window, PageKind::Playlist);
+    page(window, PageKind::Playlist);
     renderer.settle()?;
     renderer.screenshot(&root.join("current/playlist.png"))?;
     anyhow::ensure!(
         window.global::<LibraryView>().get_tracks().row_count() == 13,
         "playlist fixture changed"
     );
-    let report = Report {
-        compatibility,
-        revision: report::revision()?,
-        elapsed_ms,
-        rss_peak_kib,
-        artwork,
-        samples,
-    };
-    report::save(&root, &report, baseline.as_ref(), update)
+    Ok(())
+}
+
+fn create_window(configuration: &Configuration) -> anyhow::Result<(AppWindow, Renderer)> {
+    crate::i18n::initialize(crate::i18n::Language::English)?;
+    let renderer = Renderer::new(configuration)?;
+    let window = AppWindow::new()?;
+    crate::i18n::select_window_language(crate::i18n::Language::English)?;
+    crate::bind_art(&window);
+    backgrounds::install(&window);
+    render::sound_icons(&window);
+    fixture::playback(&window, false);
+    window.global::<Session>().set_drawer_pinned(true);
+    page(&window, PageKind::Soundboards);
+    renderer.show(&window)?;
+    Ok((window, renderer))
 }
 
 fn animate(
