@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 use nutype::nutype;
 
 use crate::{
-    library::{CollectionEntryId, CollectionId, SoundSettings, Volume},
+    library::{CollectionEntryId, CollectionId, SoundSettings, Volume, song_loop::LoopRegion},
     playback::{
         AudioFilePath, OutputTarget,
         music_layers::{MusicLayerState, MusicLayers},
@@ -107,6 +107,28 @@ pub struct MusicState {
     /// The decoded length when known, which can differ slightly from the library's.
     pub duration: Option<Duration>,
     pub paused: bool,
+    /// The region the track started with, which later edits don't change.
+    pub loop_region: Option<LoopRegion>,
+}
+
+impl MusicState {
+    /// Advances the sample while playing, wrapping at the loop end while `looping` and stopping
+    /// there otherwise.
+    #[must_use]
+    pub fn position_at(&self, now: SystemTime, looping: bool) -> Duration {
+        let unwrapped = self.position.at(now, !self.paused);
+        let Some(region) = self.loop_region else {
+            return unwrapped;
+        };
+        if looping {
+            region.position_after(
+                self.position.position,
+                unwrapped.saturating_sub(self.position.position),
+            )
+        } else {
+            unwrapped.min(region.loop_end())
+        }
+    }
 }
 
 /// A playback position and the wall-clock time it was read. While playback runs, the position
@@ -158,6 +180,53 @@ mod tests {
             sample.at(sampled_at - Duration::from_secs(1), true),
             Duration::from_secs(3)
         );
+    }
+
+    #[test]
+    fn positions_wrap_inside_a_loop_only_while_it_loops() {
+        use std::num::NonZeroU32;
+
+        use crate::library::{
+            AudioFileId, CollectionEntryId, CollectionId,
+            song_loop::{LoopMarkers, LoopRegion, SourceFrames, SourceTiming},
+        };
+
+        let sampled_at = SystemTime::UNIX_EPOCH + Duration::from_secs(100);
+        let region = LoopRegion::try_new(
+            SourceTiming {
+                sample_rate: NonZeroU32::new(1_000).unwrap(),
+                frame_count: SourceFrames(10_000),
+            },
+            LoopMarkers {
+                playback_start: SourceFrames::ZERO,
+                loop_start: SourceFrames(2_000),
+                loop_end: SourceFrames(6_000),
+                crossfade: SourceFrames::ZERO,
+            },
+        )
+        .unwrap();
+        let id = toasty::stmt::Uuid::from_u128(1);
+        let music = MusicState {
+            collection_id: CollectionId::from_uuid(id),
+            entry: QueueEntry {
+                entry_id: CollectionEntryId::from_uuid(id),
+                audio_file_id: AudioFileId::from_uuid(id),
+                path: AudioFilePath::try_new(std::env::temp_dir().join("boss.ogg")).unwrap(),
+                title: "Boss".to_owned(),
+                duration: None,
+            },
+            position: PositionSample {
+                position: Duration::from_secs(5),
+                sampled_at,
+            },
+            duration: Some(Duration::from_secs(10)),
+            paused: false,
+            loop_region: Some(region),
+        };
+        let later = sampled_at + Duration::from_secs(3);
+
+        assert_eq!(music.position_at(later, true), Duration::from_secs(4));
+        assert_eq!(music.position_at(later, false), Duration::from_secs(6));
     }
 
     #[test]

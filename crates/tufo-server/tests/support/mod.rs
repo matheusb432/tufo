@@ -32,7 +32,7 @@ impl TestServer {
         let library = Arc::new(Library::open(database, DiskLibraryFiles).await?);
         let discord = SongbirdDiscordClient::not_configured();
         let state = AppState::new(
-            EnginePlayer::start(discord.clone()),
+            EnginePlayer::start(discord.clone(), library.saved_song_loops()),
             discord,
             library,
             directory.path().join("discord.toml"),

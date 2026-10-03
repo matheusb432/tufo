@@ -27,6 +27,7 @@ pub(super) fn find_playlist_song(
 pub(super) fn queue_entry(entry: &EntryView) -> QueueEntry {
     QueueEntry {
         entry_id: entry.id,
+        audio_file_id: entry.audio_file_id,
         path: entry.path.clone(),
         title: entry.title.as_str().to_owned(),
         duration: Some(entry.duration),

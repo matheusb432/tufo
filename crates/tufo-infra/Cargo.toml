@@ -24,6 +24,7 @@ percent-encoding = { workspace = true }
 kira = { workspace = true }
 rtrb = { workspace = true }
 rubato = { workspace = true }
+sha2 = { workspace = true }
 rusqlite = { workspace = true }
 rusty-leveldb = { workspace = true }
 serde = { workspace = true }

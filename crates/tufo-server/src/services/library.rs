@@ -5,8 +5,9 @@ use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::library::{
     add_files_to_collection, add_songs_to_playlist, create_collection, delete_collection,
-    delete_collection_entry, delete_library_folder, delete_song, import_kenku_library,
-    import_paths, sync_library, update_collection, update_collection_entry,
+    delete_collection_entry, delete_library_folder, delete_song, delete_song_loop,
+    export_song_loops, get_song_waveform, import_kenku_library, import_paths, import_song_loops,
+    sync_library, update_collection, update_collection_entry, update_song_loop,
 };
 use tufo_infra::kenku::DiskKenkuReader;
 use tufo_wire::{
@@ -207,6 +208,64 @@ impl LibraryService for LibraryGrpcService {
         Ok(Response::new(pb::ImportKenkuLibraryResponse {
             import_id: id.to_string(),
         }))
+    }
+
+    async fn get_song_waveform(
+        &self,
+        request: Request<pb::GetSongWaveformRequest>,
+    ) -> Result<Response<pb::GetSongWaveformResponse>, Status> {
+        let id = proto::song_loop::get_song_waveform_request(request.get_ref())?;
+        let waveform = get_song_waveform::execute(id, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(proto::song_loop::get_song_waveform_response(
+            waveform.as_ref().clone(),
+        )))
+    }
+
+    async fn update_song_loop(
+        &self,
+        request: Request<pb::UpdateSongLoopRequest>,
+    ) -> Result<Response<pb::UpdateSongLoopResponse>, Status> {
+        let update = proto::song_loop::update_song_loop_request(request.into_inner())?;
+        update_song_loop::execute(update, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::UpdateSongLoopResponse {}))
+    }
+
+    async fn delete_song_loop(
+        &self,
+        request: Request<pb::DeleteSongLoopRequest>,
+    ) -> Result<Response<pb::DeleteSongLoopResponse>, Status> {
+        let id = proto::song_loop::delete_song_loop_request(request.get_ref())?;
+        delete_song_loop::execute(id, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::DeleteSongLoopResponse {}))
+    }
+
+    async fn export_song_loops(
+        &self,
+        _request: Request<pb::ExportSongLoopsRequest>,
+    ) -> Result<Response<pb::ExportSongLoopsResponse>, Status> {
+        let document = export_song_loops::execute(&self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::ExportSongLoopsResponse { document }))
+    }
+
+    async fn import_song_loops(
+        &self,
+        request: Request<pb::ImportSongLoopsRequest>,
+    ) -> Result<Response<pb::ImportSongLoopsResponse>, Status> {
+        let request = proto::song_loop::import_song_loops_request(request.into_inner());
+        let results = import_song_loops::execute(request, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(proto::song_loop::import_song_loops_response(
+            &results,
+        )))
     }
 }
 

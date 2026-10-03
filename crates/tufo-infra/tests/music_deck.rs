@@ -197,7 +197,7 @@ fn a_track_can_start_partway_through_its_file() -> anyhow::Result<()> {
         &ramp(TRACK_FRAMES),
         DecodeOptions {
             start_position: Duration::from_millis(100),
-            looping: false,
+            ..DecodeOptions::default()
         },
     )?;
     fixture
@@ -221,8 +221,8 @@ fn a_looping_track_wraps_from_its_last_frame_to_its_first() -> anyhow::Result<()
         FIRST,
         &samples,
         DecodeOptions {
-            start_position: Duration::ZERO,
             looping: true,
+            ..DecodeOptions::default()
         },
     )?;
     fixture

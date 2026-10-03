@@ -4,6 +4,7 @@ package tufo.v1;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+import "tufo/v1/library.proto";
 
 // Plays a music queue with up to two extra songs and any number of sound effects on one output.
 service PlayerService {
@@ -61,6 +62,10 @@ service PlayerService {
   rpc StandBy(StandByRequest) returns (StandByResponse);
   // Playback health totals since the server started.
   rpc GetPlayerDiagnostics(GetPlayerDiagnosticsRequest) returns (GetPlayerDiagnosticsResponse);
+  // Plays a draft loop on the local device while the stream stays open, from a frame or
+  // repeating both sides of its seam. Music playing on the local device pauses meanwhile and
+  // resumes afterwards. A newer preview ends this one.
+  rpc PreviewSongLoop(PreviewSongLoopRequest) returns (stream PreviewSongLoopResponse);
 }
 
 message WatchPlayerRequest {}
@@ -107,6 +112,10 @@ message MusicState {
   bool paused = 7;
   // The track's absolute path.
   string path = 8;
+  // A canonical UUID.
+  string audio_file_id = 9;
+  // The loop the track started with; the position wraps from its loop end to its loop start.
+  optional SongLoop loop = 10;
 }
 
 message ActiveSound {
@@ -314,4 +323,32 @@ message VoicePacing {
   google.protobuf.Duration lateness_p99 = 5;
   google.protobuf.Duration lateness_p999 = 6;
   google.protobuf.Duration lateness_max = 7;
+}
+
+message PreviewSongLoopRequest {
+  string audio_file_id = 1;
+  string source_fingerprint = 2;
+  SongLoop draft = 3;
+  oneof mode {
+    PreviewFromFrame from_frame = 4;
+    PreviewSeam seam = 5;
+  }
+}
+
+// Plays the draft as the song would, wrapping at its loop end.
+message PreviewFromFrame {
+  uint64 start_frame = 1;
+}
+
+// Repeats the audio before the loop end, the seam, and the audio after the loop start.
+message PreviewSeam {
+  // Each side of the seam, at most 10 s.
+  google.protobuf.Duration side = 1;
+}
+
+// Sent once, when the preview starts.
+message PreviewSongLoopResponse {
+  google.protobuf.Timestamp started_at = 1;
+  // How long one seam repetition lasts, including the silence after it.
+  optional google.protobuf.Duration seam_cycle = 2;
 }

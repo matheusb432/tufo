@@ -23,6 +23,7 @@ use std::{
 use kira::Frame;
 use rtrb::{Consumer, RingBuffer};
 pub use track_file::TrackFile;
+use tufo_models::library::song_loop::{LoopRegion, SourceFrames, nearest_frames};
 
 const BUFFER_DURATION: Duration = Duration::from_secs(30);
 const PREFILL_TIMEOUT: Duration = Duration::from_secs(2);
@@ -85,13 +86,13 @@ impl AudioFile {
     }
 }
 
-/// Where decoding starts and whether it wraps around at the end.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DecodeOptions {
     pub start_position: Duration,
-    /// Restart from the beginning at the end of the file, until turned off through
-    /// [`TrackHandle::set_looping`].
+    /// Wraps from the loop end to the loop start, the file's own bounds without a region, until
+    /// turned off through [`TrackHandle::set_looping`].
     pub looping: bool,
+    pub loop_region: Option<LoopRegion>,
 }
 
 /// A track whose decoder is running, split into the audio thread's reader and the control
@@ -111,13 +112,46 @@ impl BufferedTrack {
         options: DecodeOptions,
     ) -> Result<Self, OpenTrackError> {
         let duration = file.duration();
-        let declared_frames = duration
-            .map(|duration| duration.saturating_sub(options.start_position))
-            .map(|remaining| frames_in(remaining, output_sample_rate));
+        let source_sample_rate = file.source_sample_rate();
+        let loop_region = options.loop_region.filter(|region| {
+            let saved_at_source_rate = region.timing().sample_rate.get() == source_sample_rate;
+            if !saved_at_source_rate {
+                tracing::warn!("ignoring a loop region saved for another sample rate");
+            }
+            saved_at_source_rate
+        });
+        let requested_start =
+            SourceFrames(nearest_frames(options.start_position, source_sample_rate));
+        let start = match loop_region {
+            Some(region) if requested_start >= region.markers().loop_end => {
+                region.markers().loop_start
+            }
+            _ => requested_start,
+        };
+        let pass_ends = match loop_region {
+            Some(region) => PassEnds::Region(RegionPassEnds {
+                region,
+                start,
+                output_sample_rate,
+            }),
+            None => PassEnds::WholeFile {
+                first_pass: duration
+                    .map(|duration| duration.saturating_sub(options.start_position))
+                    .map(|remaining| frame_count(frames_in(remaining, output_sample_rate))),
+                file: duration.and_then(|duration| {
+                    NonZeroU64::new(frame_count(frames_in(duration, output_sample_rate)))
+                }),
+            },
+        };
         let track_file = file.file().clone();
         let decoder = file
             .into_probed()
-            .into_decoder(track_file, output_sample_rate, options.start_position)
+            .into_decoder(
+                track_file,
+                output_sample_rate,
+                start,
+                loop_region.map(|region| region.markers()),
+            )
             .map_err(OpenTrackError::Unsupported)?;
         let (producer, consumer) = RingBuffer::new(frames_in(BUFFER_DURATION, output_sample_rate));
         let shared = Arc::new(TrackShared {
@@ -136,7 +170,7 @@ impl BufferedTrack {
             consumer,
             shared: Arc::clone(&shared),
             frames_played: 0,
-            declared_frames: declared_frames.map(frame_count),
+            declared_frames: pass_ends.first(),
             underrun_frames_total: None,
         };
         reader.wait_for_prefill(frames_in(BUFFER_DURATION, output_sample_rate));
@@ -146,10 +180,7 @@ impl BufferedTrack {
                 shared,
                 sample_rate: output_sample_rate,
                 decoder_thread: decoder_thread.thread().clone(),
-                first_pass_frames: declared_frames.map(frame_count),
-                loop_frames: duration.and_then(|duration| {
-                    NonZeroU64::new(frame_count(frames_in(duration, output_sample_rate)))
-                }),
+                pass_ends,
             },
         })
     }
@@ -160,7 +191,7 @@ pub struct TrackReader {
     consumer: Consumer<Frame>,
     shared: Arc<TrackShared>,
     frames_played: u64,
-    /// The frames left from the start position, as the container declares its length.
+    /// The frames left in the first pass, as the container or loop region declares its length.
     declared_frames: Option<u64>,
     underrun_frames_total: Option<Arc<AtomicU64>>,
 }
@@ -277,8 +308,7 @@ pub struct TrackHandle {
     shared: Arc<TrackShared>,
     sample_rate: u32,
     decoder_thread: thread::Thread,
-    first_pass_frames: Option<u64>,
-    loop_frames: Option<NonZeroU64>,
+    pass_ends: PassEnds,
 }
 
 impl TrackHandle {
@@ -297,28 +327,99 @@ impl TrackHandle {
         self.shared.underrun_frames.load(Ordering::Relaxed)
     }
 
-    /// Changes whether the decoder wraps around. Disabling ends the current pass at the
-    /// container's declared duration, discarding prefetched repeats.
+    /// Disabling ends the current pass where its length is known, discarding prefetched repeats.
     pub fn set_looping(&self, looping: bool) {
         if looping {
             self.shared
                 .playback_frames_end
                 .store(u64::MAX, Ordering::Release);
         } else if self.shared.looping.load(Ordering::Relaxed)
-            && let (Some(first_pass), Some(loop_frames)) =
-                (self.first_pass_frames, self.loop_frames)
+            && let Some(end) = self
+                .pass_ends
+                .at_or_after(self.shared.frames_played.load(Ordering::Relaxed))
         {
-            let played = self.shared.frames_played.load(Ordering::Relaxed);
-            let passes = played
-                .saturating_sub(first_pass)
-                .div_ceil(loop_frames.get());
-            let end = first_pass.saturating_add(passes.saturating_mul(loop_frames.get()));
             self.shared
                 .playback_frames_end
                 .store(end, Ordering::Release);
         }
         self.shared.looping.store(looping, Ordering::Relaxed);
         self.decoder_thread.unpark();
+    }
+}
+
+/// Output frames from the start position to the end of each pass of a looping track.
+#[derive(Debug, Clone, Copy)]
+enum PassEnds {
+    /// Unknown when the container doesn't declare its length.
+    WholeFile {
+        first_pass: Option<u64>,
+        file: Option<NonZeroU64>,
+    },
+    Region(RegionPassEnds),
+}
+
+impl PassEnds {
+    fn first(&self) -> Option<u64> {
+        match self {
+            Self::WholeFile { first_pass, .. } => *first_pass,
+            Self::Region(region) => Some(region.pass_end(0)),
+        }
+    }
+
+    fn at_or_after(&self, played_frames: u64) -> Option<u64> {
+        match *self {
+            Self::WholeFile {
+                first_pass: Some(first_pass),
+                file: Some(file),
+            } => {
+                let passes = played_frames
+                    .saturating_sub(first_pass)
+                    .div_ceil(file.get());
+                Some(first_pass.saturating_add(passes.saturating_mul(file.get())))
+            }
+            Self::WholeFile { .. } => None,
+            Self::Region(region) => Some(region.at_or_after(played_frames)),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RegionPassEnds {
+    region: LoopRegion,
+    start: SourceFrames,
+    output_sample_rate: u32,
+}
+
+impl RegionPassEnds {
+    /// Matches the resampler, which emits the floor of the frames its input covers.
+    fn output_frames(&self, frames: SourceFrames) -> u64 {
+        let output = u128::from(frames.0) * u128::from(self.output_sample_rate)
+            / u128::from(self.region.timing().sample_rate.get());
+        u64::try_from(output).unwrap_or(u64::MAX)
+    }
+
+    fn source_frames(&self, output_frames: u64) -> SourceFrames {
+        let source = u128::from(output_frames) * u128::from(self.region.timing().sample_rate.get())
+            / u128::from(self.output_sample_rate);
+        SourceFrames(u64::try_from(source).unwrap_or(u64::MAX))
+    }
+
+    fn pass_end(&self, pass: u64) -> u64 {
+        self.output_frames(self.region.frames_to_pass_end(self.start, pass))
+    }
+
+    fn at_or_after(&self, played_frames: u64) -> u64 {
+        let past_first_pass = self
+            .source_frames(played_frames)
+            .saturating_sub(self.region.frames_to_pass_end(self.start, 0));
+        let pass = past_first_pass.0.div_ceil(self.region.loop_length().0);
+        let end = self.pass_end(pass);
+        // Rounding between the rates can leave the reader a frame into the next pass.
+        if end >= played_frames {
+            end
+        } else {
+            self.pass_end(pass + 1)
+        }
     }
 }
 

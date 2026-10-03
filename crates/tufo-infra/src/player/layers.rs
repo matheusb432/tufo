@@ -8,7 +8,7 @@ use tufo_application::playback::{
     player::PlayAudioError,
 };
 use tufo_models::{
-    library::{CollectionEntryId, Volume},
+    library::{CollectionEntryId, Volume, song_loop::LoopRegion},
     playback::{
         music_layers::{MUSIC_LAYERS_EXTRA_MAX, MusicLayerState},
         player_state::{MusicState, PositionSample},
@@ -19,7 +19,8 @@ use tufo_wire::player::UpdateMusicLayer;
 
 use super::{
     ANTI_CLICK_FADE, Engine, EnginePlayer, MusicTrack, PAUSE_FADE, RESTORE_FADE_IN, STOP_FADE,
-    TrackSource, open_track, outputs::AudioOutputs, probe_track, shuffle_seed,
+    TrackSource, TrackStart, open_track, outputs::AudioOutputs, probe_track, shuffle_seed,
+    start_position,
 };
 use crate::audio::{
     buffered_track::DecodeOptions,
@@ -50,6 +51,7 @@ impl MusicLayer {
                 },
                 duration: self.track.duration,
                 paused: self.paused,
+                loop_region: self.track.loop_region,
             },
             volume: self.volume,
             looping: self.looping,
@@ -59,7 +61,9 @@ impl MusicLayer {
     fn position(&self) -> Duration {
         let position = self.track.position();
         match self.track.duration {
-            Some(duration) if self.looping && !duration.is_zero() => {
+            Some(duration)
+                if self.looping && self.track.loop_region.is_none() && !duration.is_zero() =>
+            {
                 Duration::from_secs_f64(position.as_secs_f64() % duration.as_secs_f64())
             }
             _ => position,
@@ -92,14 +96,17 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             .ok_or_else(|| PlayAudioError::OutputUnavailable(anyhow::anyhow!("no output is open")))?
             .mixer
             .sample_rate();
+        let loop_region = self.song_loops.loop_region(cue.entry.audio_file_id);
+        let becomes_main_track = engine.music.is_none();
+        let looping = becomes_main_track && engine.main_track_loops(loop_region);
+        let options = DecodeOptions {
+            start_position: start_position(loop_region),
+            looping,
+            loop_region,
+        };
         // Keep admission and installation together; only decoder workers touch the file.
-        let opened = open_track(
-            TrackSource::Open(file),
-            sample_rate,
-            DecodeOptions::default(),
-        )
-        .await?;
-        if engine.music.is_none() {
+        let opened = open_track(TrackSource::Open(file), sample_rate, options).await?;
+        if becomes_main_track {
             let queue = MusicQueue::new(
                 QueueStart {
                     collection_id: cue.collection_id,
@@ -120,13 +127,17 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 &mut engine,
                 queue,
                 opened,
-                Duration::ZERO,
-                ANTI_CLICK_FADE,
-                Duration::ZERO,
-                paused,
+                TrackStart {
+                    start_offset: start_position(loop_region),
+                    fade_in: ANTI_CLICK_FADE,
+                    fade_out: Duration::ZERO,
+                    paused,
+                    loop_region,
+                    looping,
+                },
             )?;
         } else {
-            engine.install_layer(cue, opened)?;
+            engine.install_layer(cue, opened, loop_region)?;
         }
         self.publish(&engine);
         Ok(())
@@ -154,12 +165,14 @@ async fn restore_layer(
     let paused = layer.paused;
     let volume = layer.volume;
     let duration = layer.track.duration;
+    let loop_region = layer.track.loop_region;
     let opened = open_track(
         TrackSource::Open(layer.track.file.clone()),
         sample_rate,
         DecodeOptions {
             start_position: position,
             looping: layer.looping,
+            loop_region,
         },
     )
     .await?;
@@ -188,6 +201,7 @@ async fn restore_layer(
             file: opened.file,
             start_offset: position,
             duration: opened.duration.or(duration),
+            loop_region,
             handle: Some(opened.track.handle),
         };
     }
@@ -251,14 +265,16 @@ impl Engine {
         &mut self,
         cue: MusicLayerCue,
         opened: super::OpenedTrack,
+        loop_region: Option<LoopRegion>,
     ) -> Result<(), AddMusicLayerError> {
         let paused = self.music.as_ref().is_some_and(|music| music.paused);
         let token = self.next_token();
         let track = MusicTrack {
             token,
             file: opened.file,
-            start_offset: Duration::ZERO,
+            start_offset: start_position(loop_region),
             duration: opened.duration.or(cue.entry.duration),
+            loop_region,
             handle: Some(opened.track.handle),
         };
         let slot = self
@@ -376,6 +392,10 @@ impl Engine {
             changed = true;
         }
         changed
+    }
+
+    pub(super) fn any_layer_playing(&self) -> bool {
+        self.music_layers.iter().any(|(_, layer)| !layer.paused)
     }
 
     pub(super) fn layer_underrun_frames(&self) -> u64 {

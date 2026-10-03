@@ -6,6 +6,7 @@ pub mod library;
 pub mod player;
 pub mod proto;
 pub mod server;
+pub mod song_loops;
 pub mod voice_channels;
 
 /// Generated Protobuf and Tonic bindings.

@@ -48,7 +48,6 @@ pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
         .or_else(default_discord_credentials)
         .context("resolving Tufo's config directory for the Discord credentials")?;
     let discord = start_discord(&discord_credentials_path)?;
-    let player = EnginePlayer::start(discord.clone());
     let database_path = database::database_path()?;
     let database = database::open_database(&database_path)
         .await
@@ -58,6 +57,7 @@ pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
             .await
             .context("loading the library")?,
     );
+    let player = EnginePlayer::start(discord.clone(), library.saved_song_loops());
     seed_default_effects(&database_path, &library).await;
     if let Err(error) = update_player_settings::restore(player.as_ref(), library.database()).await {
         tracing::warn!(%error, "cannot restore the saved player settings");

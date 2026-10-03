@@ -15,7 +15,10 @@ use tufo_models::{
     playback::AudioFilePath,
 };
 
-use super::{InvalidMessage, duration_message, duration_value, invalid, parse_uuid, required};
+use super::{
+    InvalidMessage, duration_message, duration_value, invalid, parse_uuid, required,
+    song_loop::{saved_song_loop, saved_song_loop_message},
+};
 use crate::{
     library::{
         AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
@@ -604,6 +607,7 @@ fn entry_message(entry: &EntryView) -> pb::CollectionEntry {
         missing: entry.missing,
         sound: Some(sound_settings_message(entry.sound)),
         icon: sound_icon_message(entry.icon).into(),
+        saved_loop: entry.saved_loop.map(saved_song_loop_message),
     }
 }
 
@@ -669,6 +673,7 @@ fn entry_view(message: pb::CollectionEntry) -> Result<EntryView, InvalidMessage>
             .and_then(sound_settings)
             .map_err(|_| invalid("sound"))?,
         icon: sound_icon(message.icon).map_err(|_| invalid("icon"))?,
+        saved_loop: message.saved_loop.map(saved_song_loop).transpose()?,
     })
 }
 
@@ -686,6 +691,7 @@ fn song_message(song: &SongView) -> pb::Song {
         added_at: Some(timestamp_message(song.added_at)),
         missing: song.missing,
         source: Some(source),
+        saved_loop: song.saved_loop.map(saved_song_loop_message),
     }
 }
 
@@ -715,6 +721,7 @@ fn song_view(message: pb::Song) -> Result<SongView, InvalidMessage> {
             .map_err(|_| invalid("added_at"))?,
         missing: message.missing,
         source,
+        saved_loop: message.saved_loop.map(saved_song_loop).transpose()?,
     })
 }
 
@@ -1048,8 +1055,10 @@ mod tests {
     use std::time::Duration;
 
     use tonic::Code;
+    use tufo_models::library::song_loop::{LoopMarkers, LoopRegion, SourceFrames, SourceTiming};
 
     use super::*;
+    use crate::song_loops::SavedSongLoop;
 
     fn absolute(name: &str) -> PathBuf {
         std::env::temp_dir().join(name)
@@ -1091,6 +1100,7 @@ mod tests {
                         fade_out: FadeDuration::default(),
                     },
                     icon: SoundIcon::CloudLightning,
+                    saved_loop: None,
                 }],
             }],
             songs: vec![
@@ -1103,6 +1113,22 @@ mod tests {
                     added_at: Timestamp::from_second(1_790_000_100).unwrap(),
                     missing: false,
                     source: SongSource::Folder(LibraryFolderId::from_uuid(id)),
+                    saved_loop: Some(SavedSongLoop {
+                        region: LoopRegion::try_new(
+                            SourceTiming {
+                                sample_rate: std::num::NonZeroU32::new(48_000).unwrap(),
+                                frame_count: SourceFrames(8_880_000),
+                            },
+                            LoopMarkers {
+                                playback_start: SourceFrames(19_200),
+                                loop_start: SourceFrames(960_000),
+                                loop_end: SourceFrames(5_568_000),
+                                crossfade: SourceFrames(4_800),
+                            },
+                        )
+                        .unwrap(),
+                        needs_review: true,
+                    }),
                 },
                 SongView {
                     audio_file_id: AudioFileId::from_uuid(uuid::Uuid::from_u128(8)),
@@ -1113,6 +1139,7 @@ mod tests {
                     added_at: Timestamp::from_second(1_790_000_200).unwrap(),
                     missing: true,
                     source: SongSource::File,
+                    saved_loop: None,
                 },
             ],
             library_folders: vec![LibraryFolderView {

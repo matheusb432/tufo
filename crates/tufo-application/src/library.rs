@@ -11,18 +11,26 @@ pub mod delete_collection;
 pub mod delete_collection_entry;
 pub mod delete_library_folder;
 pub mod delete_song;
+pub mod delete_song_loop;
+pub mod export_song_loops;
 pub mod folder_watcher;
+pub mod get_song_waveform;
 pub mod import_kenku_library;
 pub mod import_paths;
+pub mod import_song_loops;
 pub mod library_files;
 mod manual_files;
 pub mod reconcile;
+pub mod saved_song_loops;
 pub mod seed_default_effects;
 mod snapshot;
+pub mod song_analysis;
+pub mod song_loop_document;
 mod store;
 pub mod sync_library;
 pub mod update_collection;
 pub mod update_collection_entry;
+pub mod update_song_loop;
 
 use std::sync::Arc;
 
@@ -63,6 +71,7 @@ pub struct Library<F> {
     write_gate: Mutex<()>,
     snapshot: watch::Sender<Arc<LibrarySnapshot>>,
     kenku_imports: import_kenku_library::journal::KenkuImports,
+    song_analyses: song_analysis::SongAnalyses,
 }
 
 impl<F: LibraryFiles> Library<F> {
@@ -80,6 +89,7 @@ impl<F: LibraryFiles> Library<F> {
             write_gate: Mutex::new(()),
             snapshot: watch::Sender::new(Arc::new(first)),
             kenku_imports,
+            song_analyses: song_analysis::SongAnalyses::default(),
         })
     }
 

@@ -45,8 +45,8 @@ fn first_mismatch(pass: &[Frame], expected: &[Frame]) -> Option<usize> {
 
 fn decode(path: &std::path::Path, looping: bool) -> anyhow::Result<TrackReader> {
     let options = DecodeOptions {
-        start_position: Duration::ZERO,
         looping,
+        ..DecodeOptions::default()
     };
     let BufferedTrack { reader, handle: _ } =
         BufferedTrack::start(AudioFile::open(path)?, EFFECT_SAMPLE_RATE, options)?;

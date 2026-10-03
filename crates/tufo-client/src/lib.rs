@@ -16,7 +16,7 @@ use tufo_models::{
     playback::{OutputTarget, diagnostics::PlayerDiagnostics, player_state::PlayerState},
 };
 /// The operation and status contracts callers exchange with the server.
-pub use tufo_wire::{error, library, player, server};
+pub use tufo_wire::{error, library, player, server, song_loops};
 use tufo_wire::{
     library::{
         AddFilesToCollection, AddSongsToPlaylist, CreateCollection, ImportKenkuLibrary,
@@ -30,6 +30,10 @@ use tufo_wire::{
     },
     player::{UpdateMusicLayer, UpdatePlayerSettings},
     proto::{self, InvalidMessage},
+    song_loops::{
+        ImportSongLoops, PreviewSongLoop, PreviewStarted, SongLoopImportResult, SongWaveform,
+        UpdateSongLoop,
+    },
 };
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(2);
@@ -43,6 +47,8 @@ const SELECT_OUTPUT_TIMEOUT: Duration = Duration::from_secs(20);
 /// Covers scanning and fingerprinting a large dropped folder; the server reads about 50 files a
 /// second.
 const IMPORT_TIMEOUT: Duration = Duration::from_mins(10);
+/// Covers decoding a long song in full.
+const SONG_ANALYSIS_TIMEOUT: Duration = Duration::from_mins(2);
 /// A library snapshot carries every entry, so it may be large.
 const LIBRARY_SNAPSHOT_SIZE_MAX: usize = 64 * 1024 * 1024;
 /// Bounds how many pages `list_voice_channels` follows.
@@ -56,6 +62,8 @@ pub enum ClientError {
     InvalidResponse(#[from] InvalidMessage),
     #[error("the server returned more than {VOICE_CHANNEL_PAGES_MAX} pages of voice channels")]
     TooManyPages,
+    #[error("the server ended the preview before it started")]
+    PreviewNotStarted,
 }
 
 #[derive(Debug, Clone)]
@@ -285,6 +293,53 @@ impl TufoClient {
         let response = self.library.clone().import_kenku_library(request).await?;
         Ok(proto::library::kenku_import_id(
             &response.into_inner().import_id,
+        )?)
+    }
+
+    pub async fn get_song_waveform(&self, id: AudioFileId) -> Result<SongWaveform, ClientError> {
+        let request = with_timeout(
+            proto::song_loop::get_song_waveform_message(id),
+            SONG_ANALYSIS_TIMEOUT,
+        );
+        let response = self.library.clone().get_song_waveform(request).await?;
+        Ok(proto::song_loop::song_waveform(response.into_inner())?)
+    }
+
+    pub async fn update_song_loop(&self, update: &UpdateSongLoop) -> Result<(), ClientError> {
+        let request = with_timeout(
+            proto::song_loop::update_song_loop_message(update),
+            SONG_ANALYSIS_TIMEOUT,
+        );
+        self.library.clone().update_song_loop(request).await?;
+        Ok(())
+    }
+
+    pub async fn delete_song_loop(&self, id: AudioFileId) -> Result<(), ClientError> {
+        let request = with_timeout(
+            proto::song_loop::delete_song_loop_message(id),
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.library.clone().delete_song_loop(request).await?;
+        Ok(())
+    }
+
+    pub async fn export_song_loops(&self) -> Result<String, ClientError> {
+        let request = with_timeout(pb::ExportSongLoopsRequest {}, QUICK_REQUEST_TIMEOUT);
+        let response = self.library.clone().export_song_loops(request).await?;
+        Ok(response.into_inner().document)
+    }
+
+    pub async fn import_song_loops(
+        &self,
+        request: &ImportSongLoops,
+    ) -> Result<Vec<SongLoopImportResult>, ClientError> {
+        let request = with_timeout(
+            proto::song_loop::import_song_loops_message(request),
+            IMPORT_TIMEOUT,
+        );
+        let response = self.library.clone().import_song_loops(request).await?;
+        Ok(proto::song_loop::song_loop_import_results(
+            response.into_inner(),
         )?)
     }
 
@@ -530,6 +585,31 @@ impl TufoClient {
         Ok(())
     }
 
+    /// The preview plays until the returned value drops.
+    pub async fn preview_song_loop(
+        &self,
+        request: &PreviewSongLoop,
+    ) -> Result<SongLoopPreview, ClientError> {
+        let request = with_timeout(
+            proto::song_loop::preview_song_loop_message(request),
+            SONG_ANALYSIS_TIMEOUT,
+        );
+        let mut stream = self
+            .player
+            .clone()
+            .preview_song_loop(request)
+            .await?
+            .into_inner();
+        let started = stream
+            .message()
+            .await?
+            .ok_or(ClientError::PreviewNotStarted)?;
+        Ok(SongLoopPreview {
+            started: proto::song_loop::preview_started(started)?,
+            stream,
+        })
+    }
+
     pub async fn player_diagnostics(&self) -> Result<PlayerDiagnostics, ClientError> {
         let request = with_timeout(pb::GetPlayerDiagnosticsRequest {}, QUICK_REQUEST_TIMEOUT);
         let response = self.player.clone().get_player_diagnostics(request).await?;
@@ -575,6 +655,19 @@ impl TufoClient {
             .enable_discord_connection(request)
             .await?;
         Ok(())
+    }
+}
+
+/// A preview playing on the server's local device.
+pub struct SongLoopPreview {
+    pub started: PreviewStarted,
+    stream: Streaming<pb::PreviewSongLoopResponse>,
+}
+
+impl SongLoopPreview {
+    /// Resolves when the server ends the preview, as when a newer one replaces it.
+    pub async fn ended(&mut self) {
+        while let Ok(Some(_)) = self.stream.message().await {}
     }
 }
 

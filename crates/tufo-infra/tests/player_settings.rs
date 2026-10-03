@@ -2,13 +2,24 @@
 
 use std::time::Duration;
 
-use tufo_application::playback::{player::Player as _, update_player_settings};
+use tufo_application::playback::{
+    player::{Player as _, SongLoops},
+    update_player_settings,
+};
 use tufo_infra::{database::open_database, discord::SongbirdDiscordClient, player::EnginePlayer};
 use tufo_models::{
-    library::Volume,
+    library::{AudioFileId, Volume, song_loop::LoopRegion},
     playback::{player_state::CrossfadeDuration, queue::RepeatMode},
 };
 use tufo_wire::player::UpdatePlayerSettings;
+
+struct NoSongLoops;
+
+impl SongLoops for NoSongLoops {
+    fn loop_region(&self, _: AudioFileId) -> Option<LoopRegion> {
+        None
+    }
+}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn saved_settings_survive_a_restart() {
@@ -24,12 +35,12 @@ async fn saved_settings_survive_a_restart() {
         repeat: Some(RepeatMode::Track),
         crossfade: Some(CrossfadeDuration::try_new(Duration::from_millis(500)).unwrap()),
     };
-    let before = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    let before = EnginePlayer::start(SongbirdDiscordClient::not_configured(), NoSongLoops);
     update_player_settings::execute(update, before.as_ref(), database.clone())
         .await
         .unwrap();
 
-    let after = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    let after = EnginePlayer::start(SongbirdDiscordClient::not_configured(), NoSongLoops);
     update_player_settings::restore(after.as_ref(), database)
         .await
         .unwrap();
@@ -47,7 +58,7 @@ async fn existing_player_settings_default_effects_to_full_volume() -> anyhow::Re
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("tufo.sqlite3");
     let database = open_database(&path).await?;
-    let before = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    let before = EnginePlayer::start(SongbirdDiscordClient::not_configured(), NoSongLoops);
     update_player_settings::execute(
         UpdatePlayerSettings {
             volume: Some(Volume::try_new(0.25)?),
@@ -60,13 +71,15 @@ async fn existing_player_settings_default_effects_to_full_volume() -> anyhow::Re
     .await?;
     let legacy = rusqlite::Connection::open(&path)?;
     legacy.execute_batch(
-        "ALTER TABLE player_settings DROP COLUMN effects_volume;
-         DELETE FROM __toasty_migrations WHERE name = '0009_effects_volume.sql';",
+        "DROP TABLE song_loops;
+         ALTER TABLE player_settings DROP COLUMN effects_volume;
+         DELETE FROM __toasty_migrations
+         WHERE name IN ('0009_effects_volume.sql', '0010_song_loops.sql');",
     )?;
     drop(legacy);
 
     let migrated = open_database(&path).await?;
-    let after = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    let after = EnginePlayer::start(SongbirdDiscordClient::not_configured(), NoSongLoops);
     update_player_settings::restore(after.as_ref(), migrated).await?;
     let state = after.watch_player().borrow().clone();
     assert_eq!(state.effects_volume, Volume::default());

@@ -48,6 +48,20 @@ service LibraryService {
   // Sends the latest saved import immediately, then coalesced progress and its durable result.
   // Disconnecting a watcher does not cancel the import. Ends when the server shuts down.
   rpc WatchKenkuImport(WatchKenkuImportRequest) returns (stream WatchKenkuImportResponse);
+  // Decodes a song into its exact length and peak levels, for placing loop markers. Long files
+  // take a few seconds.
+  rpc GetSongWaveform(GetSongWaveformRequest) returns (GetSongWaveformResponse);
+  // Changes the loop markers present in the request. A song without a saved loop starts from
+  // its whole file. Saving clears needs_review. FAILED_PRECONDITION when the file's audio no
+  // longer matches source_fingerprint.
+  rpc UpdateSongLoop(UpdateSongLoopRequest) returns (UpdateSongLoopResponse);
+  // Forgets a song's loop. Deleting an absent loop succeeds.
+  rpc DeleteSongLoop(DeleteSongLoopRequest) returns (DeleteSongLoopResponse);
+  // Writes every saved loop into a portable JSON document.
+  rpc ExportSongLoops(ExportSongLoopsRequest) returns (ExportSongLoopsResponse);
+  // Matches each loop of a JSON document to a song by fingerprint, or by path and SHA-256, and
+  // checks its sample rate and length before saving it. A dry run saves nothing.
+  rpc ImportSongLoops(ImportSongLoopsRequest) returns (ImportSongLoopsResponse);
 }
 
 message WatchLibraryRequest {}
@@ -87,6 +101,25 @@ message Song {
     string library_folder_id = 8;
     FileSongSource file = 9;
   }
+  optional SavedSongLoop saved_loop = 10;
+}
+
+// Loop markers in frames at the file's own sample rate.
+message SongLoop {
+  uint32 sample_rate = 1;
+  // The file's whole length.
+  uint64 frame_count = 2;
+  uint64 playback_start_frame = 3;
+  uint64 loop_start_frame = 4;
+  uint64 loop_end_frame = 5;
+  // The audio before the loop start fades in over this many frames before the loop end.
+  uint64 crossfade_frames = 6;
+}
+
+message SavedSongLoop {
+  SongLoop markers = 1;
+  // The file's audio changed since saving, so the song plays without the loop until saved again.
+  bool needs_review = 2;
 }
 
 // The file was added to a playlist by its own path.
@@ -198,6 +231,7 @@ message CollectionEntry {
   SoundSettings sound = 8;
   SoundIcon icon = 9;
   optional BuiltinTitle builtin_title = 10;
+  optional SavedSongLoop saved_loop = 11;
 }
 
 // How an entry plays as a sound effect.
@@ -407,6 +441,81 @@ message WatchKenkuImportRequest {}
 message WatchKenkuImportResponse {
   // Absent until the first import.
   KenkuImportStatus status = 1;
+}
+
+message GetSongWaveformRequest {
+  string audio_file_id = 1;
+}
+
+message GetSongWaveformResponse {
+  // The BLAKE3 hex fingerprint that loop changes name as their source.
+  string fingerprint = 1;
+  uint32 sample_rate = 2;
+  uint64 frame_count = 3;
+  uint64 bucket_frames = 4;
+  // One byte per bucket: its largest absolute sample, 255 at full scale.
+  bytes peaks = 5;
+}
+
+message UpdateSongLoopRequest {
+  string audio_file_id = 1;
+  string source_fingerprint = 2;
+  optional uint64 playback_start_frame = 3;
+  optional uint64 loop_start_frame = 4;
+  optional uint64 loop_end_frame = 5;
+  optional uint64 crossfade_frames = 6;
+}
+
+message UpdateSongLoopResponse {}
+
+message DeleteSongLoopRequest {
+  string audio_file_id = 1;
+}
+
+message DeleteSongLoopResponse {}
+
+message ExportSongLoopsRequest {}
+
+message ExportSongLoopsResponse {
+  string document = 1;
+}
+
+message ImportSongLoopsRequest {
+  string document = 1;
+  bool dry_run = 2;
+  // Overwrites different saved loops instead of reporting them as conflicts.
+  bool replace_existing = 3;
+}
+
+message ImportSongLoopsResponse {
+  // In the document's order.
+  repeated SongLoopImportResult results = 1;
+}
+
+message SongLoopImportResult {
+  // The path the document names.
+  string path = 1;
+  // A canonical UUID, present when a song matched.
+  optional string audio_file_id = 2;
+  SongLoopImportOutcome outcome = 3;
+}
+
+// On a dry run, what saving would do.
+enum SongLoopImportOutcome {
+  SONG_LOOP_IMPORT_OUTCOME_UNSPECIFIED = 0;
+  SONG_LOOP_IMPORT_OUTCOME_SAVED = 1;
+  SONG_LOOP_IMPORT_OUTCOME_REPLACED = 2;
+  // The song already has these markers.
+  SONG_LOOP_IMPORT_OUTCOME_UNCHANGED = 3;
+  // The song has other markers, kept without replace_existing.
+  SONG_LOOP_IMPORT_OUTCOME_CONFLICT = 4;
+  SONG_LOOP_IMPORT_OUTCOME_NO_MATCH = 5;
+  // The song at the path holds other audio.
+  SONG_LOOP_IMPORT_OUTCOME_IDENTITY_MISMATCH = 6;
+  // The song decodes at another sample rate or length.
+  SONG_LOOP_IMPORT_OUTCOME_LENGTH_MISMATCH = 7;
+  SONG_LOOP_IMPORT_OUTCOME_INVALID_MARKERS = 8;
+  SONG_LOOP_IMPORT_OUTCOME_UNREADABLE = 9;
 }
 
 message KenkuImportStatus {

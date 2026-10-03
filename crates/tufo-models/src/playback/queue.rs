@@ -11,7 +11,7 @@
 use std::{collections::VecDeque, time::Duration};
 
 use crate::{
-    library::{CollectionEntryId, CollectionId},
+    library::{AudioFileId, CollectionEntryId, CollectionId},
     playback::AudioFilePath,
 };
 
@@ -22,6 +22,7 @@ pub const PREVIOUS_RESTART_THRESHOLD: Duration = Duration::from_secs(5);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct QueueEntry {
     pub entry_id: CollectionEntryId,
+    pub audio_file_id: AudioFileId,
     pub path: AudioFilePath,
     pub title: String,
     /// The track's length when the library knows it.
@@ -394,6 +395,7 @@ mod tests {
     fn entry(number: u128) -> QueueEntry {
         QueueEntry {
             entry_id: CollectionEntryId::from_uuid(Uuid::from_u128(number)),
+            audio_file_id: AudioFileId::from_uuid(Uuid::from_u128(number)),
             path: AudioFilePath::try_new(std::env::temp_dir().join(format!("{number}.flac")))
                 .unwrap(),
             title: format!("Track {number}"),

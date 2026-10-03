@@ -27,8 +27,8 @@ use symphonia::core::{
 const SAMPLE_RATE: u32 = 48_000;
 /// The longest packet: 120 ms.
 const PACKET_FRAMES_MAX: usize = 5_760;
-/// RFC 7845, section 4.6: the output converges within 80 ms of decoding.
-pub(super) const SEEK_PREROLL: Duration = Duration::from_millis(80);
+/// RFC 7845 asks for at least 80 ms; 400 ms matches continuous decoding, so loop seams stay exact.
+pub(super) const SEEK_PREROLL: Duration = Duration::from_millis(400);
 const SUPPORTED_CODECS: &[SupportedAudioCodec] = &[SupportedAudioCodec {
     id: CODEC_ID_OPUS,
     info: CodecInfo {
@@ -127,7 +127,9 @@ impl OpusDecoder {
 }
 
 impl AudioDecoder for OpusDecoder {
+    /// Seeks discard the pre-skip with the rest of their run-up, so a reset drops it too.
     fn reset(&mut self) {
+        self.pre_skip_remaining = 0;
         let streams = self
             .streams
             .get_mut()

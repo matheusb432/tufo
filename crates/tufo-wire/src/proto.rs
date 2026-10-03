@@ -6,6 +6,7 @@
 pub mod library;
 pub mod player;
 pub mod server;
+pub mod song_loop;
 pub mod voice_channel;
 
 use std::{

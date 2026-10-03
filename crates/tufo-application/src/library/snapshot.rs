@@ -6,11 +6,14 @@ use std::collections::HashMap;
 use toasty::Db;
 use tufo_models::library::{
     AudioFile, AudioFileId, Collection, CollectionEntry, CollectionKind, EntryOrder, EntryOrderKey,
-    LibraryFolder, compare_titles,
+    LibraryFolder, compare_titles, song_loop::SongLoop,
 };
-use tufo_wire::library::{
-    Background, CollectionSource, CollectionView, EntryView, LibraryFolderView, LibrarySnapshot,
-    SongSource, SongView,
+use tufo_wire::{
+    library::{
+        Background, CollectionSource, CollectionView, EntryView, LibraryFolderView,
+        LibrarySnapshot, SongSource, SongView,
+    },
+    song_loops::SavedSongLoop,
 };
 
 use super::{LibraryStorageError, store};
@@ -26,17 +29,42 @@ pub(super) async fn load_snapshot(
         .map(|file| (file.id, file))
         .collect::<HashMap<_, _>>();
     let library_folders = LibraryFolder::all().exec(database).await?;
+    let saved_loops = load_saved_loops(database, &audio_files).await?;
     Ok(LibrarySnapshot {
         revision: 0,
-        collections: load_collections(database, &audio_files).await?,
-        songs: songs(&audio_files, &library_folders),
+        collections: load_collections(database, &audio_files, &saved_loops).await?,
+        songs: songs(&audio_files, &library_folders, &saved_loops),
         library_folders: library_folder_views(library_folders),
     })
+}
+
+async fn load_saved_loops(
+    database: &mut Db,
+    audio_files: &HashMap<AudioFileId, AudioFile>,
+) -> Result<HashMap<AudioFileId, SavedSongLoop>, LibraryStorageError> {
+    let mut saved_loops = HashMap::new();
+    for song_loop in SongLoop::all().exec(database).await? {
+        let Some(file) = audio_files.get(&song_loop.audio_file_id) else {
+            continue;
+        };
+        let region = song_loop
+            .region()
+            .map_err(|error| LibraryStorageError(error.into()))?;
+        saved_loops.insert(
+            song_loop.audio_file_id,
+            SavedSongLoop {
+                region,
+                needs_review: song_loop.fingerprint != file.fingerprint,
+            },
+        );
+    }
+    Ok(saved_loops)
 }
 
 async fn load_collections(
     database: &mut Db,
     audio_files: &HashMap<AudioFileId, AudioFile>,
+    saved_loops: &HashMap<AudioFileId, SavedSongLoop>,
 ) -> Result<Vec<CollectionView>, LibraryStorageError> {
     let collections = Collection::all().exec(database).await?;
     let entries = CollectionEntry::all().exec(database).await?;
@@ -48,7 +76,7 @@ async fn load_collections(
         entries_by_collection
             .entry(entry.collection_id)
             .or_default()
-            .push(entry_view(&entry, file));
+            .push(entry_view(&entry, file, saved_loops.get(&file.id).copied()));
     }
     let mut views = collections
         .into_iter()
@@ -75,6 +103,7 @@ async fn load_collections(
 fn songs(
     audio_files: &HashMap<AudioFileId, AudioFile>,
     library_folders: &[LibraryFolder],
+    saved_loops: &HashMap<AudioFileId, SavedSongLoop>,
 ) -> Vec<SongView> {
     let music_folders = library_folders
         .iter()
@@ -102,6 +131,7 @@ fn songs(
                 added_at: file.created_at,
                 missing: file.missing_since.is_some(),
                 source,
+                saved_loop: saved_loops.get(&file.id).copied(),
             })
         })
         .collect::<Vec<_>>();
@@ -132,7 +162,11 @@ fn kind_rank(kind: CollectionKind) -> u8 {
     }
 }
 
-fn entry_view(entry: &CollectionEntry, file: &AudioFile) -> EntryView {
+fn entry_view(
+    entry: &CollectionEntry,
+    file: &AudioFile,
+    saved_loop: Option<SavedSongLoop>,
+) -> EntryView {
     EntryView {
         id: entry.id,
         audio_file_id: file.id,
@@ -144,6 +178,7 @@ fn entry_view(entry: &CollectionEntry, file: &AudioFile) -> EntryView {
         missing: file.missing_since.is_some(),
         sound: entry.sound_settings(),
         icon: entry.icon,
+        saved_loop,
     }
 }
 
@@ -216,6 +251,7 @@ mod tests {
             missing: false,
             sound: SoundSettings::default(),
             icon: SoundIcon::default(),
+            saved_loop: None,
         }
     }
 

@@ -5,8 +5,8 @@ use tufo_application::playback::{
     add_music_layer, add_to_queue,
     control_music::{self, MusicCommand},
     control_sounds::{self, SoundsCommand},
-    get_diagnostics, play_collection, play_entry_sound, remove_from_queue, resume_saved_loops,
-    select_output, stand_by, stop_music_layer, stop_sound, update_music_layer,
+    get_diagnostics, play_collection, play_entry_sound, preview_song_loop, remove_from_queue,
+    resume_saved_loops, select_output, stand_by, stop_music_layer, stop_sound, update_music_layer,
     update_player_settings, watch_player,
 };
 use tufo_models::playback::player_state::PlayerState;
@@ -48,6 +48,33 @@ impl PlayerGrpcService {
 #[tonic::async_trait]
 impl PlayerService for PlayerGrpcService {
     type WatchPlayerStream = ReceiverStream<Result<pb::WatchPlayerResponse, Status>>;
+    type PreviewSongLoopStream = ReceiverStream<Result<pb::PreviewSongLoopResponse, Status>>;
+
+    async fn preview_song_loop(
+        &self,
+        request: Request<pb::PreviewSongLoopRequest>,
+    ) -> Result<Response<Self::PreviewSongLoopStream>, Status> {
+        let request = proto::song_loop::preview_song_loop_request(request.into_inner())?;
+        let session =
+            preview_song_loop::execute(request, &self.state.library, self.state.player.as_ref())
+                .await
+                .into_grpc()?;
+        let (sender, receiver) = mpsc::channel(1);
+        let started = proto::song_loop::preview_song_loop_response(session.started);
+        let player = std::sync::Arc::clone(&self.state.player);
+        let mut draining = self.draining.clone();
+        tokio::spawn(async move {
+            if sender.send(Ok(started)).await.is_ok() {
+                tokio::select! {
+                    () = sender.closed() => {}
+                    _ = session.ended => {}
+                    _ = draining.wait_for(|draining| *draining) => {}
+                }
+            }
+            preview_song_loop::stop(session.id, player.as_ref()).await;
+        });
+        Ok(Response::new(ReceiverStream::new(receiver)))
+    }
 
     async fn watch_player(
         &self,

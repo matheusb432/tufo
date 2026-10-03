@@ -16,6 +16,7 @@ use crate::{
 };
 
 pub mod default_effects;
+pub mod song_loop;
 
 /// A Tufo-generated title, translated by the GUI until the user renames it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, toasty::Embed)]
@@ -232,6 +233,15 @@ const FINGERPRINT_HEX_LENGTH: usize = 64;
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, AsRef, Display)
 )]
 pub struct AudioFingerprint(String);
+
+/// A SHA-256 hash of a whole file, in lowercase hex. Unlike [`AudioFingerprint`], tag edits change
+/// it.
+#[nutype(
+    validate(predicate = |hex| hex.len() == FINGERPRINT_HEX_LENGTH
+        && hex.bytes().all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))),
+    derive(Debug, Clone, PartialEq, Eq, Hash, AsRef, Display)
+)]
+pub struct FileSha256(String);
 
 /// Rounds `duration` down to whole milliseconds, saturating at about 49 days, which is how Tufo
 /// stores durations.

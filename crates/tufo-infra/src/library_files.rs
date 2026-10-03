@@ -2,6 +2,7 @@
 //!
 //! Every call runs on tokio's blocking pool, since directory walks and demuxing block.
 
+mod analyze;
 mod inspect;
 mod scan;
 
@@ -11,10 +12,13 @@ use tufo_application::library::library_files::{
     AudioFacts, ClassifiedPath, FolderScan, InspectAudioError, LibraryFiles, ScanFolderError,
 };
 use tufo_models::{
-    library::{FileIdentity, FileStamp},
+    library::{FileIdentity, FileSha256, FileStamp},
     path::{FolderPath, LocalPath},
     playback::AudioFilePath,
 };
+use tufo_wire::song_loops::SongWaveform;
+
+const SHA256_CHUNK_BYTES: usize = 1 << 16;
 
 /// Reads the library's folders and files from the local filesystem.
 #[derive(Debug, Clone, Copy, Default)]
@@ -41,6 +45,16 @@ impl LibraryFiles for DiskLibraryFiles {
 
     async fn inspect_audio(&self, path: AudioFilePath) -> Result<AudioFacts, InspectAudioError> {
         run_blocking(move || inspect::inspect_audio(path.as_ref()))
+            .await
+            .unwrap_or_else(|error| Err(InspectAudioError::Unreadable(error)))
+    }
+
+    async fn sha256_of_file(&self, path: AudioFilePath) -> Result<FileSha256, io::Error> {
+        run_blocking(move || sha256_of_file(path.as_ref())).await?
+    }
+
+    async fn analyze_audio(&self, path: AudioFilePath) -> Result<SongWaveform, InspectAudioError> {
+        run_blocking(move || analyze::analyze_audio(path.as_ref()))
             .await
             .unwrap_or_else(|error| Err(InspectAudioError::Unreadable(error)))
     }
@@ -71,6 +85,31 @@ fn classify_path(path: &Path) -> Result<ClassifiedPath, io::Error> {
             .map_or(ClassifiedPath::Other, ClassifiedPath::AudioFile));
     }
     Ok(ClassifiedPath::Other)
+}
+
+fn sha256_of_file(path: &Path) -> Result<FileSha256, io::Error> {
+    use std::fmt::Write as _;
+
+    use sha2::Digest as _;
+
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = sha2::Sha256::new();
+    let mut chunk = vec![0; SHA256_CHUNK_BYTES];
+    loop {
+        let read = io::Read::read(&mut file, &mut chunk)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&chunk[..read]);
+    }
+    let hex = hasher
+        .finalize()
+        .iter()
+        .fold(String::with_capacity(64), |mut hex, byte| {
+            let _ = write!(hex, "{byte:02x}");
+            hex
+        });
+    FileSha256::try_new(hex).map_err(io::Error::other)
 }
 
 fn stat_file(path: &Path) -> Result<Option<FileStamp>, io::Error> {

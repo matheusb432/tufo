@@ -3,7 +3,10 @@
 use std::{num::NonZeroU64, time::Duration};
 
 use tufo_application::playback::player::PlayAudioError;
-use tufo_models::playback::{AudioFilePath, queue::MusicQueue};
+use tufo_models::{
+    library::song_loop::LoopRegion,
+    playback::{AudioFilePath, queue::MusicQueue},
+};
 
 use crate::audio::buffered_track::{
     AudioFile, BufferedTrack, DecodeOptions, OpenTrackError, TrackFile, TrackHandle,
@@ -30,22 +33,45 @@ pub(super) struct MusicTrack {
     pub(super) start_offset: Duration,
     /// The decoded length when the container declares it, else the library's.
     pub(super) duration: Option<Duration>,
+    pub(super) loop_region: Option<LoopRegion>,
     /// Absent while no output renders the track.
     pub(super) handle: Option<TrackHandle>,
 }
 
 impl MusicTrack {
+    /// The source position, which wraps from the loop end to the loop start.
     pub(super) fn position(&self) -> Duration {
-        self.start_offset
-            + self
-                .handle
-                .as_ref()
-                .map_or(Duration::ZERO, TrackHandle::played)
+        match self.loop_region {
+            Some(region) => region.position_after(self.start_offset, self.played()),
+            None => self.elapsed(),
+        }
+    }
+
+    /// Counts every pass, unlike [`Self::position`].
+    pub(super) fn elapsed(&self) -> Duration {
+        self.start_offset + self.played()
+    }
+
+    /// Where a pass that doesn't wrap ends.
+    pub(super) fn end(&self) -> Option<Duration> {
+        self.loop_region
+            .map(|region| region.loop_end())
+            .or(self.duration)
+    }
+
+    fn played(&self) -> Duration {
+        self.handle
+            .as_ref()
+            .map_or(Duration::ZERO, TrackHandle::played)
     }
 
     pub(super) fn underrun_frames(&self) -> u64 {
         self.handle.as_ref().map_or(0, TrackHandle::underrun_frames)
     }
+}
+
+pub(super) fn start_position(loop_region: Option<LoopRegion>) -> Duration {
+    loop_region.map_or(Duration::ZERO, |region| region.playback_start())
 }
 
 /// Where a track's file comes from.

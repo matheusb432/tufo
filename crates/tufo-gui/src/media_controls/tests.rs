@@ -1,5 +1,5 @@
 use tufo_models::{
-    library::{CollectionId, Volume},
+    library::{AudioFileId, CollectionId, Volume},
     playback::{
         AudioFilePath,
         music_layers::MusicLayerState,
@@ -15,6 +15,7 @@ fn music(paused: bool) -> MusicState {
         collection_id: CollectionId::from_uuid(uuid::Uuid::from_u128(1)),
         entry: QueueEntry {
             entry_id: CollectionEntryId::from_uuid(uuid::Uuid::from_u128(2)),
+            audio_file_id: AudioFileId::from_uuid(uuid::Uuid::from_u128(2)),
             path: AudioFilePath::try_new(std::env::temp_dir().join("tufo-media-test.wav")).unwrap(),
             title: "Forest".to_owned(),
             duration: Some(Duration::from_secs(120)),
@@ -25,6 +26,7 @@ fn music(paused: bool) -> MusicState {
         },
         duration: Some(Duration::from_secs(120)),
         paused,
+        loop_region: None,
     }
 }
 

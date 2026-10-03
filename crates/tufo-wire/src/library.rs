@@ -13,6 +13,8 @@ use tufo_models::{
     playback::AudioFilePath,
 };
 
+use crate::song_loops::SavedSongLoop;
+
 /// Every collection with its entries in the collection's order, the songs, and the followed
 /// folders. Each change to the library publishes a new snapshot with a higher revision.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -94,6 +96,7 @@ pub struct EntryView {
     pub missing: bool,
     pub sound: SoundSettings,
     pub icon: SoundIcon,
+    pub saved_loop: Option<SavedSongLoop>,
 }
 
 /// An audio file a song source keeps in the library, whether or not a playlist lists it.
@@ -109,6 +112,7 @@ pub struct SongView {
     /// Whether Tufo last looked for the file and didn't find it.
     pub missing: bool,
     pub source: SongSource,
+    pub saved_loop: Option<SavedSongLoop>,
 }
 
 /// What keeps a song in the library. A followed folder wins over the file's own path.

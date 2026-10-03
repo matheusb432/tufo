@@ -36,6 +36,7 @@ fn entry(seed: u128, title: &str, seconds: u64) -> EntryView {
         missing: false,
         sound: SoundSettings::default(),
         icon: SoundIcon::default(),
+        saved_loop: None,
     }
 }
 
@@ -82,6 +83,7 @@ fn song(seed: u128, title: &str, source: SongSource) -> SongView {
         added_at: jiff::Timestamp::UNIX_EPOCH,
         missing: false,
         source,
+        saved_loop: None,
     }
 }
 
@@ -334,6 +336,7 @@ fn playing(entry_seed: u128, paused: bool) -> PlayerState {
             collection_id: CollectionId::from_uuid(uuid(1)),
             entry: QueueEntry {
                 entry_id: CollectionEntryId::from_uuid(uuid(entry_seed)),
+                audio_file_id: AudioFileId::from_uuid(uuid(entry_seed)),
                 path: AudioFilePath::try_new(std::env::temp_dir().join("x")).unwrap(),
                 title: "Ancient Dragon".to_owned(),
                 duration: Some(Duration::from_secs(241)),
@@ -344,6 +347,7 @@ fn playing(entry_seed: u128, paused: bool) -> PlayerState {
             },
             duration: Some(Duration::from_secs(241)),
             paused,
+            loop_region: None,
         }),
         ..PlayerState::default()
     }

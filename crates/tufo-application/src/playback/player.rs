@@ -2,16 +2,17 @@
 
 use std::future::Future;
 
-use tokio::sync::watch;
+use tokio::sync::{oneshot, watch};
 use tufo_models::{
-    library::{CollectionEntryId, SoundSettings},
+    library::{AudioFileId, CollectionEntryId, SoundSettings, song_loop::LoopRegion},
     playback::{
-        OutputTarget,
+        AudioFilePath, OutputTarget,
         diagnostics::PlayerDiagnostics,
         player_state::{PlayerState, SoundCue},
         queue::{QueueStart, QueuedEntry},
     },
 };
+use tufo_wire::song_loops::{PreviewMode, PreviewStarted};
 
 use super::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
@@ -96,10 +97,45 @@ pub trait Player: Send + Sync {
     /// or enabled. Does nothing while a voice channel is the output.
     fn refresh_voice_availability(&self) -> impl Future<Output = ()> + Send;
 
+    /// Plays on the local device whatever the output, pausing music playing there, and ends a
+    /// running preview.
+    fn start_preview(
+        &self,
+        preview: SongPreview,
+    ) -> impl Future<Output = Result<PreviewSession, PlayAudioError>> + Send;
+
+    /// Resumes music the preview paused. Stopping an ended preview does nothing.
+    fn stop_preview(&self, id: PreviewId) -> impl Future<Output = ()> + Send;
+
     /// Observes the current state and every later change.
     fn watch_player(&self) -> watch::Receiver<PlayerState>;
 
     fn diagnostics(&self) -> PlayerDiagnostics;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SongPreview {
+    pub path: AudioFilePath,
+    pub draft: LoopRegion,
+    pub mode: PreviewMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreviewId(pub u64);
+
+#[derive(Debug)]
+pub struct PreviewSession {
+    pub id: PreviewId,
+    pub started: PreviewStarted,
+    /// Resolves once the preview ends without [`Player::stop_preview`], as when a newer one
+    /// replaces it.
+    pub ended: oneshot::Receiver<()>,
+}
+
+/// Looked up whenever a song starts, so saved changes reach a playing song when it restarts.
+pub trait SongLoops: Send + Sync + 'static {
+    /// `None` for songs without a saved region and for regions that need review.
+    fn loop_region(&self, audio_file_id: AudioFileId) -> Option<LoopRegion>;
 }
 
 /// Why an audio file couldn't start playing.

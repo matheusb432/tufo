@@ -2,8 +2,9 @@
 //! card, recording everything each output played.
 
 use std::{
+    collections::HashMap,
     future::Future,
-    num::NonZeroU64,
+    num::{NonZeroU32, NonZeroU64},
     sync::{
         Arc, Mutex, PoisonError,
         atomic::{AtomicBool, AtomicUsize, Ordering},
@@ -24,7 +25,7 @@ use tufo_application::{
         control_music::{ControlMusicError, MusicCommand},
         control_sounds::{self, SoundsCommand},
         play_entry_sound,
-        player::Player,
+        player::{Player, SongLoops, SongPreview},
         resume_saved_loops::{self, ResumeSavedLoopsOutcome},
         select_output::SelectOutputError,
         stop_sound,
@@ -42,7 +43,10 @@ use tufo_infra::{
 };
 use tufo_models::{
     discord::{GuildId, VoiceChannelId, VoiceChannelTarget},
-    library::{CollectionEntryId, CollectionId, CollectionKind, SoundSettings, Volume},
+    library::{
+        AudioFileId, CollectionEntryId, CollectionId, CollectionKind, SoundSettings, Volume,
+        song_loop::{LoopMarkers, LoopRegion, SeamPreviewSide, SourceFrames, SourceTiming},
+    },
     path::LocalPath,
     playback::{
         AudioFilePath, OutputTarget,
@@ -53,7 +57,10 @@ use tufo_models::{
         queue::{QueueEntry, QueueStart, QueuedEntry, RepeatMode},
     },
 };
-use tufo_wire::library::{ImportPaths, UpdateCollectionEntry};
+use tufo_wire::{
+    library::{ImportPaths, UpdateCollectionEntry},
+    song_loops::PreviewMode,
+};
 use uuid::Uuid;
 
 mod support;
@@ -239,9 +246,23 @@ fn lock(captures: &Captures) -> std::sync::MutexGuard<'_, Vec<Vec<f32>>> {
     captures.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+#[derive(Clone, Default)]
+struct TestSongLoops(Arc<Mutex<HashMap<AudioFileId, LoopRegion>>>);
+
+impl SongLoops for TestSongLoops {
+    fn loop_region(&self, audio_file_id: AudioFileId) -> Option<LoopRegion> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(&audio_file_id)
+            .copied()
+    }
+}
+
 struct Rig {
     player: Arc<EnginePlayer<TestOutputs>>,
     controls: Arc<OutputControls>,
+    song_loops: TestSongLoops,
     sound_card: SoundCard,
     states: watch::Receiver<PlayerState>,
     directory: tempfile::TempDir,
@@ -262,21 +283,32 @@ impl Rig {
     fn with_timings(timings: EngineTimings) -> anyhow::Result<Self> {
         let (sender, receiver) = mpsc::channel();
         let controls = Arc::new(OutputControls::default());
+        let song_loops = TestSongLoops::default();
         let player = EnginePlayer::with_outputs(
             TestOutputs {
                 controls: Arc::clone(&controls),
                 renderers: Mutex::new(sender),
             },
             timings,
+            song_loops.clone(),
         );
         let states = player.watch_player();
         Ok(Self {
             player,
             controls,
+            song_loops,
             sound_card: SoundCard::start(receiver),
             states,
             directory: tempfile::tempdir()?,
         })
+    }
+
+    fn save_loop(&self, entry: &QueueEntry, region: LoopRegion) {
+        self.song_loops
+            .0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(entry.audio_file_id, region);
     }
 
     fn file(&self, name: &str, samples: &[f32]) -> anyhow::Result<AudioFilePath> {
@@ -363,6 +395,7 @@ fn sound(path: AudioFilePath, looping: bool) -> SoundCue {
 fn entry(path: AudioFilePath, title: &str) -> QueueEntry {
     QueueEntry {
         entry_id: CollectionEntryId::from_uuid(Uuid::now_v7()),
+        audio_file_id: AudioFileId::from_uuid(Uuid::now_v7()),
         path,
         title: title.to_owned(),
         duration: None,
@@ -1365,5 +1398,368 @@ async fn changing_an_entry_updates_the_library_and_the_active_sound() -> anyhow:
         .context("the entry remains in the library")?;
     assert!(!saved.sound.looping);
     player.shut_down().await;
+    Ok(())
+}
+
+/// A three-second ramp's region: the intro from 0.2 s to 1 s plays once, then 1 s to 2 s repeats.
+fn ramp_region() -> anyhow::Result<LoopRegion> {
+    Ok(LoopRegion::try_new(
+        SourceTiming {
+            sample_rate: NonZeroU32::new(SAMPLE_RATE).context("the sample rate is zero")?,
+            frame_count: SourceFrames(u64::try_from(THREE_SECONDS)?),
+        },
+        LoopMarkers {
+            playback_start: SourceFrames(9_600),
+            loop_start: SourceFrames(48_000),
+            loop_end: SourceFrames(96_000),
+            crossfade: SourceFrames::ZERO,
+        },
+    )?)
+}
+
+/// [`ramp_region`]'s first wrap and pass length at the local output's 44.1 kHz.
+const RAMP_REGION_FIRST_WRAP_FRAME: usize = 79_380;
+const RAMP_REGION_PASS_FRAMES: usize = 44_100;
+/// The resampler smooths a jump over a few dozen frames.
+const RESAMPLED_JUMP_FRAMES: usize = 64;
+
+fn ramp_wraps(played: &[f32]) -> Vec<usize> {
+    played
+        .windows(2)
+        .enumerate()
+        .filter(|(_, pair)| pair[1] < pair[0] - 0.05)
+        .map(|(index, _)| index + 1)
+        .collect()
+}
+
+fn ramp_seconds_at(played: &[f32], frame: usize) -> f32 {
+    ramp_position_seconds(played[frame])
+}
+
+impl Rig {
+    /// Waits for `frames` frames after the output's first sound.
+    async fn wait_for_played_frames(&self, output: usize, frames: usize) -> anyhow::Result<()> {
+        tokio::time::timeout(WAIT_TIMEOUT, async {
+            while self
+                .sound_card
+                .captures()
+                .get(output)
+                .is_none_or(|capture| from_first_sound(capture).len() < frames)
+            {
+                tokio::time::sleep(POLL_INTERVAL).await;
+            }
+        })
+        .await
+        .with_context(|| format!("output {output} never played {frames} frames"))
+    }
+
+    /// Pausing publishes a fresh position sample.
+    async fn paused_state(&self) -> anyhow::Result<PlayerState> {
+        self.control(MusicCommand::Pause).await?;
+        Ok(self.state())
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn repeating_a_track_plays_its_intro_once_then_repeats_its_loop() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let looped = entry(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    rig.save_loop(&looped, ramp_region()?);
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await?;
+
+    rig.play(vec![looped]).await?;
+    rig.wait_for_played_frames(
+        0,
+        RAMP_REGION_FIRST_WRAP_FRAME + 3 * RAMP_REGION_PASS_FRAMES,
+    )
+    .await?;
+    let paused = rig.paused_state().await?;
+
+    let captures = rig.sound_card.captures();
+    let played = from_first_sound(&captures[0]);
+    assert!((ramp_seconds_at(played, 100) - 0.2).abs() < 0.01);
+    let wraps = ramp_wraps(played);
+    let expected_wraps =
+        (0..3).map(|pass| RAMP_REGION_FIRST_WRAP_FRAME + pass * RAMP_REGION_PASS_FRAMES);
+    assert!(
+        wraps
+            .iter()
+            .zip(expected_wraps)
+            .all(|(wrap, expected)| *wrap == expected),
+        "wrapped at {wraps:?}"
+    );
+    for wrap in wraps.iter().take(3) {
+        assert!((ramp_seconds_at(played, wrap - RESAMPLED_JUMP_FRAMES) - 2.0).abs() < 0.01);
+        assert!((ramp_seconds_at(played, wrap + RESAMPLED_JUMP_FRAMES) - 1.0).abs() < 0.01);
+    }
+    let position = position_seconds(&paused)?;
+    assert!((1.0..2.0).contains(&position), "at {position} s");
+    assert_eq!(rig.player.diagnostics().music_underrun_frames, 0);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn turning_repeat_off_finishes_the_loop_pass_then_moves_on() -> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let looped = entry(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    let next = entry(
+        rig.file("next.wav", &constant(-0.25, THREE_SECONDS))?,
+        "Next",
+    );
+    rig.save_loop(&looped, ramp_region()?);
+    rig.control(MusicCommand::SetCrossfade(CrossfadeDuration::try_new(
+        Duration::ZERO,
+    )?))
+    .await?;
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await?;
+    rig.play(vec![looped, next]).await?;
+    rig.wait_for_played_frames(
+        0,
+        RAMP_REGION_FIRST_WRAP_FRAME + RAMP_REGION_PASS_FRAMES / 2,
+    )
+    .await?;
+
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Off))
+        .await?;
+    rig.wait_for(|state| playing_title(state) == Some("Next"))
+        .await?;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let captures = rig.sound_card.captures();
+    let played = from_first_sound(&captures[0]);
+    let next_starts = played
+        .iter()
+        .position(|sample| (sample + 0.25).abs() < 0.01)
+        .context("the next track never played")?;
+    let pass_end = RAMP_REGION_FIRST_WRAP_FRAME + RAMP_REGION_PASS_FRAMES;
+    assert!(next_starts.abs_diff(pass_end) < RESAMPLED_JUMP_FRAMES);
+    assert_eq!(
+        ramp_wraps(&played[..pass_end - RESAMPLED_JUMP_FRAMES]),
+        [RAMP_REGION_FIRST_WRAP_FRAME]
+    );
+    assert!((ramp_seconds_at(played, pass_end - RESAMPLED_JUMP_FRAMES) - 2.0).abs() < 0.01);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_song_that_does_not_repeat_plays_from_its_playback_start_to_its_loop_end()
+-> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let looped = entry(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    let next = entry(rig.file("next.wav", &constant(-0.25, 14_400))?, "Next");
+    rig.save_loop(&looped, ramp_region()?);
+    rig.control(MusicCommand::SetCrossfade(CrossfadeDuration::try_new(
+        Duration::ZERO,
+    )?))
+    .await?;
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Off))
+        .await?;
+
+    rig.play(vec![looped, next]).await?;
+    rig.wait_for(|state| playing_title(state) == Some("Next"))
+        .await?;
+    rig.wait_for(|state| state.music.is_none()).await?;
+
+    let captures = rig.sound_card.captures();
+    let played = from_first_sound(&captures[0]);
+    let next_starts = played
+        .iter()
+        .position(|sample| (sample + 0.25).abs() < 0.01)
+        .context("the next track never played")?;
+    assert!(next_starts.abs_diff(RAMP_REGION_FIRST_WRAP_FRAME) < RESAMPLED_JUMP_FRAMES);
+    assert_eq!(
+        ramp_wraps(&played[..RAMP_REGION_FIRST_WRAP_FRAME - RESAMPLED_JUMP_FRAMES]),
+        Vec::<usize>::new()
+    );
+    assert!((ramp_seconds_at(played, 100) - 0.2).abs() < 0.01);
+    assert!(
+        (ramp_seconds_at(played, RAMP_REGION_FIRST_WRAP_FRAME - RESAMPLED_JUMP_FRAMES) - 2.0).abs()
+            < 0.01
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seeks_stay_between_the_playback_start_and_the_loop_end() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let looped = entry(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    rig.save_loop(&looped, ramp_region()?);
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await?;
+    rig.play(vec![looped]).await?;
+
+    rig.control(MusicCommand::Seek(Duration::from_millis(50)))
+        .await?;
+    let before_playback_start = position_seconds(&rig.state())?;
+    let past_loop_end = rig
+        .player
+        .control_music(MusicCommand::Seek(Duration::from_millis(2_500)))
+        .await;
+
+    assert!((before_playback_start - 0.2).abs() < 0.05);
+    assert!(matches!(past_loop_end, Err(ControlMusicError::SeekPastEnd)));
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn restarting_a_song_replays_its_intro_with_the_loop_saved_since() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let song = entry(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await?;
+    rig.play(vec![song.clone()]).await?;
+    tokio::time::sleep(Duration::from_millis(300)).await;
+
+    rig.save_loop(&song, ramp_region()?);
+    let before_restart = rig.state();
+    rig.control(MusicCommand::Next).await?;
+    let restarted = rig.state();
+
+    assert_eq!(
+        before_restart.music.and_then(|music| music.loop_region),
+        None
+    );
+    let music = restarted.music.context("the song stopped")?;
+    assert_eq!(music.loop_region, Some(ramp_region()?));
+    assert!((music.position.position.as_secs_f32() - 0.2).abs() < 0.05);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn switching_outputs_inside_a_loop_resumes_at_its_position_and_keeps_looping()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let looped = entry(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    rig.save_loop(&looped, ramp_region()?);
+    rig.control(MusicCommand::SetRepeat(RepeatMode::Track))
+        .await?;
+    rig.play(vec![looped]).await?;
+    rig.wait_for_played_frames(
+        0,
+        RAMP_REGION_FIRST_WRAP_FRAME + RAMP_REGION_PASS_FRAMES / 4,
+    )
+    .await?;
+
+    rig.player.select_output(voice_channel()).await?;
+    let switched_at = position_seconds(&rig.state())?;
+    rig.wait_for_played_frames(1, SAMPLE_RATE as usize * 2)
+        .await?;
+
+    assert!((1.0..1.6).contains(&switched_at), "at {switched_at} s");
+    let captures = rig.sound_card.captures();
+    let resumed_at = resumed_ramp_position(&captures[1])?;
+    assert!(
+        (resumed_at - switched_at).abs() < 0.1,
+        "switched at {switched_at} s, resumed at {resumed_at} s"
+    );
+    let resumed = from_first_sound(&captures[1]);
+    let wraps = ramp_wraps(resumed);
+    assert_ne!(wraps, Vec::<usize>::new());
+    for wrap in wraps {
+        assert!((ramp_seconds_at(resumed, wrap - 1) - 2.0).abs() < 0.01);
+        assert!((ramp_seconds_at(resumed, wrap) - 1.0).abs() < 0.01);
+    }
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_extra_song_repeats_its_loop_while_it_loops() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let main = rig.file("main.wav", &constant(0.1, THREE_SECONDS * 3))?;
+    let extra = layer(rig.file("boss.wav", &ramp(THREE_SECONDS))?, "Boss");
+    rig.save_loop(&extra.entry, ramp_region()?);
+    rig.play_once(entry(main, "Main")).await?;
+    rig.player.add_music_layer(extra.clone()).await?;
+    rig.player
+        .update_music_layer(
+            extra.entry.entry_id,
+            tufo_wire::player::UpdateMusicLayer {
+                looping: Some(true),
+                ..Default::default()
+            },
+        )
+        .await;
+
+    tokio::time::sleep(Duration::from_millis(3_200)).await;
+    let paused = rig.paused_state().await?;
+
+    let (_, layer_state) = paused
+        .music_layers
+        .iter()
+        .next()
+        .context("the extra song stopped")?;
+    let position = layer_state.music.position.position.as_secs_f32();
+    assert!((1.0..2.0).contains(&position), "at {position} s");
+    assert_eq!(layer_state.music.loop_region, Some(ramp_region()?));
+    Ok(())
+}
+
+fn seam_preview(path: AudioFilePath) -> anyhow::Result<SongPreview> {
+    Ok(SongPreview {
+        path,
+        draft: ramp_region()?,
+        mode: PreviewMode::Seam(SeamPreviewSide::try_new(Duration::from_millis(300))?),
+    })
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_seam_preview_pauses_local_music_and_resumes_it_when_it_stops() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let song = rig.file("boss.wav", &ramp(THREE_SECONDS))?;
+    rig.play_once(entry(song.clone(), "Boss")).await?;
+    tokio::time::sleep(Duration::from_millis(200)).await;
+
+    let session = rig.player.start_preview(seam_preview(song)?).await?;
+    let during = rig.state();
+    rig.wait_for_played_frames(1, 44_100).await?;
+    rig.player.stop_preview(session.id).await;
+    let after = rig.state();
+
+    assert_eq!(
+        session.started.seam_cycle,
+        Some(Duration::from_millis(300 + 300 + 750))
+    );
+    assert!(during.music.as_ref().is_some_and(|music| music.paused));
+    assert!(after.music.as_ref().is_some_and(|music| !music.paused));
+    let captures = rig.sound_card.captures();
+    let preview = from_first_sound(&captures[1]);
+    // The clip plays 1.7 s to 2 s of the ramp, then 1 s to 1.3 s, at 44.1 kHz.
+    assert!((ramp_seconds_at(preview, 4_410) - 1.8).abs() < 0.01);
+    assert!((ramp_seconds_at(preview, 13_230 + 4_410) - 1.1).abs() < 0.01);
+    assert!(session.ended.await.is_err());
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_newer_preview_ends_the_previous_one_and_keeps_the_music_paused() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let song = rig.file("boss.wav", &ramp(THREE_SECONDS))?;
+    rig.play_once(entry(song.clone(), "Boss")).await?;
+
+    let first = rig
+        .player
+        .start_preview(seam_preview(song.clone())?)
+        .await?;
+    let second = rig.player.start_preview(seam_preview(song)?).await?;
+    let first_ended = tokio::time::timeout(WAIT_TIMEOUT, first.ended).await;
+    rig.player.stop_preview(first.id).await;
+    let after_stale_stop = rig.state();
+    rig.player.stop_preview(second.id).await;
+
+    assert!(first_ended.is_ok());
+    assert!(
+        after_stale_stop
+            .music
+            .as_ref()
+            .is_some_and(|music| music.paused)
+    );
+    assert!(
+        rig.state()
+            .music
+            .as_ref()
+            .is_some_and(|music| !music.paused)
+    );
     Ok(())
 }

@@ -9,6 +9,7 @@ mod envelope;
 pub mod limiter;
 pub mod music_deck;
 pub mod pull_backend;
+pub(crate) mod seam;
 pub mod sound_cache;
 pub mod streamed_sound;
 

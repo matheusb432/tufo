@@ -35,10 +35,18 @@ pub(crate) fn seek_preroll(codec: AudioCodecId) -> Duration {
 /// The start of the track that its timestamps count but the decoder drops: Opus's pre-skip, which
 /// symphonia's Ogg reader leaves in.
 pub(crate) fn decoder_delay(parameters: &AudioCodecParameters, track: &Track) -> Duration {
-    match (parameters.codec, track.delay, parameters.sample_rate) {
-        (CODEC_ID_OPUS, Some(frames), Some(rate)) if rate > 0 => {
-            Duration::from_secs_f64(f64::from(frames) / f64::from(rate))
-        }
+    match parameters.sample_rate {
+        Some(rate) if rate > 0 => Duration::from_secs_f64(
+            f64::from(decoder_delay_frames(parameters, track)) / f64::from(rate),
+        ),
         _ => Duration::ZERO,
+    }
+}
+
+/// [`decoder_delay`] in frames at the track's own rate.
+pub(crate) fn decoder_delay_frames(parameters: &AudioCodecParameters, track: &Track) -> u32 {
+    match (parameters.codec, track.delay) {
+        (CODEC_ID_OPUS, Some(frames)) => frames,
+        _ => 0,
     }
 }

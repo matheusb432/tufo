@@ -4,7 +4,7 @@ use std::{path::PathBuf, time::Duration};
 
 use tonic::Status;
 use tufo_models::{
-    library::{CollectionEntryId, CollectionId, Volume},
+    library::{AudioFileId, CollectionEntryId, CollectionId, Volume},
     playback::{
         AudioFilePath, OutputTarget,
         diagnostics::{PlayerDiagnostics, VoicePacing},
@@ -18,8 +18,9 @@ use tufo_models::{
 };
 
 use super::{
-    InvalidMessage, duration_message, duration_value, invalid, parse_uuid, required, system_time,
-    timestamp_message, voice_channel_target,
+    InvalidMessage, duration_message, duration_value, invalid, parse_uuid, required,
+    song_loop::{loop_region, song_loop_message},
+    system_time, timestamp_message, voice_channel_target,
 };
 use crate::{
     pb,
@@ -366,6 +367,8 @@ fn music_message(music: &MusicState) -> pb::MusicState {
         duration: music.duration.map(duration_message),
         paused: music.paused,
         path: music.entry.path.as_ref().to_string_lossy().into_owned(),
+        audio_file_id: music.entry.audio_file_id.to_string(),
+        r#loop: music.loop_region.map(song_loop_message),
     }
 }
 
@@ -383,6 +386,9 @@ fn music_state(message: pb::MusicState) -> Result<MusicState, InvalidMessage> {
             entry_id: parse_uuid(&message.collection_entry_id)
                 .map(CollectionEntryId::from_uuid)
                 .ok_or(invalid("collection_entry_id"))?,
+            audio_file_id: parse_uuid(&message.audio_file_id)
+                .map(AudioFileId::from_uuid)
+                .ok_or(invalid("audio_file_id"))?,
             path: AudioFilePath::try_new(PathBuf::from(message.path))
                 .map_err(|_| invalid("path"))?,
             title: message.title,
@@ -400,6 +406,10 @@ fn music_state(message: pb::MusicState) -> Result<MusicState, InvalidMessage> {
         },
         duration,
         paused: message.paused,
+        loop_region: message
+            .r#loop
+            .map(|region| loop_region(region).map_err(|_| invalid("loop")))
+            .transpose()?,
     })
 }
 
@@ -523,7 +533,10 @@ mod tests {
     use std::{num::NonZeroU64, time::SystemTime};
 
     use tonic::Code;
-    use tufo_models::discord::{GuildId, VoiceChannelId, VoiceChannelTarget};
+    use tufo_models::{
+        discord::{GuildId, VoiceChannelId, VoiceChannelTarget},
+        library::song_loop::{LoopMarkers, LoopRegion, SourceFrames, SourceTiming},
+    };
 
     use super::*;
 
@@ -556,6 +569,7 @@ mod tests {
                 collection_id: CollectionId::from_uuid(id),
                 entry: QueueEntry {
                     entry_id: CollectionEntryId::from_uuid(id),
+                    audio_file_id: AudioFileId::from_uuid(id),
                     path: AudioFilePath::try_new(std::env::temp_dir().join("tavern.mp3")).unwrap(),
                     title: "Tavern".to_owned(),
                     duration: Some(Duration::from_secs(95)),
@@ -566,6 +580,21 @@ mod tests {
                 },
                 duration: Some(Duration::from_secs(95)),
                 paused: true,
+                loop_region: Some(
+                    LoopRegion::try_new(
+                        SourceTiming {
+                            sample_rate: std::num::NonZeroU32::new(44_100).unwrap(),
+                            frame_count: SourceFrames(4_189_500),
+                        },
+                        LoopMarkers {
+                            playback_start: SourceFrames::ZERO,
+                            loop_start: SourceFrames(441_000),
+                            loop_end: SourceFrames(4_000_000),
+                            crossfade: SourceFrames::ZERO,
+                        },
+                    )
+                    .unwrap(),
+                ),
             }),
             volume: Volume::try_new(0.75).unwrap(),
             effects_volume: Volume::try_new(0.5).unwrap(),

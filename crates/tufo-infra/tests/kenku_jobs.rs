@@ -68,7 +68,10 @@ async fn kenku_job_outlives_thirty_seconds_without_a_watcher_and_duplicate_start
             .await
             .unwrap(),
     );
-    let player = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    let player = EnginePlayer::start(
+        SongbirdDiscordClient::not_configured(),
+        library.saved_song_loops(),
+    );
     let credentials = FileBotCredentials::new(folder.path().join("discord.toml"));
     let entered = Arc::new(Notify::new());
     let release = Arc::new(Notify::new());
@@ -150,7 +153,10 @@ async fn kenku_job_fails_at_five_minutes_and_its_failure_is_saved() {
     let id = import_kenku_library::execute(
         ImportKenkuLibrary::default(),
         library.clone(),
-        EnginePlayer::start(SongbirdDiscordClient::not_configured()),
+        EnginePlayer::start(
+            SongbirdDiscordClient::not_configured(),
+            library.saved_song_loops(),
+        ),
         PausedReader {
             entered: entered.clone(),
             release: Arc::new(Notify::new()),
@@ -192,7 +198,10 @@ async fn an_interrupted_kenku_job_can_resume_after_reopening_the_library() {
             .unwrap(),
     );
     let entered = Arc::new(Notify::new());
-    let player = EnginePlayer::start(SongbirdDiscordClient::not_configured());
+    let player = EnginePlayer::start(
+        SongbirdDiscordClient::not_configured(),
+        library.saved_song_loops(),
+    );
     let credentials = FileBotCredentials::new(folder.path().join("discord.toml"));
     let id = import_kenku_library::execute(
         ImportKenkuLibrary::default(),

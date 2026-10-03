@@ -699,6 +699,7 @@ async fn renaming_seeded_content_clears_its_translation_key() {
         .unwrap();
     let player = tufo_infra::player::EnginePlayer::start(
         tufo_infra::discord::SongbirdDiscordClient::not_configured(),
+        fixture.library.saved_song_loops(),
     );
     let effects = titled(&fixture.snapshot(), "Effects").unwrap().clone();
 

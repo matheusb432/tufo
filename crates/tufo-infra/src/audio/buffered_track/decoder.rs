@@ -17,14 +17,15 @@ use symphonia::core::{
     formats::{FormatOptions, FormatReader, SeekMode, SeekTo, TrackType, probe::Hint},
     io::{MediaSourceStream, MediaSourceStreamOptions},
     meta::MetadataOptions,
-    units::{Time, TimeBase},
+    units::{TimeBase, Timestamp},
 };
+use tufo_models::library::song_loop::{LoopMarkers, SourceFrames};
 
 use super::{
-    TrackShared, duration_of_frames, frames_in,
+    TrackShared, duration_of_frames, frame_count, frames_in,
     track_file::{TrackFile, TrackFileReader},
 };
-use crate::audio::codecs;
+use crate::audio::{codecs, seam};
 
 const STEREO: usize = 2;
 const RESAMPLER_CHUNK_FRAMES: usize = 1024;
@@ -39,7 +40,7 @@ pub(crate) struct ProbedTrack {
     time_base: TimeBase,
     duration: Option<Duration>,
     seek_preroll: Duration,
-    decoder_delay: Duration,
+    decoder_delay: SourceFrames,
 }
 
 impl ProbedTrack {
@@ -66,7 +67,8 @@ impl ProbedTrack {
             .make_audio_decoder(parameters, &AudioDecoderOptions::default())
             .context("creating the audio decoder")?;
         let seek_preroll = codecs::seek_preroll(parameters.codec);
-        let decoder_delay = codecs::decoder_delay(parameters, track);
+        let decoder_delay_frames =
+            SourceFrames(u64::from(codecs::decoder_delay_frames(parameters, track)));
         let time_base = track
             .time_base
             .or_else(|| TimeBase::try_from_recip(source_sample_rate))
@@ -78,7 +80,7 @@ impl ProbedTrack {
                 .and_then(|time| Duration::try_from_secs_f64(time.as_secs_f64()).ok()),
             (None, None) => None,
         }
-        .map(|duration| duration.saturating_sub(decoder_delay));
+        .map(|duration| duration.saturating_sub(codecs::decoder_delay(parameters, track)));
         let track_id = track.id;
         Ok(Self {
             format_reader,
@@ -88,7 +90,7 @@ impl ProbedTrack {
             time_base,
             duration,
             seek_preroll,
-            decoder_delay,
+            decoder_delay: decoder_delay_frames,
         })
     }
 
@@ -104,12 +106,16 @@ impl ProbedTrack {
         mut self,
         file: TrackFile,
         output_sample_rate: u32,
-        start_position: Duration,
+        start: SourceFrames,
+        region: Option<LoopMarkers>,
     ) -> anyhow::Result<TrackDecoder> {
-        let skip_frames = if start_position.is_zero() {
-            0
+        let region = region
+            .map(|markers| RegionCursor::new(&file, markers, start))
+            .transpose()?;
+        let frames_to_skip = if start == SourceFrames::ZERO {
+            SourceFrames::ZERO
         } else {
-            self.seek(start_position)?
+            self.seek_to_frame(start)?
         };
         let resampler = if self.source_sample_rate == output_sample_rate {
             None
@@ -124,9 +130,10 @@ impl ProbedTrack {
             track: self,
             resampler,
             output_sample_rate,
-            skip_frames,
+            frames_to_skip,
             decoded: Vec::new(),
             stereo: Vec::new(),
+            region,
         })
     }
 
@@ -140,21 +147,7 @@ impl ProbedTrack {
             .map_or(0, |duration| frames_in(duration, self.source_sample_rate))
             .min(frames_max);
         let mut frames = Vec::with_capacity(frames_expected);
-        while let Some(packet) = self.next_packet()? {
-            if packet.track_id != self.track_id {
-                continue;
-            }
-            let buffer = match self.decoder.decode(&packet) {
-                Ok(buffer) => buffer,
-                Err(errors::Error::DecodeError(reason)) => {
-                    tracing::debug!(reason, "skipping an undecodable packet");
-                    continue;
-                }
-                Err(error) => return Err(error).context("decoding a packet"),
-            };
-            let channel_count = buffer.spec().channels().count();
-            buffer.copy_to_vec_interleaved(&mut decoded);
-            downmix_to_stereo(&decoded, channel_count, &mut stereo);
+        while self.decode_next_packet(&mut decoded, &mut stereo)? {
             let frames_next = frames.len().saturating_add(stereo.len() / STEREO);
             if frames_next > frames_max {
                 return Ok(None);
@@ -178,31 +171,110 @@ impl ProbedTrack {
         Ok(Some(frames))
     }
 
-    /// Moves to `position` and returns how many source frames the decoder must discard to land
-    /// on it exactly, since demuxers seek to a packet boundary before the requested time and some
-    /// decoders need a run-up.
-    fn seek(&mut self, position: Duration) -> anyhow::Result<u64> {
-        let preroll = self.seek_preroll.min(position);
-        let target = position.saturating_sub(preroll) + self.decoder_delay;
-        let time =
-            Time::try_from_secs_f64(target.as_secs_f64()).context("the position overflows")?;
+    /// Decodes up to `frames_max` frames from `start` into interleaved stereo at the file's own
+    /// rate. Blocks the calling thread.
+    pub(crate) fn decode_range(
+        mut self,
+        start: SourceFrames,
+        frames_max: usize,
+    ) -> anyhow::Result<Vec<f32>> {
+        let mut frames_to_skip = if start == SourceFrames::ZERO {
+            0
+        } else {
+            self.seek_to_frame(start)?.0
+        };
+        let mut decoded = Vec::new();
+        let mut stereo = Vec::new();
+        let samples_max = frames_max.saturating_mul(STEREO);
+        let mut samples = Vec::with_capacity(samples_max);
+        while samples.len() < samples_max && self.decode_next_packet(&mut decoded, &mut stereo)? {
+            let skipped = usize::try_from(frames_to_skip)
+                .unwrap_or(usize::MAX)
+                .min(stereo.len() / STEREO);
+            frames_to_skip -= frame_count(skipped);
+            let kept = &stereo[skipped * STEREO..];
+            let wanted = (samples_max - samples.len()).min(kept.len());
+            samples.extend_from_slice(&kept[..wanted]);
+        }
+        Ok(samples)
+    }
+
+    /// Decodes the track's next packet into `stereo`, which stays empty for packets of other
+    /// tracks and packets the decoder rejects. Returns `false` at the end of the file.
+    pub(crate) fn decode_next_packet(
+        &mut self,
+        decoded: &mut Vec<f32>,
+        stereo: &mut Vec<f32>,
+    ) -> anyhow::Result<bool> {
+        self.decode_next_packet_observed(decoded, stereo, |_| {})
+    }
+
+    /// Hands the track's compressed packets to `observe_packet` before decoding them.
+    pub(crate) fn decode_next_packet_observed(
+        &mut self,
+        decoded: &mut Vec<f32>,
+        stereo: &mut Vec<f32>,
+        observe_packet: impl FnOnce(&[u8]),
+    ) -> anyhow::Result<bool> {
+        stereo.clear();
+        let Some(packet) = self.next_packet()? else {
+            return Ok(false);
+        };
+        if packet.track_id != self.track_id {
+            return Ok(true);
+        }
+        observe_packet(&packet.data);
+        let buffer = match self.decoder.decode(&packet) {
+            Ok(buffer) => buffer,
+            Err(errors::Error::DecodeError(reason)) => {
+                tracing::debug!(reason, "skipping an undecodable packet");
+                return Ok(true);
+            }
+            Err(error) => return Err(error).context("decoding a packet"),
+        };
+        let channel_count = buffer.spec().channels().count();
+        buffer.copy_to_vec_interleaved(&mut *decoded);
+        downmix_to_stereo(decoded, channel_count, stereo);
+        Ok(true)
+    }
+
+    /// Returns the frames to discard after the seek to land exactly on `frame`: demuxers stop at
+    /// a packet boundary, and some decoders need a run-up.
+    fn seek_to_frame(&mut self, frame: SourceFrames) -> anyhow::Result<SourceFrames> {
+        let preroll = SourceFrames(frame_count(frames_in(
+            self.seek_preroll,
+            self.source_sample_rate,
+        )))
+        .min(frame);
+        let target = frame.saturating_add(self.decoder_delay);
         let seeked = self
             .format_reader
             .seek(
                 SeekMode::Accurate,
-                SeekTo::Time {
-                    time,
-                    track_id: Some(self.track_id),
+                SeekTo::Timestamp {
+                    ts: self.timestamp_of_frame(target.saturating_sub(preroll))?,
+                    track_id: self.track_id,
                 },
             )
             .context("seeking in the container")?;
         self.decoder.reset();
-        let required = self.time_base.calc_time_saturating(seeked.required_ts);
-        let actual = self.time_base.calc_time_saturating(seeked.actual_ts);
-        let skipped = Duration::try_from_secs_f64(required.as_secs_f64() - actual.as_secs_f64())
-            .unwrap_or_default()
-            + preroll;
-        Ok(duration_to_frames(skipped, self.source_sample_rate))
+        Ok(target.saturating_sub(self.frame_of_timestamp(seeked.actual_ts)))
+    }
+
+    fn timestamp_of_frame(&self, frame: SourceFrames) -> anyhow::Result<Timestamp> {
+        let ticks = u128::from(frame.0) * u128::from(self.time_base.denom.get())
+            / (u128::from(self.time_base.numer.get()) * u128::from(self.source_sample_rate));
+        Ok(Timestamp::new(
+            i64::try_from(ticks).context("the position overflows")?,
+        ))
+    }
+
+    fn frame_of_timestamp(&self, timestamp: Timestamp) -> SourceFrames {
+        let ticks = u128::try_from(timestamp.get()).unwrap_or(0);
+        let frames =
+            ticks * u128::from(self.time_base.numer.get()) * u128::from(self.source_sample_rate)
+                / u128::from(self.time_base.denom.get());
+        SourceFrames(u64::try_from(frames).unwrap_or(u64::MAX))
     }
 
     /// The next packet, or `None` at the end of the file.
@@ -222,10 +294,88 @@ pub(super) struct TrackDecoder {
     track: ProbedTrack,
     resampler: Option<StereoResampler>,
     output_sample_rate: u32,
-    /// Source frames still to discard after a seek.
-    skip_frames: u64,
+    frames_to_skip: SourceFrames,
     decoded: Vec<f32>,
     stereo: Vec<f32>,
+    region: Option<RegionCursor>,
+}
+
+struct RegionCursor {
+    markers: LoopMarkers,
+    next_frame: SourceFrames,
+    /// Interleaved stereo frames just before the loop start, as long as the crossfade.
+    lead_in: Vec<f32>,
+}
+
+impl RegionCursor {
+    fn new(file: &TrackFile, markers: LoopMarkers, start: SourceFrames) -> anyhow::Result<Self> {
+        let lead_in = if markers.crossfade == SourceFrames::ZERO {
+            Vec::new()
+        } else {
+            ProbedTrack::probe(file.reader())?
+                .decode_range(
+                    markers.loop_start.saturating_sub(markers.crossfade),
+                    usize::try_from(markers.crossfade.0)?,
+                )
+                .context("decoding the audio leading into the loop")?
+        };
+        Ok(Self {
+            markers,
+            next_frame: start,
+            lead_in,
+        })
+    }
+
+    fn frames_until_loop_end(&self) -> SourceFrames {
+        self.markers.loop_end.saturating_sub(self.next_frame)
+    }
+
+    /// Returns how many samples of `stereo` lie before the loop end, and whether they reach it.
+    fn take_until_loop_end(
+        &mut self,
+        stereo: &mut [f32],
+        wraps_at_loop_end: bool,
+    ) -> (usize, bool) {
+        let available = SourceFrames(frame_count(stereo.len() / STEREO));
+        let taken = self.frames_until_loop_end().min(available);
+        let kept_samples = usize::try_from(taken.0).unwrap_or(usize::MAX) * STEREO;
+        if wraps_at_loop_end {
+            self.fade_in_lead(&mut stereo[..kept_samples]);
+        }
+        self.next_frame = self.next_frame.saturating_add(taken);
+        (
+            kept_samples,
+            self.frames_until_loop_end() == SourceFrames::ZERO,
+        )
+    }
+
+    /// `stereo` holds the frames from `next_frame` on.
+    fn fade_in_lead(&self, stereo: &mut [f32]) {
+        let lead_in_frames = SourceFrames(frame_count(self.lead_in.len() / STEREO));
+        let crossfade_start = self.markers.loop_end.saturating_sub(lead_in_frames);
+        let chunk_end = self
+            .next_frame
+            .saturating_add(SourceFrames(frame_count(stereo.len() / STEREO)));
+        if self.lead_in.is_empty() || chunk_end <= crossfade_start {
+            return;
+        }
+        let first_inside = crossfade_start.saturating_sub(self.next_frame);
+        let tail_offset = self
+            .next_frame
+            .saturating_add(first_inside)
+            .saturating_sub(crossfade_start);
+        let (Ok(first_inside), Ok(tail_offset)) = (
+            usize::try_from(first_inside.0),
+            usize::try_from(tail_offset.0),
+        ) else {
+            return;
+        };
+        seam::fade_in_lead(
+            &mut stereo[first_inside * STEREO..],
+            &self.lead_in,
+            tail_offset,
+        );
+    }
 }
 
 impl TrackDecoder {
@@ -254,10 +404,9 @@ impl TrackDecoder {
             if writer.should_stop() {
                 return Ok(());
             }
-            // Prefill can reach EOF before the caller enables looping. A finished resampler
-            // has flushed its tail, so a later pass needs a fresh resampler as well as a probe.
-            self.track = ProbedTrack::probe(self.file.reader())?;
-            self.skip_frames = 0;
+            // Prefill can reach the end before the caller enables looping. A finished resampler
+            // has flushed its tail, so a later pass also needs a fresh one.
+            self.restart_loop()?;
             if self.resampler.is_some() {
                 self.resampler = Some(StereoResampler::new(
                     self.track.source_sample_rate,
@@ -276,33 +425,32 @@ impl TrackDecoder {
             if writer.should_stop() {
                 return Ok(());
             }
-            let packet = match self.track.next_packet()? {
-                Some(packet) => packet,
-                None if self.restart_for_loop(writer)? => continue,
-                None => break,
-            };
-            if packet.track_id != self.track.track_id {
+            let file_continues = self
+                .track
+                .decode_next_packet(&mut self.decoded, &mut self.stereo)?;
+            if !file_continues && self.wrap_if_looping(writer)? {
                 continue;
             }
-            let buffer = match self.track.decoder.decode(&packet) {
-                Ok(buffer) => buffer,
-                Err(errors::Error::DecodeError(reason)) => {
-                    tracing::debug!(reason, "skipping an undecodable packet");
-                    continue;
-                }
-                Err(error) => return Err(error).context("decoding a packet"),
-            };
-            let channel_count = buffer.spec().channels().count();
-            buffer.copy_to_vec_interleaved(&mut self.decoded);
-            downmix_to_stereo(&self.decoded, channel_count, &mut self.stereo);
+            if !file_continues {
+                break;
+            }
             let skipped_samples = self.take_skipped_frames(self.stereo.len() / STEREO) * STEREO;
-            let stereo = &self.stereo[skipped_samples..];
+            let wraps_at_loop_end = writer.shared.looping.load(Ordering::Relaxed);
+            let (kept_samples, loop_end_reached) = match &mut self.region {
+                Some(region) => region
+                    .take_until_loop_end(&mut self.stereo[skipped_samples..], wraps_at_loop_end),
+                None => (self.stereo.len() - skipped_samples, false),
+            };
+            let stereo = &self.stereo[skipped_samples..skipped_samples + kept_samples];
             let flow = match &mut self.resampler {
                 Some(resampler) => resampler.push(stereo, writer),
                 None => writer.write(stereo),
             };
             if flow.is_break() {
                 return Ok(());
+            }
+            if loop_end_reached && !self.wrap_if_looping(writer)? {
+                break;
             }
         }
         if let Some(resampler) = &mut self.resampler {
@@ -311,26 +459,42 @@ impl TrackDecoder {
         Ok(())
     }
 
-    /// At the end of the file, starts it again when the track loops, and reports whether it did.
-    fn restart_for_loop(&mut self, writer: &FrameWriter<'_>) -> anyhow::Result<bool> {
+    /// A file that ends before its loop end wraps where it ends.
+    fn wrap_if_looping(&mut self, writer: &FrameWriter<'_>) -> anyhow::Result<bool> {
         if !writer.shared.looping.load(Ordering::Relaxed) {
             return Ok(false);
         }
-        // Seeking to the start drops Vorbis's first packet, so probe the file afresh. The
-        // resampler keeps its state, so the end joins the start without a click.
-        self.track = ProbedTrack::probe(self.file.reader())?;
-        self.skip_frames = 0;
+        self.restart_loop()?;
         Ok(true)
+    }
+
+    /// Keeps the resampler's state, so the loop end joins the loop start without a click.
+    fn restart_loop(&mut self) -> anyhow::Result<()> {
+        let loop_start = self
+            .region
+            .as_ref()
+            .map_or(SourceFrames::ZERO, |region| region.markers.loop_start);
+        if loop_start == SourceFrames::ZERO {
+            // Seeking to the start drops Vorbis's first packet.
+            self.track = ProbedTrack::probe(self.file.reader())?;
+            self.frames_to_skip = SourceFrames::ZERO;
+        } else {
+            self.frames_to_skip = self.track.seek_to_frame(loop_start)?;
+        }
+        if let Some(region) = &mut self.region {
+            region.next_frame = loop_start;
+        }
+        Ok(())
     }
 
     /// Consumes up to `available` frames of the pending skip and returns how many to drop.
     fn take_skipped_frames(&mut self, available: usize) -> usize {
-        let skipped = usize::try_from(self.skip_frames)
+        let skipped = usize::try_from(self.frames_to_skip.0)
             .unwrap_or(usize::MAX)
             .min(available);
-        self.skip_frames = self
-            .skip_frames
-            .saturating_sub(u64::try_from(skipped).unwrap_or(u64::MAX));
+        self.frames_to_skip = self
+            .frames_to_skip
+            .saturating_sub(SourceFrames(frame_count(skipped)));
         skipped
     }
 }
@@ -347,15 +511,6 @@ fn downmix_to_stereo(interleaved: &[f32], channel_count: usize, stereo: &mut Vec
                 .flat_map(|frame| [frame[0], frame[1]]),
         ),
     }
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "the product is a non-negative frame count far below u64::MAX"
-)]
-fn duration_to_frames(duration: Duration, sample_rate: u32) -> u64 {
-    (duration.as_secs_f64() * f64::from(sample_rate)).round() as u64
 }
 
 struct FrameWriter<'a> {

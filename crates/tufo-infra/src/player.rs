@@ -9,6 +9,7 @@
 mod layers;
 mod music;
 pub mod outputs;
+mod preview;
 mod sounds;
 
 use std::{
@@ -26,6 +27,7 @@ use std::{
 use layers::MusicLayer;
 use music::{
     Music, MusicTrack, OpenedTrack, TrackSource, open_track, play_audio_error, probe_track,
+    start_position,
 };
 use outputs::{AudioOutputs, DeviceOutputs, OpenedOutput};
 use sounds::{FiredSound, SoundPlayback, decoded_sound, volume_gain};
@@ -36,11 +38,11 @@ use tufo_application::playback::{
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
     play_queue::PlayQueueError,
-    player::{PlayAudioError, Player},
+    player::{PlayAudioError, Player, PreviewId, PreviewSession, SongLoops, SongPreview},
     select_output::SelectOutputError,
 };
 use tufo_models::{
-    library::{CollectionEntryId, SoundSettings, Volume},
+    library::{CollectionEntryId, SoundSettings, Volume, song_loop::LoopRegion},
     playback::{
         AudioFilePath, OutputTarget,
         diagnostics::PlayerDiagnostics,
@@ -49,7 +51,10 @@ use tufo_models::{
             CrossfadeDuration, MusicState, PlayerState, PositionSample, SoundCue,
             VoiceConnectionState,
         },
-        queue::{EnqueueError, MusicQueue, QueueModes, QueueStart, QueuedEntry, SetRepeatError},
+        queue::{
+            EnqueueError, MusicQueue, QueueEntry, QueueModes, QueueStart, QueuedEntry, RepeatMode,
+            SetRepeatError,
+        },
     },
 };
 
@@ -119,6 +124,7 @@ impl Default for ReconnectPolicy {
 pub struct EnginePlayer<O: AudioOutputs> {
     outputs: O,
     timings: EngineTimings,
+    song_loops: Box<dyn SongLoops>,
     engine: Mutex<Engine>,
     state: watch::Sender<PlayerState>,
     /// Updated by the tick, so diagnostics never wait for the engine lock.
@@ -132,8 +138,12 @@ pub struct EnginePlayer<O: AudioOutputs> {
 impl EnginePlayer<DeviceOutputs> {
     /// Starts on the local output. Must run inside a tokio runtime.
     #[must_use]
-    pub fn start(discord: SongbirdDiscordClient) -> Arc<Self> {
-        Self::with_outputs(DeviceOutputs::new(discord), EngineTimings::default())
+    pub fn start(discord: SongbirdDiscordClient, song_loops: impl SongLoops) -> Arc<Self> {
+        Self::with_outputs(
+            DeviceOutputs::new(discord),
+            EngineTimings::default(),
+            song_loops,
+        )
     }
 }
 
@@ -141,7 +151,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     /// Starts on the local output of `outputs`, which opens on first use. Must run inside a
     /// tokio runtime.
     #[must_use]
-    pub fn with_outputs(outputs: O, timings: EngineTimings) -> Arc<Self> {
+    pub fn with_outputs(
+        outputs: O,
+        timings: EngineTimings,
+        song_loops: impl SongLoops,
+    ) -> Arc<Self> {
         let sound_underrun_frames = Arc::new(AtomicU64::new(0));
         let engine = Engine {
             target: OutputTarget::Local,
@@ -165,11 +179,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             last_token: 0,
             retired_underrun_frames: 0,
             release_at: None,
+            preview: None,
+            last_preview_id: 0,
         };
         let state = watch::Sender::new(engine.snapshot());
         let player = Arc::new_cyclic(|this| Self {
             outputs,
             timings,
+            song_loops: Box::new(song_loops),
             engine: Mutex::new(engine),
             state,
             music_underrun_frames: AtomicU64::new(0),
@@ -186,6 +203,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     /// logs the playback diagnostics.
     pub async fn shut_down(&self) {
         let mut engine = self.engine.lock().await;
+        self.discard_preview(&mut engine).await;
         engine.music_generation += 1;
         if let Some(music) = engine.music.take() {
             engine.retire_music(&music);
@@ -301,9 +319,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         };
         let start_offset = music.current.position();
         let source = TrackSource::Open(music.current.file.clone());
+        let loop_region = music.current.loop_region;
         let options = DecodeOptions {
             start_position: start_offset,
-            looping: false,
+            looping: engine.main_track_loops(loop_region),
+            loop_region,
         };
         let opened = open_track(source, sample_rate, options).await;
         let token = engine.next_token();
@@ -328,6 +348,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 file: opened.file,
                 start_offset,
                 duration: music.current.duration,
+                loop_region,
                 handle: Some(opened.track.handle),
             })
         });
@@ -416,16 +437,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 
     /// Opens the planned track and makes it current, unless a later change superseded it.
     async fn apply_music_plan(&self, plan: MusicPlan) -> Result<(), PlayAudioError> {
-        let MusicChange {
-            source,
-            start_offset,
-            fade_in,
-            fade_out,
-            paused,
-        } = plan.change;
+        let MusicChange { source, start } = plan.change;
         let options = DecodeOptions {
-            start_position: start_offset,
-            looping: false,
+            start_position: start.start_offset,
+            looping: start.looping,
+            loop_region: start.loop_region,
         };
         let opened = open_track(source, plan.sample_rate, options).await;
         let mut engine = self.engine.lock().await;
@@ -442,15 +458,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 return opened.map(drop);
             }
         };
-        Self::install_music_track(
-            &mut engine,
-            queue,
-            opened,
-            start_offset,
-            fade_in,
-            fade_out,
-            paused,
-        )?;
+        Self::install_music_track(&mut engine, queue, opened, start)?;
         self.publish(&engine);
         Ok(())
     }
@@ -459,11 +467,16 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         engine: &mut Engine,
         queue: MusicQueue,
         opened: OpenedTrack,
-        start_offset: Duration,
-        fade_in: Duration,
-        fade_out: Duration,
-        paused: bool,
+        start: TrackStart,
     ) -> Result<(), PlayAudioError> {
+        let TrackStart {
+            start_offset,
+            fade_in,
+            fade_out,
+            paused,
+            loop_region,
+            looping,
+        } = start;
         engine.pause_layers(paused)?;
         let token = engine.next_token();
         let OpenedTrack {
@@ -491,11 +504,16 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 )
             })
             .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?;
+        let looping_now = engine.main_track_loops(loop_region);
+        if looping_now != looping {
+            track.handle.set_looping(looping_now);
+        }
         let current = MusicTrack {
             token,
             file,
             start_offset,
             duration: duration.or(queue.current().duration),
+            loop_region,
             handle: Some(track.handle),
         };
         let previous = engine.music.replace(Music {
@@ -512,6 +530,25 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         Ok(())
     }
 
+    /// Starts `entry` from its playback start with the region saved for it now.
+    fn song_start(
+        &self,
+        engine: &Engine,
+        entry: &QueueEntry,
+        fade: Duration,
+        paused: bool,
+    ) -> TrackStart {
+        let loop_region = self.song_loops.loop_region(entry.audio_file_id);
+        TrackStart {
+            start_offset: start_position(loop_region),
+            fade_in: fade,
+            fade_out: fade,
+            paused,
+            loop_region,
+            looping: engine.main_track_loops(loop_region),
+        }
+    }
+
     /// Plans moving the queue to its next or previous track, or stops at its end.
     async fn skip(&self, backwards: bool) -> Result<(), ControlMusicError> {
         let mut engine = self.engine.lock().await;
@@ -522,7 +559,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let mut queue = music.queue.clone();
         let current_entry_id = queue.current().entry_id;
         let next = if backwards {
-            queue.skip_to_previous(music.current.position())
+            queue.skip_to_previous(music.current.elapsed())
         } else {
             queue.skip_to_next()
         }
@@ -535,21 +572,12 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let source = if next.entry_id == current_entry_id {
             TrackSource::Open(music.current.file.clone())
         } else {
-            TrackSource::Path(next.path)
+            TrackSource::Path(next.path.clone())
         };
         let fade = engine.manual_fade();
+        let start = self.song_start(&engine, &next, fade, false);
         self.ensure_output(&mut engine).await?;
-        let plan = Self::plan_music(
-            &mut engine,
-            queue,
-            MusicChange {
-                source,
-                start_offset: Duration::ZERO,
-                fade_in: fade,
-                fade_out: fade,
-                paused: false,
-            },
-        )?;
+        let plan = Self::plan_music(&mut engine, queue, MusicChange { source, start })?;
         drop(engine);
         Ok(self.apply_music_plan(plan).await?)
     }
@@ -560,20 +588,29 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             .music
             .as_ref()
             .ok_or(ControlMusicError::NothingPlaying)?;
-        if music
-            .current
-            .duration
-            .is_some_and(|duration| position >= duration)
-        {
-            return Err(ControlMusicError::SeekPastEnd);
+        let loop_region = music.current.loop_region;
+        let position = match loop_region {
+            Some(region) => region.clamp_start(position),
+            None => Some(position),
         }
+        .filter(|position| {
+            music
+                .current
+                .duration
+                .is_none_or(|duration| *position < duration)
+        })
+        .ok_or(ControlMusicError::SeekPastEnd)?;
         let queue = music.queue.clone();
         let change = MusicChange {
             source: TrackSource::Open(music.current.file.clone()),
-            start_offset: position,
-            fade_in: ANTI_CLICK_FADE,
-            fade_out: ANTI_CLICK_FADE,
-            paused: music.paused,
+            start: TrackStart {
+                start_offset: position,
+                fade_in: ANTI_CLICK_FADE,
+                fade_out: ANTI_CLICK_FADE,
+                paused: music.paused,
+                loop_region,
+                looping: engine.main_track_loops(loop_region),
+            },
         };
         self.ensure_output(&mut engine).await?;
         let plan = Self::plan_music(&mut engine, queue, change)?;
@@ -602,14 +639,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             let source = if next.entry_id == current_entry_id {
                 TrackSource::Open(music.current.file.clone())
             } else {
-                TrackSource::Path(next.path)
+                TrackSource::Path(next.path.clone())
             };
             let change = MusicChange {
                 source,
-                start_offset: Duration::ZERO,
-                fade_in: Duration::ZERO,
-                fade_out: Duration::ZERO,
-                paused,
+                start: self.song_start(&engine, &next, Duration::ZERO, paused),
             };
             match Self::plan_music(&mut engine, queue, change) {
                 Ok(plan) => plan,
@@ -626,12 +660,12 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 
     /// Decodes the queue's following track and hands it to the deck ahead of time.
     async fn arm_following(self: Arc<Self>, request: ArmRequest) {
-        let opened = open_track(
-            request.source,
-            request.sample_rate,
-            DecodeOptions::default(),
-        )
-        .await;
+        let options = DecodeOptions {
+            start_position: start_position(request.loop_region),
+            looping: request.looping,
+            loop_region: request.loop_region,
+        };
+        let opened = open_track(request.source, request.sample_rate, options).await;
         let mut engine = self.engine.lock().await;
         let token = engine.next_token();
         let still_wanted = engine.music.as_ref().is_some_and(|music| {
@@ -667,8 +701,9 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             music.armed = Some(MusicTrack {
                 token,
                 file: opened.file,
-                start_offset: Duration::ZERO,
+                start_offset: start_position(request.loop_region),
                 duration,
+                loop_region: request.loop_region,
                 handle: Some(opened.track.handle),
             });
         }
@@ -733,10 +768,16 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 
     fn arm_if_due(self: &Arc<Self>, engine: &mut Engine) {
         let crossfade = engine.crossfade.into_inner();
+        let modes = engine.modes;
         let (Some(output), Some(music)) = (engine.output.as_ref(), engine.music.as_mut()) else {
             return;
         };
-        if music.changing || music.paused || music.armed.is_some() || music.arm_requested {
+        if music.changing
+            || music.paused
+            || music.armed.is_some()
+            || music.arm_requested
+            || main_track_loops(modes, music.current.loop_region)
+        {
             return;
         }
         let Some(following) = music.queue.following() else {
@@ -744,8 +785,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         };
         let remaining = music
             .current
-            .duration
-            .map(|duration| duration.saturating_sub(music.current.position()));
+            .end()
+            .map(|end| end.saturating_sub(music.current.position()));
         if remaining.is_some_and(|remaining| remaining > ARM_LEAD + crossfade) {
             return;
         }
@@ -754,11 +795,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         } else {
             TrackSource::Path(following.path.clone())
         };
+        let loop_region = self.song_loops.loop_region(following.audio_file_id);
         let request = ArmRequest {
             current_token: music.current.token,
             entry_id: following.entry_id,
             source,
             sample_rate: output.mixer.sample_rate(),
+            loop_region,
+            looping: main_track_loops(modes, loop_region),
         };
         music.arm_requested = true;
         tokio::spawn(Arc::clone(self).arm_following(request));
@@ -904,18 +948,9 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             None => TrackSource::Path(queue.current().path.clone()),
         };
         let fade = engine.manual_fade();
+        let start = self.song_start(&engine, queue.current(), fade, false);
         self.ensure_output(&mut engine).await?;
-        let plan = Self::plan_music(
-            &mut engine,
-            queue,
-            MusicChange {
-                source,
-                start_offset: Duration::ZERO,
-                fade_in: fade,
-                fade_out: fade,
-                paused: false,
-            },
-        )?;
+        let plan = Self::plan_music(&mut engine, queue, MusicChange { source, start })?;
         drop(engine);
         Ok(self.apply_music_plan(plan).await?)
     }
@@ -951,6 +986,11 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             _ => {}
         }
         let mut engine = self.engine.lock().await;
+        if matches!(command, MusicCommand::Pause | MusicCommand::Resume)
+            && let Some(preview) = &mut engine.preview
+        {
+            preview.resumes_music = false;
+        }
         match command {
             MusicCommand::Pause => engine.set_paused(true)?,
             MusicCommand::Resume => engine.set_paused(false)?,
@@ -981,6 +1021,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
                 }
                 engine.modes.repeat = repeat;
                 engine.disarm();
+                engine.update_main_track_looping();
             }
             MusicCommand::SetCrossfade(crossfade) => {
                 engine.crossfade = crossfade;
@@ -1134,6 +1175,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
 
     async fn stand_by(&self) {
         let mut engine = self.engine.lock().await;
+        self.discard_preview(&mut engine).await;
         // Ends reconnection attempts, which would otherwise rejoin a voice channel meanwhile.
         engine.output_generation += 1;
         engine.stop_music();
@@ -1147,6 +1189,14 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         engine.unpause_when_no_sounds_left();
         engine.release_at = Some(Instant::now() + STOP_FADE);
         self.publish(&engine);
+    }
+
+    async fn start_preview(&self, preview: SongPreview) -> Result<PreviewSession, PlayAudioError> {
+        self.begin_preview(preview).await
+    }
+
+    async fn stop_preview(&self, id: PreviewId) {
+        self.end_preview(id).await;
     }
 
     fn watch_player(&self) -> watch::Receiver<PlayerState> {
@@ -1226,6 +1276,8 @@ struct Engine {
     retired_underrun_frames: u64,
     /// When the tick closes the output and drops the decoded sounds, if nothing plays by then.
     release_at: Option<Instant>,
+    preview: Option<preview::Preview>,
+    last_preview_id: u64,
 }
 
 impl Engine {
@@ -1255,8 +1307,29 @@ impl Engine {
         NonZeroU64::new(self.last_token).unwrap_or(NonZeroU64::MIN)
     }
 
+    fn main_track_loops(&self, loop_region: Option<LoopRegion>) -> bool {
+        main_track_loops(self.modes, loop_region)
+    }
+
+    fn update_main_track_looping(&self) {
+        let Some(music) = &self.music else {
+            return;
+        };
+        if let Some(handle) = &music.current.handle {
+            handle.set_looping(self.main_track_loops(music.current.loop_region));
+        }
+    }
+
     fn deck(&mut self) -> Option<&mut MusicDeckHandle> {
         self.output.as_mut().map(|output| output.mixer.music())
+    }
+
+    fn music_is_playing(&self) -> bool {
+        self.music.as_ref().is_some_and(|music| !music.paused) || self.any_layer_playing()
+    }
+
+    fn music_is_paused(&self) -> bool {
+        (self.music.is_some() || !self.music_layers.is_empty()) && !self.music_is_playing()
     }
 
     fn has_audio(&self) -> bool {
@@ -1465,6 +1538,7 @@ impl Engine {
                 },
                 duration: music.current.duration,
                 paused: music.paused,
+                loop_region: music.current.loop_region,
             }),
             queued_entry_ids: self
                 .upcoming_queue()
@@ -1482,13 +1556,20 @@ impl Engine {
     }
 }
 
-/// How the new current track starts.
 struct MusicChange {
     source: TrackSource,
+    start: TrackStart,
+}
+
+/// How the new current track starts.
+#[derive(Clone, Copy)]
+struct TrackStart {
     start_offset: Duration,
     fade_in: Duration,
     fade_out: Duration,
     paused: bool,
+    loop_region: Option<LoopRegion>,
+    looping: bool,
 }
 
 /// The queue a track change leaves behind, from planning until its track opens.
@@ -1508,6 +1589,8 @@ struct ArmRequest {
     entry_id: CollectionEntryId,
     source: TrackSource,
     sample_rate: u32,
+    loop_region: Option<LoopRegion>,
+    looping: bool,
 }
 
 /// Plays a loaded sound on the engine's output.
@@ -1537,6 +1620,7 @@ async fn fire_sound(
             let options = DecodeOptions {
                 start_position: Duration::ZERO,
                 looping: cue.settings.looping,
+                loop_region: None,
             };
             let mut track = tokio::task::spawn_blocking(move || {
                 BufferedTrack::start(file, sample_rate, options)
@@ -1605,6 +1689,11 @@ async fn run_ticks<O: AudioOutputs>(player: Weak<EnginePlayer<O>>) {
         };
         player.tick().await;
     }
+}
+
+/// Repeating the track repeats a saved region; a track without one restarts through the queue.
+fn main_track_loops(modes: QueueModes, loop_region: Option<LoopRegion>) -> bool {
+    loop_region.is_some() && modes.repeat == RepeatMode::Track
 }
 
 fn idle_voice(availability: VoiceAvailability, reason: Option<String>) -> VoiceConnectionState {

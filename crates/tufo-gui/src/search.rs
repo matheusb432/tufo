@@ -208,6 +208,7 @@ mod tests {
             missing,
             sound: SoundSettings::default(),
             icon: SoundIcon::default(),
+            saved_loop: None,
         }
     }
 

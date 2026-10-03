@@ -3,10 +3,11 @@
 use std::{future::Future, time::Duration};
 
 use tufo_models::{
-    library::{AudioFingerprint, FileIdentity, FileStamp},
+    library::{AudioFingerprint, FileIdentity, FileSha256, FileStamp},
     path::{FolderPath, LocalPath},
     playback::AudioFilePath,
 };
+use tufo_wire::song_loops::SongWaveform;
 
 /// Reads the folders and audio files the library points at. Tufo never writes through it.
 pub trait LibraryFiles: Send + Sync {
@@ -41,6 +42,18 @@ pub trait LibraryFiles: Send + Sync {
         &self,
         path: AudioFilePath,
     ) -> impl Future<Output = Result<AudioFacts, InspectAudioError>> + Send;
+
+    fn sha256_of_file(
+        &self,
+        path: AudioFilePath,
+    ) -> impl Future<Output = Result<FileSha256, std::io::Error>> + Send;
+
+    /// Decodes the whole file, which takes seconds for long files, into its fingerprint, the
+    /// frame count playback decodes, and its peaks.
+    fn analyze_audio(
+        &self,
+        path: AudioFilePath,
+    ) -> impl Future<Output = Result<SongWaveform, InspectAudioError>> + Send;
 }
 
 /// What a dropped path turned out to be, at its resolved location.
