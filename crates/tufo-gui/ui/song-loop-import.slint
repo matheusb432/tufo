@@ -1,0 +1,90 @@
+// What importing a song loop document would change, before it saves anything.
+
+import { ListView } from "std-widgets.slint";
+import { Theme } from "theme.slint";
+import { Actions, SongLoopImportView } from "state.slint";
+import { Actions-Row, DialogFrame } from "dialogs.slint";
+import { Button, ButtonKind, LoadingProgress, Switch } from "widgets.slint";
+
+export component SongLoopImportDialog inherits DialogFrame {
+    title: @tr("Import Song Loops");
+    card-width-max: 560px;
+
+    Text {
+        text: SongLoopImportView.summary;
+        color: Theme.text;
+        font-size: Theme.body;
+        wrap: word-wrap;
+    }
+
+    if SongLoopImportView.busy: LoadingProgress {
+        value: 0.5;
+        label: SongLoopImportView.summary;
+    }
+
+    if !SongLoopImportView.busy && SongLoopImportView.rows.length > 0: ListView {
+        height: min(260px, SongLoopImportView.rows.length * 52px);
+        for row in SongLoopImportView.rows: Rectangle {
+            height: 52px;
+            HorizontalLayout {
+                spacing: 12px;
+                padding-right: 12px;
+                Text {
+                    horizontal-stretch: 1;
+                    text: row.path;
+                    color: Theme.text;
+                    font-size: Theme.body-small;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: row.outcome;
+                    color: row.failed ? Theme.error : row.conflict ? Theme.warning : Theme.text-secondary;
+                    font-size: Theme.caption;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    if SongLoopImportView.conflicts > 0: HorizontalLayout {
+        spacing: 16px;
+        Text {
+            horizontal-stretch: 1;
+            text: @tr("Replace the loops already saved for these songs");
+            color: Theme.text;
+            font-size: Theme.body-small;
+            wrap: word-wrap;
+            vertical-alignment: center;
+        }
+
+        Switch {
+            label: @tr("Replace the loops already saved for these songs");
+            checked: SongLoopImportView.replace;
+            toggled(checked) => {
+                Actions.set-song-loop-import-replace(checked);
+            }
+        }
+    }
+
+    Actions-Row {
+        Button {
+            text: @tr("Cancel");
+            kind: ButtonKind.quiet;
+            clicked => {
+                root.cancel();
+            }
+        }
+
+        Button {
+            text: @tr("Import");
+            kind: ButtonKind.primary;
+            enabled: SongLoopImportView.can-import && !SongLoopImportView.busy;
+            clicked => {
+                Actions.confirm-song-loop-import();
+            }
+        }
+    }
+}

@@ -9,6 +9,7 @@ use tufo_models::{kenku_import::KenkuImportState, library::SoundIcon};
 use crate::{
     backgrounds,
     i18n::{tr, tr_args, tr_count},
+    loop_editor::{LoopEditorFrame, PreviewKind},
     presentation::{
         self, CardView, CollectionPageView, CurrentOutputView, DrawerView, LibraryPageView,
         NavItemView, OutputRowView, PageKind, PlayerBarView, SongRowView, SongsPageView,
@@ -19,8 +20,9 @@ use crate::{
     ui::{
         AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
         CollectionBackground, CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView,
-        LibraryView, MusicLayer, NavItem, Navigation, OutputRow, OutputRowKind, Page, PlayerView,
-        PlaylistChoice, Search, SearchResult, Session, SongFolder, SongRow, SoundChip, SoundIcons,
+        LibraryView, LoopBadge, LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation,
+        OutputRow, OutputRowKind, Page, PlayerView, PlaylistChoice, Search, SearchResult, Session,
+        SongFolder, SongLoopImportRow, SongLoopImportView, SongRow, SoundChip, SoundIcons,
         SoundTile, TrackRow, VoiceBadge,
     },
 };
@@ -167,6 +169,15 @@ fn song_row(song: SongRowView) -> SongRow {
         source: song.source.into(),
         missing: song.missing,
         removable: song.removable,
+        loop_badge: loop_badge(song.loop_badge),
+    }
+}
+
+fn loop_badge(badge: presentation::LoopBadgeView) -> LoopBadge {
+    match badge {
+        presentation::LoopBadgeView::None => LoopBadge::None,
+        presentation::LoopBadgeView::Saved => LoopBadge::Saved,
+        presentation::LoopBadgeView::NeedsReview => LoopBadge::NeedsReview,
     }
 }
 
@@ -356,6 +367,7 @@ fn collection_page(library: &LibraryView<'_>, collection: CollectionPageView) {
                     .queue_number
                     .and_then(|number| i32::try_from(number).ok())
                     .unwrap_or(0),
+                loop_badge: loop_badge(track.loop_badge),
             })
             .collect(),
     ));
@@ -600,6 +612,74 @@ pub(crate) fn drop_target(window: &slint::Weak<AppWindow>, hovering: bool, label
         let session = window.global::<Session>();
         session.set_drop_hover(hovering);
         session.set_drop_label(label.into());
+    });
+}
+
+/// `None` closes the editor.
+pub(crate) fn loop_editor(window: &slint::Weak<AppWindow>, frame: Option<LoopEditorFrame>) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let view = window.global::<LoopEditorView>();
+        let Some(frame) = frame else {
+            view.set_open(false);
+            return;
+        };
+        view.set_song_title(frame.song_title.into());
+        view.set_loading(frame.loading);
+        view.set_notice(frame.notice.into());
+        view.set_error(frame.error.into());
+        view.set_has_saved_loop(frame.has_saved_loop);
+        view.set_can_save(frame.can_save);
+        view.set_playback_start_text(frame.playback_start_text.into());
+        view.set_loop_start_text(frame.loop_start_text.into());
+        view.set_loop_end_text(frame.loop_end_text.into());
+        view.set_crossfade_text(frame.crossfade_text.into());
+        view.set_playhead_text(frame.playhead_text.into());
+        view.set_playback_start_x(frame.playback_start_x);
+        view.set_loop_start_x(frame.loop_start_x);
+        view.set_loop_end_x(frame.loop_end_x);
+        view.set_crossfade_start_x(frame.crossfade_start_x);
+        view.set_playhead_x(frame.playhead_x);
+        view.set_view_start(frame.view_start);
+        view.set_view_visible(frame.view_visible);
+        view.set_waveform_revision(frame.waveform_revision);
+        view.set_preview(match frame.preview {
+            PreviewKind::Stopped => LoopPreview::Stopped,
+            PreviewKind::FromPlayhead => LoopPreview::FromPlayhead,
+            PreviewKind::Seam => LoopPreview::Seam,
+        });
+        view.set_open(true);
+    });
+}
+
+/// `None` closes the dialog.
+pub(crate) fn song_loop_import(
+    window: &slint::Weak<AppWindow>,
+    import: Option<presentation::SongLoopImportView>,
+) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let view = window.global::<SongLoopImportView>();
+        let Some(import) = import else {
+            view.set_open(false);
+            return;
+        };
+        view.set_busy(import.busy);
+        view.set_summary(import.summary.into());
+        view.set_rows(model(
+            import
+                .rows
+                .into_iter()
+                .map(|row| SongLoopImportRow {
+                    path: row.path.into(),
+                    outcome: row.outcome.into(),
+                    failed: row.failed,
+                    conflict: row.conflict,
+                })
+                .collect(),
+        ));
+        view.set_conflicts(i32::try_from(import.conflicts).unwrap_or(i32::MAX));
+        view.set_replace(import.replace);
+        view.set_can_import(import.can_import);
+        view.set_open(true);
     });
 }
 

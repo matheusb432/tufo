@@ -1,0 +1,24 @@
+import { Tour, TourId } from "state.slint";
+
+export global LoopEditorTour {
+    out property <string> waveform: "loop-editor.waveform";
+    out property <string> markers: "loop-editor.markers";
+    out property <string> preview: "loop-editor.preview";
+    out property <Tour> guide: { id: TourId.loop-editor, steps: [
+        {
+            anchor: LoopEditorTour.waveform,
+            title: @tr("Place the loop"),
+            body: @tr("The song plays from Start through End once, then repeats from Loop to End. Drag markers 1 to 3, click to move the playhead, and zoom in to place them on a beat."),
+        },
+        {
+            anchor: LoopEditorTour.markers,
+            title: @tr("Type exact times"),
+            body: @tr("Each field takes minutes, seconds, and milliseconds; press Enter to apply it. The pin moves a marker to the playhead. A crossfade blends the end of the loop into its start."),
+        },
+        {
+            anchor: LoopEditorTour.preview,
+            title: @tr("Listen before saving"),
+            body: @tr("Play from the playhead, or repeat the seam to hear the loop’s end run into its start. Previews play only on this computer and pause music playing here."),
+        },
+    ] };
+}

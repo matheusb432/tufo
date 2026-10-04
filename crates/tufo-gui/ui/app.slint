@@ -9,9 +9,9 @@ import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, FormSwitch,
-    KenkuConflictRow, KenkuImportView, LibraryView,
-    NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons, SoundTile, VoiceBadge,
-    WindowFrame,
+    KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge, LoopEditorView, LoopMarker,
+    LoopPreview, NavItem, Navigation, Page, PlayerView, Search, Session, SongLoopImportRow,
+    SongLoopImportView, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
 import { ConnectingPage, GridPage, HomePage, PlaylistPage, SongsPage, SoundboardPage } from "pages.slint";
@@ -24,16 +24,22 @@ import { SearchPalette } from "search.slint";
 import { WindowButtons, WindowDragArea } from "frame.slint";
 import { Icon, Presence, Scrim } from "widgets.slint";
 import { KenkuImportDialog } from "kenku-import.slint";
+import { LoopEditorDialog } from "loop-editor.slint";
+import { SongLoopImportDialog } from "song-loop-import.slint";
 
 export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, KenkuConflictRow,
-    KenkuImportView, LibraryView, NavItem, Navigation, Page, PlayerView, Search, Session, SoundIcons,
-    SoundTile, Theme, VoiceBadge, WindowFrame, GuidedTours, TourId, TourLayout, TourRect, TourScroll, Tour, TourStep,
-    HomeTour, SettingsTour,
+    KenkuImportView, LibraryView, LoopBadge, LoopEditorView, LoopMarker, LoopPreview, NavItem,
+    Navigation, Page, PlayerView, Search, Session, SongLoopImportRow, SongLoopImportView,
+    SoundIcons, SoundTile, Theme, VoiceBadge, WindowFrame, GuidedTours, TourId, TourLayout,
+    TourRect, TourScroll, Tour, TourStep, HomeTour, SettingsTour,
 }
 
-enum DialogKind { none, add-collection, edit-collection, edit-entry, add-to-playlist, settings, kenku-import }
+enum DialogKind {
+    none, add-collection, edit-collection, edit-entry, add-to-playlist, settings, kenku-import, loop-editor,
+    song-loop-import,
+}
 
 export component AppWindow inherits Window {
     title: @tr("Tufo");
@@ -57,11 +63,35 @@ export component AppWindow inherits Window {
         GuidedTours.close();
         shortcuts.focus();
         if root.dialog != DialogKind.kenku-import { KenkuImportView.open = false; }
+        if root.dialog != DialogKind.loop-editor && LoopEditorView.open {
+            LoopEditorView.open = false;
+            Actions.close-loop-editor();
+        }
+        if root.dialog != DialogKind.song-loop-import && SongLoopImportView.open {
+            SongLoopImportView.open = false;
+            Actions.close-song-loop-import();
+        }
     }
     property <bool> kenku-import-open: KenkuImportView.open;
     changed kenku-import-open => {
         if root.kenku-import-open {
             root.dialog = DialogKind.kenku-import;
+        }
+    }
+    property <bool> loop-editor-open: LoopEditorView.open;
+    changed loop-editor-open => {
+        if root.loop-editor-open {
+            root.dialog = DialogKind.loop-editor;
+        } else if root.dialog == DialogKind.loop-editor {
+            root.close-dialog();
+        }
+    }
+    property <bool> song-loop-import-open: SongLoopImportView.open;
+    changed song-loop-import-open => {
+        if root.song-loop-import-open {
+            root.dialog = DialogKind.song-loop-import;
+        } else if root.dialog == DialogKind.song-loop-import {
+            root.close-dialog();
         }
     }
     property <CollectionKind> add-kind;
@@ -576,6 +606,22 @@ export component AppWindow inherits Window {
 
             if kenku-dialog.present: KenkuImportDialog {
                 progress: kenku-dialog.progress;
+                cancel => { root.close-dialog(); }
+            }
+            loop-editor-dialog := Presence {
+                open: root.dialog == DialogKind.loop-editor;
+            }
+
+            if loop-editor-dialog.present: LoopEditorDialog {
+                progress: loop-editor-dialog.progress;
+                cancel => { root.close-dialog(); }
+            }
+            song-loop-import-dialog := Presence {
+                open: root.dialog == DialogKind.song-loop-import;
+            }
+
+            if song-loop-import-dialog.present: SongLoopImportDialog {
+                progress: song-loop-import-dialog.progress;
                 cancel => { root.close-dialog(); }
             }
         }

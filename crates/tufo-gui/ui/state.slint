@@ -60,6 +60,12 @@ export struct NavItem {
     missing: bool,
 }
 
+export enum LoopMarker { playback-start, loop-start, loop-end }
+
+export enum LoopPreview { stopped, from-playhead, seam }
+
+export enum LoopBadge { none, saved, needs-review }
+
 export struct TrackRow {
     id: string,
     // The audio file's id, which Add to playlist adds.
@@ -74,6 +80,7 @@ export struct TrackRow {
     playing: bool,
     // Its place in the queue, from 1, or 0.
     queue-number: int,
+    loop-badge: LoopBadge,
 }
 
 // A song on the Songs page or among a playlist's song search results.
@@ -87,6 +94,7 @@ export struct SongRow {
     missing: bool,
     // Added by its own path, so it can leave the songs; a followed folder keeps the others.
     removable: bool,
+    loop-badge: LoopBadge,
 }
 
 // A followed folder of music.
@@ -347,6 +355,52 @@ export global KenkuImportView {
     in-out property <[KenkuConflictRow]> conflicts;
 }
 
+// The draft loop the editor shows. Marker positions are fractions of the visible waveform,
+// outside 0 to 1 when scrolled out of view.
+export global LoopEditorView {
+    in-out property <bool> open;
+    in property <string> song-title;
+    in property <bool> loading;
+    in property <string> notice;
+    in property <string> error;
+    in property <bool> has-saved-loop;
+    in property <bool> can-save;
+    in property <string> playback-start-text;
+    in property <string> loop-start-text;
+    in property <string> loop-end-text;
+    in property <string> crossfade-text;
+    in property <string> playhead-text;
+    in property <float> playback-start-x;
+    in property <float> loop-start-x;
+    in property <float> loop-end-x;
+    in property <float> crossfade-start-x;
+    in property <float> playhead-x;
+    // The share of the song before the view, and the share it shows.
+    in property <float> view-start;
+    in property <float> view-visible: 1;
+    in property <int> waveform-revision;
+    in property <LoopPreview> preview;
+    // The visible peaks at this size and color; the last argument redraws it when it rises.
+    pure callback waveform(length, length, color, int) -> image;
+}
+
+export struct SongLoopImportRow {
+    path: string,
+    outcome: string,
+    failed: bool,
+    conflict: bool,
+}
+
+export global SongLoopImportView {
+    in-out property <bool> open;
+    in property <bool> busy;
+    in property <string> summary;
+    in property <[SongLoopImportRow]> rows;
+    in property <int> conflicts;
+    in-out property <bool> replace;
+    in property <bool> can-import;
+}
+
 export global Actions {
     callback open-page(Page, string);
     callback filter-changed(string);
@@ -422,4 +476,28 @@ export global Actions {
     callback retry-kenku-import();
     callback choose-kenku-conflict(int, bool);
     callback confirm-kenku-import();
+
+    // The song's audio file id.
+    callback edit-song-loop(string);
+    callback close-loop-editor();
+    callback loop-marker-dragged(LoopMarker, float);
+    callback loop-marker-typed(LoopMarker, string);
+    // In milliseconds.
+    callback loop-crossfade-typed(string);
+    callback loop-playhead-set(float);
+    // Forward or back, by a fine step or a coarse one.
+    callback loop-playhead-step(bool, bool);
+    callback loop-marker-at-playhead(LoopMarker);
+    callback loop-show-marker(LoopMarker);
+    callback loop-zoom(bool);
+    callback loop-scroll(float);
+    callback toggle-loop-preview(LoopPreview);
+    callback loop-editor-tick();
+    callback save-song-loop();
+    callback delete-song-loop();
+    callback export-song-loops();
+    callback import-song-loops();
+    callback set-song-loop-import-replace(bool);
+    callback confirm-song-loop-import();
+    callback close-song-loop-import();
 }

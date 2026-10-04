@@ -66,7 +66,7 @@ impl MediaState {
     ) -> Self {
         let track = player.music_tracks().next().map(|music| {
             let duration = music.duration.or(music.entry.duration);
-            let position = music.position.at(now, !music.paused);
+            let position = presentation::music_position(music, player.modes, now);
             MediaTrack {
                 metadata: TrackMetadata {
                     entry_id: music.entry.entry_id,

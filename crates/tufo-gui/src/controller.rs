@@ -9,6 +9,7 @@ use std::{
 };
 
 mod kenku_import;
+mod song_loops;
 
 use slint::ComponentHandle as _;
 use tufo_client::{
@@ -91,6 +92,7 @@ struct Shared {
     resume_saved_loops_on_connect: bool,
     quitting: bool,
     kenku: kenku_import::KenkuImportSession,
+    song_loops: song_loops::SongLoopSession,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1081,19 +1083,24 @@ impl Controller {
     }
 
     pub(crate) fn seek_by(&self, forward: bool, offset: Duration) {
-        let target = self.lock().player.music.as_ref().map(|music| {
-            let position = music.position.at(SystemTime::now(), !music.paused);
-            let position = if forward {
-                position.saturating_add(offset)
-            } else {
-                position.saturating_sub(offset)
-            };
-            (position, music.duration)
-        });
-        let Some((position, Some(duration))) = target else {
+        let now = {
+            let shared = self.lock();
+            shared.player.music.as_ref().map(|music| {
+                (
+                    presentation::music_position(music, shared.player.modes, SystemTime::now()),
+                    presentation::music_end(music),
+                )
+            })
+        };
+        let Some((position, Some(end))) = now else {
             return;
         };
-        if position >= duration {
+        let position = if forward {
+            position.saturating_add(offset)
+        } else {
+            position.saturating_sub(offset)
+        };
+        if position >= end {
             self.next_track();
         } else {
             self.seek_to(position);
@@ -1109,16 +1116,16 @@ impl Controller {
     }
 
     pub(crate) fn seek(&self, fraction: f32) {
-        let duration = self
+        let bounds = self
             .lock()
             .player
             .music
             .as_ref()
-            .and_then(|music| music.duration);
-        if let Some(duration) = duration {
+            .and_then(|music| Some((music.duration?, presentation::music_end(music)?)));
+        if let Some((duration, end)) = bounds {
             let position = duration
                 .mul_f32(fraction.clamp(0.0, 1.0))
-                .min(duration.saturating_sub(SEEK_END_MARGIN));
+                .min(end.saturating_sub(SEEK_END_MARGIN));
             self.seek_to(position);
         }
     }

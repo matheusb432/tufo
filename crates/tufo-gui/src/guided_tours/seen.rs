@@ -22,6 +22,7 @@ const TOURS: &[TourId] = &[
     TourId::Settings,
     TourId::Kenku,
     TourId::MiniPlayer,
+    TourId::LoopEditor,
 ];
 
 fn stable_id(tour: TourId) -> &'static str {
@@ -42,6 +43,7 @@ fn stable_id(tour: TourId) -> &'static str {
         TourId::Settings => "settings",
         TourId::Kenku => "kenku",
         TourId::MiniPlayer => "mini-player",
+        TourId::LoopEditor => "loop-editor",
     }
 }
 

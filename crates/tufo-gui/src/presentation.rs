@@ -14,6 +14,7 @@ use tufo_client::{
         Background, CollectionSource, CollectionView, EntryView, KenkuImportReport,
         LibraryFolderView, LibrarySnapshot, SongSource, SongView,
     },
+    song_loops::SavedSongLoop,
 };
 use tufo_models::{
     discord::{VoiceChannel, VoiceChannelTarget},
@@ -25,7 +26,7 @@ use tufo_models::{
     playback::{
         OutputTarget,
         player_state::{ActiveSound, MusicState, PlayerState, VoiceConnectionState},
-        queue::RepeatMode,
+        queue::{QueueModes, RepeatMode},
     },
 };
 
@@ -104,6 +105,24 @@ pub(crate) struct TrackRowView {
     pub(crate) playing: bool,
     /// Its place in the queue, from 1.
     pub(crate) queue_number: Option<usize>,
+    pub(crate) loop_badge: LoopBadgeView,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LoopBadgeView {
+    None,
+    Saved,
+    NeedsReview,
+}
+
+impl LoopBadgeView {
+    fn of(saved_loop: Option<SavedSongLoop>) -> Self {
+        match saved_loop {
+            None => Self::None,
+            Some(saved) if saved.needs_review => Self::NeedsReview,
+            Some(_) => Self::Saved,
+        }
+    }
 }
 
 /// A song on the Songs page or among a playlist's song search results.
@@ -117,6 +136,25 @@ pub(crate) struct SongRowView {
     pub(crate) missing: bool,
     /// Added by its own path, so it can leave the songs; a followed folder keeps the others.
     pub(crate) removable: bool,
+    pub(crate) loop_badge: LoopBadgeView,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SongLoopImportView {
+    pub(crate) busy: bool,
+    pub(crate) summary: String,
+    pub(crate) rows: Vec<SongLoopImportRowView>,
+    pub(crate) conflicts: usize,
+    pub(crate) replace: bool,
+    pub(crate) can_import: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SongLoopImportRowView {
+    pub(crate) path: String,
+    pub(crate) outcome: String,
+    pub(crate) failed: bool,
+    pub(crate) conflict: bool,
 }
 
 /// A followed music folder on the Songs page.
@@ -352,6 +390,7 @@ impl<'a> SongIndex<'a> {
             source: self.source_label(song.audio_file_id),
             missing: song.missing,
             removable: song.source == SongSource::File,
+            loop_badge: LoopBadgeView::of(song.saved_loop),
         }
     }
 
@@ -628,6 +667,7 @@ fn track_row(entry: &EntryView, player: &PlayerState, songs: &SongIndex<'_>) -> 
             .iter()
             .position(|id| *id == entry.id)
             .map(|index| index + 1),
+        loop_badge: LoopBadgeView::of(entry.saved_loop),
     }
 }
 
@@ -928,7 +968,7 @@ pub(crate) fn player_bar(
 ) -> PlayerBarView {
     let music = player.music.as_ref();
     let (elapsed, duration) = music.map_or((Duration::ZERO, None), |music| {
-        (music_position(music, now), music.duration)
+        (music_position(music, player.modes, now), music.duration)
     });
     let progress = duration
         .filter(|duration| !duration.is_zero())
@@ -1050,11 +1090,20 @@ fn sound_progress(sound: &ActiveSound, now: SystemTime) -> f32 {
     }
 }
 
-pub(crate) fn music_position(music: &MusicState, now: SystemTime) -> Duration {
-    let position = music.position.at(now, !music.paused);
+/// Wraps within a saved loop while the track repeats.
+pub(crate) fn music_position(music: &MusicState, modes: QueueModes, now: SystemTime) -> Duration {
+    let position = music.position_at(now, modes.repeat == RepeatMode::Track);
     music
         .duration
         .map_or(position, |duration| position.min(duration))
+}
+
+/// Where the track stops when it doesn't repeat: its loop end, or its file's end.
+pub(crate) fn music_end(music: &MusicState) -> Option<Duration> {
+    music
+        .loop_region
+        .map(|region| region.loop_end())
+        .or(music.duration)
 }
 
 /// `targets[i]` is the output of the row whose `index` is `Some(i)`.
@@ -1371,6 +1420,42 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
     })
 }
 
+fn song_loop_reason_text(code: Code, reason: &str) -> Option<&'static str> {
+    use tufo_application::{
+        library::{
+            get_song_waveform::GetSongWaveformError, import_song_loops::ImportSongLoopsError,
+            song_analysis::AnalyzeSongError, update_song_loop::UpdateSongLoopError,
+        },
+        playback::preview_song_loop::PreviewSongLoopError,
+    };
+    Some(match (code, reason) {
+        (
+            Code::NotFound,
+            GetSongWaveformError::NOT_FOUND
+            | UpdateSongLoopError::NOT_FOUND
+            | PreviewSongLoopError::NOT_FOUND,
+        ) => tr("That song is no longer among your songs."),
+        (Code::FailedPrecondition, AnalyzeSongError::MISSING) => {
+            tr("The audio file is missing. Restore it and try again.")
+        }
+        (
+            Code::FailedPrecondition,
+            AnalyzeSongError::UNREADABLE | AnalyzeSongError::UNSUPPORTED,
+        ) => tr("Could not read this song’s audio."),
+        (
+            Code::FailedPrecondition,
+            UpdateSongLoopError::SOURCE_CHANGED | PreviewSongLoopError::SOURCE_CHANGED,
+        ) => tr("The song’s file changed while the editor was open. Open the loop again."),
+        (Code::InvalidArgument, UpdateSongLoopError::INVALID_MARKERS) => {
+            tr("Place Start, Loop, and End in that order inside the song.")
+        }
+        (Code::InvalidArgument, ImportSongLoopsError::INVALID_DOCUMENT) => {
+            tr("That file is not a song loop export.")
+        }
+        _ => return None,
+    })
+}
+
 fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
     use tufo_application::{
         discord::{
@@ -1383,7 +1468,9 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             player::PlayAudioError, select_output::SelectOutputError,
         },
     };
-    if let Some(text) = library_reason_text(code, reason) {
+    if let Some(text) =
+        library_reason_text(code, reason).or_else(|| song_loop_reason_text(code, reason))
+    {
         return Some(text);
     }
     Some(match (code, reason) {

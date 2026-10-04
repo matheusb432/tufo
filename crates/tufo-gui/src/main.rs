@@ -15,6 +15,7 @@ mod files;
 mod frame;
 mod guided_tours;
 mod i18n;
+mod loop_editor;
 #[cfg(target_os = "macos")]
 mod macos_reopen;
 mod media_controls;
@@ -382,6 +383,22 @@ fn physical_pixels(length: f32, scale: f32) -> u32 {
     pixels
 }
 
+fn loop_marker(marker: ui::LoopMarker) -> loop_editor::Marker {
+    match marker {
+        ui::LoopMarker::PlaybackStart => loop_editor::Marker::PlaybackStart,
+        ui::LoopMarker::LoopStart => loop_editor::Marker::LoopStart,
+        ui::LoopMarker::LoopEnd => loop_editor::Marker::LoopEnd,
+    }
+}
+
+fn preview_kind(preview: ui::LoopPreview) -> loop_editor::PreviewKind {
+    match preview {
+        ui::LoopPreview::Stopped => loop_editor::PreviewKind::Stopped,
+        ui::LoopPreview::FromPlayhead => loop_editor::PreviewKind::FromPlayhead,
+        ui::LoopPreview::Seam => loop_editor::PreviewKind::Seam,
+    }
+}
+
 fn page(page: ui::Page) -> PageKind {
     match page {
         ui::Page::Home => PageKind::Home,
@@ -490,4 +507,47 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_retry_kenku_import, | | controller.retry_kenku_import());
     on!(controller => on_choose_kenku_conflict, | index, overwrite | controller.choose_kenku_conflict(index, overwrite));
     on!(controller => on_confirm_kenku_import, | | controller.confirm_kenku_import());
+    on!(controller => on_edit_song_loop, |song_id| controller.edit_song_loop(&song_id));
+    on!(controller => on_close_loop_editor, | | controller.close_loop_editor());
+    on!(controller => on_loop_marker_dragged, |marker, fraction| {
+        controller.drag_loop_marker(loop_marker(marker), fraction);
+    });
+    on!(controller => on_loop_marker_typed, |marker, text| {
+        controller.type_loop_marker(loop_marker(marker), &text);
+    });
+    on!(controller => on_loop_crossfade_typed, |text| controller.type_loop_crossfade(&text));
+    on!(controller => on_loop_playhead_set, |fraction| controller.set_loop_playhead(fraction));
+    on!(controller => on_loop_playhead_step, |forward, fine| controller.step_loop_playhead(forward, fine));
+    on!(controller => on_loop_marker_at_playhead, |marker| {
+        controller.place_loop_marker_at_playhead(loop_marker(marker));
+    });
+    on!(controller => on_loop_show_marker, |marker| controller.show_loop_marker(loop_marker(marker)));
+    on!(controller => on_loop_zoom, |zoom_in| controller.zoom_loop_view(zoom_in));
+    on!(controller => on_loop_scroll, |fraction| controller.scroll_loop_view(fraction));
+    on!(controller => on_toggle_loop_preview, |preview| controller.toggle_loop_preview(preview_kind(preview)));
+    on!(controller => on_loop_editor_tick, | | controller.tick_loop_editor());
+    on!(controller => on_save_song_loop, | | controller.save_song_loop());
+    on!(controller => on_delete_song_loop, | | controller.delete_song_loop());
+    on!(controller => on_export_song_loops, | | controller.export_song_loops());
+    on!(controller => on_import_song_loops, | | controller.import_song_loops());
+    on!(controller => on_set_song_loop_import_replace, |replace| controller.set_song_loop_import_replace(replace));
+    on!(controller => on_confirm_song_loop_import, | | controller.confirm_song_loop_import());
+    on!(controller => on_close_song_loop_import, | | controller.close_song_loop_import());
+    let loop_editor = window.global::<ui::LoopEditorView>();
+    loop_editor.on_waveform({
+        let controller = controller.clone();
+        let window = window.as_weak();
+        move |width, height, color, _revision| {
+            let scale = window
+                .upgrade()
+                .map_or(1.0, |window| window.window().scale_factor());
+            controller.loop_waveform_image(
+                (
+                    physical_pixels(width, scale),
+                    physical_pixels(height, scale),
+                ),
+                color,
+            )
+        }
+    });
 }

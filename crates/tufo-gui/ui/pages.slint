@@ -9,8 +9,8 @@ import { TourButton } from "tours/button.slint";
 import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
-    Actions, Art, CollectionCard, CollectionKind, LibraryView, Navigation, Page, PlayerView,
-    Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
+    Actions, Art, CollectionCard, CollectionKind, LibraryView, LoopBadge, Navigation, Page,
+    PlayerView, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
 } from "state.slint";
 import {
     Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem as MenuAction, MenuSurface, ScrollThumb, Slider,
@@ -707,7 +707,8 @@ component CollectionHero inherits HorizontalLayout {
 }
 
 // A row's right-click menu: a primary action, then optionally a second action, Add to playlist,
-// Edit, and a red Remove. Slint's built-in menu items cannot color destructive actions.
+// Edit, Edit loop, and a red Remove. Slint's built-in menu items cannot color destructive
+// actions.
 component RowMenu inherits TouchArea {
     in property <string> primary-action-title;
     in property <bool> primary-action-enabled: true;
@@ -716,18 +717,21 @@ component RowMenu inherits TouchArea {
     in property <bool> secondary-action-enabled: true;
     in property <bool> add-to-playlist-shown;
     in property <bool> edit-shown: true;
+    in property <bool> loop-shown;
     in property <bool> remove-shown;
     in property <string> remove-title: @tr("Remove");
     callback primary-action();
     callback secondary-action();
     callback add-to-playlist();
     callback edit();
+    callback edit-loop();
     callback remove();
     property <Point> menu-position;
     // Where each optional action sits when it shows.
     property <int> playlist-index: root.secondary-action-shown ? 2 : 1;
     property <int> edit-index: root.playlist-index + (root.add-to-playlist-shown ? 1 : 0);
-    property <int> remove-index: root.edit-index + (root.edit-shown ? 1 : 0);
+    property <int> loop-index: root.edit-index + (root.edit-shown ? 1 : 0);
+    property <int> remove-index: root.loop-index + (root.loop-shown ? 1 : 0);
     property <int> action-count: root.remove-index + (root.remove-shown ? 1 : 0);
     mouse-cursor: MouseCursor.pointer;
 
@@ -766,6 +770,8 @@ component RowMenu inherits TouchArea {
             root.add-to-playlist();
         } else if root.edit-shown && index == root.edit-index {
             root.edit();
+        } else if root.loop-shown && index == root.loop-index {
+            root.edit-loop();
         } else if root.remove-shown && index == root.remove-index {
             root.remove();
         }
@@ -846,6 +852,14 @@ component RowMenu inherits TouchArea {
                     }
                     activated => { root.activate(root.edit-index); }
                 }
+                if root.loop-shown: MenuAction {
+                    text: @tr("Edit loop…");
+                    highlighted: keys.selected == root.loop-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.loop-index; }
+                    }
+                    activated => { root.activate(root.loop-index); }
+                }
                 if root.remove-shown: MenuAction {
                     text: root.remove-title;
                     destructive: true;
@@ -858,6 +872,16 @@ component RowMenu inherits TouchArea {
             }
         }
     }
+}
+
+component LoopBadgeIcon inherits Icon {
+    in property <LoopBadge> badge;
+    width: 16px;
+    height: 16px;
+    source: @image-url("icons/repeat.svg");
+    tint: root.badge == LoopBadge.needs-review ? Theme.warning : Theme.text-faint;
+    accessible-role: image;
+    accessible-label: root.badge == LoopBadge.needs-review ? @tr("Loop needs review") : @tr("Saved loop");
 }
 
 // Where a queued song plays in the queue, in place of its row number.
@@ -930,6 +954,8 @@ component TrackItem inherits Rectangle {
         add-to-playlist-shown: true;
         add-to-playlist => { root.add-to-playlist(); }
         edit => { root.edit(); }
+        loop-shown: !root.track.missing;
+        edit-loop => { Actions.edit-song-loop(root.track.song-id); }
         remove-shown: !LibraryView.collection-linked;
         remove => { Actions.delete-entry(root.track.id); }
         double-clicked => {
@@ -981,6 +1007,11 @@ component TrackItem inherits Rectangle {
                 font-weight: root.track.current ? 800 : 500;
                 color: root.track.current ? Theme.lit-bright : Theme.text;
             }
+        }
+
+        if root.track.loop-badge != LoopBadge.none: LoopBadgeIcon {
+            y: (parent.height - self.height) / 2;
+            badge: root.track.loop-badge;
         }
 
         if root.track.missing: Text {
@@ -1066,6 +1097,8 @@ component SongItem inherits Rectangle {
         primary-action-title: root.add-title;
         primary-action => { root.add(); }
         edit-shown: false;
+        loop-shown: !root.song.missing;
+        edit-loop => { Actions.edit-song-loop(root.song.id); }
         remove-shown: root.song.removable;
         remove-title: @tr("Remove from Songs");
         remove => { Actions.remove-song(root.song.id); }
@@ -1110,6 +1143,11 @@ component SongItem inherits Rectangle {
                 font-weight: 500;
                 color: Theme.text;
             }
+        }
+
+        if root.song.loop-badge != LoopBadge.none: LoopBadgeIcon {
+            y: (parent.height - self.height) / 2;
+            badge: root.song.loop-badge;
         }
 
         if root.song.missing: Text {

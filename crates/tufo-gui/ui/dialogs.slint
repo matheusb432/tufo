@@ -25,6 +25,7 @@ export component DialogFrame inherits Rectangle {
     in property <bool> closable;
     // A `Presence`'s progress, which fades the dialog in and out.
     in property <float> progress: 1;
+    in property <length> card-width-max: 440px;
     callback cancel();
     Scrim {
         progress: root.progress;
@@ -37,7 +38,7 @@ export component DialogFrame inherits Rectangle {
     surface := Rectangle {
         y: max(Theme.title-row-height, (root.height - self.height) / 2) + Motion.presence-sink(root.progress);
         opacity: root.progress;
-        width: min(parent.width - 48px, 440px);
+        width: min(parent.width - 48px, root.card-width-max);
         height: min(layout.preferred-height, root.height - Theme.title-row-height - 24px);
         background: Theme.raised;
         border-radius: Theme.radius-card;
@@ -64,7 +65,7 @@ export component DialogFrame inherits Rectangle {
                         font-weight: Theme.display-weight;
                         color: Theme.text;
                     }
-                    TourButton {
+                    if root.guide.steps.length > 0: TourButton {
                         y: (parent.height - self.height) / 2;
                         guide: root.guide;
                         label: root.title;
@@ -101,7 +102,7 @@ export component DialogFrame inherits Rectangle {
     if root.progress < 1: TouchArea { }
 }
 
-component Actions-Row inherits HorizontalLayout {
+export component Actions-Row inherits HorizontalLayout {
     alignment: end;
     spacing: 8px;
 }
@@ -754,6 +755,44 @@ export component SettingsDialog inherits DialogFrame {
                 clicked => {
                     Actions.import-kenku-library();
                     root.cancel();
+                }
+            }
+        }
+    }
+
+    VerticalLayout {
+        spacing: 10px;
+        VerticalLayout {
+            spacing: 4px;
+            Text {
+                text: @tr("Song loops");
+                font-size: Theme.body;
+                font-weight: 700;
+                color: Theme.text;
+            }
+
+            Text {
+                text: @tr("Moves saved loops between libraries as a file; importing checks each song’s audio first.");
+                font-size: Theme.caption;
+                color: Theme.text-secondary;
+                wrap: word-wrap;
+            }
+        }
+
+        HorizontalLayout {
+            alignment: start;
+            spacing: 8px;
+            Button {
+                text: @tr("Import…");
+                clicked => {
+                    Actions.import-song-loops();
+                }
+            }
+
+            Button {
+                text: @tr("Export…");
+                clicked => {
+                    Actions.export-song-loops();
                 }
             }
         }

@@ -2120,3 +2120,246 @@ msgstr "Sua biblioteca de músicas"
 #: ui/tours/settings.slint
 msgid "Close Kenku FM before importing. Import brings collections, local audio references and supported settings. View import reopens its saved progress and report."
 msgstr "Feche o Kenku FM antes de importar. A importação traz coleções, referências a arquivos de áudio locais e configurações compatíveis. Ver importação reabre o progresso e o relatório salvos."
+
+
+#: src/controller/song_loops.rs
+msgid "Already saved"
+msgstr "Já salvo"
+
+#: src/controller/song_loops.rs
+msgid "Checking each song’s audio…"
+msgstr "Conferindo o áudio de cada música…"
+
+#: src/controller/song_loops.rs
+msgid "Could not read that file."
+msgstr "Não foi possível ler esse arquivo."
+
+#: src/presentation.rs
+msgid "Could not read this song’s audio."
+msgstr "Não foi possível ler o áudio desta música."
+
+#: src/controller/song_loops.rs
+msgid "Could not write that file."
+msgstr "Não foi possível gravar esse arquivo."
+
+#: ui/loop-editor.slint
+msgid "Crossfade (ms)"
+msgstr "Transição (ms)"
+
+#: src/controller/song_loops.rs
+msgid "Different audio"
+msgstr "Áudio diferente"
+
+#: src/controller/song_loops.rs
+msgid "Different length"
+msgstr "Duração diferente"
+
+#: ui/tours/loop-editor.slint
+msgid "Each field takes minutes, seconds, and milliseconds; press Enter to apply it. The pin moves a marker to the playhead. A crossfade blends the end of the loop into its start."
+msgstr "Cada campo aceita minutos, segundos e milissegundos; pressione Enter para aplicar. O alfinete move um marcador para o cursor de reprodução. A transição mistura o fim do loop com o início."
+
+#: ui/loop-editor.slint
+msgid "Edit Loop"
+msgstr "Editar loop"
+
+#: ui/pages.slint
+msgid "Edit loop…"
+msgstr "Editar loop…"
+
+#: ui/loop-editor.slint
+msgid "End (3)"
+msgstr "Fim (3)"
+
+#: src/controller/song_loops.rs
+msgid "Enter a time like 1:23.456."
+msgstr "Digite um tempo como 1:23.456."
+
+#: src/controller/song_loops.rs
+msgid "Enter the crossfade in milliseconds."
+msgstr "Digite a transição em milissegundos."
+
+#: src/controller/song_loops.rs
+msgid "Export song loops"
+msgstr "Exportar loops de músicas"
+
+#: src/controller/song_loops.rs
+msgid "Exported the song loops to {0}."
+msgstr "Loops de músicas exportados para {0}."
+
+#: ui/dialogs.slint
+msgid "Export…"
+msgstr "Exportar…"
+
+#: src/controller/song_loops.rs
+msgid "Has another loop"
+msgstr "Já tem outro loop"
+
+#: ui/song-loop-import.slint
+msgid "Import Song Loops"
+msgstr "Importar loops de músicas"
+
+#: src/controller/song_loops.rs
+msgid "Import song loops"
+msgstr "Importar loops de músicas"
+
+#: ui/dialogs.slint
+msgid "Import…"
+msgstr "Importar…"
+
+#: src/controller/song_loops.rs
+msgid "Invalid markers"
+msgstr "Marcadores inválidos"
+
+#: ui/tours/loop-editor.slint
+msgid "Listen before saving"
+msgstr "Ouça antes de salvar"
+
+#: ui/loop-editor.slint
+msgid "Loop (2)"
+msgstr "Loop (2)"
+
+#: ui/pages.slint
+msgid "Loop needs review"
+msgstr "Loop precisa de revisão"
+
+#: ui/loop-editor.slint
+msgid "Move to the playhead"
+msgstr "Mover para o cursor de reprodução"
+
+#: ui/dialogs.slint
+msgid "Moves saved loops between libraries as a file; importing checks each song’s audio first."
+msgstr "Leva loops salvos entre bibliotecas num arquivo; a importação confere antes o áudio de cada música."
+
+#: src/controller/song_loops.rs
+msgid "New loop"
+msgstr "Loop novo"
+
+#: src/controller/song_loops.rs
+msgid "No matching song"
+msgstr "Nenhuma música correspondente"
+
+#: src/controller/song_loops.rs src/presentation.rs
+msgid "Place Start, Loop, and End in that order inside the song."
+msgstr "Posicione Início, Loop e Fim nessa ordem dentro da música."
+
+#: ui/tours/loop-editor.slint
+msgid "Place the loop"
+msgstr "Posicione o loop"
+
+#: ui/loop-editor.slint
+msgid "Play from the playhead (Space)"
+msgstr "Reproduzir a partir do cursor (Espaço)"
+
+#: ui/tours/loop-editor.slint
+msgid "Play from the playhead, or repeat the seam to hear the loop’s end run into its start. Previews play only on this computer and pause music playing here."
+msgstr "Reproduza a partir do cursor ou repita a emenda para ouvir o fim do loop seguir para o início. As prévias tocam só neste computador e pausam a música que toca aqui."
+
+#: ui/loop-editor.slint
+msgid "Playhead {0}"
+msgstr "Cursor {0}"
+
+#: ui/loop-editor.slint
+msgid "Reading the song…"
+msgstr "Lendo a música…"
+
+#: ui/loop-editor.slint
+msgid "Remove Loop"
+msgstr "Remover loop"
+
+#: src/controller/song_loops.rs
+msgid "Removed the loop from {0}."
+msgstr "Loop removido de {0}."
+
+#: ui/loop-editor.slint
+msgid "Repeat the seam (R)"
+msgstr "Repetir a emenda (R)"
+
+#: ui/song-loop-import.slint
+msgid "Replace the loops already saved for these songs"
+msgstr "Substituir os loops já salvos dessas músicas"
+
+#: src/controller/song_loops.rs
+msgid "Replaces the saved loop"
+msgstr "Substitui o loop salvo"
+
+#: ui/pages.slint
+msgid "Saved loop"
+msgstr "Loop salvo"
+
+#: src/controller/song_loops.rs
+msgid "Saved the loop for {0}."
+msgstr "Loop de {0} salvo."
+
+#: src/controller/song_loops.rs
+msgid "Saved {n} song loop."
+msgid_plural "Saved {n} song loops."
+msgstr[0] "{n} loop de música salvo."
+msgstr[1] "{n} loops de músicas salvos."
+
+#: ui/loop-editor.slint
+msgid "Show on the waveform"
+msgstr "Mostrar na forma de onda"
+
+#: src/controller/song_loops.rs ui/dialogs.slint
+msgid "Song loops"
+msgstr "Loops de músicas"
+
+#: ui/loop-editor.slint
+msgid "Space plays, R repeats the seam, arrows move the playhead (Shift for fine steps) and zoom, 1–3 place markers."
+msgstr "Espaço reproduz, R repete a emenda, as setas movem o cursor (Shift para passos finos) e ajustam o zoom, 1–3 posicionam os marcadores."
+
+#: ui/loop-editor.slint
+msgid "Start (1)"
+msgstr "Início (1)"
+
+#: ui/loop-editor.slint
+msgid "Stop (R)"
+msgstr "Parar (R)"
+
+#: ui/loop-editor.slint
+msgid "Stop (Space)"
+msgstr "Parar (Espaço)"
+
+#: src/presentation.rs
+msgid "That file is not a song loop export."
+msgstr "Esse arquivo não é uma exportação de loops de músicas."
+
+#: src/controller/song_loops.rs
+msgid "The file changed since this loop was saved. Check the markers, then save to use the loop again."
+msgstr "O arquivo mudou desde que este loop foi salvo. Confira os marcadores e salve para voltar a usar o loop."
+
+#: ui/tours/loop-editor.slint
+msgid "The song plays from Start through End once, then repeats from Loop to End. Drag markers 1 to 3, click to move the playhead, and zoom in to place them on a beat."
+msgstr "A música toca uma vez do Início ao Fim e depois repete do Loop ao Fim. Arraste os marcadores 1 a 3, clique para mover o cursor e aproxime o zoom para posicioná-los num tempo da música."
+
+#: src/presentation.rs
+msgid "The song’s file changed while the editor was open. Open the loop again."
+msgstr "O arquivo da música mudou enquanto o editor estava aberto. Abra o loop de novo."
+
+#: ui/tours/loop-editor.slint
+msgid "Type exact times"
+msgstr "Digite tempos exatos"
+
+#: src/controller/song_loops.rs
+msgid "Unreadable file"
+msgstr "Arquivo ilegível"
+
+#: ui/loop-editor.slint
+msgid "Zoom in on the playhead (Up)"
+msgstr "Aproximar no cursor (Para cima)"
+
+#: ui/loop-editor.slint
+msgid "Zoom out (Down)"
+msgstr "Afastar (Para baixo)"
+
+#: src/controller/song_loops.rs
+msgid "{n} loop matches no song and will be skipped."
+msgid_plural "{n} loops match no song and will be skipped."
+msgstr[0] "{n} loop não corresponde a nenhuma música e será ignorado."
+msgstr[1] "{n} loops não correspondem a nenhuma música e serão ignorados."
+
+#: src/controller/song_loops.rs
+msgid "{n} loop will be saved."
+msgid_plural "{n} loops will be saved."
+msgstr[0] "{n} loop será salvo."
+msgstr[1] "{n} loops serão salvos."
