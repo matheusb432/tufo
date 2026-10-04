@@ -107,7 +107,8 @@ impl AudioOutputs for DeviceOutputs {
                         JoinVoiceError::UnknownChannel => SelectOutputError::UnknownVoiceChannel,
                         JoinVoiceError::NotReady
                         | JoinVoiceError::TimedOut
-                        | JoinVoiceError::Join(_) => {
+                        | JoinVoiceError::Join(_)
+                        | JoinVoiceError::VoiceInput(_) => {
                             SelectOutputError::VoiceConnection(error.into())
                         }
                     })?;

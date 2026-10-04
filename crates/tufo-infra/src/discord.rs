@@ -6,6 +6,9 @@ mod pacing_totals;
 mod voice_channel_cache;
 mod voice_source;
 
+#[cfg(test)]
+mod benchmark;
+
 use std::{
     collections::HashMap,
     sync::{
@@ -21,7 +24,11 @@ use kira::backend::Renderer;
 use pacing_totals::PacingTotals;
 use songbird::{
     CoreEvent, Event, EventContext, EventHandler, Songbird,
-    input::{Input, RawAdapter},
+    input::{
+        AudioStream, Input, LiveInput, RawAdapter,
+        codecs::{get_codec_registry, get_probe},
+        core::errors,
+    },
     shards::TwilightMap,
     tracks::TrackHandle,
 };
@@ -117,6 +124,13 @@ impl SongbirdDiscordClient {
         renderer_receiver: Receiver<Renderer>,
     ) -> Result<VoiceSession, JoinVoiceError> {
         let songbird = self.songbird_seeing(target)?;
+        let stats = Arc::new(VoicePacingStats::default());
+        let input = voice_input(
+            renderer_receiver,
+            Arc::clone(&stats),
+            Arc::clone(&self.pacing_totals),
+        )
+        .map_err(JoinVoiceError::VoiceInput)?;
         let call = tokio::time::timeout(
             JOIN_TIMEOUT,
             songbird.join(target.guild_id.into_inner(), target.channel_id.into_inner()),
@@ -125,7 +139,6 @@ impl SongbirdDiscordClient {
         .map_err(|_| JoinVoiceError::TimedOut)?
         .map_err(JoinVoiceError::Join)?;
 
-        let stats = Arc::new(VoicePacingStats::default());
         let leaving = Arc::new(AtomicBool::new(false));
         let (lost_sender, lost_receiver) = oneshot::channel();
         let track = {
@@ -141,16 +154,7 @@ impl SongbirdDiscordClient {
                     lost_sender: Mutex::new(Some(lost_sender)),
                 },
             );
-            let source = KiraVoiceSource::new(
-                renderer_receiver,
-                Arc::clone(&stats),
-                Arc::clone(&self.pacing_totals),
-            );
-            call.play_input(Input::from(RawAdapter::new(
-                source,
-                DISCORD_SAMPLE_RATE,
-                DISCORD_CHANNELS,
-            )))
+            call.play_input(input)
         };
         let reporter = tokio::spawn(report_pacing(stats));
         tracing::info!(?target, "joined the Discord voice channel");
@@ -188,6 +192,25 @@ impl SongbirdDiscordClient {
             .read()
             .unwrap_or_else(PoisonError::into_inner)
     }
+}
+
+fn voice_input(
+    renderer_receiver: Receiver<Renderer>,
+    stats: Arc<VoicePacingStats>,
+    totals: Arc<PacingTotals>,
+) -> Result<Input, errors::Error> {
+    let source = KiraVoiceSource::new(renderer_receiver, stats, totals);
+    let input = LiveInput::Raw(AudioStream {
+        input: Box::new(RawAdapter::new(
+            source,
+            DISCORD_SAMPLE_RATE,
+            DISCORD_CHANNELS,
+        )),
+    });
+    // Only the in-memory header is read. Preparing before playback avoids a worker round trip
+    // and the extra packet tick Songbird otherwise spends waiting for that worker.
+    let input = input.promote(get_codec_registry(), get_probe())?;
+    Ok(Input::Live(input, None))
 }
 
 impl DiscordClient for SongbirdDiscordClient {
@@ -240,6 +263,8 @@ pub enum JoinVoiceError {
     TimedOut,
     #[error("joining the voice channel failed")]
     Join(#[source] songbird::error::JoinError),
+    #[error("preparing the voice audio stream failed")]
+    VoiceInput(#[source] errors::Error),
 }
 
 /// A gateway session following Discord in the background; dropping it logs the bot out.
