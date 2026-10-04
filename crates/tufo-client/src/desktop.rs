@@ -64,16 +64,38 @@ pub enum QuitBehavior {
     KeepPlaying,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TourVisibility {
+    AlwaysShow,
+    #[default]
+    ShowUnseen,
+    AlwaysHide,
+}
+
+impl TourVisibility {
+    #[must_use]
+    pub const fn config_name(self) -> &'static str {
+        match self {
+            Self::AlwaysShow => "always-show",
+            Self::ShowUnseen => "show-unseen",
+            Self::AlwaysHide => "always-hide",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DesktopSettings {
     pub quit_behavior: QuitBehavior,
     pub language: Language,
+    pub tours: TourVisibility,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DesktopSettingsUpdate {
     pub quit_behavior: Option<QuitBehavior>,
     pub language: Option<Language>,
+    pub tours: Option<TourVisibility>,
 }
 
 impl DesktopSettingsUpdate {
@@ -81,6 +103,7 @@ impl DesktopSettingsUpdate {
         DesktopSettings {
             quit_behavior: self.quit_behavior.unwrap_or(current.quit_behavior),
             language: self.language.unwrap_or(current.language),
+            tours: self.tours.unwrap_or(current.tours),
         }
     }
 }
@@ -91,6 +114,8 @@ impl DesktopSettingsUpdate {
 struct SettingsDocument {
     #[serde(default)]
     language: Language,
+    #[serde(default)]
+    tours: TourVisibility,
     #[serde(default)]
     quit: QuitSection,
 }
@@ -112,6 +137,7 @@ impl From<SettingsDocument> for DesktopSettings {
         Self {
             quit_behavior,
             language: document.language,
+            tours: document.tours,
         }
     }
 }
@@ -248,11 +274,13 @@ fn parse(text: &str) -> Result<DesktopSettings, toml::de::Error> {
 
 fn render(settings: DesktopSettings) -> String {
     let language = settings.language.config_name();
+    let tours = settings.tours.config_name();
     let keep_playing = settings.quit_behavior == QuitBehavior::KeepPlaying;
     format!(
         "# Tufo's desktop settings. Changing a setting in Tufo rewrites this file.\n\
          \n\
          language = \"{language}\"\n\
+         tours = \"{tours}\"\n\
          \n\
          [quit]\n\
          # Leave the music and sounds playing after Tufo quits.\n\

@@ -73,7 +73,7 @@ async fn player_settings_preserve_omitted_fields_and_reject_invalid_updates_atom
 #[tokio::test]
 async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Result<()> {
     use anyhow::Context as _;
-    use tufo_client::desktop::{Language, QuitBehavior, SettingsFile};
+    use tufo_client::desktop::{Language, QuitBehavior, SettingsFile, TourVisibility};
 
     let session = Session::new()?;
     let config = session.path("XDG_CONFIG_HOME/tufo/config.toml");
@@ -81,12 +81,12 @@ async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Re
     let defaults = session.json(&["desktop", "get"]).await?;
     assert_eq!(
         defaults,
-        json!({"language": "system", "keep_playing_after_quit": false, "autostart": false})
+        json!({"language": "system", "keep_playing_after_quit": false, "tours": "show-unseen", "autostart": false})
     );
     session
         .mutation(
             &["desktop", "update"],
-            json!({"language": "pt-BR", "keep_playing_after_quit": true}),
+            json!({"language": "pt-BR", "keep_playing_after_quit": true, "tours": "always-hide"}),
         )
         .await?;
     session
@@ -95,15 +95,18 @@ async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Re
     let settings = session.json(&["desktop", "get"]).await?;
     assert_eq!(
         settings,
-        json!({"language": "en", "keep_playing_after_quit": true, "autostart": false})
+        json!({"language": "en", "keep_playing_after_quit": true, "tours": "always-hide", "autostart": false})
     );
     let shared = SettingsFile::at(config.clone()).load()?;
     assert_eq!(shared.language, Language::English);
     assert_eq!(shared.quit_behavior, QuitBehavior::KeepPlaying);
+    assert_eq!(shared.tours, TourVisibility::AlwaysHide);
     let saved_bytes = std::fs::read(&config)?;
     for payload in [
         r#"{"language":"invalid","autostart":true}"#,
         r#"{"keep_playing_after_quit":null}"#,
+        r#"{"tours":null}"#,
+        r#"{"tours":"sometimes"}"#,
         r#"{"language":"en","typo":true}"#,
     ] {
         session.failure(&["desktop", "update", payload], 2).await?;
@@ -133,7 +136,7 @@ async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Re
     session
         .mutation(
             &["desktop", "update"],
-            json!({"language": "system", "keep_playing_after_quit": false}),
+            json!({"language": "system", "keep_playing_after_quit": false, "tours": "show-unseen"}),
         )
         .await?;
     assert_eq!(session.json(&["desktop", "get"]).await?, defaults);

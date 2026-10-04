@@ -11,6 +11,7 @@ fn a_missing_file_holds_the_defaults() -> anyhow::Result<()> {
     let settings = file.load()?;
     assert_eq!(settings.quit_behavior, QuitBehavior::StandBy);
     assert_eq!(settings.language, Language::System);
+    assert_eq!(settings.tours, TourVisibility::ShowUnseen);
     assert!(!file.path.exists());
     Ok(())
 }
@@ -78,6 +79,7 @@ fn partial_updates_preserve_omitted_fields_and_allow_defaults() -> anyhow::Resul
     file.update(DesktopSettingsUpdate {
         language: Some(Language::PortugueseBrazil),
         quit_behavior: Some(QuitBehavior::KeepPlaying),
+        tours: Some(TourVisibility::AlwaysHide),
     })?;
 
     let settings = file.update(DesktopSettingsUpdate {
@@ -86,6 +88,7 @@ fn partial_updates_preserve_omitted_fields_and_allow_defaults() -> anyhow::Resul
     })?;
     assert_eq!(settings.language, Language::PortugueseBrazil);
     assert_eq!(settings.quit_behavior, QuitBehavior::StandBy);
+    assert_eq!(settings.tours, TourVisibility::AlwaysHide);
     assert_eq!(file.load()?, settings);
 
     file.update(DesktopSettingsUpdate {
@@ -98,6 +101,7 @@ fn partial_updates_preserve_omitted_fields_and_allow_defaults() -> anyhow::Resul
     })?;
     assert_eq!(settings.language, Language::System);
     assert_eq!(settings.quit_behavior, QuitBehavior::KeepPlaying);
+    assert_eq!(settings.tours, TourVisibility::AlwaysHide);
     assert_eq!(file.load()?, settings);
     Ok(())
 }
@@ -125,6 +129,35 @@ fn unknown_settings_fields_and_languages_are_rejected() {
     assert!(parse("language = \"pt-BRR\"").is_err());
     assert!(parse("langauge = \"en\"\n").is_err());
     assert!(parse("[quit]\nkeep_playing = true\nunknown = true\n").is_err());
+    assert!(parse("tours = \"sometimes\"\n").is_err());
+}
+
+#[test]
+fn tour_visibility_round_trips_and_old_settings_default_to_unseen() -> anyhow::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let file = settings_file(&directory);
+    std::fs::create_dir_all(directory.path().join("tufo"))?;
+    std::fs::write(
+        &file.path,
+        "language = \"pt-BR\"\n[quit]\nkeep_playing = true\n",
+    )?;
+    assert_eq!(file.load()?.tours, TourVisibility::ShowUnseen);
+
+    for tours in [
+        TourVisibility::AlwaysShow,
+        TourVisibility::AlwaysHide,
+        TourVisibility::ShowUnseen,
+    ] {
+        let settings = file.update(DesktopSettingsUpdate {
+            tours: Some(tours),
+            ..DesktopSettingsUpdate::default()
+        })?;
+        assert_eq!(file.load()?, settings);
+        assert_eq!(settings.tours, tours);
+        assert_eq!(settings.language, Language::PortugueseBrazil);
+        assert_eq!(settings.quit_behavior, QuitBehavior::KeepPlaying);
+    }
+    Ok(())
 }
 
 #[test]

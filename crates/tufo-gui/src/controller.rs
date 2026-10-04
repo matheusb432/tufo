@@ -14,6 +14,7 @@ mod song_loops;
 use slint::ComponentHandle as _;
 use tufo_client::{
     ClientError, Code, LocalEndpoint, TufoClient,
+    desktop::{DesktopSettingsUpdate, TourVisibility},
     library::{
         AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CreateCollection,
         ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
@@ -1295,11 +1296,22 @@ impl Controller {
         } else {
             QuitBehavior::StandBy
         };
-        let settings = DesktopSettings {
-            quit_behavior,
-            ..self.lock().settings
+        self.save_desktop_settings(DesktopSettingsUpdate {
+            quit_behavior: Some(quit_behavior),
+            ..DesktopSettingsUpdate::default()
+        });
+    }
+
+    pub(crate) fn set_tour_visibility(&self, visibility: ui::TourVisibility) {
+        let tours = match visibility {
+            ui::TourVisibility::AlwaysShow => TourVisibility::AlwaysShow,
+            ui::TourVisibility::ShowUnseen => TourVisibility::ShowUnseen,
+            ui::TourVisibility::AlwaysHide => TourVisibility::AlwaysHide,
         };
-        self.save_desktop_settings(settings);
+        self.save_desktop_settings(DesktopSettingsUpdate {
+            tours: Some(tours),
+            ..DesktopSettingsUpdate::default()
+        });
     }
 
     pub(crate) fn set_discord_connection_disabled(&self, disabled: bool) {
@@ -1338,10 +1350,7 @@ impl Controller {
         }
     }
 
-    fn save_desktop_settings(&self, settings: DesktopSettings) {
-        if self.lock().settings == settings {
-            return;
-        }
+    fn save_desktop_settings(&self, update: DesktopSettingsUpdate) {
         let Some(file) = self.settings_file.clone() else {
             self.toast_error(
                 tr("This system names no config directory for Tufo's settings.").to_owned(),
@@ -1349,9 +1358,9 @@ impl Controller {
             return;
         };
         let controller = self.clone();
-        self.runtime.spawn_blocking(move || {
-            match file.save_quit_behavior(settings.quit_behavior) {
-                Ok(()) => {
+        self.runtime
+            .spawn_blocking(move || match file.update(update) {
+                Ok(settings) => {
                     controller.lock().settings = settings;
                     render::desktop_settings(&controller.window, settings);
                 }
@@ -1362,8 +1371,7 @@ impl Controller {
                             .to_owned(),
                     );
                 }
-            }
-        });
+            });
     }
 
     /// Quits Tufo, leaving the server running and, unless the audio should keep playing,

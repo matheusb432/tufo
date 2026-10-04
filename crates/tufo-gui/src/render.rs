@@ -3,7 +3,10 @@
 use std::time::Duration;
 
 use slint::{ComponentHandle as _, Model as _, ModelRc, SharedString, Timer, TimerMode, VecModel};
-use tufo_client::library::{Background, ImportReport, KenkuImportStatus};
+use tufo_client::{
+    desktop::TourVisibility,
+    library::{Background, ImportReport, KenkuImportStatus},
+};
 use tufo_models::{kenku_import::KenkuImportState, library::SoundIcon};
 
 use crate::{
@@ -598,6 +601,16 @@ pub(crate) fn desktop_settings(window: &slint::Weak<AppWindow>, settings: Deskto
         window
             .global::<Session>()
             .set_keep_playing_after_quit(settings.quit_behavior == QuitBehavior::KeepPlaying);
+        let guides = window.global::<crate::ui::GuidedTours>();
+        let visibility = match settings.tours {
+            TourVisibility::AlwaysShow => crate::ui::TourVisibility::AlwaysShow,
+            TourVisibility::ShowUnseen => crate::ui::TourVisibility::ShowUnseen,
+            TourVisibility::AlwaysHide => crate::ui::TourVisibility::AlwaysHide,
+        };
+        guides.set_visibility(visibility);
+        if visibility == crate::ui::TourVisibility::AlwaysHide {
+            guides.invoke_close();
+        }
     });
 }
 

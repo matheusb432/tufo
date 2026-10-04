@@ -1858,8 +1858,8 @@ msgid "Layer music"
 msgstr "Sobreponha músicas"
 
 #: ui/tours/settings.slint
-msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to its question mark."
-msgstr "Esquerda e Direita percorrem as etapas. Tab e Shift+Tab ficam dentro do guia; foque o texto e use Cima ou Baixo para rolar. Escape fecha o guia e devolve o foco ao ponto de interrogação."
+msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to the page or its visible question mark."
+msgstr "Esquerda e Direita percorrem as etapas. Tab e Shift+Tab ficam dentro do guia; foque o texto e use Cima ou Baixo para rolar. Escape fecha o guia e devolve o foco à página ou ao ponto de interrogação visível."
 
 #: ui/dock.slint
 msgid "Mini player"
@@ -2363,3 +2363,31 @@ msgid "{n} loop will be saved."
 msgid_plural "{n} loops will be saved."
 msgstr[0] "{n} loop será salvo."
 msgstr[1] "{n} loops serão salvos."
+
+#: ui/dialogs.slint
+msgid "Tours"
+msgstr "Guias"
+
+#: ui/dialogs.slint
+msgid "Always show"
+msgstr "Sempre mostrar"
+
+#: ui/dialogs.slint
+msgid "Show unseen"
+msgstr "Mostrar não vistos"
+
+#: ui/dialogs.slint
+msgid "Always hide"
+msgstr "Sempre ocultar"
+
+#: ui/dialogs.slint
+msgid "Tours: {0}"
+msgstr "Guias: {0}"
+
+#: ui/tours/settings.slint
+msgid "Choose when guides appear"
+msgstr "Escolha quando os guias aparecem"
+
+#: ui/tours/settings.slint
+msgid "Tours controls every guide icon. Always show keeps guides available to replay, Show unseen hides each icon after you start its guide, and Always hide hides all guide icons. You can change this setting here at any time."
+msgstr "Guias controla todos os ícones de guia. Sempre mostrar mantém os guias disponíveis para rever, Mostrar não vistos oculta cada ícone depois que você inicia o guia e Sempre ocultar oculta todos os ícones de guia. Você pode mudar esta configuração aqui a qualquer momento."

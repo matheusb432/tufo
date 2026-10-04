@@ -4,6 +4,7 @@ export global SettingsTour {
     out property <string> crossfade: "settings.crossfade";
     out property <string> quit-behavior: "settings.quit-behavior";
     out property <string> startup: "settings.startup";
+    out property <string> tours: "settings.tours";
     out property <string> kenku-launch: "settings.kenku-launch";
     out property <string> discord-token: "settings.discord-token";
     out property <string> discord-disable: "settings.discord-disable";
@@ -34,6 +35,11 @@ export global SettingsTour {
             body: @tr("Run at startup opens Tufo when you log in. Settings save as you change them; a new Discord token has its own Save and restart button."),
         },
         {
+            anchor: SettingsTour.tours,
+            title: @tr("Choose when guides appear"),
+            body: @tr("Tours controls every guide icon. Always show keeps guides available to replay, Show unseen hides each icon after you start its guide, and Always hide hides all guide icons. You can change this setting here at any time."),
+        },
+        {
             anchor: SettingsTour.kenku-launch,
             title: @tr("Bring your Kenku FM library"),
             body: @tr("Close Kenku FM before importing. Import brings collections, local audio references and supported settings. View import reopens its saved progress and report."),
@@ -51,7 +57,7 @@ export global SettingsTour {
         {
             anchor: "",
             title: @tr("Navigate a guide"),
-            body: @tr("Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to its question mark."),
+            body: @tr("Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to the page or its visible question mark."),
         },
     ] };
 }

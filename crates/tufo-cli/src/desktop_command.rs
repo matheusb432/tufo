@@ -4,27 +4,29 @@ use anyhow::Context as _;
 use clap::Subcommand;
 use serde::Deserialize;
 use tufo_client::desktop::{
-    DesktopSettingsUpdate, Language, QuitBehavior, SettingsFile, autostart,
+    DesktopSettingsUpdate, Language, QuitBehavior, SettingsFile, TourVisibility, autostart,
 };
 
 use crate::input::deserialize_present;
 
 #[derive(Subcommand)]
 pub(crate) enum DesktopCommand {
-    /// Read local language, quit behavior, and autostart without contacting the server.
+    /// Read local language, quit behavior, tours, and autostart without contacting the server.
     Get,
     /// Update supplied desktop settings without contacting the server.
     #[command(after_long_help = r#"Examples:
   tufo desktop update '{"language":"pt-BR","keep_playing_after_quit":true}'
   tufo desktop update '{"language":"system","autostart":false}'
+  tufo desktop update '{"tours":"always-hide"}'
 
 Omitted fields keep their current values. Languages: system, en, pt-BR.
+Tours: always-show, show-unseen (default), always-hide.
 Use "system" to restore system locale selection and false to disable a boolean setting.
 Null values and unknown fields are errors.
 The GUI loads desktop settings at startup; restart it to apply external changes.
 Autostart registers tufo-gui --at-login; enabling it requires tufo-gui beside tufo or on PATH."#)]
     Update {
-        /// One JSON object with `language`, `keep_playing_after_quit`, or `autostart`.
+        /// One JSON object with `language`, `keep_playing_after_quit`, `tours`, or `autostart`.
         #[arg(value_name = "JSON_PAYLOAD")]
         payload: DesktopUpdatePayload,
     },
@@ -42,6 +44,8 @@ struct DesktopUpdateJson {
     #[serde(default, deserialize_with = "deserialize_present")]
     language: Option<Language>,
     #[serde(default, deserialize_with = "deserialize_present")]
+    tours: Option<TourVisibility>,
+    #[serde(default, deserialize_with = "deserialize_present")]
     keep_playing_after_quit: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_present")]
     autostart: Option<bool>,
@@ -55,6 +59,7 @@ impl FromStr for DesktopUpdatePayload {
         Ok(Self {
             settings: DesktopSettingsUpdate {
                 language: document.language,
+                tours: document.tours,
                 quit_behavior: document.keep_playing_after_quit.map(|keep_playing| {
                     if keep_playing {
                         QuitBehavior::KeepPlaying
@@ -92,6 +97,7 @@ fn get() -> anyhow::Result<serde_json::Value> {
     let autostart = autostart::read_enabled()?;
     Ok(serde_json::json!({
         "language": settings.language.config_name(),
+        "tours": settings.tours.config_name(),
         "keep_playing_after_quit": settings.quit_behavior == QuitBehavior::KeepPlaying,
         "autostart": autostart,
     }))
@@ -124,13 +130,14 @@ mod tests {
         let cli = DesktopCli::try_parse_from([
             "tufo",
             "update",
-            r#"{"language":"pt-BR","keep_playing_after_quit":true,"autostart":false}"#,
+            r#"{"language":"pt-BR","keep_playing_after_quit":true,"tours":"always-hide","autostart":false}"#,
         ])?;
         let DesktopCommand::Update { payload } = cli.command else {
             anyhow::bail!("desktop update selected a different command");
         };
 
         assert_eq!(payload.settings.language, Some(Language::PortugueseBrazil));
+        assert_eq!(payload.settings.tours, Some(TourVisibility::AlwaysHide));
         assert_eq!(
             payload.settings.quit_behavior,
             Some(QuitBehavior::KeepPlaying)
@@ -143,13 +150,14 @@ mod tests {
     fn omitted_fields_and_explicit_defaults_are_distinct() -> anyhow::Result<()> {
         let omitted: DesktopUpdatePayload = "{}".parse().map_err(anyhow::Error::msg)?;
         let reset: DesktopUpdatePayload =
-            r#"{"language":"system","keep_playing_after_quit":false}"#
+            r#"{"language":"system","keep_playing_after_quit":false,"tours":"show-unseen"}"#
                 .parse()
                 .map_err(anyhow::Error::msg)?;
 
         assert_eq!(omitted.settings, DesktopSettingsUpdate::default());
         assert_eq!(omitted.autostart, None);
         assert_eq!(reset.settings.language, Some(Language::System));
+        assert_eq!(reset.settings.tours, Some(TourVisibility::ShowUnseen));
         assert_eq!(reset.settings.quit_behavior, Some(QuitBehavior::StandBy));
         assert_eq!(reset.autostart, None);
         Ok(())
@@ -163,6 +171,8 @@ mod tests {
             "{} {}",
             r#"{"language":"pt-BRR"}"#,
             r#"{"language":null}"#,
+            r#"{"tours":null}"#,
+            r#"{"tours":"sometimes"}"#,
             r#"{"keep_playing_after_quit":null}"#,
             r#"{"autostart":null}"#,
             r#"{"keep_playing_after_quit":"true"}"#,

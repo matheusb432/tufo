@@ -164,9 +164,10 @@ export component BackgroundGallery inherits Rectangle {
                     font-size: Theme.heading;
                     vertical-alignment: center;
                     overflow: elide;
-                    horizontal-stretch: 1;
+                    horizontal-stretch: 0;
                 }
                 TourButton { y: (parent.height - self.height) / 2; guide: ArtworkTour.guide; label: @tr("Artwork"); available: root.progress == 1; }
+                Rectangle { horizontal-stretch: 1; }
 
                 IconButton {
                     icon: @image-url("icons/x.svg");

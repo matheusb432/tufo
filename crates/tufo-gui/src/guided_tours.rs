@@ -7,7 +7,9 @@ use layout::{Measurement, Rect, Target, place_card};
 use seen::{SeenFile, SeenTours};
 use slint::{ComponentHandle as _, Model as _, Timer, TimerMode};
 
-use crate::ui::{AppWindow, GuidedTours, Session, Theme, Tour, TourScroll, TourStep};
+use crate::ui::{
+    AppWindow, GuidedTours, Session, Theme, Tour, TourScroll, TourStep, TourVisibility,
+};
 
 struct ActiveTour {
     steps: Vec<TourStep>,
@@ -117,6 +119,9 @@ impl TourRuntime {
             return;
         }
         let guides = window.global::<GuidedTours>();
+        if guides.get_visibility() == TourVisibility::AlwaysHide {
+            return;
+        }
         let content = content(&window);
         *self.active.borrow_mut() = Some(ActiveTour {
             steps,
@@ -131,6 +136,7 @@ impl TourRuntime {
             tracing::warn!(%error, "cannot save guided tours; guides remain replayable");
         }
         guides.set_tour(tour.id);
+        guides.set_seen_revision(guides.get_seen_revision().wrapping_add(1));
         guides.set_layout(place_card(None, content));
         guides.set_active(true);
         self.present_step(&window);

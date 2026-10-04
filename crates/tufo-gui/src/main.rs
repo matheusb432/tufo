@@ -494,6 +494,9 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_set_keep_playing_after_quit, |keep_playing| {
         controller.set_keep_playing_after_quit(keep_playing);
     });
+    on!(controller => on_set_tour_visibility, |visibility| {
+        controller.set_tour_visibility(visibility);
+    });
     on!(controller => on_set_start_at_login, |start_at_login| {
         controller.set_start_at_login(start_at_login);
     });

@@ -418,7 +418,7 @@ export component GridPage inherits Rectangle {
         spacing: 8px;
         Heading {
             text: root.kind == CollectionKind.playlist ? @tr("Playlists") : @tr("Soundboards");
-            horizontal-stretch: 1;
+            horizontal-stretch: 0;
             overflow: elide;
         }
         TourButton {
@@ -426,6 +426,7 @@ export component GridPage inherits Rectangle {
             guide: root.kind == CollectionKind.playlist ? ShelfTour.playlists : ShelfTour.soundboards;
             label: root.kind == CollectionKind.playlist ? @tr("Playlists") : @tr("Soundboards");
         }
+        Rectangle { horizontal-stretch: 1; }
 
         if root.width >= 520px: Button {
             y: (parent.height - self.height) / 2;
@@ -604,7 +605,7 @@ component CollectionBar inherits Rectangle {
 
         Text {
             text: LibraryView.collection-title;
-            horizontal-stretch: 1;
+            horizontal-stretch: 0;
             vertical-alignment: center;
             overflow: elide;
             font-family: Theme.display-font;
@@ -617,6 +618,7 @@ component CollectionBar inherits Rectangle {
             guide: root.kind == CollectionKind.playlist ? CollectionTour.playlist : CollectionTour.soundboard;
             label: LibraryView.collection-title;
         }
+        Rectangle { horizontal-stretch: 1; }
 
         @children
         CollectionTools {
@@ -1643,10 +1645,11 @@ export component SongsPage inherits Rectangle {
         spacing: 8px;
         Heading {
             text: @tr("Songs");
-            horizontal-stretch: 1;
+            horizontal-stretch: 0;
             overflow: elide;
         }
         TourButton { y: (parent.height - self.height) / 2; guide: SongsTour.guide; label: @tr("Songs"); }
+        Rectangle { horizontal-stretch: 1; }
 
         if root.width >= 520px: Button {
             y: (parent.height - self.height) / 2;

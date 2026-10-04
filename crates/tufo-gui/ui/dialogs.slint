@@ -4,7 +4,7 @@ import { CollectionFormTour } from "tours/collection-form.slint";
 import { AddToPlaylistTour } from "tours/add-to-playlist.slint";
 import { EntryTour } from "tours/entry.slint";
 import { SettingsTour } from "tours/settings.slint";
-import { GuidedTours, Tour, TourRect, TourScroll } from "tours/state.slint";
+import { GuidedTours, Tour, TourRect, TourScroll, TourVisibility } from "tours/state.slint";
 import { TourButton } from "tours/button.slint";
 import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
@@ -13,7 +13,7 @@ import {
     KenkuImportView, Navigation, PlaylistChoice, Session, SoundIcons,
 } from "state.slint";
 import {
-    Button, ButtonKind, Icon, IconButton, Scrim, ScrollThumb, Slider, Switch, TextField, TextLink,
+    Button, ButtonKind, Icon, IconButton, MenuItem, MenuSurface, Scrim, ScrollThumb, Slider, Switch, TextField, TextLink,
 } from "widgets.slint";
 
 // A modal card over a dimmed window. Clicking the dimmed area cancels.
@@ -56,9 +56,11 @@ export component DialogFrame inherits Rectangle {
                 padding: 24px;
                 spacing: 20px;
                 HorizontalLayout {
+                    spacing: 8px;
                     Text {
                         text: root.title;
-                        horizontal-stretch: 1;
+                        horizontal-stretch: 0;
+                        overflow: elide;
                         vertical-alignment: center;
                         font-family: Theme.display-font;
                         font-size: Theme.heading;
@@ -71,6 +73,7 @@ export component DialogFrame inherits Rectangle {
                         label: root.title;
                         available: root.progress == 1;
                     }
+                    Rectangle { horizontal-stretch: 1; }
 
                     if root.closable: IconButton {
                         size: 36px;
@@ -617,6 +620,96 @@ component SwitchSetting inherits HorizontalLayout {
     }
 }
 
+struct TourVisibilityOption { visibility: TourVisibility, label: string }
+
+component TourVisibilitySetting inherits VerticalLayout {
+    spacing: 8px;
+    property <[TourVisibilityOption]> options: [
+        { visibility: TourVisibility.always-show, label: @tr("Always show") },
+        { visibility: TourVisibility.show-unseen, label: @tr("Show unseen") },
+        { visibility: TourVisibility.always-hide, label: @tr("Always hide") },
+    ];
+    property <int> selected-index: GuidedTours.visibility == TourVisibility.always-show ? 0 : GuidedTours.visibility == TourVisibility.show-unseen ? 1 : 2;
+    property <int> keyboard-index;
+    function show-menu() {
+        root.keyboard-index = root.selected-index;
+        menu.show();
+    }
+    function select(visibility: TourVisibility) {
+        menu.close();
+        Actions.set-tour-visibility(visibility);
+        picker-keys.focus();
+    }
+    TourTarget {
+        anchor: SettingsTour.tours;
+        scroll: TourScroll.dialog;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
+    Text {
+        text: @tr("Tours");
+        font-size: Theme.body;
+        font-weight: 700;
+        color: Theme.text;
+    }
+    picker := Button {
+        text: root.options[root.selected-index].label;
+        icon: @image-url("icons/chevron-down.svg");
+        accessible-label: @tr("Tours: {0}", self.text);
+        forward-focus: picker-keys;
+        clicked => { root.show-menu(); }
+        Rectangle {
+            border-radius: parent.height / 2;
+            border-width: picker-keys.has-focus ? 1px : 0px;
+            border-color: Theme.accent;
+        }
+        picker-keys := FocusScope {
+            focus-on-click: false;
+            focus-on-tab-navigation: true;
+            key-pressed(event) => {
+                if event.text == Key.Return || event.text == " " || event.text == Key.DownArrow {
+                    root.show-menu();
+                    return accept;
+                }
+                reject
+            }
+        }
+    }
+    menu := PopupWindow {
+        width: picker.width;
+        x: picker.x;
+        y: picker.y + picker.height + 4px;
+        MenuSurface {
+            width: picker.width;
+            forward-focus: option-keys;
+            init => { option-keys.focus(); }
+            for option[index] in root.options: MenuItem {
+                text: option.label;
+                highlighted: index == root.keyboard-index;
+                activated => { root.select(option.visibility); }
+            }
+            option-keys := FocusScope {
+                focus-on-click: false;
+                key-pressed(event) => {
+                    if event.text == Key.UpArrow || event.text == Key.DownArrow {
+                        root.keyboard-index = clamp(root.keyboard-index + (event.text == Key.DownArrow ? 1 : -1), 0, root.options.length - 1);
+                        return accept;
+                    }
+                    if event.text == Key.Return || event.text == " " {
+                        root.select(root.options[root.keyboard-index].visibility);
+                        return accept;
+                    }
+                    if event.text == Key.Escape || event.text == Key.Tab {
+                        menu.close();
+                        picker-keys.focus();
+                        return accept;
+                    }
+                    reject
+                }
+            }
+        }
+    }
+}
+
 // Each setting saves as it changes; only a new bot token waits for its button, since saving it
 // restarts tufo-server.
 export component SettingsDialog inherits DialogFrame {
@@ -723,6 +816,8 @@ export component SettingsDialog inherits DialogFrame {
             Actions.set-start-at-login(checked);
         }
     }
+
+    TourVisibilitySetting { }
 
     HorizontalLayout {
         TourTarget {

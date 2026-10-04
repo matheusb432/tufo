@@ -15,15 +15,11 @@ impl SettingsFile {
         self.file.load()
     }
 
-    pub(crate) fn save_quit_behavior(
+    pub(crate) fn update(
         &self,
-        quit_behavior: QuitBehavior,
-    ) -> Result<(), SettingsError> {
-        self.file.update(DesktopSettingsUpdate {
-            quit_behavior: Some(quit_behavior),
-            ..DesktopSettingsUpdate::default()
-        })?;
-        Ok(())
+        update: DesktopSettingsUpdate,
+    ) -> Result<DesktopSettings, SettingsError> {
+        self.file.update(update)
     }
 }
 

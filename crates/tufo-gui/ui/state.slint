@@ -1,5 +1,7 @@
 // State the host pushes into the window, and the actions the window asks the host to run.
 
+import { TourVisibility } from "tours/state.slint";
+
 export enum Page { home, songs, playlists, playlist, soundboards, soundboard }
 
 export enum CollectionKind { playlist, soundboard }
@@ -466,6 +468,7 @@ export global Actions {
     // In milliseconds.
     callback set-crossfade(int);
     callback set-keep-playing-after-quit(bool);
+    callback set-tour-visibility(TourVisibility);
     callback set-start-at-login(bool);
     // Restarts tufo-server, so its bot logs in with the new token.
     callback save-discord-token(string);

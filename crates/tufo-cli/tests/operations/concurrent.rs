@@ -6,7 +6,7 @@ async fn concurrent_offline_desktop_updates_preserve_language_and_quit_behavior(
 
     use anyhow::Context as _;
     use serde_json::{Value, json};
-    use tufo_client::desktop::{Language, QuitBehavior, SettingsFile};
+    use tufo_client::desktop::{Language, QuitBehavior, SettingsFile, TourVisibility};
 
     use super::support::{Session, TEST_TIMEOUT, read_file};
 
@@ -14,7 +14,7 @@ async fn concurrent_offline_desktop_updates_preserve_language_and_quit_behavior(
     session
         .mutation(
             &["desktop", "update"],
-            json!({"language": "en", "keep_playing_after_quit": false}),
+            json!({"language": "en", "keep_playing_after_quit": false, "tours": "always-hide"}),
         )
         .await?;
     let config = session.path("XDG_CONFIG_HOME/tufo/config.toml");
@@ -75,9 +75,10 @@ async fn concurrent_offline_desktop_updates_preserve_language_and_quit_behavior(
     let settings = SettingsFile::at(config).load()?;
     assert_eq!(settings.language, Language::PortugueseBrazil);
     assert_eq!(settings.quit_behavior, QuitBehavior::KeepPlaying);
+    assert_eq!(settings.tours, TourVisibility::AlwaysHide);
     assert_eq!(
         session.json(&["desktop", "get"]).await?,
-        json!({"language": "pt-BR", "keep_playing_after_quit": true, "autostart": false})
+        json!({"language": "pt-BR", "keep_playing_after_quit": true, "tours": "always-hide", "autostart": false})
     );
     assert!(
         !session

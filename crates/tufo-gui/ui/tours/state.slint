@@ -3,6 +3,8 @@ export enum TourId {
     artwork, search, settings, kenku, mini-player, loop-editor,
 }
 
+export enum TourVisibility { always-show, show-unseen, always-hide }
+
 export struct TourStep {
     anchor: string,
     title: string,
@@ -15,6 +17,8 @@ export struct TourRect { x: length, y: length, width: length, height: length }
 export struct TourLayout { card: TourRect, spotlight: TourRect, spotlight-visible: bool }
 
 export global GuidedTours {
+    in-out property <TourVisibility> visibility: TourVisibility.show-unseen;
+    in-out property <int> seen-revision;
     in-out property <bool> ready;
     in-out property <bool> active;
     in-out property <TourId> tour;

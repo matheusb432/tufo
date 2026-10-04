@@ -1,40 +1,40 @@
 import { Theme } from "../theme.slint";
 import { IconButton } from "../widgets.slint";
-import { GuidedTours, Tour } from "state.slint";
+import { GuidedTours, Tour, TourId, TourVisibility } from "state.slint";
 
 export component TourButton inherits IconButton {
     in property <Tour> guide;
     in property <string> label;
     in property <bool> available: true;
     property <bool> unseen: true;
-    property <bool> initialized;
     property <bool> ready: GuidedTours.ready;
-    property <bool> started: GuidedTours.active && GuidedTours.tour == root.guide.id;
+    property <TourId> tour-id: root.guide.id;
+    property <int> seen-revision: GuidedTours.seen-revision;
     property <int> restoration: GuidedTours.restore-revision;
-    size: 28px;
+    visible: GuidedTours.visibility == TourVisibility.always-show || (GuidedTours.visibility == TourVisibility.show-unseen && root.unseen);
+    size: root.visible ? 28px : 0px;
     icon-size: 18px;
     icon: @image-url("../icons/circle-help.svg");
     tooltip: @tr("Start guide: {0}", root.label);
-    tooltip-enabled: root.available && !GuidedTours.active;
-    enabled: root.available && !GuidedTours.active;
+    tooltip-enabled: root.enabled;
+    enabled: root.visible && root.available && !GuidedTours.active;
     accessible-enabled: root.enabled;
     forward-focus: keys;
     function read-seen() {
-        if root.ready && !root.initialized {
+        if root.ready {
             root.unseen = !GuidedTours.seen(root.guide.id);
-            root.initialized = true;
         }
     }
     init => { root.read-seen(); }
     changed ready => { root.read-seen(); }
-    changed started => { if root.started { root.unseen = false; } }
+    changed tour-id => { root.read-seen(); }
+    changed seen-revision => { root.read-seen(); }
     changed restoration => {
-        if root.available && GuidedTours.tour == root.guide.id { keys.focus(); }
+        if root.enabled && GuidedTours.tour == root.guide.id { keys.focus(); }
     }
     clicked => {
-        if root.available && !GuidedTours.active {
+        if root.enabled {
             keys.focus();
-            root.unseen = false;
             GuidedTours.start(root.guide);
         }
     }
@@ -54,7 +54,7 @@ export component TourButton inherits IconButton {
     }
     keys := FocusScope {
         focus-on-click: false;
-        enabled: root.available && !GuidedTours.active;
+        enabled: root.enabled;
         focus-on-tab-navigation: true;
         key-pressed(event) => {
             if event.text == Key.Return || event.text == " " {

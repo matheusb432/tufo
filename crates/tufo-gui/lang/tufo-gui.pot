@@ -1858,7 +1858,7 @@ msgid "Layer music"
 msgstr ""
 
 #: ui/tours/settings.slint
-msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to its question mark."
+msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to the page or its visible question mark."
 msgstr ""
 
 #: ui/dock.slint
@@ -2363,3 +2363,31 @@ msgid "{n} loop will be saved."
 msgid_plural "{n} loops will be saved."
 msgstr[0] ""
 msgstr[1] ""
+
+#: ui/dialogs.slint
+msgid "Tours"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Always show"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Show unseen"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Always hide"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Tours: {0}"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Choose when guides appear"
+msgstr ""
+
+#: ui/tours/settings.slint
+msgid "Tours controls every guide icon. Always show keeps guides available to replay, Show unseen hides each icon after you start its guide, and Always hide hides all guide icons. You can change this setting here at any time."
+msgstr ""
