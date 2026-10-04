@@ -28,6 +28,7 @@ message GetServerStatusResponse {
   google.protobuf.Duration uptime = 3;
   DiscordBotTokenStatus discord_bot_token = 4;
   DiscordConnectionStatus discord_connection = 5;
+  bool supports_library_patches = 6;
 }
 
 // The saved token file, which may differ from the running bot's configuration until a restart.

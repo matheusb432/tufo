@@ -1,21 +1,11 @@
 //! The login entry, which launches the window with [`AT_LOGIN_FLAG`]: hidden in the tray, resuming
 //! the saved loops.
 
-#[cfg(target_os = "linux")]
-mod linux;
-#[cfg(target_os = "macos")]
-mod macos;
-#[cfg(windows)]
-mod windows;
+pub(crate) use tufo_client::desktop::autostart::{AT_LOGIN_FLAG, set_enabled};
 
-#[cfg(target_os = "linux")]
-pub(crate) use linux::{is_enabled, set_enabled};
-#[cfg(target_os = "macos")]
-pub(crate) use macos::{is_enabled, set_enabled};
-#[cfg(windows)]
-pub(crate) use windows::{is_enabled, set_enabled};
-
-pub(crate) const AT_LOGIN_FLAG: &str = "--at-login";
+pub(crate) fn is_enabled() -> bool {
+    tufo_client::desktop::autostart::read_enabled().unwrap_or(false)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Launch {

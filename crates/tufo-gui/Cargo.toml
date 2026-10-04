@@ -53,7 +53,7 @@ tray-icon = { workspace = true }
 [target.'cfg(windows)'.dependencies]
 souvlaki = { version = "0.8.3", default-features = false }
 tray-icon = { workspace = true }
-windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_System_Registry", "Win32_UI_WindowsAndMessaging"] }
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
 tonic = { workspace = true }

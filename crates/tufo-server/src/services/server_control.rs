@@ -3,6 +3,7 @@ use tufo_application::{
     discord::{disable_discord_connection, enable_discord_connection, set_discord_bot_token},
     server::get_server_status,
 };
+use tufo_infra::player::outputs::{AudioOutputs, DeviceOutputs};
 use tufo_wire::{
     pb::{self, server_service_server::ServerService},
     proto,
@@ -11,18 +12,18 @@ use tufo_wire::{
 use super::GrpcResultExt as _;
 use crate::AppState;
 
-pub(crate) struct ServerControlGrpcService {
-    state: AppState,
+pub(crate) struct ServerControlGrpcService<O: AudioOutputs = DeviceOutputs> {
+    state: AppState<O>,
 }
 
-impl ServerControlGrpcService {
-    pub(crate) fn new(state: AppState) -> Self {
+impl<O: AudioOutputs> ServerControlGrpcService<O> {
+    pub(crate) fn new(state: AppState<O>) -> Self {
         Self { state }
     }
 }
 
 #[tonic::async_trait]
-impl ServerService for ServerControlGrpcService {
+impl<O: AudioOutputs> ServerService for ServerControlGrpcService<O> {
     async fn get_server_status(
         &self,
         _request: Request<pb::GetServerStatusRequest>,

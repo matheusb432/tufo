@@ -22,10 +22,10 @@ use super::{
 use crate::{
     library::{
         AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
-        CreateCollection, EntryView, ImportKenkuLibrary, ImportPaths, ImportReport,
-        KenkuCollectionChoice, KenkuImportConflict, KenkuImportReport, KenkuImportStatus,
-        LibraryFolderView, LibrarySnapshot, SongSource, SongView, UpdateCollection,
-        UpdateCollectionEntry,
+        CreateCollection, EntryOrderPatch, EntryView, ImportKenkuLibrary, ImportPaths,
+        ImportReport, KenkuCollectionChoice, KenkuImportConflict, KenkuImportReport,
+        KenkuImportStatus, LibraryFolderView, LibrarySnapshot, SongSource, SongView,
+        SoundSettingsPatch, UpdateCollection, UpdateCollectionEntry,
     },
     pb,
 };
@@ -104,6 +104,12 @@ pub fn create_collection_request(
 pub fn update_collection_request(
     request: pb::UpdateCollectionRequest,
 ) -> Result<(CollectionId, UpdateCollection), Status> {
+    if request.order.is_some() && request.order_patch.is_some() {
+        return Err(invalid(
+            "order_patch",
+            "cannot be supplied together with order",
+        ));
+    }
     let update = UpdateCollection {
         title: request
             .title
@@ -119,6 +125,10 @@ pub fn update_collection_request(
             .order
             .map(|order| entry_order(order).map_err(|reason| invalid("order", reason)))
             .transpose()?,
+        order_patch: request
+            .order_patch
+            .map(|patch| entry_order_patch(patch).map_err(|reason| invalid("order_patch", reason)))
+            .transpose()?,
     };
     Ok((collection_id(&request.collection_id)?, update))
 }
@@ -132,6 +142,12 @@ pub fn delete_collection_request(
 pub fn update_collection_entry_request(
     request: pb::UpdateCollectionEntryRequest,
 ) -> Result<(CollectionEntryId, UpdateCollectionEntry), Status> {
+    if request.sound.is_some() && request.sound_patch.is_some() {
+        return Err(invalid(
+            "sound_patch",
+            "cannot be supplied together with sound",
+        ));
+    }
     let update = UpdateCollectionEntry {
         title: request
             .title
@@ -144,6 +160,12 @@ pub fn update_collection_entry_request(
         icon: request
             .icon
             .map(|icon| sound_icon(icon).map_err(|reason| invalid("icon", reason)))
+            .transpose()?,
+        sound_patch: request
+            .sound_patch
+            .map(|patch| {
+                sound_settings_patch(patch).map_err(|reason| invalid("sound_patch", reason))
+            })
             .transpose()?,
     };
     Ok((collection_entry_id(&request.collection_entry_id)?, update))
@@ -410,6 +432,7 @@ pub fn update_collection_message(
         title: update.title.as_ref().map(|title| title.as_str().to_owned()),
         background: update.background.as_ref().map(background_message),
         order: update.order.map(entry_order_message),
+        order_patch: update.order_patch.map(entry_order_patch_message),
     }
 }
 
@@ -430,6 +453,7 @@ pub fn update_collection_entry_message(
         title: update.title.as_ref().map(|title| title.as_str().to_owned()),
         sound: update.sound.map(sound_settings_message),
         icon: update.icon.map(|icon| sound_icon_message(icon).into()),
+        sound_patch: update.sound_patch.map(sound_settings_patch_message),
     }
 }
 
@@ -876,29 +900,49 @@ fn background_preset_message(preset: BackgroundPreset) -> pb::BackgroundPreset {
 }
 
 fn entry_order(message: pb::EntryOrder) -> Result<EntryOrder, &'static str> {
-    let key = match pb::EntryOrderKey::try_from(message.key) {
-        Ok(pb::EntryOrderKey::Title) => EntryOrderKey::Title,
-        Ok(pb::EntryOrderKey::Duration) => EntryOrderKey::Duration,
-        Ok(pb::EntryOrderKey::DateAdded) => EntryOrderKey::DateAdded,
-        Ok(pb::EntryOrderKey::Unspecified) | Err(_) => {
-            return Err("key must be title, duration, or date added");
-        }
-    };
     Ok(EntryOrder {
-        key,
+        key: entry_order_key(message.key)?,
         descending: message.descending,
     })
 }
 
+fn entry_order_key(key: i32) -> Result<EntryOrderKey, &'static str> {
+    match pb::EntryOrderKey::try_from(key) {
+        Ok(pb::EntryOrderKey::Title) => Ok(EntryOrderKey::Title),
+        Ok(pb::EntryOrderKey::Duration) => Ok(EntryOrderKey::Duration),
+        Ok(pb::EntryOrderKey::DateAdded) => Ok(EntryOrderKey::DateAdded),
+        Ok(pb::EntryOrderKey::Unspecified) | Err(_) => {
+            Err("key must be title, duration, or date added")
+        }
+    }
+}
+
 fn entry_order_message(order: EntryOrder) -> pb::EntryOrder {
-    let key = match order.key {
+    pb::EntryOrder {
+        key: entry_order_key_message(order.key).into(),
+        descending: order.descending,
+    }
+}
+
+fn entry_order_key_message(key: EntryOrderKey) -> pb::EntryOrderKey {
+    match key {
         EntryOrderKey::Title => pb::EntryOrderKey::Title,
         EntryOrderKey::Duration => pb::EntryOrderKey::Duration,
         EntryOrderKey::DateAdded => pb::EntryOrderKey::DateAdded,
-    };
-    pb::EntryOrder {
-        key: key.into(),
-        descending: order.descending,
+    }
+}
+
+fn entry_order_patch(message: pb::EntryOrderPatch) -> Result<EntryOrderPatch, &'static str> {
+    Ok(EntryOrderPatch {
+        key: message.key.map(entry_order_key).transpose()?,
+        descending: message.descending,
+    })
+}
+
+fn entry_order_patch_message(patch: EntryOrderPatch) -> pb::EntryOrderPatch {
+    pb::EntryOrderPatch {
+        key: patch.key.map(|key| entry_order_key_message(key).into()),
+        descending: patch.descending,
     }
 }
 
@@ -922,6 +966,39 @@ fn sound_settings_message(sound: SoundSettings) -> pb::SoundSettings {
         volume: sound.volume.into_inner(),
         fade_in: Some(duration_message(sound.fade_in.into_inner())),
         fade_out: Some(duration_message(sound.fade_out.into_inner())),
+    }
+}
+
+fn sound_settings_patch(
+    message: pb::SoundSettingsPatch,
+) -> Result<SoundSettingsPatch, &'static str> {
+    let fade = |duration| {
+        duration_value(duration)
+            .and_then(|duration| FadeDuration::try_new(duration).ok())
+            .ok_or("fades must be between 0 and 60 s")
+    };
+    Ok(SoundSettingsPatch {
+        looping: message.looping,
+        volume: message
+            .volume
+            .map(Volume::try_new)
+            .transpose()
+            .map_err(|_| "volume must be between 0 and 1")?,
+        fade_in: message.fade_in.map(fade).transpose()?,
+        fade_out: message.fade_out.map(fade).transpose()?,
+    })
+}
+
+fn sound_settings_patch_message(patch: SoundSettingsPatch) -> pb::SoundSettingsPatch {
+    pb::SoundSettingsPatch {
+        looping: patch.looping,
+        volume: patch.volume.map(Volume::into_inner),
+        fade_in: patch
+            .fade_in
+            .map(|fade| duration_message(fade.into_inner())),
+        fade_out: patch
+            .fade_out
+            .map(|fade| duration_message(fade.into_inner())),
     }
 }
 
@@ -1223,6 +1300,148 @@ mod tests {
     }
 
     #[test]
+    fn nested_update_properties_preserve_presence_through_the_wire() {
+        let collection_id = CollectionId::from_uuid(uuid::Uuid::from_u128(9));
+        for patch in [
+            EntryOrderPatch::default(),
+            EntryOrderPatch {
+                key: Some(EntryOrderKey::Duration),
+                descending: None,
+            },
+            EntryOrderPatch {
+                key: None,
+                descending: Some(false),
+            },
+        ] {
+            let update = UpdateCollection {
+                order_patch: Some(patch),
+                ..UpdateCollection::default()
+            };
+            assert_eq!(
+                update_collection_request(update_collection_message(collection_id, &update))
+                    .unwrap(),
+                (collection_id, update)
+            );
+        }
+        let entry_id = CollectionEntryId::from_uuid(uuid::Uuid::from_u128(10));
+        for patch in [
+            SoundSettingsPatch::default(),
+            SoundSettingsPatch {
+                looping: Some(false),
+                ..SoundSettingsPatch::default()
+            },
+            SoundSettingsPatch {
+                volume: Some(Volume::try_new(0.0).unwrap()),
+                ..SoundSettingsPatch::default()
+            },
+            SoundSettingsPatch {
+                fade_in: Some(FadeDuration::try_new(Duration::ZERO).unwrap()),
+                fade_out: Some(FadeDuration::try_new(Duration::from_secs(60)).unwrap()),
+                ..SoundSettingsPatch::default()
+            },
+        ] {
+            let update = UpdateCollectionEntry {
+                sound_patch: Some(patch),
+                ..UpdateCollectionEntry::default()
+            };
+            assert_eq!(
+                update_collection_entry_request(update_collection_entry_message(entry_id, &update))
+                    .unwrap(),
+                (entry_id, update)
+            );
+        }
+    }
+
+    #[test]
+    fn full_replacements_and_nested_patches_are_mutually_exclusive() {
+        let id = CollectionId::from_uuid(uuid::Uuid::from_u128(9));
+        let update = UpdateCollection {
+            order: Some(EntryOrder::default()),
+            order_patch: Some(EntryOrderPatch::default()),
+            ..UpdateCollection::default()
+        };
+        assert_eq!(
+            update_collection_request(update_collection_message(id, &update))
+                .unwrap_err()
+                .code(),
+            Code::InvalidArgument
+        );
+        let id = CollectionEntryId::from_uuid(uuid::Uuid::from_u128(10));
+        let update = UpdateCollectionEntry {
+            sound: Some(SoundSettings::default()),
+            sound_patch: Some(SoundSettingsPatch::default()),
+            ..UpdateCollectionEntry::default()
+        };
+        assert_eq!(
+            update_collection_entry_request(update_collection_entry_message(id, &update))
+                .unwrap_err()
+                .code(),
+            Code::InvalidArgument
+        );
+    }
+
+    #[test]
+    fn nested_patch_values_are_checked_at_decoding() {
+        let collection_id = uuid::Uuid::from_u128(9).to_string();
+        for key in [pb::EntryOrderKey::Unspecified.into(), 999] {
+            let request = pb::UpdateCollectionRequest {
+                collection_id: collection_id.clone(),
+                order_patch: Some(pb::EntryOrderPatch {
+                    key: Some(key),
+                    descending: None,
+                }),
+                ..pb::UpdateCollectionRequest::default()
+            };
+            assert_eq!(
+                update_collection_request(request).unwrap_err().code(),
+                Code::InvalidArgument
+            );
+        }
+        let entry_id = uuid::Uuid::from_u128(10).to_string();
+        for volume in [-0.1, 1.1, f32::NAN, f32::INFINITY] {
+            let request = pb::UpdateCollectionEntryRequest {
+                collection_entry_id: entry_id.clone(),
+                sound_patch: Some(pb::SoundSettingsPatch {
+                    volume: Some(volume),
+                    ..pb::SoundSettingsPatch::default()
+                }),
+                ..pb::UpdateCollectionEntryRequest::default()
+            };
+            assert_eq!(
+                update_collection_entry_request(request).unwrap_err().code(),
+                Code::InvalidArgument
+            );
+        }
+        for duration in [
+            prost_types::Duration {
+                seconds: -1,
+                nanos: 0,
+            },
+            prost_types::Duration {
+                seconds: 0,
+                nanos: 1_000_000_000,
+            },
+            prost_types::Duration {
+                seconds: 61,
+                nanos: 0,
+            },
+        ] {
+            let request = pb::UpdateCollectionEntryRequest {
+                collection_entry_id: entry_id.clone(),
+                sound_patch: Some(pb::SoundSettingsPatch {
+                    fade_in: Some(duration),
+                    ..pb::SoundSettingsPatch::default()
+                }),
+                ..pb::UpdateCollectionEntryRequest::default()
+            };
+            assert_eq!(
+                update_collection_entry_request(request).unwrap_err().code(),
+                Code::InvalidArgument
+            );
+        }
+    }
+
+    #[test]
     fn every_preset_survives_the_round_trip() {
         for preset in BackgroundPreset::ALL {
             let request = CreateCollection {
@@ -1272,12 +1491,14 @@ mod tests {
                 ..sound_settings_message(SoundSettings::default())
             }),
             icon: None,
+            sound_patch: None,
         });
         let unknown_icon = update_collection_entry_request(pb::UpdateCollectionEntryRequest {
             collection_entry_id: uuid::Uuid::from_u128(1).to_string(),
             title: None,
             sound: None,
             icon: Some(999),
+            sound_patch: None,
         });
 
         let no_background = create_collection_request(pb::CreateCollectionRequest {

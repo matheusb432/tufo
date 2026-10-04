@@ -5,8 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::AT_LOGIN_FLAG;
-use crate::APP_ID;
+use super::{APP_ID, AT_LOGIN_FLAG};
 
 const AUTOSTART_FOLDER_NAME: &str = "autostart";
 
@@ -19,22 +18,19 @@ fn entry_path() -> io::Result<PathBuf> {
         .join(format!("{APP_ID}.desktop")))
 }
 
-pub(crate) fn is_enabled() -> bool {
-    entry_path().is_ok_and(|path| path.exists())
+pub(super) fn read_enabled() -> io::Result<bool> {
+    entry_path()?.try_exists()
 }
 
-pub(crate) fn set_enabled(enabled: bool) -> io::Result<()> {
+pub(super) fn enable(gui: &Path) -> io::Result<()> {
     let path = entry_path()?;
-    if enabled {
-        if let Some(folder) = path.parent() {
-            fs::create_dir_all(folder)?;
-        }
-        fs::write(&path, entry_text(&std::env::current_exe()?))
-    } else {
-        match fs::remove_file(&path) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-            removed => removed,
-        }
+    super::super::files::write_atomically(&path, &entry_text(gui))
+}
+
+pub(super) fn disable() -> io::Result<()> {
+    match fs::remove_file(entry_path()?) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        removed => removed,
     }
 }
 

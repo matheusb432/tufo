@@ -9,7 +9,10 @@ use tufo_application::library::{
     export_song_loops, get_song_waveform, import_kenku_library, import_paths, import_song_loops,
     sync_library, update_collection, update_collection_entry, update_song_loop,
 };
-use tufo_infra::kenku::DiskKenkuReader;
+use tufo_infra::{
+    kenku::DiskKenkuReader,
+    player::outputs::{AudioOutputs, DeviceOutputs},
+};
 use tufo_wire::{
     library::LibrarySnapshot,
     pb::{self, library_service_server::LibraryService},
@@ -19,20 +22,20 @@ use tufo_wire::{
 use super::GrpcResultExt as _;
 use crate::AppState;
 
-pub(crate) struct LibraryGrpcService {
-    state: AppState,
+pub(crate) struct LibraryGrpcService<O: AudioOutputs = DeviceOutputs> {
+    state: AppState<O>,
     /// Turns true when the server starts draining, which ends every library stream.
     draining: watch::Receiver<bool>,
 }
 
-impl LibraryGrpcService {
-    pub(crate) fn new(state: AppState, draining: watch::Receiver<bool>) -> Self {
+impl<O: AudioOutputs> LibraryGrpcService<O> {
+    pub(crate) fn new(state: AppState<O>, draining: watch::Receiver<bool>) -> Self {
         Self { state, draining }
     }
 }
 
 #[tonic::async_trait]
-impl LibraryService for LibraryGrpcService {
+impl<O: AudioOutputs> LibraryService for LibraryGrpcService<O> {
     type WatchLibraryStream = ReceiverStream<Result<pb::WatchLibraryResponse, Status>>;
     type WatchKenkuImportStream = ReceiverStream<Result<pb::WatchKenkuImportResponse, Status>>;
 

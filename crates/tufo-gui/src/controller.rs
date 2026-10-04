@@ -976,6 +976,7 @@ impl Controller {
             title,
             sound: Some(sound),
             icon,
+            ..UpdateCollectionEntry::default()
         })
     }
 
@@ -1348,8 +1349,8 @@ impl Controller {
             return;
         };
         let controller = self.clone();
-        self.runtime
-            .spawn_blocking(move || match file.save(settings) {
+        self.runtime.spawn_blocking(move || {
+            match file.save_quit_behavior(settings.quit_behavior) {
                 Ok(()) => {
                     controller.lock().settings = settings;
                     render::desktop_settings(&controller.window, settings);
@@ -1361,7 +1362,8 @@ impl Controller {
                             .to_owned(),
                     );
                 }
-            });
+            }
+        });
     }
 
     /// Quits Tufo, leaving the server running and, unless the audio should keep playing,

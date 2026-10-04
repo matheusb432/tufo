@@ -11,7 +11,6 @@ mod benchmark;
 mod card_art;
 mod controller;
 mod drops;
-mod files;
 mod frame;
 mod guided_tours;
 mod i18n;

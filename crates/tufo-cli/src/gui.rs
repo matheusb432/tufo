@@ -10,10 +10,25 @@ use crate::{command::GuiCommand, render::Console};
 const STARTUP_EXIT_WAIT: Duration = Duration::from_secs(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
-pub(crate) async fn run(command: GuiCommand, console: Console) -> anyhow::Result<(String, bool)> {
+pub(crate) async fn run(
+    command: GuiCommand,
+    console: Console,
+    json: bool,
+) -> anyhow::Result<(String, bool)> {
     let detail = match command {
         GuiCommand::Open => open().await?,
     };
+    if json {
+        return Ok((
+            serde_json::to_string(&serde_json::json!({
+                "action": "open",
+                "resource": "gui",
+                "id": "window",
+                "status": detail,
+            }))?,
+            true,
+        ));
+    }
     Ok((
         format!(
             "{}\n{}",

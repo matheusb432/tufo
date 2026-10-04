@@ -36,7 +36,14 @@ pub(crate) async fn inspect(endpoint: &LocalEndpoint) -> anyhow::Result<Option<S
 pub(crate) async fn run(
     command: ServerCommand,
     console: Console,
+    json: bool,
 ) -> anyhow::Result<(String, bool)> {
+    let action = match &command {
+        ServerCommand::Start => "start",
+        ServerCommand::Kill => "kill",
+        ServerCommand::Restart => "restart",
+        ServerCommand::Status => "status",
+    };
     let (endpoint, detail) = match command {
         ServerCommand::Start => {
             let endpoint = LocalEndpoint::from_environment().context("resolve TUFO_RUNTIME_DIR")?;
@@ -54,10 +61,22 @@ pub(crate) async fn run(
             start(&endpoint).await?;
             (endpoint, "Restarted and healthy")
         }
-        ServerCommand::Status { json } => {
+        ServerCommand::Status => {
             return doctor::run(console, "server", json).await;
         }
     };
+    if json {
+        return Ok((
+            serde_json::to_string(&serde_json::json!({
+                "action": action,
+                "resource": "server",
+                "id": endpoint.path().display().to_string(),
+                "status": detail,
+                "endpoint": endpoint.path().display().to_string(),
+            }))?,
+            true,
+        ));
+    }
     Ok((
         format!(
             "{}\n{}\n{}",

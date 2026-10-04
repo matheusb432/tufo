@@ -27,5 +27,6 @@ pub async fn execute(
         uptime,
         discord_bot_token,
         discord_connection,
+        supports_library_patches: true,
     })
 }

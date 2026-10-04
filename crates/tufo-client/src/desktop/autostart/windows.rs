@@ -1,6 +1,6 @@
 //! A value under the current user's `Run` registry key.
 
-use std::{io, iter, ptr};
+use std::{io, iter, path::Path, ptr};
 
 use windows_sys::Win32::{
     Foundation::{ERROR_FILE_NOT_FOUND, ERROR_SUCCESS, WIN32_ERROR},
@@ -26,7 +26,7 @@ fn checked(status: WIN32_ERROR) -> io::Result<()> {
     }
 }
 
-pub(crate) fn is_enabled() -> bool {
+pub(super) fn read_enabled() -> io::Result<bool> {
     let (key, value) = (wide(RUN_KEY), wide(VALUE_NAME));
     // SAFETY: both names are NUL-terminated, and null output pointers only ask whether it exists.
     let status = unsafe {
@@ -40,24 +40,27 @@ pub(crate) fn is_enabled() -> bool {
             ptr::null_mut(),
         )
     };
-    status == ERROR_SUCCESS
+    match status {
+        ERROR_SUCCESS => Ok(true),
+        ERROR_FILE_NOT_FOUND => Ok(false),
+        _ => Err(io::Error::from_raw_os_error(status.cast_signed())),
+    }
 }
 
-pub(crate) fn set_enabled(enabled: bool) -> io::Result<()> {
+pub(super) fn disable() -> io::Result<()> {
     let (key, value) = (wide(RUN_KEY), wide(VALUE_NAME));
-    if !enabled {
-        // SAFETY: both names are NUL-terminated.
-        let status = unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), value.as_ptr()) };
-        return if status == ERROR_FILE_NOT_FOUND {
-            Ok(())
-        } else {
-            checked(status)
-        };
+    // SAFETY: both names are NUL-terminated.
+    let status = unsafe { RegDeleteKeyValueW(HKEY_CURRENT_USER, key.as_ptr(), value.as_ptr()) };
+    if status == ERROR_FILE_NOT_FOUND {
+        Ok(())
+    } else {
+        checked(status)
     }
-    let command = wide(&format!(
-        "\"{}\" {AT_LOGIN_FLAG}",
-        std::env::current_exe()?.display()
-    ));
+}
+
+pub(super) fn enable(gui: &Path) -> io::Result<()> {
+    let (key, value) = (wide(RUN_KEY), wide(VALUE_NAME));
+    let command = wide(&command_text(gui));
     let byte_len = u32::try_from(command.len() * size_of::<u16>())
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "the path is too long"))?;
     // SAFETY: the names and the command are NUL-terminated, and `byte_len` covers the command.
@@ -72,4 +75,21 @@ pub(crate) fn set_enabled(enabled: bool) -> io::Result<()> {
         )
     };
     checked(status)
+}
+
+fn command_text(gui: &Path) -> String {
+    format!("\"{}\" {AT_LOGIN_FLAG}", gui.display())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_run_value_launches_the_gui_at_login() {
+        assert_eq!(
+            command_text(Path::new(r"C:\Program Files\Tufo\tufo-gui.exe")),
+            r#""C:\Program Files\Tufo\tufo-gui.exe" --at-login"#,
+        );
+    }
 }

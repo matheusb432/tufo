@@ -8,11 +8,9 @@ use slint::{
     winit_030::{WinitWindowAccessor as _, winit},
 };
 use tokio::{runtime::Handle, sync::watch};
+use tufo_client::desktop::files;
 
-use crate::{
-    files,
-    ui::{Actions, AppWindow, Session, Theme, WindowFrame},
-};
+use crate::ui::{Actions, AppWindow, Session, Theme, WindowFrame};
 
 const WINDOW_STATE_FILE_NAME: &str = "window.toml";
 /// Lets a drag that resizes the window settle before its size is written.

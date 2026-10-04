@@ -197,6 +197,12 @@ message EntryOrder {
   bool descending = 2;
 }
 
+// Changes only the supplied ordering properties.
+message EntryOrderPatch {
+  optional EntryOrderKey key = 1;
+  optional bool descending = 2;
+}
+
 enum EntryOrderKey {
   ENTRY_ORDER_KEY_UNSPECIFIED = 0;
   ENTRY_ORDER_KEY_TITLE = 1;
@@ -243,6 +249,17 @@ message SoundSettings {
   google.protobuf.Duration fade_in = 3;
   // At most one minute.
   google.protobuf.Duration fade_out = 4;
+}
+
+// Changes only the supplied sound properties.
+message SoundSettingsPatch {
+  optional bool looping = 1;
+  // A linear gain from 0 (silence) to 1 (the file's own level).
+  optional float volume = 2;
+  // At most one minute.
+  optional google.protobuf.Duration fade_in = 3;
+  // At most one minute.
+  optional google.protobuf.Duration fade_out = 4;
 }
 
 // A Lucide icon for a sound's tile.
@@ -365,6 +382,8 @@ message UpdateCollectionRequest {
   optional string title = 2;
   optional Background background = 3;
   optional EntryOrder order = 4;
+  // Mutually exclusive with order; omitted nested properties keep their current values.
+  optional EntryOrderPatch order_patch = 5;
 }
 
 message UpdateCollectionResponse {}
@@ -381,6 +400,8 @@ message UpdateCollectionEntryRequest {
   optional string title = 2;
   optional SoundSettings sound = 3;
   optional SoundIcon icon = 4;
+  // Mutually exclusive with sound; omitted nested properties keep their current values.
+  optional SoundSettingsPatch sound_patch = 5;
 }
 
 message UpdateCollectionEntryResponse {}

@@ -7,7 +7,8 @@ use tufo_models::{
     kenku_import::{ImportProgress, KenkuImportId, KenkuImportState},
     library::{
         AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
-        CollectionKind, EntryOrder, LibraryFolderId, SoundIcon, SoundSettings, Title,
+        CollectionKind, EntryOrder, EntryOrderKey, FadeDuration, LibraryFolderId, SoundIcon,
+        SoundSettings, Title, Volume,
     },
     path::{FolderPath, ImageFilePath, LocalPath},
     playback::AudioFilePath,
@@ -229,6 +230,15 @@ pub struct UpdateCollection {
     pub title: Option<Title>,
     pub background: Option<Background>,
     pub order: Option<EntryOrder>,
+    /// Mutually exclusive with `order`.
+    pub order_patch: Option<EntryOrderPatch>,
+}
+
+/// Each omitted ordering property keeps its current value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct EntryOrderPatch {
+    pub key: Option<EntryOrderKey>,
+    pub descending: Option<bool>,
 }
 
 /// Changes to an entry; `None` leaves a property as it is.
@@ -238,4 +248,15 @@ pub struct UpdateCollectionEntry {
     pub title: Option<Title>,
     pub sound: Option<SoundSettings>,
     pub icon: Option<SoundIcon>,
+    /// Mutually exclusive with `sound`.
+    pub sound_patch: Option<SoundSettingsPatch>,
+}
+
+/// Each omitted sound property keeps its current value.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct SoundSettingsPatch {
+    pub looping: Option<bool>,
+    pub volume: Option<Volume>,
+    pub fade_in: Option<FadeDuration>,
+    pub fade_out: Option<FadeDuration>,
 }

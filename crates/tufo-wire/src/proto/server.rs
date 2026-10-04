@@ -38,6 +38,7 @@ pub fn server_status(message: pb::GetServerStatusResponse) -> Result<ServerStatu
         uptime,
         discord_bot_token,
         discord_connection,
+        supports_library_patches: message.supports_library_patches,
     })
 }
 
@@ -45,6 +46,7 @@ pub fn server_status(message: pb::GetServerStatusResponse) -> Result<ServerStatu
 pub fn server_status_message(status: ServerStatus) -> pb::GetServerStatusResponse {
     pb::GetServerStatusResponse {
         version: status.version,
+        supports_library_patches: status.supports_library_patches,
         process_id: status.process_id.get(),
         uptime: Some(super::duration_message(status.uptime)),
         discord_bot_token: match status.discord_bot_token {
@@ -78,6 +80,7 @@ mod tests {
             }),
             discord_bot_token: pb::DiscordBotTokenStatus::Configured.into(),
             discord_connection: pb::DiscordConnectionStatus::Ready.into(),
+            supports_library_patches: true,
         };
         assert!(server_status(valid.clone()).is_ok());
         for invalid in [

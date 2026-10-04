@@ -22,6 +22,7 @@ struct ServerDetails {
     process_id: Option<u32>,
     uptime_seconds: Option<u64>,
     serving: bool,
+    supports_library_patches: Option<bool>,
 }
 
 #[derive(serde::Serialize)]
@@ -192,6 +193,7 @@ impl Report {
             process_id: None,
             uptime_seconds: None,
             serving: snapshot.serving,
+            supports_library_patches: None,
         };
         match snapshot.status {
             Ok(status) => {
@@ -202,6 +204,22 @@ impl Report {
                     (status.version != self.cli_version).then_some("Run `just update` from the Tufo checkout to install matching binaries and restart the server."),
                 ));
                 self.checks.extend(discord_checks(&status));
+                self.checks.push(Check::new(
+                    "Library API",
+                    if status.supports_library_patches {
+                        CheckStatus::Pass
+                    } else {
+                        CheckStatus::Warning
+                    },
+                    if status.supports_library_patches {
+                        "Atomic partial library updates are supported"
+                    } else {
+                        "The running server cannot apply nested partial library updates"
+                    },
+                    (!status.supports_library_patches)
+                        .then_some("Replace matching Tufo binaries and run `tufo server restart`."),
+                ));
+                details.supports_library_patches = Some(status.supports_library_patches);
                 details.version = Some(status.version);
                 details.process_id = Some(status.process_id.get());
                 details.uptime_seconds = Some(status.uptime.as_secs());

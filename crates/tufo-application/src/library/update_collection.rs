@@ -1,13 +1,16 @@
 //! Retitling a collection, changing its background, or reordering its entries.
 
-use tufo_models::library::{BuiltinTitle, Collection, CollectionId};
-use tufo_wire::library::UpdateCollection;
+use tufo_models::library::{BuiltinTitle, Collection, CollectionId, EntryOrder};
+use tufo_wire::library::{EntryOrderPatch, UpdateCollection};
 
 use super::{Library, LibraryStorageError, library_files::LibraryFiles, store};
 use crate::error::ErrorMeta;
 
 #[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum UpdateCollectionError {
+    #[error("order and order_patch cannot both be supplied")]
+    #[meta(class = InvalidArgument, reason = Self::CONFLICTING_ORDER_INPUTS)]
+    ConflictingOrderInputs,
     #[error("the collection does not exist")]
     #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
@@ -17,6 +20,8 @@ pub enum UpdateCollectionError {
 }
 
 impl UpdateCollectionError {
+    pub const CONFLICTING_ORDER_INPUTS: &'static str =
+        "library.update_collection.conflicting_order_inputs";
     pub const NOT_FOUND: &'static str = "library.update_collection.not_found";
 }
 
@@ -25,16 +30,22 @@ pub async fn execute<F: LibraryFiles>(
     request: UpdateCollection,
     library: &Library<F>,
 ) -> Result<(), UpdateCollectionError> {
+    if request.order.is_some() && request.order_patch.is_some() {
+        return Err(UpdateCollectionError::ConflictingOrderInputs);
+    }
     let _change = library.begin_change().await;
     let mut database = library.database();
-    store::find_visible_collection(&mut database, id)
+    let current = store::find_visible_collection(&mut database, id)
         .await?
         .ok_or(UpdateCollectionError::NotFound)?;
     let UpdateCollection {
         title,
         background,
         order,
+        order_patch,
     } = request;
+    let order =
+        order.or_else(|| order_patch.and_then(|patch| apply_order_patch(current.order(), patch)));
     if title.is_none() && background.is_none() && order.is_none() {
         return Ok(());
     }
@@ -57,4 +68,56 @@ pub async fn execute<F: LibraryFiles>(
         .map_err(LibraryStorageError::from)?;
     library.publish().await?;
     Ok(())
+}
+
+fn apply_order_patch(current: EntryOrder, patch: EntryOrderPatch) -> Option<EntryOrder> {
+    if patch.key.is_none() && patch.descending.is_none() {
+        return None;
+    }
+    Some(EntryOrder {
+        key: patch.key.unwrap_or(current.key),
+        descending: patch.descending.unwrap_or(current.descending),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use tufo_models::library::EntryOrderKey;
+
+    use super::*;
+
+    #[test]
+    fn ordering_patches_preserve_unselected_current_properties() {
+        let current = EntryOrder {
+            key: EntryOrderKey::DateAdded,
+            descending: true,
+        };
+        assert_eq!(
+            apply_order_patch(
+                current,
+                EntryOrderPatch {
+                    descending: Some(false),
+                    ..EntryOrderPatch::default()
+                }
+            ),
+            Some(EntryOrder {
+                key: EntryOrderKey::DateAdded,
+                descending: false
+            })
+        );
+        assert_eq!(
+            apply_order_patch(
+                current,
+                EntryOrderPatch {
+                    key: Some(EntryOrderKey::Duration),
+                    ..EntryOrderPatch::default()
+                }
+            ),
+            Some(EntryOrder {
+                key: EntryOrderKey::Duration,
+                descending: true
+            })
+        );
+        assert_eq!(apply_order_patch(current, EntryOrderPatch::default()), None);
+    }
 }

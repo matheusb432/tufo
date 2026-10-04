@@ -16,15 +16,26 @@ clap = { workspace = true }
 clap-cargo = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-tokio = { workspace = true, features = ["macros", "rt", "time"] }
+tokio = { workspace = true, features = ["io-std", "io-util", "macros", "rt", "signal", "time"] }
 tufo-client = { workspace = true }
+tufo-models = { workspace = true }
 
 [dev-dependencies]
+kira = { workspace = true }
 tempfile = { workspace = true }
-tokio = { workspace = true, features = ["process"] }
+tokio = { workspace = true, features = ["process", "rt-multi-thread", "sync"] }
 tonic = { workspace = true, features = ["router", "transport"] }
 tonic-health = { workspace = true }
+tufo-application = { workspace = true }
+tufo-infra = { workspace = true, features = ["test-support"] }
 tufo-local-transport = { workspace = true }
+tufo-server = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Pipes"] }
 
 [lints]
 workspace = true

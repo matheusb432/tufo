@@ -53,7 +53,7 @@ const PACKAGE_POLICIES: [PackagePolicy; 12] = [
     },
     PackagePolicy {
         package: "tufo-cli",
-        dependencies: &["tufo-client"],
+        dependencies: &["tufo-client", "tufo-models"],
     },
     PackagePolicy {
         package: "tufo-gui",
@@ -220,7 +220,7 @@ mod tests {
                 ),
                 (
                     "tufo-cli",
-                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\n",
+                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
                 ),
                 ("xtask", ""),
             ],
@@ -269,7 +269,7 @@ mod tests {
                 ),
                 (
                     "tufo-cli",
-                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\n",
+                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
                 ),
                 ("xtask", ""),
             ],
@@ -335,7 +335,7 @@ mod tests {
                 ),
                 (
                     "tufo-cli",
-                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\n",
+                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
                 ),
                 ("xtask", ""),
             ],
@@ -387,7 +387,7 @@ mod tests {
                 ),
                 (
                     "tufo-cli",
-                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\n",
+                    "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
                 ),
                 ("xtask", ""),
                 ("other-support", ""),

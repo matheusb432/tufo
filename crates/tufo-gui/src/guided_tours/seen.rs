@@ -3,7 +3,9 @@ use std::{
     path::PathBuf,
 };
 
-use crate::{files, ui::TourId};
+use tufo_client::desktop::files;
+
+use crate::ui::TourId;
 
 const TOURS: &[TourId] = &[
     TourId::Home,

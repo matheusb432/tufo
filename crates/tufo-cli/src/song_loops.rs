@@ -85,6 +85,7 @@ impl ImportOutcome {
 pub(crate) async fn run(
     command: SongLoopsCommand,
     console: Console,
+    json: bool,
 ) -> anyhow::Result<(String, bool)> {
     let client = running_server_client().await?;
     match command {
@@ -93,7 +94,6 @@ pub(crate) async fn run(
             from,
             dry_run,
             replace,
-            json,
         } => import(&client, from, dry_run, replace, json, console).await,
     }
 }

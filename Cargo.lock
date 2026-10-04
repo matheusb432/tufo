@@ -10664,14 +10664,21 @@ dependencies = [
  "anyhow",
  "clap",
  "clap-cargo",
+ "kira",
+ "libc",
  "serde",
  "serde_json",
  "tempfile",
  "tokio",
  "tonic",
  "tonic-health",
+ "tufo-application",
  "tufo-client",
+ "tufo-infra",
  "tufo-local-transport",
+ "tufo-models",
+ "tufo-server",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -10680,13 +10687,18 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "directories",
+ "serde",
+ "tempfile",
  "thiserror 2.0.21",
  "tokio",
+ "toml",
  "tonic",
  "tonic-health",
  "tufo-local-transport",
  "tufo-models",
  "tufo-wire",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

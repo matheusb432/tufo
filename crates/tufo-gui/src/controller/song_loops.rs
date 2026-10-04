@@ -8,6 +8,7 @@ use std::{
 
 use tufo_client::{
     TufoClient,
+    desktop::files,
     library::LibrarySnapshot,
     song_loops::{
         ImportSongLoops, PreviewMode, PreviewSongLoop, SavedSongLoop, SongLoopImportOutcome,
@@ -21,7 +22,6 @@ use tufo_models::library::{
 
 use super::{Controller, audio_file_id};
 use crate::{
-    files,
     i18n::{tr, tr_args, tr_count},
     loop_editor::{
         LoopDraft, LoopEditorFrame, Marker, PreviewKind, WaveformView, format_milliseconds,
@@ -594,7 +594,7 @@ impl Controller {
             running.started_at = Some(preview.started.started_at);
             running.seam_cycle = preview.started.seam_cycle;
         }
-        preview.ended().await;
+        let _ = preview.ended().await;
         self.end_loop_preview(generation, None);
     }
 

@@ -3,46 +3,10 @@
 use std::{fmt::Display, sync::OnceLock};
 
 use gettext::Catalog;
+pub(crate) use tufo_client::desktop::Language;
 
 static CATALOG: OnceLock<Catalog> = OnceLock::new();
 const PORTUGUESE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/pt_BR.mo"));
-
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
-pub(crate) enum Language {
-    #[default]
-    #[serde(rename = "system")]
-    System,
-    #[serde(rename = "en")]
-    English,
-    #[serde(rename = "pt-BR", alias = "pt_BR")]
-    PortugueseBrazil,
-}
-
-impl Language {
-    pub(crate) fn config_name(self) -> &'static str {
-        match self {
-            Self::System => "system",
-            Self::English => "en",
-            Self::PortugueseBrazil => "pt-BR",
-        }
-    }
-
-    fn resolve(self, locales: impl IntoIterator<Item = String>) -> Self {
-        if self != Self::System {
-            return self;
-        }
-        for locale in locales {
-            let language = locale.split(['-', '_', '.', '@']).next().unwrap_or("");
-            if language.eq_ignore_ascii_case("pt") {
-                return Self::PortugueseBrazil;
-            }
-            if language.eq_ignore_ascii_case("en") || matches!(language, "C" | "POSIX") {
-                return Self::English;
-            }
-        }
-        Self::English
-    }
-}
 
 pub(crate) fn initialize(language: Language) -> Result<(), gettext::Error> {
     let language = language.resolve(sys_locale::get_locales());
@@ -116,28 +80,6 @@ fn format_message(message: &str, count: Option<usize>, args: &[&dyn Display]) ->
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn language_override_and_system_fallback() {
-        for locale in ["pt-BR", "pt_BR.UTF-8", "pt", "pt-PT"] {
-            assert_eq!(
-                Language::System.resolve([locale.to_owned()]),
-                Language::PortugueseBrazil
-            );
-        }
-        assert_eq!(
-            Language::English.resolve(["pt-BR".to_owned()]),
-            Language::English
-        );
-        assert_eq!(
-            Language::System.resolve(["de-DE".to_owned()]),
-            Language::English
-        );
-        assert_eq!(
-            Language::System.resolve(["en-US".to_owned(), "pt-BR".to_owned()]),
-            Language::English
-        );
-    }
 
     #[test]
     fn catalog_uses_brazilian_portuguese_plural_rules() {

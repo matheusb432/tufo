@@ -2,6 +2,7 @@ use std::{future::Future, time::Duration};
 
 use anyhow::Context as _;
 use tonic::{server::NamedService, transport::Server};
+use tufo_infra::player::outputs::AudioOutputs;
 use tufo_local_transport::LocalListener;
 use tufo_wire::{
     FILE_DESCRIPTOR_SET,
@@ -35,11 +36,11 @@ const APPLICATION_SERVICE_NAMES: [&str; 4] = [
 
 /// Serves every Tufo service on `listener` until `shutdown` resolves or a client asks it to stop.
 /// Draining ends playback streams at once and gives other requests at most `shutdown_grace_period`.
-pub async fn serve(
+pub async fn serve<O: AudioOutputs>(
     listener: LocalListener,
     shutdown: impl Future<Output = ()> + Send + 'static,
     shutdown_grace_period: Duration,
-    state: AppState,
+    state: AppState<O>,
 ) -> anyhow::Result<()> {
     let (incoming, _ownership) = listener.into_parts();
     let (health_reporter, health_server) = tonic_health::server::health_reporter();

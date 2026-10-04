@@ -5,8 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use super::AT_LOGIN_FLAG;
-use crate::APP_ID;
+use super::{APP_ID, AT_LOGIN_FLAG};
 
 fn agent_path() -> io::Result<PathBuf> {
     let base = directories::BaseDirs::new()
@@ -18,22 +17,19 @@ fn agent_path() -> io::Result<PathBuf> {
         .join(format!("{APP_ID}.plist")))
 }
 
-pub(crate) fn is_enabled() -> bool {
-    agent_path().is_ok_and(|path| path.exists())
+pub(super) fn read_enabled() -> io::Result<bool> {
+    agent_path()?.try_exists()
 }
 
-pub(crate) fn set_enabled(enabled: bool) -> io::Result<()> {
+pub(super) fn enable(gui: &Path) -> io::Result<()> {
     let path = agent_path()?;
-    if enabled {
-        if let Some(folder) = path.parent() {
-            fs::create_dir_all(folder)?;
-        }
-        fs::write(&path, agent_plist(&std::env::current_exe()?))
-    } else {
-        match fs::remove_file(&path) {
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
-            removed => removed,
-        }
+    super::super::files::write_atomically(&path, &agent_plist(gui))
+}
+
+pub(super) fn disable() -> io::Result<()> {
+    match fs::remove_file(agent_path()?) {
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(()),
+        removed => removed,
     }
 }
 

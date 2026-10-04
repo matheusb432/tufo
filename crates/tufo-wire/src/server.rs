@@ -9,6 +9,7 @@ pub struct ServerStatus {
     pub uptime: Duration,
     pub discord_bot_token: DiscordBotTokenStatus,
     pub discord_connection: DiscordConnectionStatus,
+    pub supports_library_patches: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

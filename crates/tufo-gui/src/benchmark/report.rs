@@ -5,9 +5,10 @@ use std::{
 
 use anyhow::Context as _;
 use serde::{Deserialize, Serialize};
+use tufo_client::desktop::files;
 
 use super::{BATCHES, Configuration, FRAME_STEP_NS};
-use crate::{backgrounds::metrics::Counters, files};
+use crate::backgrounds::metrics::Counters;
 
 pub(super) const SCREENSHOTS: [&str; 4] = ["expanded", "collapsed", "settings", "playlist"];
 

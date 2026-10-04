@@ -5,13 +5,15 @@ use tufo_application::library::Library;
 use tufo_infra::{
     discord::{SongbirdDiscordClient, bot_credentials::FileBotCredentials},
     library_files::DiskLibraryFiles,
-    player::{EnginePlayer, outputs::DeviceOutputs},
+    player::{
+        EnginePlayer,
+        outputs::{AudioOutputs, DeviceOutputs},
+    },
 };
 
 /// Cloneable composition shared by the gRPC service adapters.
-#[derive(Clone)]
-pub struct AppState {
-    pub(crate) player: Arc<EnginePlayer<DeviceOutputs>>,
+pub struct AppState<O: AudioOutputs = DeviceOutputs> {
+    pub(crate) player: Arc<EnginePlayer<O>>,
     pub(crate) discord: SongbirdDiscordClient,
     pub(crate) library: Arc<Library<DiskLibraryFiles>>,
     /// Where the server reads its Discord bot token at startup and saves a new one.
@@ -21,10 +23,23 @@ pub struct AppState {
     pub(crate) started_at: Instant,
 }
 
-impl AppState {
+impl<O: AudioOutputs> Clone for AppState<O> {
+    fn clone(&self) -> Self {
+        Self {
+            player: Arc::clone(&self.player),
+            discord: self.discord.clone(),
+            library: Arc::clone(&self.library),
+            discord_credentials: self.discord_credentials.clone(),
+            stop_requested: Arc::clone(&self.stop_requested),
+            started_at: self.started_at,
+        }
+    }
+}
+
+impl<O: AudioOutputs> AppState<O> {
     #[must_use]
     pub fn new(
-        player: Arc<EnginePlayer<DeviceOutputs>>,
+        player: Arc<EnginePlayer<O>>,
         discord: SongbirdDiscordClient,
         library: Arc<Library<DiskLibraryFiles>>,
         discord_credentials_path: PathBuf,

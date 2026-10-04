@@ -4,7 +4,10 @@
 
 use std::time::Duration;
 
+pub mod desktop;
+pub mod import_resources;
 pub mod process;
+pub mod song_loop_update;
 
 pub use tonic::Code;
 use tonic::{Request, Streaming, transport::Channel};
@@ -64,6 +67,10 @@ pub enum ClientError {
     TooManyPages,
     #[error("the server ended the preview before it started")]
     PreviewNotStarted,
+    #[error(
+        "the running server does not support partial library updates; replace matching Tufo binaries and run `tufo server restart`"
+    )]
+    LibraryPatchesUnsupported,
 }
 
 #[derive(Debug, Clone)]
@@ -194,11 +201,18 @@ impl TufoClient {
         Ok(proto::library::created_collection_id(response.get_ref())?)
     }
 
+    /// Rejects nonempty nested patches before mutation when the server lacks patch support.
     pub async fn update_collection(
         &self,
         id: CollectionId,
         update: &UpdateCollection,
     ) -> Result<(), ClientError> {
+        if update
+            .order_patch
+            .is_some_and(|patch| patch != library::EntryOrderPatch::default())
+        {
+            self.require_library_patches().await?;
+        }
         let request = with_timeout(
             proto::library::update_collection_message(id, update),
             QUICK_REQUEST_TIMEOUT,
@@ -216,11 +230,18 @@ impl TufoClient {
         Ok(())
     }
 
+    /// Rejects nonempty nested patches before mutation when the server lacks patch support.
     pub async fn update_collection_entry(
         &self,
         id: CollectionEntryId,
         update: &UpdateCollectionEntry,
     ) -> Result<(), ClientError> {
+        if update
+            .sound_patch
+            .is_some_and(|patch| patch != library::SoundSettingsPatch::default())
+        {
+            self.require_library_patches().await?;
+        }
         let request = with_timeout(
             proto::library::update_collection_entry_message(id, update),
             QUICK_REQUEST_TIMEOUT,
@@ -229,6 +250,13 @@ impl TufoClient {
             .clone()
             .update_collection_entry(request)
             .await?;
+        Ok(())
+    }
+
+    async fn require_library_patches(&self) -> Result<(), ClientError> {
+        if !self.server_status().await?.supports_library_patches {
+            return Err(ClientError::LibraryPatchesUnsupported);
+        }
         Ok(())
     }
 
@@ -666,8 +694,9 @@ pub struct SongLoopPreview {
 
 impl SongLoopPreview {
     /// Resolves when the server ends the preview, as when a newer one replaces it.
-    pub async fn ended(&mut self) {
-        while let Ok(Some(_)) = self.stream.message().await {}
+    pub async fn ended(&mut self) -> Result<(), ClientError> {
+        while self.stream.message().await?.is_some() {}
+        Ok(())
     }
 }
 

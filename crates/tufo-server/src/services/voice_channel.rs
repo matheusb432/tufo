@@ -1,5 +1,6 @@
 use tonic::{Request, Response, Status};
 use tufo_application::voice_channels::list_voice_channels;
+use tufo_infra::player::outputs::{AudioOutputs, DeviceOutputs};
 use tufo_wire::{
     pb::{self, voice_channel_service_server::VoiceChannelService},
     proto,
@@ -8,18 +9,18 @@ use tufo_wire::{
 use super::GrpcResultExt as _;
 use crate::AppState;
 
-pub(crate) struct VoiceChannelGrpcService {
-    state: AppState,
+pub(crate) struct VoiceChannelGrpcService<O: AudioOutputs = DeviceOutputs> {
+    state: AppState<O>,
 }
 
-impl VoiceChannelGrpcService {
-    pub(crate) fn new(state: AppState) -> Self {
+impl<O: AudioOutputs> VoiceChannelGrpcService<O> {
+    pub(crate) fn new(state: AppState<O>) -> Self {
         Self { state }
     }
 }
 
 #[tonic::async_trait]
-impl VoiceChannelService for VoiceChannelGrpcService {
+impl<O: AudioOutputs> VoiceChannelService for VoiceChannelGrpcService<O> {
     async fn list_voice_channels(
         &self,
         request: Request<pb::ListVoiceChannelsRequest>,

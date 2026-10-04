@@ -9,6 +9,7 @@ use tufo_application::playback::{
     resume_saved_loops, select_output, stand_by, stop_music_layer, stop_sound, update_music_layer,
     update_player_settings, watch_player,
 };
+use tufo_infra::player::outputs::{AudioOutputs, DeviceOutputs};
 use tufo_models::playback::player_state::PlayerState;
 use tufo_wire::{
     pb::{self, player_service_server::PlayerService},
@@ -18,14 +19,14 @@ use tufo_wire::{
 use super::GrpcResultExt as _;
 use crate::AppState;
 
-pub(crate) struct PlayerGrpcService {
-    state: AppState,
+pub(crate) struct PlayerGrpcService<O: AudioOutputs = DeviceOutputs> {
+    state: AppState<O>,
     /// Turns true when the server starts draining, which ends every player stream.
     draining: watch::Receiver<bool>,
 }
 
-impl PlayerGrpcService {
-    pub(crate) fn new(state: AppState, draining: watch::Receiver<bool>) -> Self {
+impl<O: AudioOutputs> PlayerGrpcService<O> {
+    pub(crate) fn new(state: AppState<O>, draining: watch::Receiver<bool>) -> Self {
         Self { state, draining }
     }
 
@@ -46,7 +47,7 @@ impl PlayerGrpcService {
 }
 
 #[tonic::async_trait]
-impl PlayerService for PlayerGrpcService {
+impl<O: AudioOutputs> PlayerService for PlayerGrpcService<O> {
     type WatchPlayerStream = ReceiverStream<Result<pb::WatchPlayerResponse, Status>>;
     type PreviewSongLoopStream = ReceiverStream<Result<pb::PreviewSongLoopResponse, Status>>;
 
