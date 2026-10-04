@@ -1,5 +1,5 @@
-//! The stress run's workload: a crossfading playlist, a looping ambience, and an effect every
-//! 10 s, then a check of the server's playback diagnostics.
+//! The stress run's workload: a crossfading playlist, two extra songs repeating short saved loops,
+//! a looping ambience, and an effect every 10 s, then a check of the server's playback diagnostics.
 //!
 //! `just stress` starts an isolated server pinned to two CPUs, loads those CPUs with stress-ng,
 //! and runs this against it. It exits non-zero when playback fell behind.
@@ -11,13 +11,15 @@ use clap::Parser;
 use tufo_client::{
     LocalEndpoint, TufoClient,
     library::{
-        CollectionSource, CollectionView, ImportPaths, LibrarySnapshot, UpdateCollectionEntry,
+        CollectionSource, CollectionView, EntryView, ImportPaths, LibrarySnapshot,
+        UpdateCollectionEntry,
     },
     player::{UpdateMusicLayer, UpdatePlayerSettings},
+    song_loops::UpdateSongLoop,
 };
 use tufo_models::{
     discord::{GuildId, VoiceChannelId, VoiceChannelTarget},
-    library::{CollectionKind, Volume},
+    library::{CollectionKind, Volume, song_loop::SourceFrames},
     path::LocalPath,
     playback::{OutputTarget, diagnostics::PlayerDiagnostics, player_state::CrossfadeDuration},
 };
@@ -27,6 +29,10 @@ const EFFECT_INTERVAL: Duration = Duration::from_secs(10);
 const SKIP_INTERVAL: Duration = Duration::from_secs(45);
 const LATE_TICK_P999_MAX: Duration = Duration::from_millis(5);
 const LATE_TICK_MAX: Duration = Duration::from_millis(20);
+/// Short loops cross a seam every few seconds.
+const LOOP_SECONDS_MIN: u64 = 4;
+const LOOP_SECONDS_MAX: u64 = 8;
+const LOOP_CROSSFADE: Duration = Duration::from_millis(200);
 
 #[derive(Parser)]
 struct Arguments {
@@ -82,6 +88,9 @@ async fn main() -> anyhow::Result<()> {
             ..UpdatePlayerSettings::default()
         })
         .await?;
+    for entry in playlist.entries.iter().skip(1).take(2) {
+        save_short_loop(&client, entry).await?;
+    }
     client.play_collection(playlist.id, None).await?;
     for entry in playlist.entries.iter().skip(1).take(2) {
         client.add_music_layer(entry.id).await?;
@@ -138,6 +147,33 @@ async fn import(client: &TufoClient, arguments: &Arguments) -> anyhow::Result<Li
         .await
         .context("the server ended the library stream")?
         .map_err(Into::into)
+}
+
+/// Saves a loop from a quarter into the song, so the song's layer wraps every few seconds.
+async fn save_short_loop(client: &TufoClient, entry: &EntryView) -> anyhow::Result<()> {
+    let waveform = client.get_song_waveform(entry.audio_file_id).await?;
+    let timing = waveform.timing;
+    let frame_count = timing.frame_count.0;
+    let rate = u64::from(timing.sample_rate.get());
+    let loop_start = frame_count / 4;
+    let loop_length = (frame_count / 4).clamp(LOOP_SECONDS_MIN * rate, LOOP_SECONDS_MAX * rate);
+    ensure!(
+        loop_start >= rate && loop_start + loop_length <= frame_count,
+        "{} is too short for a stress loop",
+        entry.title
+    );
+    let crossfade = timing.frames_in(LOOP_CROSSFADE);
+    client
+        .update_song_loop(&UpdateSongLoop {
+            audio_file_id: entry.audio_file_id,
+            source_fingerprint: waveform.fingerprint,
+            playback_start: Some(SourceFrames(loop_start / 2)),
+            loop_start: Some(SourceFrames(loop_start)),
+            loop_end: Some(SourceFrames(loop_start + loop_length)),
+            crossfade: Some(crossfade),
+        })
+        .await?;
+    Ok(())
 }
 
 /// Loops the first sound; the rest stay one-shot.

@@ -50,5 +50,8 @@ stress voice="" minutes="10" music="" sounds="":
     sounds=()
     sounds_path="{{ sounds }}"
     if [[ -n "$sounds_path" ]]; then sounds=(--sounds "${sounds_path/#\~/$HOME}"); fi
+    # Loop wraps must not grow the server's memory; compare a minute in with the last half minute.
+    (sleep 60; ps -o rss= -p "$server" > "$run/rss-early"; sleep $(({{ minutes }} * 60 - 90)); ps -o rss= -p "$server" > "$run/rss-late") &
     "$target/examples/stress_workload" --music "${music/#\~/$HOME}" --minutes "{{ minutes }}" "${voice[@]}" "${sounds[@]}"
+    echo "Server RSS: $(cat "$run/rss-early" 2>/dev/null || echo ?) KiB a minute in, $(cat "$run/rss-late" 2>/dev/null || echo ?) KiB 30 s before the end"
     echo "Server log: $run/state/tufo/tufo-server.log (deleted on exit)"
