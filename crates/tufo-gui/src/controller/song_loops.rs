@@ -78,10 +78,57 @@ struct RunningPreview {
 }
 
 struct PendingImport {
+    id: SongLoopImportId,
     document: String,
     results: Vec<SongLoopImportResult>,
     replace: bool,
     busy: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct SongLoopImportId(uuid::Uuid);
+
+impl SongLoopSession {
+    fn begin_import(&mut self, document: String) -> SongLoopImportId {
+        let id = SongLoopImportId(uuid::Uuid::new_v4());
+        self.import = Some(PendingImport {
+            id,
+            document,
+            results: Vec::new(),
+            replace: false,
+            busy: true,
+        });
+        id
+    }
+
+    fn finish_import_check(
+        &mut self,
+        id: SongLoopImportId,
+        checked: Result<Vec<SongLoopImportResult>, tufo_client::ClientError>,
+    ) -> Result<bool, tufo_client::ClientError> {
+        let Some(import) = self.import.as_mut().filter(|import| import.id == id) else {
+            return Ok(false);
+        };
+        match checked {
+            Ok(results) => {
+                import.results = results;
+                import.busy = false;
+                Ok(true)
+            }
+            Err(error) => {
+                self.import = None;
+                Err(error)
+            }
+        }
+    }
+
+    fn finish_import(&mut self, id: SongLoopImportId) -> bool {
+        let finished = self.import.as_ref().is_some_and(|import| import.id == id);
+        if finished {
+            self.import = None;
+        }
+        finished
+    }
 }
 
 impl LoopEditor {
@@ -792,12 +839,7 @@ impl Controller {
                 controller.toast_error(tr("Could not read that file.").to_owned());
                 return;
             };
-            controller.lock().song_loops.import = Some(PendingImport {
-                document: document.clone(),
-                results: Vec::new(),
-                replace: false,
-                busy: true,
-            });
+            let id = controller.lock().song_loops.begin_import(document.clone());
             controller.render_song_loop_import();
             let checked = client
                 .import_song_loops(&ImportSongLoops {
@@ -806,25 +848,21 @@ impl Controller {
                     replace_existing: false,
                 })
                 .await;
-            controller.show_song_loop_check(checked);
+            controller.show_song_loop_check(id, checked);
         });
     }
 
     fn show_song_loop_check(
         &self,
+        id: SongLoopImportId,
         checked: Result<Vec<SongLoopImportResult>, tufo_client::ClientError>,
     ) {
+        let checked = self.lock().song_loops.finish_import_check(id, checked);
         match checked {
-            Ok(results) => {
-                if let Some(import) = self.lock().song_loops.import.as_mut() {
-                    import.results = results;
-                    import.busy = false;
-                }
-                self.render_song_loop_import();
-            }
+            Ok(true) => self.render_song_loop_import(),
+            Ok(false) => {}
             Err(error) => {
-                self.lock().song_loops.import = None;
-                render::song_loop_import(&self.window, None);
+                self.render_song_loop_import();
                 self.toast_error(presentation::error_text(&error));
             }
         }
@@ -838,15 +876,24 @@ impl Controller {
     }
 
     pub(crate) fn confirm_song_loop_import(&self) {
-        let request = self.lock().song_loops.import.as_mut().map(|import| {
-            import.busy = true;
-            ImportSongLoops {
-                document: import.document.clone(),
-                dry_run: false,
-                replace_existing: import.replace,
-            }
-        });
-        let Some(request) = request else {
+        let request = self
+            .lock()
+            .song_loops
+            .import
+            .as_mut()
+            .filter(|import| !import.busy)
+            .map(|import| {
+                import.busy = true;
+                (
+                    import.id,
+                    ImportSongLoops {
+                        document: import.document.clone(),
+                        dry_run: false,
+                        replace_existing: import.replace,
+                    },
+                )
+            });
+        let Some((id, request)) = request else {
             return;
         };
         self.render_song_loop_import();
@@ -856,8 +903,10 @@ impl Controller {
         let controller = self.clone();
         self.runtime.spawn(async move {
             let imported = client.import_song_loops(&request).await;
-            controller.lock().song_loops.import = None;
-            render::song_loop_import(&controller.window, None);
+            if !controller.lock().song_loops.finish_import(id) {
+                return;
+            }
+            controller.render_song_loop_import();
             match imported {
                 Ok(results) => {
                     let saved = count(&results, SongLoopImportOutcome::Saved)
@@ -878,12 +927,10 @@ impl Controller {
     }
 
     fn render_song_loop_import(&self) {
-        let view =
-            self.lock()
-                .song_loops
-                .import
-                .as_ref()
-                .map(|import| presentation::SongLoopImportView {
+        let controller = self.clone();
+        render::song_loop_import(&self.window, move || {
+            controller.lock().song_loops.import.as_ref().map(|import| {
+                presentation::SongLoopImportView {
                     busy: import.busy,
                     summary: import.summary(),
                     rows: import
@@ -899,8 +946,9 @@ impl Controller {
                     conflicts: count(&import.results, SongLoopImportOutcome::Conflict),
                     replace: import.replace,
                     can_import: import.saves() > 0,
-                });
-        render::song_loop_import(&self.window, view);
+                }
+            })
+        });
     }
 }
 
@@ -919,4 +967,86 @@ fn premultiplied(pixel: slint::Rgba8Pixel) -> slint::Rgba8Pixel {
         u8::try_from(u16::from(channel) * u16::from(pixel.a) / 255).unwrap_or(u8::MAX)
     };
     slint::Rgba8Pixel::new(scale(pixel.r), scale(pixel.g), scale(pixel.b), pixel.a)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn checked_song(path: &str) -> SongLoopImportResult {
+        SongLoopImportResult {
+            path: path.to_owned(),
+            audio_file_id: Some(AudioFileId::from_uuid(uuid::Uuid::new_v4())),
+            outcome: SongLoopImportOutcome::Saved,
+        }
+    }
+
+    fn invalid_document() -> tufo_client::ClientError {
+        tonic::Status::invalid_argument("invalid song loop document").into()
+    }
+
+    #[test]
+    fn canceled_checks_cannot_enable_change_or_close_a_new_import() -> anyhow::Result<()> {
+        for (already_checked, checked) in [
+            (false, Ok(vec![checked_song("old.ogg")])),
+            (false, Err(invalid_document())),
+            (true, Ok(vec![checked_song("old.ogg")])),
+            (true, Err(invalid_document())),
+        ] {
+            let mut session = SongLoopSession::default();
+            let old = session.begin_import("old document".to_owned());
+            session.import = None;
+            let current = session.begin_import("new document".to_owned());
+            if already_checked {
+                assert!(session.finish_import_check(current, Ok(vec![checked_song("new.ogg")]))?);
+                session.import.as_mut().unwrap().replace = true;
+            }
+
+            assert!(!session.finish_import_check(old, checked)?);
+
+            let import = session.import.as_ref().unwrap();
+            assert_eq!(import.document, "new document");
+            assert_eq!(import.busy, !already_checked);
+            assert_eq!(import.replace, already_checked);
+            assert_eq!(import.saves(), usize::from(already_checked));
+            if already_checked {
+                assert_eq!(import.results[0].path, "new.ogg");
+            } else {
+                assert_eq!(import.results.len(), 0);
+                assert!(session.finish_import_check(current, Ok(vec![checked_song("new.ogg")]))?);
+                assert_eq!(session.import.as_ref().unwrap().saves(), 1);
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn a_current_check_failure_closes_its_import_and_reports_the_error() {
+        let mut session = SongLoopSession::default();
+        let id = session.begin_import("invalid document".to_owned());
+
+        let checked = session.finish_import_check(id, Err(invalid_document()));
+
+        assert!(matches!(checked, Err(tufo_client::ClientError::Status(_))));
+        assert!(session.import.is_none());
+    }
+
+    #[test]
+    fn canceled_save_completions_cannot_close_a_new_import() -> anyhow::Result<()> {
+        let mut session = SongLoopSession::default();
+        let old = session.begin_import("old document".to_owned());
+        session.import = None;
+        let current = session.begin_import("new document".to_owned());
+        assert!(session.finish_import_check(current, Ok(vec![checked_song("new.ogg")]))?);
+
+        assert!(!session.finish_import(old));
+
+        let import = session.import.as_ref().unwrap();
+        assert_eq!(import.document, "new document");
+        assert_eq!(import.results[0].path, "new.ogg");
+        assert!(!import.busy);
+        assert!(session.finish_import(current));
+        assert!(session.import.is_none());
+        Ok(())
+    }
 }

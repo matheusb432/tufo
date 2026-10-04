@@ -654,11 +654,11 @@ pub(crate) fn loop_editor(window: &slint::Weak<AppWindow>, frame: Option<LoopEdi
 /// `None` closes the dialog.
 pub(crate) fn song_loop_import(
     window: &slint::Weak<AppWindow>,
-    import: Option<presentation::SongLoopImportView>,
+    import: impl FnOnce() -> Option<presentation::SongLoopImportView> + Send + 'static,
 ) {
     let _ = window.upgrade_in_event_loop(move |window| {
         let view = window.global::<SongLoopImportView>();
-        let Some(import) = import else {
+        let Some(import) = import() else {
             view.set_open(false);
             return;
         };
