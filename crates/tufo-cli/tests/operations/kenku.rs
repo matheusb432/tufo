@@ -105,7 +105,10 @@ async fn kenku_imports_return_durable_ids_and_conflicts_require_explicit_choices
         1
     );
     assert_eq!(collection["entries"][0]["title"], "Imported drums");
-    assert_eq!(collection["entries"][0]["path"], json!(audio_path));
+    assert_eq!(
+        collection["entries"][0]["path"],
+        json!(std::fs::canonicalize(&audio_path)?)
+    );
     assert_eq!(std::fs::read(&audio_path)?, audio_bytes);
     assert!(!session.path("discord.toml").exists());
     Ok(())

@@ -30,11 +30,12 @@ impl PreviewFixture {
             })
             .await?;
         let snapshot = session.library().await?;
+        let canonical_file = std::fs::canonicalize(&file)?;
         let entry = snapshot
             .collections
             .iter()
             .flat_map(|collection| &collection.entries)
-            .find(|entry| entry.path.as_ref() == file.as_path())
+            .find(|entry| entry.path.as_ref() == canonical_file.as_path())
             .context("synthetic preview song was not imported")?;
         let entry_id = entry.id.to_string();
         let audio_file_id = entry.audio_file_id.to_string();

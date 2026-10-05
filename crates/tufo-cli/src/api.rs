@@ -82,11 +82,7 @@ pub(crate) async fn stdout_closed() -> anyhow::Result<()> {
     let mut interval = tokio::time::interval(Duration::from_millis(100));
     loop {
         interval.tick().await;
-        #[cfg(unix)]
-        let closed = stdout_is_closed()?;
-        #[cfg(windows)]
-        let closed = stdout_is_closed();
-        if closed {
+        if stdout_is_closed()? {
             return Ok(());
         }
     }
@@ -112,36 +108,45 @@ fn stdout_is_closed() -> std::io::Result<bool> {
     Ok(descriptor.revents & (libc::POLLERR | libc::POLLHUP | libc::POLLNVAL) != 0)
 }
 
+/// Reads the pipe's state instead of writing a probe into the output. A handle without attribute
+/// access reports an open pipe until the next write fails.
 #[cfg(windows)]
-fn stdout_is_closed() -> bool {
+fn stdout_is_closed() -> std::io::Result<bool> {
     use std::os::windows::io::AsRawHandle as _;
 
-    use windows_sys::Win32::{
-        Foundation::{ERROR_BROKEN_PIPE, ERROR_NO_DATA, ERROR_PIPE_NOT_CONNECTED, GetLastError},
-        Storage::FileSystem::{FILE_TYPE_PIPE, GetFileType},
-        System::Pipes::GetNamedPipeInfo,
+    use windows_sys::{
+        Wdk::Storage::FileSystem::{
+            FILE_PIPE_CLOSING_STATE, FILE_PIPE_DISCONNECTED_STATE, FILE_PIPE_LOCAL_INFORMATION,
+            FilePipeLocalInformation, NtQueryInformationFile,
+        },
+        Win32::{
+            Storage::FileSystem::{FILE_TYPE_PIPE, GetFileType},
+            System::IO::IO_STATUS_BLOCK,
+        },
     };
 
     let handle = std::io::stdout().as_raw_handle();
-    // SAFETY: stdout owns this handle; pipe inspection neither writes nor consumes bytes.
-    let error = unsafe {
-        if GetFileType(handle) != FILE_TYPE_PIPE
-            || GetNamedPipeInfo(
+    let mut io_status = IO_STATUS_BLOCK::default();
+    let mut pipe = FILE_PIPE_LOCAL_INFORMATION::default();
+    let pipe_bytes =
+        u32::try_from(size_of::<FILE_PIPE_LOCAL_INFORMATION>()).map_err(std::io::Error::other)?;
+    // SAFETY: stdout owns this handle, and the query writes only into two live outputs sized for
+    // it.
+    let queried = unsafe {
+        GetFileType(handle) == FILE_TYPE_PIPE
+            && NtQueryInformationFile(
                 handle,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-            ) != 0
-        {
-            return false;
-        }
-        GetLastError()
+                &raw mut io_status,
+                (&raw mut pipe).cast(),
+                pipe_bytes,
+                FilePipeLocalInformation,
+            ) >= 0
     };
-    matches!(
-        error,
-        ERROR_BROKEN_PIPE | ERROR_NO_DATA | ERROR_PIPE_NOT_CONNECTED
-    )
+    Ok(queried
+        && matches!(
+            pipe.NamedPipeState,
+            FILE_PIPE_CLOSING_STATE | FILE_PIPE_DISCONNECTED_STATE
+        ))
 }
 
 pub(crate) async fn library_snapshot(client: &TufoClient) -> anyhow::Result<LibrarySnapshot> {

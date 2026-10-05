@@ -138,11 +138,11 @@ async fn imported_audio_is_discoverable_reusable_and_left_untouched() -> anyhow:
     assert_eq!(playlist["entries"][0]["duration_ms"], 1000);
     assert_eq!(
         session.json(&["folder", "get", folder_id]).await?["folder"],
-        json!(session.path("audio/encounter"))
+        json!(std::fs::canonicalize(session.path("audio/encounter"))?)
     );
     assert_eq!(
         session.json(&["song", "get", song_id]).await?["path"],
-        json!(audio_path)
+        json!(std::fs::canonicalize(&audio_path)?)
     );
 
     let board = session
