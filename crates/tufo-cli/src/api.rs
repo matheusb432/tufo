@@ -174,7 +174,12 @@ pub(crate) async fn snapshot<S, T>(
         Ok((stream, first))
     })
     .await
-    .with_context(|| format!("{resource} snapshot did not arrive within 30 seconds"))?
+    .with_context(|| {
+        format!(
+            "{resource} snapshot did not arrive within {} seconds",
+            SNAPSHOT_TIMEOUT.as_secs()
+        )
+    })?
 }
 
 pub(crate) async fn watch_library(client: &TufoClient, json: bool) -> anyhow::Result<bool> {

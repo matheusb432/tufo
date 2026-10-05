@@ -1,14 +1,32 @@
-use std::{path::PathBuf, time::Duration};
+use std::path::PathBuf;
 
-use anyhow::{Context as _, ensure};
+use anyhow::Context as _;
+use clap::Subcommand;
 use tufo_client::{
-    LocalEndpoint, TufoClient,
+    TufoClient,
     song_loops::{ImportSongLoops, SongLoopImportOutcome, SongLoopImportResult},
 };
 
-use crate::{command::SongLoopsCommand, render::Console};
+use crate::{api, render::Console};
 
-const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
+#[derive(Subcommand)]
+pub(crate) enum SongLoopsCommand {
+    /// Print every saved song loop as JSON, naming the audio each was saved against.
+    Export,
+    /// Match each loop in a JSON document to a song by fingerprint, or by path and SHA-256, and
+    /// save it. Exits 1 when a loop matches no song or fails its checks.
+    Import {
+        /// A document written by `tufo song-loops export`.
+        #[arg(value_name = "FILE")]
+        from: PathBuf,
+        /// Report what importing would change without saving anything.
+        #[arg(long)]
+        dry_run: bool,
+        /// Overwrite different saved loops instead of reporting them as conflicts.
+        #[arg(long)]
+        replace: bool,
+    },
+}
 
 #[derive(serde::Serialize)]
 struct ImportedSong {
@@ -87,7 +105,7 @@ pub(crate) async fn run(
     console: Console,
     json: bool,
 ) -> anyhow::Result<(String, bool)> {
-    let client = running_server_client().await?;
+    let client = api::connect().await?;
     match command {
         SongLoopsCommand::Export => Ok((client.export_song_loops().await?, true)),
         SongLoopsCommand::Import {
@@ -96,15 +114,6 @@ pub(crate) async fn run(
             replace,
         } => import(&client, from, dry_run, replace, json, console).await,
     }
-}
-
-async fn running_server_client() -> anyhow::Result<TufoClient> {
-    let endpoint = LocalEndpoint::from_environment().context("resolve TUFO_RUNTIME_DIR")?;
-    ensure!(
-        endpoint.is_listening(PROBE_TIMEOUT).await?,
-        "no server is running; start it with `tufo server start`"
-    );
-    Ok(TufoClient::connect_lazy(&endpoint)?)
 }
 
 async fn import(

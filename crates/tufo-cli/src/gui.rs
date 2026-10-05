@@ -1,14 +1,22 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{Context as _, ensure};
+use clap::Subcommand;
 use tufo_client::process::Executable;
 
-use crate::{command::GuiCommand, render::Console};
+use crate::render::Console;
 
 /// A GUI that finds its window already running raises that window and exits within this time;
 /// one that fails to start exits within it too.
 const STARTUP_EXIT_WAIT: Duration = Duration::from_secs(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
+
+#[derive(Subcommand)]
+pub(crate) enum GuiCommand {
+    /// Start the sibling GUI (or tufo-gui on PATH), which raises the running window instead when
+    /// there is one.
+    Open,
+}
 
 pub(crate) async fn run(
     command: GuiCommand,

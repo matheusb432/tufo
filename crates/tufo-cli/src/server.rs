@@ -1,9 +1,10 @@
 use std::{process::Child, time::Duration};
 
 use anyhow::{Context as _, ensure};
+use clap::Subcommand;
 use tufo_client::{ClientError, LocalEndpoint, TufoClient, server::ServerStatus};
 
-use crate::{command::ServerCommand, doctor, render::Console};
+use crate::{doctor, render::Console};
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
 const HEALTH_TIMEOUT: Duration = Duration::from_secs(6);
@@ -31,6 +32,18 @@ pub(crate) async fn inspect(endpoint: &LocalEndpoint) -> anyhow::Result<Option<S
         serving: serving?,
         status,
     }))
+}
+
+#[derive(Subcommand)]
+pub(crate) enum ServerCommand {
+    /// Show health, version, process, uptime, and Discord status.
+    Status,
+    /// Start the sibling server (or tufo-server on PATH), then wait until healthy.
+    Start,
+    /// Stop all audio and shut down the server through its private control endpoint.
+    Kill,
+    /// Shut down the server, then start it and wait until healthy.
+    Restart,
 }
 
 pub(crate) async fn run(

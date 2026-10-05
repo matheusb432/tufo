@@ -1,9 +1,30 @@
-use std::{ffi::OsStr, path::Path};
+use std::{
+    ffi::OsStr,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context as _, ensure};
+use clap::Subcommand;
 use tufo_client::{LocalEndpoint, process::Executable};
 
-use crate::{command::DataCommand, server};
+use crate::server;
+
+#[derive(Subcommand)]
+pub(crate) enum DataCommand {
+    /// Write a consistent snapshot of the database and portable settings into DIR.
+    Export {
+        /// Snapshot directory to create; its parent must exist.
+        #[arg(long, value_name = "DIR")]
+        to: PathBuf,
+    },
+    /// Replace the database and portable settings with a snapshot, migrating an older snapshot
+    /// forward.
+    Import {
+        /// Snapshot directory written by `tufo data export`.
+        #[arg(long, value_name = "DIR")]
+        from: PathBuf,
+    },
+}
 
 pub(crate) async fn run(command: DataCommand) -> anyhow::Result<bool> {
     match command {
