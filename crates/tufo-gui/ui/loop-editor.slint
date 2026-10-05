@@ -171,49 +171,53 @@ component ViewScroller inherits Rectangle {
     }
 }
 
+component EditorIconButton inherits IconButton {
+    size: 36px;
+    icon-size: 18px;
+}
+
+// Shows `value` again whenever it changes, keeping what is typed in between.
+component ValueField inherits TextField {
+    in property <string> value;
+    changed value => {
+        self.text = root.value;
+    }
+    text: root.value;
+}
+
 component MarkerField inherits HorizontalLayout {
+    in property <LoopMarker> marker;
     in property <string> label;
     in property <string> value;
-    in property <bool> placeable;
-    in property <bool> showable: true;
-    callback typed(string);
-    callback place-at-playhead();
-    callback show();
+    in property <bool> showable;
     out property <string> text: field.text;
-    changed value => {
-        field.text = root.value;
-    }
     spacing: 4px;
     alignment: stretch;
-    field := TextField {
+    field := ValueField {
         horizontal-stretch: 1;
         label: root.label;
-        text: root.value;
+        value: root.value;
         accepted => {
-            root.typed(self.text);
+            Actions.loop-marker-typed(root.marker, self.text);
         }
     }
 
-    if root.placeable: VerticalLayout {
+    VerticalLayout {
         alignment: end;
         HorizontalLayout {
-            IconButton {
-                size: 36px;
-                icon-size: 18px;
+            EditorIconButton {
                 icon: @image-url("icons/pin.svg");
                 tooltip: @tr("Move to the playhead");
                 clicked => {
-                    root.place-at-playhead();
+                    Actions.loop-marker-at-playhead(root.marker);
                 }
             }
 
-            if root.showable: IconButton {
-                size: 36px;
-                icon-size: 18px;
+            if root.showable: EditorIconButton {
                 icon: @image-url("icons/search.svg");
                 tooltip: @tr("Show on the waveform");
                 clicked => {
-                    root.show();
+                    Actions.loop-show-marker(root.marker);
                 }
             }
         }
@@ -228,15 +232,13 @@ export component LoopEditorDialog inherits DialogFrame {
     guide: LoopEditorTour.guide;
     title: @tr("Edit Loop");
     card-width-max: 760px;
-    function commit-fields() {
-        Actions.loop-marker-typed(LoopMarker.playback-start, start-field.text);
-        Actions.loop-marker-typed(LoopMarker.loop-start, loop-start-field.text);
-        Actions.loop-marker-typed(LoopMarker.loop-end, loop-end-field.text);
-        Actions.loop-crossfade-typed(crossfade-field.text);
-    }
-
-    function toggle-preview(preview: LoopPreview) {
-        Actions.toggle-loop-preview(preview);
+    function save() {
+        Actions.save-song-loop({
+            playback-start: start-field.text,
+            loop-start: loop-start-field.text,
+            loop-end: loop-end-field.text,
+            crossfade: crossfade-field.text,
+        });
     }
 
     Timer {
@@ -262,11 +264,11 @@ export component LoopEditorDialog inherits DialogFrame {
                 return reject;
             }
             if event.text == " " {
-                root.toggle-preview(LoopPreview.from-playhead);
+                Actions.toggle-loop-preview(LoopPreview.from-playhead);
                 return accept;
             }
             if event.text == "r" || event.text == "R" {
-                root.toggle-preview(LoopPreview.seam);
+                Actions.toggle-loop-preview(LoopPreview.seam);
                 return accept;
             }
             if event.text == Key.LeftArrow || event.text == Key.RightArrow {
@@ -290,8 +292,7 @@ export component LoopEditorDialog inherits DialogFrame {
                 return accept;
             }
             if event.text == Key.Return && LoopEditorView.can-save {
-                root.commit-fields();
-                Actions.save-song-loop();
+                root.save();
                 return accept;
             }
             reject
@@ -336,9 +337,7 @@ export component LoopEditorDialog inherits DialogFrame {
                     bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
                 }
                 spacing: 4px;
-                IconButton {
-                    size: 36px;
-                    icon-size: 18px;
+                EditorIconButton {
                     icon: @image-url("icons/minus.svg");
                     tooltip: @tr("Zoom out (Down)");
                     enabled: !LoopEditorView.loading;
@@ -347,9 +346,7 @@ export component LoopEditorDialog inherits DialogFrame {
                     }
                 }
 
-                IconButton {
-                    size: 36px;
-                    icon-size: 18px;
+                EditorIconButton {
                     icon: @image-url("icons/plus.svg");
                     tooltip: @tr("Zoom in on the playhead (Up)");
                     enabled: !LoopEditorView.loading;
@@ -369,27 +366,23 @@ export component LoopEditorDialog inherits DialogFrame {
                     accessible-label: @tr("Playhead {0}", LoopEditorView.playhead-text);
                 }
 
-                IconButton {
-                    size: 36px;
-                    icon-size: 18px;
+                EditorIconButton {
                     icon: LoopEditorView.preview == LoopPreview.from-playhead ? @image-url("icons/square.svg") : @image-url("icons/play.svg");
                     tint: LoopEditorView.preview == LoopPreview.from-playhead ? Theme.lit : Theme.text-secondary;
                     tooltip: LoopEditorView.preview == LoopPreview.from-playhead ? @tr("Stop (Space)") : @tr("Play from the playhead (Space)");
                     enabled: !LoopEditorView.loading;
                     clicked => {
-                        root.toggle-preview(LoopPreview.from-playhead);
+                        Actions.toggle-loop-preview(LoopPreview.from-playhead);
                     }
                 }
 
-                IconButton {
-                    size: 36px;
-                    icon-size: 18px;
+                EditorIconButton {
                     icon: @image-url("icons/repeat.svg");
                     tint: LoopEditorView.preview == LoopPreview.seam ? Theme.lit : Theme.text-secondary;
                     tooltip: LoopEditorView.preview == LoopPreview.seam ? @tr("Stop (R)") : @tr("Repeat the seam (R)");
                     enabled: !LoopEditorView.loading;
                     clicked => {
-                        root.toggle-preview(LoopPreview.seam);
+                        Actions.toggle-loop-preview(LoopPreview.seam);
                     }
                 }
             }
@@ -403,60 +396,34 @@ export component LoopEditorDialog inherits DialogFrame {
                 spacing-vertical: 12px;
                 Row {
                     start-field := MarkerField {
+                        marker: LoopMarker.playback-start;
                         showable: root.roomy;
                         label: @tr("Start (1)");
                         value: LoopEditorView.playback-start-text;
-                        placeable: true;
-                        typed(text) => {
-                            Actions.loop-marker-typed(LoopMarker.playback-start, text);
-                        }
-                        place-at-playhead => {
-                            Actions.loop-marker-at-playhead(LoopMarker.playback-start);
-                        }
-                        show => {
-                            Actions.loop-show-marker(LoopMarker.playback-start);
-                        }
                     }
 
                     loop-start-field := MarkerField {
+                        marker: LoopMarker.loop-start;
                         showable: root.roomy;
                         label: @tr("Loop (2)");
                         value: LoopEditorView.loop-start-text;
-                        placeable: true;
-                        typed(text) => {
-                            Actions.loop-marker-typed(LoopMarker.loop-start, text);
-                        }
-                        place-at-playhead => {
-                            Actions.loop-marker-at-playhead(LoopMarker.loop-start);
-                        }
-                        show => {
-                            Actions.loop-show-marker(LoopMarker.loop-start);
-                        }
                     }
                 }
 
                 Row {
                     loop-end-field := MarkerField {
+                        marker: LoopMarker.loop-end;
                         showable: root.roomy;
                         label: @tr("End (3)");
                         value: LoopEditorView.loop-end-text;
-                        placeable: true;
-                        typed(text) => {
-                            Actions.loop-marker-typed(LoopMarker.loop-end, text);
-                        }
-                        place-at-playhead => {
-                            Actions.loop-marker-at-playhead(LoopMarker.loop-end);
-                        }
-                        show => {
-                            Actions.loop-show-marker(LoopMarker.loop-end);
-                        }
                     }
 
-                    crossfade-field := MarkerField {
+                    crossfade-field := ValueField {
+                        horizontal-stretch: 1;
                         label: @tr("Crossfade (ms)");
                         value: LoopEditorView.crossfade-text;
-                        typed(text) => {
-                            Actions.loop-crossfade-typed(text);
+                        accepted => {
+                            Actions.loop-crossfade-typed(self.text);
                         }
                     }
                 }
@@ -502,8 +469,7 @@ export component LoopEditorDialog inherits DialogFrame {
                     kind: ButtonKind.primary;
                     enabled: LoopEditorView.can-save;
                     clicked => {
-                        root.commit-fields();
-                        Actions.save-song-loop();
+                        root.save();
                     }
                 }
             }

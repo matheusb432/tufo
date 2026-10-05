@@ -24,8 +24,8 @@ use super::{Controller, audio_file_id};
 use crate::{
     i18n::{tr, tr_args, tr_count},
     loop_editor::{
-        LoopDraft, LoopEditorFrame, Marker, PreviewKind, WaveformView, format_milliseconds,
-        format_time, parse_milliseconds, parse_time, preview_frame, seam_preview_frame,
+        LoopDraft, LoopEditorFrame, LoopFieldError, LoopFieldTexts, Marker, PreviewKind,
+        WaveformView, format_milliseconds, format_time, preview_frame, seam_preview_frame,
     },
     presentation, render,
 };
@@ -146,10 +146,7 @@ impl LoopEditor {
             has_saved_loop: self.saved.is_some(),
             can_save: self.song.is_some() && !self.saving,
             waveform_revision: self.waveform_revision,
-            preview: self
-                .preview
-                .as_ref()
-                .map_or(PreviewKind::Stopped, |preview| preview.kind),
+            preview: self.preview.as_ref().map(|preview| preview.kind),
             view_visible: 1.0,
             ..LoopEditorFrame::default()
         };
@@ -200,6 +197,18 @@ fn song_details(
             .find(|entry| entry.audio_file_id == id)
             .map(|entry| (entry.title.as_str().to_owned(), entry.saved_loop))
     })
+}
+
+fn field_error_text(error: LoopFieldError) -> String {
+    match error {
+        LoopFieldError::UnreadableTime => tr("Enter a time like 1:23.456."),
+        LoopFieldError::UnreadableCrossfade => tr("Enter the crossfade in milliseconds."),
+    }
+    .to_owned()
+}
+
+fn markers_out_of_order_text() -> String {
+    tr("Place Start, Loop, and End in that order inside the song.").to_owned()
 }
 
 fn outcome_text(outcome: SongLoopImportOutcome) -> &'static str {
@@ -375,21 +384,15 @@ impl Controller {
 
     pub(crate) fn type_loop_marker(&self, marker: Marker, text: &str) {
         self.edit_loaded_song(false, |song| {
-            let frame = parse_time(text, song.draft.timing())
-                .ok_or_else(|| tr("Enter a time like 1:23.456.").to_owned())?;
-            if frame != song.draft.frame_of(marker) {
-                song.draft.move_marker(marker, frame);
-            }
-            Ok(())
+            song.draft
+                .type_marker(marker, text)
+                .map_err(field_error_text)
         });
     }
 
     pub(crate) fn type_loop_crossfade(&self, text: &str) {
         self.edit_loaded_song(false, |song| {
-            let frames = parse_milliseconds(text, song.draft.timing())
-                .ok_or_else(|| tr("Enter the crossfade in milliseconds.").to_owned())?;
-            song.draft.set_crossfade(frames);
-            Ok(())
+            song.draft.type_crossfade(text).map_err(field_error_text)
         });
     }
 
@@ -483,7 +486,7 @@ impl Controller {
             .editor
             .as_ref()
             .and_then(|editor| editor.preview.as_ref().map(|preview| preview.kind));
-        if running == Some(kind) || kind == PreviewKind::Stopped {
+        if running == Some(kind) {
             self.stop_loop_preview();
         } else {
             self.start_loop_preview(kind);
@@ -503,7 +506,7 @@ impl Controller {
         }
     }
 
-    fn stop_loop_preview(&self) {
+    pub(crate) fn stop_loop_preview(&self) {
         if let Some(editor) = self.lock().song_loops.editor.as_mut() {
             editor.stop_preview();
         }
@@ -526,9 +529,7 @@ impl Controller {
                 return;
             };
             let Ok(region) = song.draft.region() else {
-                editor.error = Some(
-                    tr("Place Start, Loop, and End in that order inside the song.").to_owned(),
-                );
+                editor.error = Some(markers_out_of_order_text());
                 drop(shared);
                 self.render_loop_editor();
                 return;
@@ -538,9 +539,7 @@ impl Controller {
                     Ok(side) => PreviewMode::Seam(side),
                     Err(_) => return,
                 },
-                PreviewKind::FromPlayhead | PreviewKind::Stopped => {
-                    PreviewMode::FromFrame(song.playhead)
-                }
+                PreviewKind::FromPlayhead => PreviewMode::FromFrame(song.playhead),
             };
             let request = PreviewSongLoop {
                 audio_file_id: editor.audio_file_id,
@@ -653,40 +652,49 @@ impl Controller {
         self.render_loop_editor();
     }
 
-    pub(crate) fn save_song_loop(&self) {
+    /// Saves the markers as the fields show them, including text not yet entered.
+    pub(crate) fn save_song_loop(&self, fields: &LoopFieldTexts) {
         let request = {
             let mut shared = self.lock();
             let Some(editor) = shared.song_loops.editor.as_mut() else {
                 return;
             };
-            if editor.error.is_some() {
-                return;
-            }
-            let Some(song) = editor.song.as_ref() else {
+            let Some(song) = editor.song.as_mut() else {
                 return;
             };
-            if song.draft.region().is_err() {
-                editor.error = Some(
-                    tr("Place Start, Loop, and End in that order inside the song.").to_owned(),
-                );
-                drop(shared);
-                self.render_loop_editor();
-                return;
+            let region = song
+                .draft
+                .type_fields(fields)
+                .map_err(field_error_text)
+                .and_then(|()| song.draft.region().map_err(|_| markers_out_of_order_text()));
+            match region {
+                Ok(region) => {
+                    let markers = region.markers();
+                    editor.saving = true;
+                    editor.error = None;
+                    Some((
+                        editor.generation,
+                        editor.song_title.clone(),
+                        UpdateSongLoop {
+                            audio_file_id: editor.audio_file_id,
+                            source_fingerprint: song.waveform.fingerprint.clone(),
+                            playback_start: Some(markers.playback_start),
+                            loop_start: Some(markers.loop_start),
+                            loop_end: Some(markers.loop_end),
+                            crossfade: Some(markers.crossfade),
+                        },
+                    ))
+                }
+                Err(error) => {
+                    editor.error = Some(error);
+                    None
+                }
             }
-            let markers = song.draft.markers();
-            editor.saving = true;
-            let request = UpdateSongLoop {
-                audio_file_id: editor.audio_file_id,
-                source_fingerprint: song.waveform.fingerprint.clone(),
-                playback_start: Some(markers.playback_start),
-                loop_start: Some(markers.loop_start),
-                loop_end: Some(markers.loop_end),
-                crossfade: Some(markers.crossfade),
-            };
-            (editor.generation, editor.song_title.clone(), request)
         };
         self.render_loop_editor();
-        let (generation, title, update) = request;
+        let Some((generation, title, update)) = request else {
+            return;
+        };
         self.finish_loop_request(
             generation,
             move |client| async move { client.update_song_loop(&update).await },

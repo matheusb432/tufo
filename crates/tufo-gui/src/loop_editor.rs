@@ -13,10 +13,8 @@ const ZOOM_FACTOR: u64 = 4;
 const MILLISECONDS_PER_SECOND: u64 = 1_000;
 const FRACTION_DIGITS_MAX: usize = 9;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PreviewKind {
-    #[default]
-    Stopped,
     FromPlayhead,
     Seam,
 }
@@ -43,7 +41,7 @@ pub(crate) struct LoopEditorFrame {
     pub(crate) view_start: f32,
     pub(crate) view_visible: f32,
     pub(crate) waveform_revision: i32,
-    pub(crate) preview: PreviewKind,
+    pub(crate) preview: Option<PreviewKind>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +49,21 @@ pub(crate) enum Marker {
     PlaybackStart,
     LoopStart,
     LoopEnd,
+}
+
+/// The marker and crossfade fields as typed, which may not have reached the draft yet.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct LoopFieldTexts {
+    pub(crate) playback_start: String,
+    pub(crate) loop_start: String,
+    pub(crate) loop_end: String,
+    pub(crate) crossfade: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LoopFieldError {
+    UnreadableTime,
+    UnreadableCrossfade,
 }
 
 /// Keeps its markers in order while they move, so it only fails to form a region for an empty
@@ -62,17 +75,17 @@ pub(crate) struct LoopDraft {
 }
 
 impl LoopDraft {
-    /// Saved markers that no longer fit the file stop at its bounds.
-    pub(crate) fn new(timing: SourceTiming, saved: Option<LoopMarkers>) -> Self {
+    /// Markers that don't fit the file or each other stop at the nearest frame that does.
+    pub(crate) fn new(timing: SourceTiming, markers: Option<LoopMarkers>) -> Self {
         let mut draft = Self {
             timing,
             markers: LoopMarkers::whole_file(timing.frame_count),
         };
-        if let Some(saved) = saved {
-            draft.move_marker(Marker::LoopEnd, saved.loop_end);
-            draft.move_marker(Marker::LoopStart, saved.loop_start);
-            draft.move_marker(Marker::PlaybackStart, saved.playback_start);
-            draft.set_crossfade(saved.crossfade);
+        if let Some(markers) = markers {
+            draft.move_marker(Marker::LoopEnd, markers.loop_end);
+            draft.move_marker(Marker::LoopStart, markers.loop_start);
+            draft.move_marker(Marker::PlaybackStart, markers.playback_start);
+            draft.set_crossfade(markers.crossfade);
         }
         draft
     }
@@ -113,7 +126,49 @@ impl LoopDraft {
         self.set_crossfade(self.markers.crossfade);
     }
 
-    pub(crate) fn set_crossfade(&mut self, frames: SourceFrames) {
+    pub(crate) fn type_marker(&mut self, marker: Marker, text: &str) -> Result<(), LoopFieldError> {
+        let frame = self.typed_frame(marker, text)?;
+        self.move_marker(marker, frame);
+        Ok(())
+    }
+
+    pub(crate) fn type_crossfade(&mut self, text: &str) -> Result<(), LoopFieldError> {
+        let frames = self.typed_crossfade(text)?;
+        self.set_crossfade(frames);
+        Ok(())
+    }
+
+    /// Moves every marker at once, so none stops at a neighbor that is also moving; changes
+    /// nothing unless every field reads.
+    pub(crate) fn type_fields(&mut self, fields: &LoopFieldTexts) -> Result<(), LoopFieldError> {
+        let typed = LoopMarkers {
+            playback_start: self.typed_frame(Marker::PlaybackStart, &fields.playback_start)?,
+            loop_start: self.typed_frame(Marker::LoopStart, &fields.loop_start)?,
+            loop_end: self.typed_frame(Marker::LoopEnd, &fields.loop_end)?,
+            crossfade: self.typed_crossfade(&fields.crossfade)?,
+        };
+        *self = Self::new(self.timing, Some(typed));
+        Ok(())
+    }
+
+    /// Text that still reads as the shown time keeps the marker's exact frame.
+    fn typed_frame(&self, marker: Marker, text: &str) -> Result<SourceFrames, LoopFieldError> {
+        let frame = self.frame_of(marker);
+        if text.trim() == format_time(frame, self.timing) {
+            return Ok(frame);
+        }
+        parse_time(text, self.timing).ok_or(LoopFieldError::UnreadableTime)
+    }
+
+    fn typed_crossfade(&self, text: &str) -> Result<SourceFrames, LoopFieldError> {
+        let frames = self.markers.crossfade;
+        if text.trim() == format_milliseconds(frames, self.timing) {
+            return Ok(frames);
+        }
+        parse_milliseconds(text, self.timing).ok_or(LoopFieldError::UnreadableCrossfade)
+    }
+
+    fn set_crossfade(&mut self, frames: SourceFrames) {
         self.markers.crossfade = frames.min(crossfade_max(
             self.timing,
             self.markers.loop_start,
@@ -187,7 +242,7 @@ pub(crate) fn format_time(frames: SourceFrames, timing: SourceTiming) -> String 
 }
 
 /// Accepts `[[h:]m:]s[.fraction]`, with a comma as the decimal separator too.
-pub(crate) fn parse_time(text: &str, timing: SourceTiming) -> Option<SourceFrames> {
+fn parse_time(text: &str, timing: SourceTiming) -> Option<SourceFrames> {
     let text = text.trim().replace(',', ".");
     let (whole, fraction) = text.split_once('.').unwrap_or((&text, ""));
     let mut seconds = 0_u64;
@@ -202,7 +257,7 @@ pub(crate) fn parse_time(text: &str, timing: SourceTiming) -> Option<SourceFrame
 }
 
 /// Accepts whole or fractional milliseconds.
-pub(crate) fn parse_milliseconds(text: &str, timing: SourceTiming) -> Option<SourceFrames> {
+fn parse_milliseconds(text: &str, timing: SourceTiming) -> Option<SourceFrames> {
     let text = text.trim().replace(',', ".");
     let (whole, fraction) = text.split_once('.').unwrap_or((&text, ""));
     if whole.is_empty() || !whole.bytes().all(|byte| byte.is_ascii_digit()) {
@@ -454,6 +509,73 @@ mod tests {
         assert_eq!(draft.markers().loop_end, SourceFrames(480_000));
         assert_eq!(draft.markers().loop_start, SourceFrames(400_000));
         assert!(draft.region().is_ok());
+    }
+
+    #[test]
+    fn fields_reading_as_shown_keep_frames_between_milliseconds() {
+        let timing = timing(48_000 * 600);
+        let mut draft = LoopDraft::new(timing, None);
+        draft.move_marker(Marker::LoopStart, SourceFrames(6_762_993));
+        draft.set_crossfade(SourceFrames(601));
+        let shown = draft.markers();
+        let fields = LoopFieldTexts {
+            playback_start: format_time(shown.playback_start, timing),
+            loop_start: format_time(shown.loop_start, timing),
+            loop_end: format_time(shown.loop_end, timing),
+            crossfade: format_milliseconds(shown.crossfade, timing),
+        };
+
+        assert_eq!(draft.type_fields(&fields), Ok(()));
+        assert_eq!(draft.markers(), shown);
+
+        let fields = LoopFieldTexts {
+            loop_end: "5:00".to_owned(),
+            ..fields
+        };
+        assert_eq!(draft.type_fields(&fields), Ok(()));
+        assert_eq!(draft.markers().loop_end, SourceFrames(48_000 * 300));
+        assert_eq!(draft.markers().loop_start, SourceFrames(6_762_993));
+    }
+
+    #[test]
+    fn markers_typed_together_pass_their_old_neighbors() {
+        let timing = timing(48_000 * 10);
+        let mut draft = LoopDraft::new(timing, None);
+        draft.move_marker(Marker::LoopEnd, SourceFrames(96_000));
+        draft.move_marker(Marker::LoopStart, SourceFrames(48_000));
+        let fields = LoopFieldTexts {
+            playback_start: "0:00.000".to_owned(),
+            loop_start: "0:03".to_owned(),
+            loop_end: "0:04".to_owned(),
+            crossfade: "0".to_owned(),
+        };
+
+        assert_eq!(draft.type_fields(&fields), Ok(()));
+        assert_eq!(draft.markers().loop_start, SourceFrames(144_000));
+        assert_eq!(draft.markers().loop_end, SourceFrames(192_000));
+    }
+
+    #[test]
+    fn an_unreadable_field_leaves_the_whole_draft_alone() {
+        let timing = timing(48_000 * 600);
+        let mut draft = LoopDraft::new(timing, None);
+        let before = draft.markers();
+        let fields = LoopFieldTexts {
+            playback_start: "0:01".to_owned(),
+            loop_start: "0:02".to_owned(),
+            loop_end: "soon".to_owned(),
+            crossfade: "0".to_owned(),
+        };
+
+        assert_eq!(
+            draft.type_fields(&fields),
+            Err(LoopFieldError::UnreadableTime)
+        );
+        assert_eq!(draft.markers(), before);
+        assert_eq!(
+            draft.type_crossfade("long"),
+            Err(LoopFieldError::UnreadableCrossfade)
+        );
     }
 
     #[test]

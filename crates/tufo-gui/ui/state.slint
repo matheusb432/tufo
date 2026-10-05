@@ -66,6 +66,14 @@ export enum LoopMarker { playback-start, loop-start, loop-end }
 
 export enum LoopPreview { stopped, from-playhead, seam }
 
+// The editor's fields as typed, including text not yet entered.
+export struct LoopFieldTexts {
+    playback-start: string,
+    loop-start: string,
+    loop-end: string,
+    crossfade: string,
+}
+
 export enum LoopBadge { none, saved, needs-review }
 
 export struct TrackRow {
@@ -496,7 +504,7 @@ export global Actions {
     callback loop-scroll(float);
     callback toggle-loop-preview(LoopPreview);
     callback loop-editor-tick();
-    callback save-song-loop();
+    callback save-song-loop(LoopFieldTexts);
     callback delete-song-loop();
     callback export-song-loops();
     callback import-song-loops();

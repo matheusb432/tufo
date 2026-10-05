@@ -656,9 +656,9 @@ pub(crate) fn loop_editor(window: &slint::Weak<AppWindow>, frame: Option<LoopEdi
         view.set_view_visible(frame.view_visible);
         view.set_waveform_revision(frame.waveform_revision);
         view.set_preview(match frame.preview {
-            PreviewKind::Stopped => LoopPreview::Stopped,
-            PreviewKind::FromPlayhead => LoopPreview::FromPlayhead,
-            PreviewKind::Seam => LoopPreview::Seam,
+            None => LoopPreview::Stopped,
+            Some(PreviewKind::FromPlayhead) => LoopPreview::FromPlayhead,
+            Some(PreviewKind::Seam) => LoopPreview::Seam,
         });
         view.set_open(true);
     });

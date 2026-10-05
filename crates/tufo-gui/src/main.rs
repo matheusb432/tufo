@@ -390,11 +390,20 @@ fn loop_marker(marker: ui::LoopMarker) -> loop_editor::Marker {
     }
 }
 
-fn preview_kind(preview: ui::LoopPreview) -> loop_editor::PreviewKind {
+fn preview_kind(preview: ui::LoopPreview) -> Option<loop_editor::PreviewKind> {
     match preview {
-        ui::LoopPreview::Stopped => loop_editor::PreviewKind::Stopped,
-        ui::LoopPreview::FromPlayhead => loop_editor::PreviewKind::FromPlayhead,
-        ui::LoopPreview::Seam => loop_editor::PreviewKind::Seam,
+        ui::LoopPreview::Stopped => None,
+        ui::LoopPreview::FromPlayhead => Some(loop_editor::PreviewKind::FromPlayhead),
+        ui::LoopPreview::Seam => Some(loop_editor::PreviewKind::Seam),
+    }
+}
+
+fn loop_field_texts(fields: ui::LoopFieldTexts) -> loop_editor::LoopFieldTexts {
+    loop_editor::LoopFieldTexts {
+        playback_start: fields.playback_start.into(),
+        loop_start: fields.loop_start.into(),
+        loop_end: fields.loop_end.into(),
+        crossfade: fields.crossfade.into(),
     }
 }
 
@@ -526,9 +535,12 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_loop_show_marker, |marker| controller.show_loop_marker(loop_marker(marker)));
     on!(controller => on_loop_zoom, |zoom_in| controller.zoom_loop_view(zoom_in));
     on!(controller => on_loop_scroll, |fraction| controller.scroll_loop_view(fraction));
-    on!(controller => on_toggle_loop_preview, |preview| controller.toggle_loop_preview(preview_kind(preview)));
+    on!(controller => on_toggle_loop_preview, |preview| match preview_kind(preview) {
+        Some(kind) => controller.toggle_loop_preview(kind),
+        None => controller.stop_loop_preview(),
+    });
     on!(controller => on_loop_editor_tick, | | controller.tick_loop_editor());
-    on!(controller => on_save_song_loop, | | controller.save_song_loop());
+    on!(controller => on_save_song_loop, |fields| controller.save_song_loop(&loop_field_texts(fields)));
     on!(controller => on_delete_song_loop, | | controller.delete_song_loop());
     on!(controller => on_export_song_loops, | | controller.export_song_loops());
     on!(controller => on_import_song_loops, | | controller.import_song_loops());
