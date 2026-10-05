@@ -620,7 +620,6 @@ component CollectionBar inherits Rectangle {
         }
         Rectangle { horizontal-stretch: 1; }
 
-        @children
         CollectionTools {
             compact: true;
             edit => {
@@ -1274,19 +1273,6 @@ export component PlaylistPage inherits Rectangle {
             }
             add-files => {
                 root.add-files();
-            }
-            IconButton {
-                y: (parent.height - self.height) / 2;
-                size: Theme.bar-button-size;
-                icon-size: Theme.bar-icon-size;
-                icon: root.this-plays ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
-                tint: Theme.lit;
-                hover-tint: Theme.lit-bright;
-                tooltip: root.this-plays ? @tr("Pause") : @tr("Play");
-                enabled: LibraryView.tracks.length > 0;
-                clicked => {
-                    Actions.play-collection(Navigation.collection-id);
-                }
             }
         }
         scroll := PageScroll {

@@ -274,16 +274,16 @@ component SoundsPauseButton inherits IconButton {
 }
 
 component Transport inherits HorizontalLayout {
-    TourTarget {
-        anchor: PlaybackTour.transport;
-        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
-    }
     in property <length> button-size: 40px;
     in property <length> icon-size: 22px;
     in property <length> play-size: 46px;
     alignment: center;
     spacing: 6px;
     IconButton {
+        TourTarget {
+            anchor: PlaybackTour.transport;
+            bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+        }
         y: (parent.height - self.height) / 2;
         size: root.button-size;
         icon-size: root.icon-size;
@@ -383,10 +383,6 @@ component SeekBar inherits Rectangle {
 }
 
 component SeekRow inherits HorizontalLayout {
-    TourTarget {
-        anchor: PlaybackTour.seek;
-        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
-    }
     spacing: 10px;
     Text {
         text: PlayerView.elapsed;
@@ -397,6 +393,10 @@ component SeekRow inherits HorizontalLayout {
     }
 
     SeekBar {
+        TourTarget {
+            anchor: PlaybackTour.seek;
+            bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+        }
         y: (parent.height - self.height) / 2;
         horizontal-stretch: 1;
     }
@@ -458,12 +458,12 @@ component EffectsVolumeButton inherits IconButton {
 }
 
 component VolumeControl inherits HorizontalLayout {
-    TourTarget {
-        anchor: PlaybackTour.volume;
-        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
-    }
     spacing: 4px;
     IconButton {
+        TourTarget {
+            anchor: PlaybackTour.volume;
+            bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+        }
         y: (parent.height - self.height) / 2;
         size: 32px;
         icon-size: 18px;
@@ -490,16 +490,17 @@ component VolumeControl inherits HorizontalLayout {
 
 // The pause button for every sound, and a chip for each playing sound, scrolling sideways.
 component PlayingSounds inherits HorizontalLayout {
-    TourTarget {
-        anchor: PlaybackTour.playing-sounds;
-        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
-    }
     spacing: 8px;
     SoundsPauseButton {
+        TourTarget {
+            anchor: PlaybackTour.playing-sounds;
+            bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+        }
         y: (parent.height - self.height) / 2;
     }
 
     Flickable {
+        y: (parent.height - self.height) / 2;
         height: 30px;
         horizontal-stretch: 1;
         content-width: chips.preferred-width;
@@ -658,7 +659,6 @@ export component MiniPlayer inherits Rectangle {
 
     VerticalLayout {
         padding: 12px;
-        padding-top: 8px;
         spacing: 4px;
         HorizontalLayout {
             spacing: 2px;
