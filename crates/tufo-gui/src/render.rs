@@ -25,8 +25,8 @@ use crate::{
         CollectionBackground, CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView,
         LibraryView, LoopBadge, LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation,
         OutputRow, OutputRowKind, Page, PlayerView, PlaylistChoice, Search, SearchResult, Session,
-        SongFolder, SongLoopImportRow, SongLoopImportView, SongRow, SoundChip, SoundIcons,
-        SoundTile, TrackRow, VoiceBadge,
+        SongFolder, SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SongRow,
+        SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
     },
 };
 
@@ -684,8 +684,15 @@ pub(crate) fn song_loop_import(
                 .map(|row| SongLoopImportRow {
                     path: row.path.into(),
                     outcome: row.outcome.into(),
-                    failed: row.failed,
-                    conflict: row.conflict,
+                    state: match row.state {
+                        presentation::SongLoopImportRowState::Ok => SongLoopImportRowState::Ok,
+                        presentation::SongLoopImportRowState::Conflict => {
+                            SongLoopImportRowState::Conflict
+                        }
+                        presentation::SongLoopImportRowState::Failed => {
+                            SongLoopImportRowState::Failed
+                        }
+                    },
                 })
                 .collect(),
         ));

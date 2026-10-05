@@ -11,7 +11,8 @@ import {
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, FormSwitch,
     KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge, LoopEditorView, LoopFieldTexts,
     LoopMarker, LoopPreview, NavItem, Navigation, Page, PlayerView, Search, Session,
-    SongLoopImportRow, SongLoopImportView, SoundIcons, SoundTile, VoiceBadge, WindowFrame,
+    SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SoundIcons, SoundTile, VoiceBadge,
+    WindowFrame,
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
 import { ConnectingPage, GridPage, HomePage, PlaylistPage, SongsPage, SoundboardPage } from "pages.slint";
@@ -31,9 +32,10 @@ export {
     Actions, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, BackgroundTarget,
     Backgrounds, Clock, CollectionBackground, CollectionKind, CurrentOutput, KenkuConflictRow,
     KenkuImportView, LibraryView, LoopBadge, LoopEditorView, LoopFieldTexts, LoopMarker,
-    LoopPreview, NavItem, Navigation, Page, PlayerView, Search, Session, SongLoopImportRow, SongLoopImportView,
-    SoundIcons, SoundTile, Theme, VoiceBadge, WindowFrame, GuidedTours, TourId, TourLayout,
-    TourRect, TourScroll, Tour, TourStep, TourVisibility, HomeTour, SettingsTour,
+    LoopPreview, NavItem, Navigation, Page, PlayerView, Search, Session, SongLoopImportRow,
+    SongLoopImportRowState, SongLoopImportView, SoundIcons, SoundTile, Theme, VoiceBadge,
+    WindowFrame, GuidedTours, TourId, TourLayout, TourRect, TourScroll, Tour, TourStep,
+    TourVisibility, HomeTour, SettingsTour,
 }
 
 enum DialogKind {

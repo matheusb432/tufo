@@ -79,25 +79,6 @@ impl ImportOutcome {
             Self::Unreadable => "unreadable",
         }
     }
-
-    fn failed(self) -> bool {
-        matches!(
-            self,
-            Self::NoMatch
-                | Self::IdentityMismatch
-                | Self::LengthMismatch
-                | Self::InvalidMarkers
-                | Self::Unreadable
-        )
-    }
-
-    fn badge(self) -> &'static str {
-        match self {
-            _ if self.failed() => "FAIL",
-            Self::Conflict => "WARN",
-            _ => "OK",
-        }
-    }
 }
 
 pub(crate) async fn run(
@@ -133,12 +114,12 @@ async fn import(
             replace_existing,
         })
         .await?;
-    let songs = results.iter().map(imported_song).collect::<Vec<_>>();
-    let all_matched = songs.iter().all(|song| !song.outcome.failed());
+    let all_matched = results.iter().all(|result| !result.outcome.is_failure());
     let output = if json {
+        let songs = results.iter().map(imported_song).collect::<Vec<_>>();
         serde_json::to_string_pretty(&songs)?
     } else {
-        render(&songs, dry_run, console)
+        render(&results, dry_run, console)
     };
     Ok((output, all_matched))
 }
@@ -151,16 +132,30 @@ fn imported_song(result: &SongLoopImportResult) -> ImportedSong {
     }
 }
 
-fn render(songs: &[ImportedSong], dry_run: bool, console: Console) -> String {
+fn badge(outcome: SongLoopImportOutcome) -> &'static str {
+    if outcome.is_failure() {
+        "FAIL"
+    } else if outcome == SongLoopImportOutcome::Conflict {
+        "WARN"
+    } else {
+        "OK"
+    }
+}
+
+fn render(results: &[SongLoopImportResult], dry_run: bool, console: Console) -> String {
     let section = if dry_run {
         "song loops (dry run)"
     } else {
         "song loops"
     };
     let mut output = console.heading(section);
-    for song in songs {
+    for result in results {
         output.push('\n');
-        output.push_str(&console.row(song.outcome.badge(), song.outcome.label(), &song.path));
+        output.push_str(&console.row(
+            badge(result.outcome),
+            ImportOutcome::from(result.outcome).label(),
+            &result.path,
+        ));
     }
     output
 }

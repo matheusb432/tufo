@@ -394,11 +394,12 @@ export global LoopEditorView {
     pure callback waveform(length, length, color, int) -> image;
 }
 
+export enum SongLoopImportRowState { ok, conflict, failed }
+
 export struct SongLoopImportRow {
     path: string,
     outcome: string,
-    failed: bool,
-    conflict: bool,
+    state: SongLoopImportRowState,
 }
 
 export global SongLoopImportView {

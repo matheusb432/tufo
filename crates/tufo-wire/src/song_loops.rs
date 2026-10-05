@@ -82,6 +82,21 @@ pub enum SongLoopImportOutcome {
     Unreadable,
 }
 
+impl SongLoopImportOutcome {
+    /// The song matched no audio or failed its checks, so importing skips it.
+    #[must_use]
+    pub fn is_failure(self) -> bool {
+        matches!(
+            self,
+            Self::NoMatch
+                | Self::IdentityMismatch
+                | Self::LengthMismatch
+                | Self::InvalidMarkers
+                | Self::Unreadable
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PreviewSongLoop {
     pub audio_file_id: AudioFileId,

@@ -14,7 +14,7 @@ use tufo_client::{
         Background, CollectionSource, CollectionView, EntryView, KenkuImportReport,
         LibraryFolderView, LibrarySnapshot, SongSource, SongView,
     },
-    song_loops::SavedSongLoop,
+    song_loops::{SavedSongLoop, SongLoopImportOutcome},
 };
 use tufo_models::{
     discord::{VoiceChannel, VoiceChannelTarget},
@@ -153,8 +153,26 @@ pub(crate) struct SongLoopImportView {
 pub(crate) struct SongLoopImportRowView {
     pub(crate) path: String,
     pub(crate) outcome: String,
-    pub(crate) failed: bool,
-    pub(crate) conflict: bool,
+    pub(crate) state: SongLoopImportRowState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SongLoopImportRowState {
+    Ok,
+    Conflict,
+    Failed,
+}
+
+impl SongLoopImportRowState {
+    pub(crate) fn of(outcome: SongLoopImportOutcome) -> Self {
+        if outcome.is_failure() {
+            Self::Failed
+        } else if outcome == SongLoopImportOutcome::Conflict {
+            Self::Conflict
+        } else {
+            Self::Ok
+        }
+    }
 }
 
 /// A followed music folder on the Songs page.

@@ -225,17 +225,6 @@ fn outcome_text(outcome: SongLoopImportOutcome) -> &'static str {
     }
 }
 
-fn outcome_failed(outcome: SongLoopImportOutcome) -> bool {
-    matches!(
-        outcome,
-        SongLoopImportOutcome::NoMatch
-            | SongLoopImportOutcome::IdentityMismatch
-            | SongLoopImportOutcome::LengthMismatch
-            | SongLoopImportOutcome::InvalidMarkers
-            | SongLoopImportOutcome::Unreadable
-    )
-}
-
 fn count(results: &[SongLoopImportResult], outcome: SongLoopImportOutcome) -> usize {
     results
         .iter()
@@ -262,7 +251,7 @@ impl PendingImport {
         let failed = self
             .results
             .iter()
-            .filter(|result| outcome_failed(result.outcome))
+            .filter(|result| result.outcome.is_failure())
             .count();
         let mut sentences = vec![tr_count(
             "{n} loop will be saved.",
@@ -945,8 +934,7 @@ impl Controller {
                         .map(|result| presentation::SongLoopImportRowView {
                             path: result.path.clone(),
                             outcome: outcome_text(result.outcome).to_owned(),
-                            failed: outcome_failed(result.outcome),
-                            conflict: result.outcome == SongLoopImportOutcome::Conflict,
+                            state: presentation::SongLoopImportRowState::of(result.outcome),
                         })
                         .collect(),
                     conflicts: count(&import.results, SongLoopImportOutcome::Conflict),

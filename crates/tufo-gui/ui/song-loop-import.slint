@@ -2,7 +2,7 @@
 
 import { ListView } from "std-widgets.slint";
 import { Theme } from "theme.slint";
-import { Actions, SongLoopImportView } from "state.slint";
+import { Actions, SongLoopImportRowState, SongLoopImportView } from "state.slint";
 import { Actions-Row, DialogFrame } from "dialogs.slint";
 import { Button, ButtonKind, LoadingProgress, Switch } from "widgets.slint";
 
@@ -40,7 +40,8 @@ export component SongLoopImportDialog inherits DialogFrame {
 
                 Text {
                     text: row.outcome;
-                    color: row.failed ? Theme.error : row.conflict ? Theme.warning : Theme.text-secondary;
+                    color: row.state == SongLoopImportRowState.failed ? Theme.error
+                        : row.state == SongLoopImportRowState.conflict ? Theme.warning : Theme.text-secondary;
                     font-size: Theme.caption;
                     font-weight: 700;
                     vertical-alignment: center;
