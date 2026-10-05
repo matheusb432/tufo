@@ -20,7 +20,7 @@ use tufo_models::library::{
     song_loop::{LoopRegion, SeamPreviewSide, SourceFrames},
 };
 
-use super::{Controller, audio_file_id};
+use super::{Controller, audio_file_id, server_disconnected_text};
 use crate::{
     i18n::{tr, tr_args, tr_count},
     loop_editor::{
@@ -310,7 +310,7 @@ impl Controller {
         };
         self.render_loop_editor();
         let Some(client) = self.client() else {
-            self.set_loop_editor_error(generation, tr("tufo-server is not connected.").to_owned());
+            self.set_loop_editor_error(generation, server_disconnected_text());
             return;
         };
         let controller = self.clone();
@@ -729,7 +729,7 @@ impl Controller {
         Request: std::future::Future<Output = Result<(), tufo_client::ClientError>> + Send,
     {
         let Some(client) = self.client() else {
-            self.set_loop_editor_error(generation, tr("tufo-server is not connected.").to_owned());
+            self.set_loop_editor_error(generation, server_disconnected_text());
             return;
         };
         let controller = self.clone();
@@ -795,8 +795,7 @@ impl Controller {
     // Export and import.
 
     pub(crate) fn export_song_loops(&self) {
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         let controller = self.clone();
@@ -829,8 +828,7 @@ impl Controller {
     }
 
     pub(crate) fn import_song_loops(&self) {
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         let controller = self.clone();

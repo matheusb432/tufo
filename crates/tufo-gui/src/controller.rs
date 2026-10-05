@@ -657,8 +657,7 @@ impl Controller {
         let title = presentation::find_collection(&self.lock().snapshot, playlist_id)
             .map(|playlist| playlist.title.as_str().to_owned())
             .unwrap_or_default();
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         let controller = self.clone();
@@ -684,8 +683,7 @@ impl Controller {
             self.toast_error(tr("A name needs at least one character.").to_owned());
             return;
         };
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         let shown = presentation::shown_presets(&self.lock().snapshot);
@@ -1416,8 +1414,7 @@ impl Controller {
         Command: FnOnce(TufoClient) -> Request + Send + 'static,
         Request: Future<Output = Result<(), ClientError>> + Send,
     {
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         let controller = self.clone();
@@ -1434,8 +1431,7 @@ impl Controller {
         Command: FnOnce(TufoClient) -> Request + Send + 'static,
         Request: Future<Output = Result<ImportReport, ClientError>> + Send,
     {
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         let controller = self.clone();
@@ -1458,6 +1454,15 @@ impl Controller {
 
     fn client(&self) -> Option<TufoClient> {
         self.lock().client.clone()
+    }
+
+    /// Reports a missing connection as a toast.
+    fn connected_client(&self) -> Option<TufoClient> {
+        let client = self.client();
+        if client.is_none() {
+            self.toast_error(server_disconnected_text());
+        }
+        client
     }
 
     fn lock(&self) -> MutexGuard<'_, Shared> {
@@ -1499,4 +1504,8 @@ fn entry_id_of(text: &str) -> Option<CollectionEntryId> {
 
 fn audio_file_id(text: &str) -> Option<AudioFileId> {
     parse_uuid(text).map(AudioFileId::from_uuid)
+}
+
+fn server_disconnected_text() -> String {
+    tr("tufo-server is not connected.").to_owned()
 }

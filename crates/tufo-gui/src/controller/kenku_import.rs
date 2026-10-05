@@ -93,8 +93,7 @@ impl Controller {
     }
 
     fn submit_kenku_import(&self, request: ImportKenkuLibrary) {
-        let Some(client) = self.client() else {
-            self.toast_error(tr("tufo-server is not connected.").to_owned());
+        let Some(client) = self.connected_client() else {
             return;
         };
         {
