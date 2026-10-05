@@ -8,9 +8,10 @@ use toasty::{Db, db::Executor};
 use toasty_core::driver::operation::TransactionMode;
 use tufo_models::{
     library::{
-        AudioFile, AudioFileId, BackgroundPresetChooser, BuiltinTitle, Collection, CollectionEntry,
-        CollectionId, CollectionKind, EntryOrderKey, LibraryFolder, SoundIcon, SoundSettings,
-        Title, milliseconds_saturating,
+        AudioFile, AudioFileId, AudioFingerprint, BackgroundPresetChooser, BuiltinTitle,
+        Collection, CollectionEntry, CollectionId, CollectionKind, EntryOrderKey, LibraryFolder,
+        SoundIcon, SoundSettings, Title, milliseconds_saturating,
+        song_loop::{LoopRegion, SongLoop},
     },
     playback::AudioFilePath,
 };
@@ -291,6 +292,46 @@ pub(super) async fn create_audio_file(
     })
     .exec(executor)
     .await?)
+}
+
+/// `replaces_saved` updates the song's loop row instead of creating one.
+pub(super) async fn save_song_loop(
+    database: &mut Db,
+    audio_file_id: AudioFileId,
+    fingerprint: &AudioFingerprint,
+    region: LoopRegion,
+    replaces_saved: bool,
+) -> Result<(), LibraryStorageError> {
+    let timing = region.timing();
+    let markers = region.markers();
+    if replaces_saved {
+        SongLoop::update_by_audio_file_id(audio_file_id)
+            .fingerprint(fingerprint.clone())
+            .sample_rate(timing.sample_rate.get())
+            .frame_count(timing.frame_count.0)
+            .playback_start_frame(markers.playback_start.0)
+            .loop_start_frame(markers.loop_start.0)
+            .loop_end_frame(markers.loop_end.0)
+            .crossfade_frames(markers.crossfade.0)
+            .updated_at(Timestamp::now())
+            .exec(database)
+            .await?;
+    } else {
+        toasty::create!(SongLoop {
+            audio_file_id,
+            fingerprint: fingerprint.clone(),
+            sample_rate: timing.sample_rate.get(),
+            frame_count: timing.frame_count.0,
+            playback_start_frame: markers.playback_start.0,
+            loop_start_frame: markers.loop_start.0,
+            loop_end_frame: markers.loop_end.0,
+            crossfade_frames: markers.crossfade.0,
+            updated_at: Timestamp::now(),
+        })
+        .exec(database)
+        .await?;
+    }
+    Ok(())
 }
 
 pub(super) async fn find_visible_collection(

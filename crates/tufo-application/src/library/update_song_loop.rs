@@ -1,14 +1,14 @@
 //! Saving a song's loop markers against the audio they were placed on.
 
-use jiff::Timestamp;
 use tufo_models::library::{
     AudioFile,
-    song_loop::{LoopMarkers, LoopRegion, LoopRegionError, SongLoop, SourceFrames},
+    song_loop::{LoopMarkers, LoopRegion, LoopRegionError, SongLoop},
 };
 use tufo_wire::song_loops::UpdateSongLoop;
 
 use super::{
     Library, LibraryStorageError, library_files::LibraryFiles, song_analysis::AnalyzeSongError,
+    store,
 };
 use crate::error::ErrorMeta;
 
@@ -64,22 +64,13 @@ pub async fn execute<F: LibraryFiles>(
         .exec(&mut database)
         .await
         .map_err(LibraryStorageError::from)?;
-    let base = saved.as_ref().map_or(
-        LoopMarkers {
-            loop_end: analysis.timing.frame_count,
-            ..LoopMarkers::default()
-        },
-        saved_markers,
+    let base = saved.as_ref().map_or_else(
+        || LoopMarkers::whole_file(analysis.timing.frame_count),
+        SongLoop::markers,
     );
-    let markers = LoopMarkers {
-        playback_start: update.playback_start.unwrap_or(base.playback_start),
-        loop_start: update.loop_start.unwrap_or(base.loop_start),
-        loop_end: update.loop_end.unwrap_or(base.loop_end),
-        crossfade: update.crossfade.unwrap_or(base.crossfade),
-    };
-    let region = LoopRegion::try_new(analysis.timing, markers)
+    let region = LoopRegion::try_new(analysis.timing, update.markers_over(base))
         .map_err(UpdateSongLoopError::InvalidMarkers)?;
-    save_region(
+    store::save_song_loop(
         &mut database,
         update.audio_file_id,
         &analysis.fingerprint,
@@ -88,53 +79,5 @@ pub async fn execute<F: LibraryFiles>(
     )
     .await?;
     library.publish().await?;
-    Ok(())
-}
-
-pub(super) fn saved_markers(saved: &SongLoop) -> LoopMarkers {
-    LoopMarkers {
-        playback_start: SourceFrames(saved.playback_start_frame),
-        loop_start: SourceFrames(saved.loop_start_frame),
-        loop_end: SourceFrames(saved.loop_end_frame),
-        crossfade: SourceFrames(saved.crossfade_frames),
-    }
-}
-
-pub(super) async fn save_region(
-    database: &mut toasty::Db,
-    audio_file_id: tufo_models::library::AudioFileId,
-    fingerprint: &tufo_models::library::AudioFingerprint,
-    region: LoopRegion,
-    replaces_saved: bool,
-) -> Result<(), LibraryStorageError> {
-    let timing = region.timing();
-    let markers = region.markers();
-    if replaces_saved {
-        SongLoop::update_by_audio_file_id(audio_file_id)
-            .fingerprint(fingerprint.clone())
-            .sample_rate(timing.sample_rate.get())
-            .frame_count(timing.frame_count.0)
-            .playback_start_frame(markers.playback_start.0)
-            .loop_start_frame(markers.loop_start.0)
-            .loop_end_frame(markers.loop_end.0)
-            .crossfade_frames(markers.crossfade.0)
-            .updated_at(Timestamp::now())
-            .exec(database)
-            .await?;
-    } else {
-        toasty::create!(SongLoop {
-            audio_file_id,
-            fingerprint: fingerprint.clone(),
-            sample_rate: timing.sample_rate.get(),
-            frame_count: timing.frame_count.0,
-            playback_start_frame: markers.playback_start.0,
-            loop_start_frame: markers.loop_start.0,
-            loop_end_frame: markers.loop_end.0,
-            crossfade_frames: markers.crossfade.0,
-            updated_at: Timestamp::now(),
-        })
-        .exec(database)
-        .await?;
-    }
     Ok(())
 }

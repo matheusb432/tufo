@@ -29,6 +29,28 @@ pub struct LibrarySnapshot {
     pub library_folders: Vec<LibraryFolderView>,
 }
 
+impl LibrarySnapshot {
+    /// Repeats a file's loop for each song and entry that lists the file.
+    pub fn saved_song_loops(&self) -> impl Iterator<Item = (AudioFileId, &SavedSongLoop)> {
+        let songs = self
+            .songs
+            .iter()
+            .filter_map(|song| Some((song.audio_file_id, song.saved_loop.as_ref()?)));
+        let entries = self
+            .collections
+            .iter()
+            .flat_map(|collection| &collection.entries)
+            .filter_map(|entry| Some((entry.audio_file_id, entry.saved_loop.as_ref()?)));
+        songs.chain(entries)
+    }
+
+    #[must_use]
+    pub fn saved_song_loop(&self, audio_file_id: AudioFileId) -> Option<&SavedSongLoop> {
+        self.saved_song_loops()
+            .find_map(|(id, saved)| (id == audio_file_id).then_some(saved))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct CollectionView {
     pub id: CollectionId,

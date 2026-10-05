@@ -71,6 +71,17 @@ pub struct LoopMarkers {
     pub crossfade: SourceFrames,
 }
 
+impl LoopMarkers {
+    /// Starts at the first frame and loops the whole file without a crossfade.
+    #[must_use]
+    pub fn whole_file(frame_count: SourceFrames) -> Self {
+        Self {
+            loop_end: frame_count,
+            ..Self::default()
+        }
+    }
+}
+
 /// Holds `playback_start <= loop_start < loop_end <= frame_count` and a crossfade within
 /// [`crossfade_max`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -208,6 +219,16 @@ pub struct SongLoop {
 }
 
 impl SongLoop {
+    #[must_use]
+    pub fn markers(&self) -> LoopMarkers {
+        LoopMarkers {
+            playback_start: SourceFrames(self.playback_start_frame),
+            loop_start: SourceFrames(self.loop_start_frame),
+            loop_end: SourceFrames(self.loop_end_frame),
+            crossfade: SourceFrames(self.crossfade_frames),
+        }
+    }
+
     pub fn region(&self) -> Result<LoopRegion, SongLoopRowError> {
         let sample_rate =
             NonZeroU32::new(self.sample_rate).ok_or(SongLoopRowError::ZeroSampleRate)?;
@@ -215,13 +236,7 @@ impl SongLoop {
             sample_rate,
             frame_count: SourceFrames(self.frame_count),
         };
-        let markers = LoopMarkers {
-            playback_start: SourceFrames(self.playback_start_frame),
-            loop_start: SourceFrames(self.loop_start_frame),
-            loop_end: SourceFrames(self.loop_end_frame),
-            crossfade: SourceFrames(self.crossfade_frames),
-        };
-        LoopRegion::try_new(timing, markers).map_err(SongLoopRowError::Region)
+        LoopRegion::try_new(timing, self.markers()).map_err(SongLoopRowError::Region)
     }
 }
 

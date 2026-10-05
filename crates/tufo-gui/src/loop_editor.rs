@@ -66,10 +66,7 @@ impl LoopDraft {
     pub(crate) fn new(timing: SourceTiming, saved: Option<LoopMarkers>) -> Self {
         let mut draft = Self {
             timing,
-            markers: LoopMarkers {
-                loop_end: timing.frame_count,
-                ..LoopMarkers::default()
-            },
+            markers: LoopMarkers::whole_file(timing.frame_count),
         };
         if let Some(saved) = saved {
             draft.move_marker(Marker::LoopEnd, saved.loop_end);
@@ -423,10 +420,7 @@ mod tests {
 
         assert_eq!(
             draft.markers(),
-            LoopMarkers {
-                loop_end: SourceFrames(480_000),
-                ..LoopMarkers::default()
-            }
+            LoopMarkers::whole_file(SourceFrames(480_000))
         );
         assert!(draft.region().is_ok());
     }

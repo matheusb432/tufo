@@ -14,7 +14,7 @@ use super::{
     song_loop_document::{
         DocumentSong, DocumentSongIdentity, SongLoopDocument, SongLoopDocumentError,
     },
-    update_song_loop::{save_region, saved_markers},
+    store,
 };
 use crate::error::ErrorMeta;
 
@@ -65,7 +65,7 @@ pub async fn execute<F: LibraryFiles>(
         .map_err(LibraryStorageError::from)?
         .into_iter()
         .map(|saved| {
-            let markers = saved_markers(&saved);
+            let markers = saved.markers();
             (saved.audio_file_id, (saved.fingerprint, markers))
         })
         .collect::<HashMap<AudioFileId, (AudioFingerprint, LoopMarkers)>>();
@@ -100,7 +100,7 @@ pub async fn execute<F: LibraryFiles>(
             SongLoopImportOutcome::Saved | SongLoopImportOutcome::Replaced
         ) {
             if !request.dry_run {
-                save_region(
+                store::save_song_loop(
                     &mut database,
                     matched.audio_file_id,
                     &matched.fingerprint,

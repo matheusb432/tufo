@@ -119,23 +119,7 @@ pub(crate) async fn run_loop(command: LoopCommand, json: bool) -> anyhow::Result
 }
 
 fn saved_loops(library: &LibrarySnapshot) -> BTreeMap<AudioFileId, &SavedSongLoop> {
-    library
-        .songs
-        .iter()
-        .filter_map(|song| {
-            song.saved_loop
-                .as_ref()
-                .map(|saved| (song.audio_file_id, saved))
-        })
-        .chain(library.collections.iter().flat_map(|collection| {
-            collection.entries.iter().filter_map(|entry| {
-                entry
-                    .saved_loop
-                    .as_ref()
-                    .map(|saved| (entry.audio_file_id, saved))
-            })
-        }))
-        .collect()
+    library.saved_song_loops().collect()
 }
 
 fn loop_record(id: AudioFileId, saved: &SavedSongLoop) -> Value {

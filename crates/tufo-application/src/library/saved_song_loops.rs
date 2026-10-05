@@ -25,21 +25,9 @@ impl<F: LibraryFiles> Library<F> {
 
 impl SongLoops for SavedSongLoops {
     fn loop_region(&self, audio_file_id: AudioFileId) -> Option<LoopRegion> {
-        let snapshot = self.snapshots.borrow();
-        let song_loops = snapshot
-            .songs
-            .iter()
-            .map(|song| (song.audio_file_id, song.saved_loop))
-            .chain(
-                snapshot
-                    .collections
-                    .iter()
-                    .flat_map(|collection| &collection.entries)
-                    .map(|entry| (entry.audio_file_id, entry.saved_loop)),
-            );
-        song_loops
-            .filter(|(id, _)| *id == audio_file_id)
-            .find_map(|(_, saved)| saved)
+        self.snapshots
+            .borrow()
+            .saved_song_loop(audio_file_id)
             .filter(|saved| !saved.needs_review)
             .map(|saved| saved.region)
     }

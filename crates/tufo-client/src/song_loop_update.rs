@@ -43,35 +43,11 @@ pub async fn execute(
         })
         .await
         .map_err(SongLoopUpdateError::SnapshotTimedOut)??;
-        let saved = library
-            .songs
-            .iter()
-            .filter(|song| song.audio_file_id == update.audio_file_id)
-            .find_map(|song| song.saved_loop.as_ref())
-            .or_else(|| {
-                library
-                    .collections
-                    .iter()
-                    .flat_map(|collection| &collection.entries)
-                    .filter(|entry| entry.audio_file_id == update.audio_file_id)
-                    .find_map(|entry| entry.saved_loop.as_ref())
-            });
-        let base = saved.map_or(
-            LoopMarkers {
-                loop_end: waveform.timing.frame_count,
-                ..LoopMarkers::default()
-            },
+        let base = library.saved_song_loop(update.audio_file_id).map_or_else(
+            || LoopMarkers::whole_file(waveform.timing.frame_count),
             |saved| saved.region.markers(),
         );
-        LoopRegion::try_new(
-            waveform.timing,
-            LoopMarkers {
-                playback_start: update.playback_start.unwrap_or(base.playback_start),
-                loop_start: update.loop_start.unwrap_or(base.loop_start),
-                loop_end: update.loop_end.unwrap_or(base.loop_end),
-                crossfade: update.crossfade.unwrap_or(base.crossfade),
-            },
-        )?;
+        LoopRegion::try_new(waveform.timing, update.markers_over(base))?;
         client.update_song_loop(update).await?;
         Ok(())
     })

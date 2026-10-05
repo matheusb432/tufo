@@ -7,7 +7,7 @@ use std::{
 
 use tufo_models::library::{
     AudioFileId, AudioFingerprint,
-    song_loop::{LoopRegion, SeamPreviewSide, SourceFrames, SourceTiming},
+    song_loop::{LoopMarkers, LoopRegion, SeamPreviewSide, SourceFrames, SourceTiming},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +35,19 @@ pub struct UpdateSongLoop {
     pub loop_start: Option<SourceFrames>,
     pub loop_end: Option<SourceFrames>,
     pub crossfade: Option<SourceFrames>,
+}
+
+impl UpdateSongLoop {
+    /// `base` supplies each marker the update leaves out.
+    #[must_use]
+    pub fn markers_over(&self, base: LoopMarkers) -> LoopMarkers {
+        LoopMarkers {
+            playback_start: self.playback_start.unwrap_or(base.playback_start),
+            loop_start: self.loop_start.unwrap_or(base.loop_start),
+            loop_end: self.loop_end.unwrap_or(base.loop_end),
+            crossfade: self.crossfade.unwrap_or(base.crossfade),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
