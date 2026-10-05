@@ -1,19 +1,18 @@
 // The player, docked under the page: the playing sounds as chips, then what plays, the transport
 // with its seek bar, and the volume. In a narrow window it collapses into one slim row, and the
-// mini player shows it alone in a small window.
+// mini player shows a smaller set of its controls in a small window.
 
 import { PlaybackTour } from "tours/playback.slint";
-import { MiniPlayerTour } from "tours/mini-player.slint";
 import { GuidedTours } from "tours/state.slint";
-import { TourButton } from "tours/button.slint";
 import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import { Actions, Art, PlayerView, Session, SoundChip, WindowFrame, MusicLayer } from "state.slint";
-import { Button, ButtonKind, Icon, IconButton, Slider } from "widgets.slint";
+import { Button, ButtonKind, Icon, IconButton, Slider, TooltipBubble } from "widgets.slint";
 import { WindowDragArea } from "frame.slint";
 
 component SoundChipView inherits Rectangle {
     in property <SoundChip> chip;
+    callback stop(string);
     height: 30px;
     width: min(layout.preferred-width, 220px);
     border-radius: self.height / 2;
@@ -67,7 +66,7 @@ component SoundChipView inherits Rectangle {
             icon: @image-url("icons/x.svg");
             tooltip: @tr("Stop {0}", root.chip.title);
             clicked => {
-                Actions.stop-sound(root.chip.id);
+                root.stop(root.chip.id);
             }
         }
     }
@@ -231,7 +230,12 @@ component NowPlaying inherits HorizontalLayout {
             color: Theme.text-secondary;
             overflow: elide;
         }
-        if PlayerView.music-layers.length > 0: MixButton { }
+        // Sets the quiet button's label flush with the title.
+        if PlayerView.music-layers.length > 0: HorizontalLayout {
+            alignment: start;
+            padding-left: -10px;
+            MixButton { }
+        }
     }
 }
 
@@ -277,9 +281,10 @@ component Transport inherits HorizontalLayout {
     in property <length> button-size: 40px;
     in property <length> icon-size: 22px;
     in property <length> play-size: 46px;
+    in property <bool> play-modes-visible: true;
     alignment: center;
     spacing: 6px;
-    IconButton {
+    if root.play-modes-visible: IconButton {
         TourTarget {
             anchor: PlaybackTour.transport;
             bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
@@ -325,7 +330,7 @@ component Transport inherits HorizontalLayout {
         }
     }
 
-    IconButton {
+    if root.play-modes-visible: IconButton {
         y: (parent.height - self.height) / 2;
         size: root.button-size;
         icon-size: root.icon-size;
@@ -342,6 +347,7 @@ component Transport inherits HorizontalLayout {
 
 // The seek bar, lit along the part of the track that has played.
 component SeekBar inherits Rectangle {
+    in property <bool> thumb-hover-only;
     height: 18px;
     Rectangle {
         y: (parent.height - self.height) / 2;
@@ -366,7 +372,8 @@ component SeekBar inherits Rectangle {
         height: self.width;
         border-radius: self.width / 2;
         background: Theme.lit-bright;
-        animate width { duration: 120ms; }
+        opacity: root.thumb-hover-only && !seek.hovered ? 0 : 1;
+        animate width, opacity { duration: 120ms; }
     }
 
     seek := Slider {
@@ -382,14 +389,17 @@ component SeekBar inherits Rectangle {
     }
 }
 
+component TimeText inherits Text {
+    min-width: 34px;
+    font-size: 11.5px;
+    color: Theme.text-faint;
+    vertical-alignment: center;
+}
+
 component SeekRow inherits HorizontalLayout {
     spacing: 10px;
-    Text {
+    TimeText {
         text: PlayerView.elapsed;
-        min-width: 34px;
-        font-size: 11.5px;
-        color: Theme.text-faint;
-        vertical-alignment: center;
     }
 
     SeekBar {
@@ -401,13 +411,9 @@ component SeekRow inherits HorizontalLayout {
         horizontal-stretch: 1;
     }
 
-    Text {
+    TimeText {
         text: PlayerView.remaining;
-        min-width: 34px;
         horizontal-alignment: right;
-        font-size: 11.5px;
-        color: Theme.text-faint;
-        vertical-alignment: center;
     }
 }
 
@@ -457,31 +463,37 @@ component EffectsVolumeButton inherits IconButton {
     }
 }
 
+component MuteButton inherits IconButton {
+    size: 32px;
+    icon-size: 18px;
+    icon: PlayerView.muted || PlayerView.volume == 0 ? @image-url("icons/volume-x.svg") : PlayerView.volume < 0.5 ? @image-url("icons/volume-1.svg") : @image-url("icons/volume-2.svg");
+    tooltip: PlayerView.muted ? @tr("Unmute") : @tr("Mute");
+    clicked => {
+        Actions.toggle-mute();
+    }
+}
+
+component MusicVolumeSlider inherits Slider {
+    value: PlayerView.muted ? 0 : PlayerView.volume;
+    accessible-label: @tr("Music volume");
+    changed(value) => {
+        Actions.set-volume(value);
+    }
+}
+
 component VolumeControl inherits HorizontalLayout {
     spacing: 4px;
-    IconButton {
+    MuteButton {
         TourTarget {
             anchor: PlaybackTour.volume;
             bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
         }
         y: (parent.height - self.height) / 2;
-        size: 32px;
-        icon-size: 18px;
-        icon: PlayerView.muted || PlayerView.volume == 0 ? @image-url("icons/volume-x.svg") : PlayerView.volume < 0.5 ? @image-url("icons/volume-1.svg") : @image-url("icons/volume-2.svg");
-        tooltip: PlayerView.muted ? @tr("Unmute") : @tr("Mute");
-        clicked => {
-            Actions.toggle-mute();
-        }
     }
 
-    Slider {
+    MusicVolumeSlider {
         y: (parent.height - self.height) / 2;
         horizontal-stretch: 1;
-        value: PlayerView.muted ? 0 : PlayerView.volume;
-        accessible-label: @tr("Music volume");
-        changed(value) => {
-            Actions.set-volume(value);
-        }
     }
     EffectsVolumeButton {
         y: (parent.height - self.height) / 2;
@@ -510,6 +522,9 @@ component PlayingSounds inherits HorizontalLayout {
             alignment: start;
             for chip in PlayerView.sounds: SoundChipView {
                 chip: chip;
+                stop(sound-id) => {
+                    Actions.stop-sound(sound-id);
+                }
             }
         }
     }
@@ -650,6 +665,172 @@ export component Dock inherits Rectangle {
     }
 }
 
+// The playing sounds behind one button that counts them. Its popover pauses, loops, and stops them
+// and sets the effects volume.
+component SoundsButton inherits Rectangle {
+    property <int> sound-count: PlayerView.sounds.length;
+    property <bool> tooltip-dismissed;
+    property <length> popover-margin: 4px;
+    // Beside the button rather than over it, so a second click cannot land on a row.
+    property <length> popover-width: min(264px, root.absolute-position.x - 2 * root.popover-margin);
+    property <length> popover-padding: 8px;
+    width: content.preferred-width;
+    height: 28px;
+    border-radius: self.height / 2;
+    background: root.sound-count == 0 ? (touch.has-hover ? Theme.hover : transparent) : touch.has-hover ? Theme.track : Theme.button;
+    animate background { duration: Motion.hover; }
+    accessible-role: button;
+    accessible-label: @tr("Sounds and effects volume");
+    accessible-action-default => { popover.show(); }
+    // Close the popover before playback can remove its rows.
+    function stop-sound(sound-id: string) {
+        popover.close();
+        Actions.stop-sound(sound-id);
+    }
+
+    content := HorizontalLayout {
+        padding-left: root.sound-count > 0 ? 8px : 5px;
+        padding-right: root.sound-count > 0 ? 11px : 5px;
+        spacing: 5px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 18px;
+            height: 18px;
+            source: @image-url("../icons/sounds/audio-lines.svg");
+            tint: root.sound-count > 0 && !PlayerView.sounds-paused ? Theme.accent : touch.has-hover ? Theme.text : Theme.text-faint;
+        }
+        if root.sound-count > 0: Text {
+            text: root.sound-count;
+            font-size: 13px;
+            font-weight: 800;
+            color: PlayerView.sounds-paused ? Theme.text-faint : Theme.text;
+            vertical-alignment: center;
+        }
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.tooltip-dismissed = true;
+            }
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                root.tooltip-dismissed = false;
+            }
+        }
+        clicked => {
+            popover.show();
+        }
+    }
+
+    // Stays mounted, like IconButton's tooltip.
+    Rectangle {
+        width: root.width;
+        height: root.height;
+        visible: !root.tooltip-dismissed;
+        Tooltip {
+            TooltipBubble {
+                text: @tr("Sounds and effects volume");
+            }
+        }
+    }
+
+    popover := PopupWindow {
+        close-policy: PopupClosePolicy.close-on-click-outside;
+        width: root.popover-width;
+        height: min(panel.preferred-height, Theme.mini-player-height-min - 2 * root.popover-margin);
+        x: -self.width - root.popover-margin;
+        y: root.popover-margin - root.absolute-position.y;
+        Rectangle {
+            background: Theme.raised;
+            border-radius: Theme.radius-row;
+            border-width: 1px;
+            border-color: Theme.raised-edge;
+            panel := VerticalLayout {
+                padding: root.popover-padding;
+                spacing: 4px;
+                HorizontalLayout {
+                    min-height: 24px;
+                    spacing: 6px;
+                    Text {
+                        text: @tr("Sounds");
+                        color: Theme.text;
+                        font-size: Theme.body-small;
+                        font-weight: 800;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        text: root.sound-count > 0 ? root.sound-count : "";
+                        color: Theme.text-faint;
+                        font-size: Theme.caption;
+                        vertical-alignment: center;
+                        horizontal-stretch: 1;
+                    }
+                    IconButton {
+                        y: (parent.height - self.height) / 2;
+                        size: 24px;
+                        icon-size: 15px;
+                        enabled: root.sound-count > 0;
+                        icon: PlayerView.sounds-paused ? @image-url("icons/play.svg") : @image-url("icons/pause.svg");
+                        tooltip: PlayerView.sounds-paused ? @tr("Resume sounds") : @tr("Pause sounds");
+                        clicked => {
+                            Actions.toggle-sounds-paused();
+                        }
+                    }
+                }
+                HorizontalLayout {
+                    spacing: 6px;
+                    Icon {
+                        y: (parent.height - self.height) / 2;
+                        width: 16px;
+                        height: 16px;
+                        source: PlayerView.effects-volume == 0 ? @image-url("icons/volume-x.svg") : PlayerView.effects-volume < 0.5 ? @image-url("icons/volume-1.svg") : @image-url("icons/volume-2.svg");
+                        tint: Theme.text-faint;
+                    }
+                    volume := Slider {
+                        horizontal-stretch: 1;
+                        value: PlayerView.effects-volume;
+                        accessible-label: @tr("Effects volume");
+                        changed(value) => { Actions.set-effects-volume(value); }
+                    }
+                    Text {
+                        text: round(volume.shown-value * 100) + "%";
+                        min-width: 34px;
+                        horizontal-alignment: right;
+                        color: Theme.text-secondary;
+                        font-size: Theme.caption;
+                        vertical-alignment: center;
+                    }
+                }
+                if root.sound-count == 0: Text {
+                    text: @tr("No sounds playing");
+                    color: Theme.text-faint;
+                    font-size: Theme.caption;
+                }
+                if root.sound-count > 0: Flickable {
+                    preferred-height: sounds.preferred-height;
+                    vertical-stretch: 1;
+                    content-height: sounds.preferred-height;
+                    mouse-drag-pan-enabled: false;
+                    sounds := VerticalLayout {
+                        spacing: 4px;
+                        for chip in PlayerView.sounds: SoundChipView {
+                            chip: chip;
+                            width: root.popover-width - 2 * root.popover-padding;
+                            height: 26px;
+                            stop(sound-id) => {
+                                root.stop-sound(sound-id);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // The whole window as a small player that a drag anywhere outside its controls moves.
 export component MiniPlayer inherits Rectangle {
     callback close();
@@ -658,26 +839,25 @@ export component MiniPlayer inherits Rectangle {
     }
 
     VerticalLayout {
-        padding: 12px;
-        spacing: 4px;
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 14px;
+        padding-bottom: 14px;
+        spacing: 9px;
         HorizontalLayout {
+            height: 40px;
             spacing: 2px;
             NowPlaying {
                 art-size: 40px;
                 horizontal-stretch: 1;
             }
-            TourButton { y: (parent.height - self.height) / 2; guide: MiniPlayerTour.guide; label: @tr("Mini player"); }
 
             if Session.always-on-top-supported: IconButton {
-                TourTarget {
-                    anchor: MiniPlayerTour.mini-pin;
-                    bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
-                }
                 y: (parent.height - self.height) / 2;
-                size: 32px;
-                icon-size: 18px;
+                size: 28px;
+                icon-size: 16px;
                 icon: @image-url("icons/pin.svg");
-                tint: Session.mini-player-pinned ? Theme.accent : Theme.text-secondary;
+                tint: Session.mini-player-pinned ? Theme.accent : Theme.text-faint;
                 tooltip: Session.mini-player-pinned ? @tr("Stop keeping on top") : @tr("Keep on top");
                 clicked => {
                     Session.mini-player-pinned = !Session.mini-player-pinned;
@@ -686,14 +866,11 @@ export component MiniPlayer inherits Rectangle {
             }
             IconButton {
                 y: (parent.height - self.height) / 2;
-                size: 32px;
-                icon-size: 18px;
+                size: 28px;
+                icon-size: 16px;
                 icon: @image-url("icons/maximize-2.svg");
+                tint: Theme.text-faint;
                 tooltip: @tr("Full window (Ctrl+Shift+M)");
-                TourTarget {
-                    anchor: PlaybackTour.mini-switch;
-                    bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
-                }
                 clicked => {
                     WindowFrame.switch-form();
                 }
@@ -701,9 +878,10 @@ export component MiniPlayer inherits Rectangle {
 
             IconButton {
                 y: (parent.height - self.height) / 2;
-                size: 32px;
-                icon-size: 18px;
+                size: 28px;
+                icon-size: 16px;
                 icon: @image-url("icons/x.svg");
+                tint: Theme.text-faint;
                 tooltip: @tr("Close");
                 background: self.has-hover ? Theme.window-close-hover : transparent;
                 hover-tint: Theme.text;
@@ -713,25 +891,46 @@ export component MiniPlayer inherits Rectangle {
             }
         }
 
-        Transport {
-            spacing: 2px;
-            button-size: 34px;
-            icon-size: 20px;
-            play-size: 40px;
-        }
-
-        SeekRow { }
-
         HorizontalLayout {
             spacing: 8px;
-            if PlayerView.sounds.length > 0: PlayingSounds {
+            SeekBar {
+                y: (parent.height - self.height) / 2;
                 horizontal-stretch: 1;
+                thumb-hover-only: true;
             }
-            if PlayerView.sounds.length == 0: Rectangle {
+
+            TimeText {
+                text: PlayerView.remaining;
+                horizontal-alignment: right;
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            Transport {
+                spacing: 2px;
+                button-size: 32px;
+                icon-size: 18px;
+                play-size: 36px;
+                play-modes-visible: false;
+            }
+
+            HorizontalLayout {
                 horizontal-stretch: 1;
+                spacing: 4px;
+                MuteButton {
+                    y: (parent.height - self.height) / 2;
+                    size: 28px;
+                }
+
+                MusicVolumeSlider {
+                    y: (parent.height - self.height) / 2;
+                    horizontal-stretch: 1;
+                }
             }
-            VolumeControl {
-                width: 156px;
+
+            SoundsButton {
+                y: (parent.height - self.height) / 2;
             }
         }
     }

@@ -723,6 +723,10 @@ msgstr "Nenhuma música está tocando."
 msgid "No sound matches the filter."
 msgstr "Nenhum som corresponde ao filtro."
 
+#: ui/dock.slint
+msgid "No sounds playing"
+msgstr "Nenhum som tocando"
+
 #: ui/pages.slint
 msgid "No track matches the filter."
 msgstr "Nenhuma faixa corresponde ao filtro."
@@ -997,9 +1001,13 @@ msgstr "Painel de sons"
 msgid "Soundboards"
 msgstr "Painéis de sons"
 
-#: ui/search.slint src/search.rs
+#: ui/dock.slint ui/search.slint src/search.rs
 msgid "Sounds"
 msgstr "Sons"
+
+#: ui/dock.slint
+msgid "Sounds and effects volume"
+msgstr "Sons e volume dos efeitos"
 
 #: src/sound_icons.rs
 msgid "Spell"
@@ -1845,10 +1853,6 @@ msgstr "Mantenha ou sobrescreva coleções"
 msgid "Keep playing after quitting leaves audio running on the server after the GUI exits. Otherwise quitting fades audio out and releases the output."
 msgstr "Continuar tocando ao sair mantém o áudio no servidor depois de fechar a interface. Caso contrário, sair reduz o áudio até parar e libera a saída."
 
-#: ui/tours/mini-player.slint
-msgid "Keep the player handy"
-msgstr "Mantenha o player à mão"
-
 #: ui/tours/songs.slint
 msgid "Keep your audio files"
 msgstr "Preserve seus arquivos de áudio"
@@ -1860,10 +1864,6 @@ msgstr "Sobreponha músicas"
 #: ui/tours/settings.slint
 msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to the page or its visible question mark."
 msgstr "Esquerda e Direita percorrem as etapas. Tab e Shift+Tab ficam dentro do guia; foque o texto e use Cima ou Baixo para rolar. Escape fecha o guia e devolve o foco à página ou ao ponto de interrogação visível."
-
-#: ui/dock.slint
-msgid "Mini player"
-msgstr "Mini player"
 
 #: ui/tours/playback.slint
 msgid "Mix up to three songs"
@@ -1937,10 +1937,6 @@ msgstr "Pause a conexão com o Discord"
 msgid "Pick an icon for this sound tile, then Save to apply the title, fades and icon together."
 msgstr "Escolha um ícone para este som e depois Salvar para aplicar o título, os fades e o ícone juntos."
 
-#: ui/tours/mini-player.slint
-msgid "Pin keeps this window above others when the platform supports it. On Wayland, use the desktop window menu's Always on Top instead."
-msgstr "Fixar mantém esta janela acima das outras quando a plataforma permite. No Wayland, use Sempre no topo no menu de janela do desktop."
-
 #: ui/tours/collection.slint
 msgid "Play effects and ambience"
 msgstr "Reproduza efeitos e ambientação"
@@ -1964,10 +1960,6 @@ msgstr "Os sons em reprodução aparecem com controles de Repetir e Parar. Pausa
 #: ui/tours/songs.slint
 msgid "Remove from Songs is available for songs added by their own path. Tufo removes library references and never moves or deletes your audio files."
 msgstr "Remover de Músicas está disponível para músicas adicionadas pelo próprio caminho. Tufo remove referências da biblioteca e nunca move nem exclui seus arquivos de áudio."
-
-#: ui/tours/mini-player.slint
-msgid "Return to the full window"
-msgstr "Volte à janela completa"
 
 #: ui/tours/collection.slint
 msgid "Right-click Add to mix for another music layer. The mix holds three songs including the main track. The player's Mix button offers each layer's volume, loop and stop controls."
@@ -2053,10 +2045,6 @@ msgstr "O seletor de pastas acompanha áudio e subpastas automaticamente. Tufo m
 msgid "The job continues if you close its dialog. View import reopens progress and results. Retry uses the same saved job when missing files return; Import again starts a fresh import."
 msgstr "A tarefa continua se você fechar o diálogo. Ver importação reabre o progresso e os resultados. Tentar novamente usa a mesma tarefa salva quando os arquivos ausentes retornam; Importar novamente começa uma nova importação."
 
-#: ui/tours/mini-player.slint
-msgid "The mini player keeps transport, seeking, music volume and effects volume close. Drag outside its controls to move the window."
-msgstr "O mini player mantém à mão os controles de reprodução, posição, volume da música e volume dos efeitos. Arraste fora dos controles para mover a janela."
-
 #: ui/tours/playback.slint
 msgid "The output picker sends audio to this machine or one Discord voice channel. Refresh updates voice channels. A channel change switches the output when you select it."
 msgstr "O seletor de saída envia áudio para este computador ou um canal de voz do Discord. Atualizar renova os canais de voz. Selecionar outro canal altera a saída."
@@ -2077,13 +2065,9 @@ msgstr "Tufo acompanha a pasta e atualiza seus sons. Painéis de sons vinculados
 msgid "Up and Down select a result. Enter plays a track or sound, or opens a collection. Escape closes the palette. This guide only explains those actions."
 msgstr "Cima e Baixo selecionam um resultado. Enter reproduz uma faixa ou som, ou abre uma coleção. Escape fecha a busca. Este guia apenas explica essas ações."
 
-#: ui/tours/mini-player.slint
-msgid "Use Full window or Ctrl+Shift+M. Tufo remembers each window size and the pinned state. This guide leaves those choices alone."
-msgstr "Use Janela completa ou Ctrl+Shift+M. Tufo lembra o tamanho de cada janela e se está fixada. Este guia preserva essas escolhas."
-
 #: ui/tours/playback.slint
-msgid "Use Mini player or Ctrl+Shift+M for the compact window. In narrow full windows, the chevron collapses the player to one row. The tray also offers player and pause controls where available."
-msgstr "Use Mini player ou Ctrl+Shift+M para abrir a janela compacta. Em janelas completas estreitas, a seta recolhe o player a uma linha. A bandeja também oferece controles do player e de pausa, quando disponível."
+msgid "Use Mini player or Ctrl+Shift+M for the compact window; drag outside its controls to move it. In narrow full windows, the chevron collapses the player to one row. The tray also offers player and pause controls where available."
+msgstr "Use Mini player ou Ctrl+Shift+M para abrir a janela compacta; arraste fora dos controles para movê-la. Em janelas completas estreitas, a seta recolhe o player a uma linha. A bandeja também oferece controles do player e de pausa, quando disponível."
 
 #: ui/tours/collection.slint
 msgid "Use Songs for other playlists"
@@ -2096,10 +2080,6 @@ msgstr "Endereços web, favoritos, ordenação manual e configurações remotas 
 #: ui/tours/kenku.slint
 msgid "What stays outside Tufo"
 msgstr "O que fica fora do Tufo"
-
-#: ui/tours/mini-player.slint
-msgid "Your compact player"
-msgstr "Seu player compacto"
 
 #: ui/tours/collection.slint
 msgid "Your hand-picked playlist"

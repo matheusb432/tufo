@@ -117,7 +117,7 @@ impl WindowSize {
     };
     const MINI_PLAYER_DEFAULT: Self = Self {
         width: 360.0,
-        height: 168.0,
+        height: 140.0,
     };
     fn fits_within(self, bound: Self) -> bool {
         self.width <= bound.width && self.height <= bound.height

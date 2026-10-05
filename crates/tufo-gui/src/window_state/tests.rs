@@ -8,11 +8,11 @@ fn size_limits() -> WindowSizeLimits {
         },
         mini_player_minimum: WindowSize {
             width: 320.0,
-            height: 168.0,
+            height: 140.0,
         },
         mini_player_maximum: WindowSize {
             width: 480.0,
-            height: 168.0,
+            height: 140.0,
         },
     }
 }
@@ -39,7 +39,7 @@ fn mini_player() -> WindowState {
         },
         mini_player_size: WindowSize {
             width: 400.0,
-            height: 168.0,
+            height: 140.0,
         },
         ..WindowState::default()
     }
@@ -103,7 +103,7 @@ fn the_mini_player_and_the_full_window_each_return_to_their_own_size() {
     state.record_size(
         WindowSize {
             width: 340.0,
-            height: 168.0,
+            height: 140.0,
         },
         size_limits(),
     );
@@ -114,7 +114,7 @@ fn the_mini_player_and_the_full_window_each_return_to_their_own_size() {
         state.switch_form(WindowForm::MiniPlayer),
         Some(WindowSize {
             width: 340.0,
-            height: 168.0,
+            height: 140.0,
         })
     );
 }
@@ -169,7 +169,7 @@ fn saved_sizes_outside_the_current_limits_are_repaired() {
             },
             mini_player_size: WindowSize {
                 width: 480.0,
-                height: 168.0
+                height: 140.0
             },
             ..state
         }
@@ -225,7 +225,7 @@ fn the_mini_player_resizes_its_width_with_a_fixed_height() {
     for width in [320.0, 480.0] {
         let size = WindowSize {
             width,
-            height: 168.0,
+            height: 140.0,
         };
         assert_eq!(state.record_size(size, size_limits()), None);
         assert_eq!(state.size_shown(), size);
@@ -242,7 +242,7 @@ fn the_mini_player_resizes_its_width_with_a_fixed_height() {
         correction,
         Some(WindowSize {
             width: 320.0,
-            height: 168.0
+            height: 140.0
         })
     );
 
@@ -253,7 +253,7 @@ fn the_mini_player_resizes_its_width_with_a_fixed_height() {
         },
         WindowSize {
             width: 720.0,
-            height: 168.0,
+            height: 140.0,
         },
     ] {
         assert_eq!(state.record_size(size, size_limits()), correction);

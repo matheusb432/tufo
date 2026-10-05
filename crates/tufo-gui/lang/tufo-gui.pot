@@ -723,6 +723,10 @@ msgstr ""
 msgid "No sound matches the filter."
 msgstr ""
 
+#: ui/dock.slint
+msgid "No sounds playing"
+msgstr ""
+
 #: ui/pages.slint
 msgid "No track matches the filter."
 msgstr ""
@@ -997,8 +1001,12 @@ msgstr ""
 msgid "Soundboards"
 msgstr ""
 
-#: ui/search.slint src/search.rs
+#: ui/dock.slint ui/search.slint src/search.rs
 msgid "Sounds"
+msgstr ""
+
+#: ui/dock.slint
+msgid "Sounds and effects volume"
 msgstr ""
 
 #: src/sound_icons.rs
@@ -1845,10 +1853,6 @@ msgstr ""
 msgid "Keep playing after quitting leaves audio running on the server after the GUI exits. Otherwise quitting fades audio out and releases the output."
 msgstr ""
 
-#: ui/tours/mini-player.slint
-msgid "Keep the player handy"
-msgstr ""
-
 #: ui/tours/songs.slint
 msgid "Keep your audio files"
 msgstr ""
@@ -1859,10 +1863,6 @@ msgstr ""
 
 #: ui/tours/settings.slint
 msgid "Left and Right move through steps. Tab and Shift+Tab stay inside the guide; focus the text and use Up or Down to scroll. Escape closes it and returns focus to the page or its visible question mark."
-msgstr ""
-
-#: ui/dock.slint
-msgid "Mini player"
 msgstr ""
 
 #: ui/tours/playback.slint
@@ -1937,10 +1937,6 @@ msgstr ""
 msgid "Pick an icon for this sound tile, then Save to apply the title, fades and icon together."
 msgstr ""
 
-#: ui/tours/mini-player.slint
-msgid "Pin keeps this window above others when the platform supports it. On Wayland, use the desktop window menu's Always on Top instead."
-msgstr ""
-
 #: ui/tours/collection.slint
 msgid "Play effects and ambience"
 msgstr ""
@@ -1963,10 +1959,6 @@ msgstr ""
 
 #: ui/tours/songs.slint
 msgid "Remove from Songs is available for songs added by their own path. Tufo removes library references and never moves or deletes your audio files."
-msgstr ""
-
-#: ui/tours/mini-player.slint
-msgid "Return to the full window"
 msgstr ""
 
 #: ui/tours/collection.slint
@@ -2053,10 +2045,6 @@ msgstr ""
 msgid "The job continues if you close its dialog. View import reopens progress and results. Retry uses the same saved job when missing files return; Import again starts a fresh import."
 msgstr ""
 
-#: ui/tours/mini-player.slint
-msgid "The mini player keeps transport, seeking, music volume and effects volume close. Drag outside its controls to move the window."
-msgstr ""
-
 #: ui/tours/playback.slint
 msgid "The output picker sends audio to this machine or one Discord voice channel. Refresh updates voice channels. A channel change switches the output when you select it."
 msgstr ""
@@ -2077,12 +2065,8 @@ msgstr ""
 msgid "Up and Down select a result. Enter plays a track or sound, or opens a collection. Escape closes the palette. This guide only explains those actions."
 msgstr ""
 
-#: ui/tours/mini-player.slint
-msgid "Use Full window or Ctrl+Shift+M. Tufo remembers each window size and the pinned state. This guide leaves those choices alone."
-msgstr ""
-
 #: ui/tours/playback.slint
-msgid "Use Mini player or Ctrl+Shift+M for the compact window. In narrow full windows, the chevron collapses the player to one row. The tray also offers player and pause controls where available."
+msgid "Use Mini player or Ctrl+Shift+M for the compact window; drag outside its controls to move it. In narrow full windows, the chevron collapses the player to one row. The tray also offers player and pause controls where available."
 msgstr ""
 
 #: ui/tours/collection.slint
@@ -2095,10 +2079,6 @@ msgstr ""
 
 #: ui/tours/kenku.slint
 msgid "What stays outside Tufo"
-msgstr ""
-
-#: ui/tours/mini-player.slint
-msgid "Your compact player"
 msgstr ""
 
 #: ui/tours/collection.slint
