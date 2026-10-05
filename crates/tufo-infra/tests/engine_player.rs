@@ -1439,7 +1439,9 @@ fn ramp_seconds_at(played: &[f32], frame: usize) -> f32 {
 impl Rig {
     /// Waits for `frames` frames after the output's first sound.
     async fn wait_for_played_frames(&self, output: usize, frames: usize) -> anyhow::Result<()> {
-        tokio::time::timeout(WAIT_TIMEOUT, async {
+        // The sound card renders in real time, and the local rate is the slower one.
+        let playback_duration = Duration::from_secs(1) * u32::try_from(frames)? / LOCAL_SAMPLE_RATE;
+        tokio::time::timeout(WAIT_TIMEOUT + playback_duration, async {
             while self
                 .sound_card
                 .captures()

@@ -64,6 +64,7 @@ impl Watch {
             .unwrap_or_default()
     }
 
+    #[cfg(unix)]
     pub(super) async fn stopped(&mut self) -> anyhow::Result<()> {
         self.stopped_within(TEST_TIMEOUT).await
     }
