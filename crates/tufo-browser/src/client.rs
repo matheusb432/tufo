@@ -378,7 +378,7 @@ wrap_load_handler! {
             frame: Option<&mut Frame>,
             error_code: Errorcode,
             _error_text: Option<&CefString>,
-            _failed_url: Option<&CefString>,
+            failed_url: Option<&CefString>,
         ) {
             let Some(number) = number(browser) else {
                 return;
@@ -387,8 +387,13 @@ wrap_load_handler! {
                 return;
             }
             let error = load_error(error_code);
+            // The failed page commits an error address, so the tab keeps the one that failed.
+            let failed_address = text(failed_url);
             tabs::update_tab(number, move |tab| {
                 tab.failure = Some(PageFailure::LoadFailed(error));
+                if !failed_address.is_empty() {
+                    tab.address = failed_address;
+                }
             });
         }
     }

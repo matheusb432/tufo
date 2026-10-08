@@ -32,6 +32,10 @@ use tufo_models::{
 
 use crate::i18n::{tr, tr_args, tr_count};
 
+mod browser;
+
+pub(crate) use browser::{BrowserPageView, BrowserStateView, browser_page};
+
 /// How long the server may still list a sound after it ended; its chip stays full meanwhile.
 const SOUND_END_GRACE: Duration = Duration::from_millis(250);
 /// The Songs page lists at most this many rows; the filter finds the rest.
@@ -49,6 +53,7 @@ pub(crate) enum PageKind {
     Playlist,
     Soundboards,
     Soundboard,
+    Browser,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -304,7 +309,7 @@ pub(crate) fn library_page(
 ) -> LibraryPageView {
     let card_filter = match navigation.page {
         PageKind::Home | PageKind::Playlists | PageKind::Soundboards => queries.filter,
-        PageKind::Songs | PageKind::Playlist | PageKind::Soundboard => "",
+        PageKind::Songs | PageKind::Playlist | PageKind::Soundboard | PageKind::Browser => "",
     };
     let songs = SongIndex::new(snapshot);
     let cards = |kind| {
@@ -341,7 +346,11 @@ pub(crate) fn library_page(
             .collection_id
             .and_then(|id| find_collection(snapshot, id))
             .map(|collection| collection_page(collection, player, &songs, queries, now)),
-        PageKind::Home | PageKind::Songs | PageKind::Playlists | PageKind::Soundboards => None,
+        PageKind::Home
+        | PageKind::Songs
+        | PageKind::Playlists
+        | PageKind::Soundboards
+        | PageKind::Browser => None,
     };
     LibraryPageView {
         playlists: cards(CollectionKind::Playlist),
@@ -1482,8 +1491,9 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
         },
         playback::{
             add_music_layer::AddMusicLayerError, add_to_queue::AddToQueueError,
-            control_music::ControlMusicError, play_entry_sound::PlayEntrySoundError,
-            player::PlayAudioError, select_output::SelectOutputError,
+            control_music::ControlMusicError, open_browser::OpenBrowserError,
+            play_entry_sound::PlayEntrySoundError, player::PlayAudioError,
+            select_output::SelectOutputError,
         },
     };
     if let Some(text) =
@@ -1492,6 +1502,12 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
         return Some(text);
     }
     Some(match (code, reason) {
+        (Code::Unavailable, OpenBrowserError::UNAVAILABLE) => {
+            tr("This installation of Tufo has no browser. It runs on Linux for now.")
+        }
+        (Code::Unavailable, OpenBrowserError::START_FAILED) => {
+            tr("The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder.")
+        }
         (Code::NotFound, PlayAudioError::NOT_FOUND)
         | (
             Code::FailedPrecondition,

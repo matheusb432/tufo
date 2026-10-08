@@ -2371,3 +2371,131 @@ msgstr ""
 #: ui/tours/settings.slint
 msgid "Tours controls every guide icon. Always show keeps guides available to replay, Show unseen hides each icon after you start its guide, and Always hide hides all guide icons. You can change this setting here at any time."
 msgstr ""
+
+#: ui/browser.slint
+msgid "Unmute the browser"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Mute the browser"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Browser volume"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Loading… {0}"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Close tab"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Address"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Type an address or words to search for"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Reload"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Type an address or words to search for above."
+msgstr ""
+
+#: ui/browser.slint
+msgid "Starting the browser…"
+msgstr ""
+
+#: ui/browser.slint
+msgid "The browser closed to free memory after a while without sound or a visit. Opening it again restores its tabs; pages start over."
+msgstr ""
+
+#: ui/browser.slint
+msgid "The browser stopped unexpectedly. Opening it again restores its tabs."
+msgstr ""
+
+#: src/presentation.rs ui/browser.slint
+msgid "The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder."
+msgstr ""
+
+#: src/presentation.rs ui/browser.slint
+msgid "This installation of Tufo has no browser. It runs on Linux for now."
+msgstr ""
+
+#: ui/browser.slint
+msgid "Play music and ambience from websites through Tufo, on this computer or in Discord. The browser runs only while it’s open."
+msgstr ""
+
+#: ui/browser.slint
+msgid "Try again"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Open the browser"
+msgstr ""
+
+#: ui/browser.slint ui/sidebar.slint
+msgid "Browser"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Close the browser and free its memory"
+msgstr ""
+
+#: src/presentation/browser.rs ui/browser.slint
+msgid "New tab"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Back"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Forward"
+msgstr ""
+
+#: ui/browser.slint
+msgid "Stop"
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "This page stopped working. Reload it to try again."
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "Tufo couldn’t find that site. Check the address."
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "The site didn’t respond. Try again later."
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "This computer is offline."
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "The site’s security certificate isn’t valid, so Tufo didn’t open it."
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "The site refused to open here."
+msgstr ""
+
+#: src/presentation/browser.rs
+msgid "This page couldn’t load."
+msgstr ""
+
+#: src/controller/browser.rs
+msgid "Open the browser first."
+msgstr ""
+
+#: src/controller/browser.rs
+msgid "The browser could not do that. Try again."
+msgstr ""

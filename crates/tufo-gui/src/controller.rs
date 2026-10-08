@@ -8,9 +8,11 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+mod browser;
 mod kenku_import;
 mod song_loops;
 
+pub(crate) use browser::{PaneGeometry, PanePointer};
 use slint::ComponentHandle as _;
 use tufo_client::{
     ClientError, Code, LocalEndpoint, TufoClient,
@@ -94,12 +96,14 @@ struct Shared {
     quitting: bool,
     kenku: kenku_import::KenkuImportSession,
     song_loops: song_loops::SongLoopSession,
+    browser: browser::BrowserSession,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum VolumeTarget {
     Player,
     Effects,
+    Browser,
     Sound(CollectionEntryId),
 }
 
@@ -243,6 +247,7 @@ impl Controller {
                     self.lock().player = state;
                     self.render_library();
                     self.render_player();
+                    self.sync_browser();
                 }
                 Err(error) => {
                     self.toast_error(presentation::error_text(&error));
@@ -259,6 +264,7 @@ impl Controller {
             shared.player = PlayerState::default();
         }
         self.render_player();
+        self.sync_browser();
         render::connection(
             &self.window,
             false,
@@ -412,6 +418,7 @@ impl Controller {
         render::clear_filter(&self.window);
         render::clear_song_search(&self.window);
         self.render_library();
+        self.sync_browser_view();
     }
 
     pub(crate) fn filter(&self, text: &str) {
@@ -744,7 +751,9 @@ impl Controller {
                 tr("This collection follows its folder; add files there").to_owned()
             }
             PageKind::Playlist | PageKind::Soundboard => tr("Drop the files here…").to_owned(),
-            PageKind::Home => tr("Open Playlists or Soundboards to drop folders").to_owned(),
+            PageKind::Home | PageKind::Browser => {
+                tr("Open Playlists or Soundboards to drop folders").to_owned()
+            }
         };
         render::drop_target(&self.window, hovering, label);
     }
@@ -1191,6 +1200,15 @@ impl Controller {
                 client
                     .update_player_settings(&UpdatePlayerSettings {
                         effects_volume: Some(volume),
+                        ..UpdatePlayerSettings::default()
+                    })
+                    .await
+            }
+            VolumeTarget::Browser => {
+                client
+                    .update_player_settings(&UpdatePlayerSettings {
+                        browser_volume: Some(volume),
+                        browser_muted: Some(false),
                         ..UpdatePlayerSettings::default()
                     })
                     .await

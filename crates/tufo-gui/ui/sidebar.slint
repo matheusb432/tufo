@@ -468,6 +468,15 @@ component FullSidebar inherits SidebarForm {
                     }
                 }
 
+                NavRow {
+                    icon: @image-url("icons/globe.svg");
+                    text: @tr("Browser");
+                    active: root.page == Page.browser;
+                    clicked => {
+                        root.open-page(Page.browser, "");
+                    }
+                }
+
                 SectionRow {
                     icon: @image-url("icons/list-music.svg");
                     text: @tr("Playlists");
@@ -613,6 +622,7 @@ component Rail inherits SidebarForm {
             { icon: @image-url("icons/search.svg"), label: @tr("Search everything (Ctrl+Shift+F)") },
             { icon: @image-url("icons/house.svg"), label: @tr("Home") },
             { icon: @image-url("icons/music.svg"), label: @tr("Songs") },
+            { icon: @image-url("icons/globe.svg"), label: @tr("Browser") },
             { icon: @image-url("icons/list-music.svg"), label: @tr("Playlists") },
             { icon: @image-url("icons/layout-grid.svg"), label: @tr("Soundboards") },
         ]: HorizontalLayout {
@@ -621,7 +631,7 @@ component Rail inherits SidebarForm {
                 icon: button.icon;
                 tooltip: button.label;
                 tooltip-enabled: root.shown;
-                active: index == 2 ? root.page == Page.home : index == 3 ? root.page == Page.songs : index == 4 ? root.page == Page.playlists || root.page == Page.playlist : index == 5 ? root.page == Page.soundboards || root.page == Page.soundboard : false;
+                active: index == 2 ? root.page == Page.home : index == 3 ? root.page == Page.songs : index == 4 ? root.page == Page.browser : index == 5 ? root.page == Page.playlists || root.page == Page.playlist : index == 6 ? root.page == Page.soundboards || root.page == Page.soundboard : false;
                 clicked => {
                     if index == 0 {
                         root.expand();
@@ -632,6 +642,8 @@ component Rail inherits SidebarForm {
                     } else if index == 3 {
                         root.open-page(Page.songs, "");
                     } else if index == 4 {
+                        root.open-page(Page.browser, "");
+                    } else if index == 5 {
                         root.open-page(Page.playlists, "");
                     } else {
                         root.open-page(Page.soundboards, "");

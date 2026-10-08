@@ -1,0 +1,487 @@
+// The browser page: tabs, the address and navigation, and the selected page, which the host
+// paints off screen and this pane shows as an image. Pointer and key input travel back to it.
+
+import { Theme } from "theme.slint";
+import {
+    Actions, BrowserButton, BrowserModifiers, BrowserPointer, BrowserPointerKind, BrowserState,
+    BrowserTabView, BrowserView,
+} from "state.slint";
+import { Button, ButtonKind, Icon, IconButton, Slider } from "widgets.slint";
+import { Heading, PageMetrics, WindowButtonsSpace } from "pages.slint";
+
+component BrowserVolume inherits HorizontalLayout {
+    in property <bool> show-slider: true;
+    spacing: 4px;
+    IconButton {
+        y: (parent.height - self.height) / 2;
+        size: 32px;
+        icon-size: 18px;
+        icon: BrowserView.muted || BrowserView.volume == 0 ? @image-url("icons/volume-x.svg") : BrowserView.volume < 0.5 ? @image-url("icons/volume-1.svg") : @image-url("icons/volume-2.svg");
+        tooltip: BrowserView.muted ? @tr("Unmute the browser") : @tr("Mute the browser");
+        // A page that plays catches the sun.
+        tint: BrowserView.audible && !BrowserView.muted ? Theme.lit : Theme.text-secondary;
+        clicked => {
+            Actions.toggle-browser-mute();
+        }
+    }
+
+    if root.show-slider: Slider {
+        y: (parent.height - self.height) / 2;
+        width: 110px;
+        value: BrowserView.muted ? 0 : BrowserView.volume;
+        accessible-label: @tr("Browser volume");
+        changed(value) => {
+            Actions.set-browser-volume(value);
+        }
+    }
+}
+
+component TabChip inherits Rectangle {
+    in property <BrowserTabView> tab;
+    in property <bool> selected;
+    callback activate();
+    callback close();
+    height: 34px;
+    min-width: 72px;
+    preferred-width: 200px;
+    max-width: 220px;
+    horizontal-stretch: 1;
+    border-radius: Theme.radius-row;
+    background: root.selected ? Theme.selected : touch.has-hover ? Theme.hover : Theme.field;
+    accessible-role: AccessibleRole.tab;
+    accessible-label: root.tab.title;
+    accessible-item-selected: root.selected;
+    accessible-action-default => { root.activate(); }
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.up && event.button == PointerEventButton.middle {
+                root.close();
+            }
+        }
+        clicked => {
+            root.activate();
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 4px;
+        spacing: 6px;
+        if root.tab.audible: Icon {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            source: @image-url("icons/volume-2.svg");
+            tint: Theme.lit;
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: root.tab.loading ? @tr("Loading… {0}", root.tab.title) : root.tab.title;
+            color: root.selected ? Theme.text : Theme.text-secondary;
+            font-size: Theme.body-small;
+            font-weight: root.selected ? 700 : 600;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            size: 26px;
+            icon-size: 14px;
+            icon: @image-url("icons/x.svg");
+            tooltip: @tr("Close tab");
+            clicked => {
+                root.close();
+            }
+        }
+    }
+}
+
+component AddressField inherits Rectangle {
+    // Moves the keyboard to the page once an address is entered.
+    callback entered();
+    property <string> shown-address: BrowserView.address;
+    changed shown-address => {
+        if !input.has-focus {
+            input.text = root.shown-address;
+        }
+    }
+    public function edit() {
+        input.focus();
+        input.select-all();
+    }
+    height: 36px;
+    border-radius: self.height / 2;
+    background: Theme.raised;
+    border-width: input.has-focus ? 2px : 1px;
+    border-color: input.has-focus ? Theme.accent : Theme.divider;
+    init => {
+        input.text = root.shown-address;
+    }
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 8px;
+        Icon {
+            y: (parent.height - self.height) / 2;
+            width: 16px;
+            height: 16px;
+            source: @image-url("icons/globe.svg");
+            tint: Theme.text-faint;
+        }
+
+        input := TextInput {
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            font-size: Theme.body-small;
+            color: Theme.text;
+            selection-background-color: Theme.accent.with-alpha(0.35);
+            single-line: true;
+            accessible-label: @tr("Address");
+            accepted => {
+                Actions.browser-navigate(self.text);
+                root.entered();
+            }
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    self.text = root.shown-address;
+                    self.clear-focus();
+                    return accept;
+                }
+                reject
+            }
+            changed has-focus => {
+                if self.has-focus {
+                    self.select-all();
+                } else {
+                    self.text = root.shown-address;
+                }
+            }
+            if self.text == "": Text {
+                text: @tr("Type an address or words to search for");
+                color: Theme.text-faint;
+                font-size: Theme.body-small;
+                vertical-alignment: center;
+                height: parent.height;
+            }
+        }
+    }
+}
+
+// The selected page's pixels, which take the pointer, the wheel, and the keys while focused.
+component PageView inherits Rectangle {
+    public function focus-page() {
+        keys.focus();
+    }
+    function modifiers(control: bool, shift: bool, alt: bool, meta: bool) -> BrowserModifiers {
+        { shift: shift, control: control, alt: alt, meta: meta }
+    }
+    function button(button: PointerEventButton) -> BrowserButton {
+        if button == PointerEventButton.left {
+            return BrowserButton.left;
+        }
+        if button == PointerEventButton.middle {
+            return BrowserButton.middle;
+        }
+        if button == PointerEventButton.right {
+            return BrowserButton.right;
+        }
+        BrowserButton.none
+    }
+    pure function cursor(pointer: BrowserPointer) -> MouseCursor {
+        if pointer == BrowserPointer.hand { return MouseCursor.pointer; }
+        if pointer == BrowserPointer.text { return MouseCursor.text; }
+        if pointer == BrowserPointer.wait { return MouseCursor.wait; }
+        if pointer == BrowserPointer.progress { return MouseCursor.progress; }
+        if pointer == BrowserPointer.crosshair { return MouseCursor.crosshair; }
+        if pointer == BrowserPointer.move { return MouseCursor.move; }
+        if pointer == BrowserPointer.not-allowed { return MouseCursor.not-allowed; }
+        if pointer == BrowserPointer.grab { return MouseCursor.grab; }
+        if pointer == BrowserPointer.grabbing { return MouseCursor.grabbing; }
+        if pointer == BrowserPointer.help { return MouseCursor.help; }
+        if pointer == BrowserPointer.column-resize { return MouseCursor.col-resize; }
+        if pointer == BrowserPointer.row-resize { return MouseCursor.row-resize; }
+        if pointer == BrowserPointer.nesw-resize { return MouseCursor.nesw-resize; }
+        if pointer == BrowserPointer.nwse-resize { return MouseCursor.nwse-resize; }
+        if pointer == BrowserPointer.none { return MouseCursor.none; }
+        MouseCursor.default
+    }
+    background: white;
+    clip: true;
+    changed width => {
+        Actions.browser-view-resized(self.width, self.height);
+    }
+    changed height => {
+        Actions.browser-view-resized(self.width, self.height);
+    }
+    init => {
+        Actions.browser-view-resized(self.width, self.height);
+    }
+    Image {
+        width: parent.width;
+        height: parent.height;
+        source: BrowserView.frame;
+        image-fit: fill;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: root.cursor(BrowserView.pointer);
+        pointer-event(event) => {
+            let modifiers = root.modifiers(event.modifiers.control, event.modifiers.shift, event.modifiers.alt, event.modifiers.meta);
+            if event.kind == PointerEventKind.down {
+                keys.focus();
+                Actions.browser-pointer(BrowserPointerKind.down, root.button(event.button), self.mouse-x, self.mouse-y, modifiers);
+            } else if event.kind == PointerEventKind.up {
+                Actions.browser-pointer(BrowserPointerKind.up, root.button(event.button), self.mouse-x, self.mouse-y, modifiers);
+            } else if event.kind == PointerEventKind.move {
+                Actions.browser-pointer(BrowserPointerKind.move, BrowserButton.none, self.mouse-x, self.mouse-y, modifiers);
+            }
+        }
+        scroll-event(event) => {
+            Actions.browser-scroll(self.mouse-x, self.mouse-y, event.delta-x, event.delta-y, root.modifiers(event.modifiers.control, event.modifiers.shift, event.modifiers.alt, event.modifiers.meta));
+            accept
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                Actions.browser-pointer(BrowserPointerKind.leave, BrowserButton.none, self.mouse-x, self.mouse-y, root.modifiers(false, false, false, false));
+            }
+        }
+    }
+
+    keys := FocusScope {
+        key-pressed(event) => {
+            if event.modifiers.control && !event.modifiers.alt && (event.text == "v" || event.text == "V") {
+                clipboard.paste();
+                Actions.browser-paste(clipboard.text);
+                clipboard.text = "";
+                return accept;
+            }
+            Actions.browser-key(event.text, true, event.repeat, root.modifiers(event.modifiers.control, event.modifiers.shift, event.modifiers.alt, event.modifiers.meta));
+            accept
+        }
+        key-released(event) => {
+            Actions.browser-key(event.text, false, false, root.modifiers(event.modifiers.control, event.modifiers.shift, event.modifiers.alt, event.modifiers.meta));
+            accept
+        }
+        focus-changed-event => {
+            Actions.browser-focus(self.has-focus);
+        }
+    }
+
+    // Reads the desktop's clipboard for a paste, which the page's own clipboard can't.
+    clipboard := TextInput {
+        visible: false;
+        width: 0px;
+        height: 0px;
+        single-line: false;
+    }
+
+    if BrowserView.loading: Rectangle {
+        y: 0;
+        height: 3px;
+        background: Theme.accent;
+    }
+    if BrowserView.selected-tab < 0: Rectangle {
+        background: Theme.still-shade;
+        // Swallows the pointer, which no page takes without a tab.
+        TouchArea { }
+        Text {
+            text: @tr("Type an address or words to search for above.");
+            color: Theme.text-secondary;
+            font-size: Theme.body;
+        }
+    }
+    if BrowserView.failure != "": Rectangle {
+        background: Theme.still-shade;
+        VerticalLayout {
+            alignment: center;
+            spacing: 16px;
+            padding: PageMetrics.padding;
+            Text {
+                text: BrowserView.failure;
+                color: Theme.text;
+                font-size: Theme.subheading;
+                font-weight: 700;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                Button {
+                    text: @tr("Reload");
+                    icon: @image-url("icons/refresh-cw.svg");
+                    clicked => {
+                        Actions.browser-reload();
+                    }
+                }
+            }
+        }
+    }
+}
+
+// The browser while it isn't open: why, and how to open it.
+component ClosedPanel inherits Rectangle {
+    property <string> message: BrowserView.state == BrowserState.starting ? @tr("Starting the browser…") : BrowserView.state == BrowserState.stopped-idle ? @tr("The browser closed to free memory after a while without sound or a visit. Opening it again restores its tabs; pages start over.") : BrowserView.state == BrowserState.crashed ? @tr("The browser stopped unexpectedly. Opening it again restores its tabs.") : BrowserView.state == BrowserState.start-failed ? @tr("The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder.") : BrowserView.state == BrowserState.unavailable ? @tr("This installation of Tufo has no browser. It runs on Linux for now.") : @tr("Play music and ambience from websites through Tufo, on this computer or in Discord. The browser runs only while it’s open.");
+    VerticalLayout {
+        alignment: center;
+        spacing: 18px;
+        padding: PageMetrics.padding;
+        HorizontalLayout {
+            alignment: center;
+            Icon {
+                width: 56px;
+                height: 56px;
+                source: @image-url("icons/globe.svg");
+                tint: BrowserView.state == BrowserState.crashed || BrowserView.state == BrowserState.start-failed ? Theme.error : Theme.accent;
+            }
+        }
+
+        Text {
+            text: root.message;
+            color: Theme.text-secondary;
+            font-size: Theme.body;
+            wrap: word-wrap;
+            horizontal-alignment: center;
+            max-width: 520px;
+        }
+
+        if BrowserView.state != BrowserState.starting && BrowserView.state != BrowserState.unavailable: HorizontalLayout {
+            alignment: center;
+            Button {
+                kind: ButtonKind.primary;
+                text: BrowserView.state == BrowserState.start-failed ? @tr("Try again") : @tr("Open the browser");
+                icon: @image-url("icons/globe.svg");
+                clicked => {
+                    Actions.open-browser();
+                }
+            }
+        }
+    }
+}
+
+export component BrowserPage inherits Rectangle {
+    property <bool> open: BrowserView.state == BrowserState.open;
+    HorizontalLayout {
+        y: 0;
+        height: Theme.title-row-height;
+        padding-left: PageMetrics.padding;
+        padding-right: 8px;
+        spacing: 8px;
+        Heading {
+            text: @tr("Browser");
+            horizontal-stretch: 0;
+            overflow: elide;
+        }
+
+        Rectangle { horizontal-stretch: 1; }
+
+        BrowserVolume {
+            show-slider: root.width >= 520px;
+        }
+        if root.open: IconButton {
+            y: (parent.height - self.height) / 2;
+            size: Theme.bar-button-size;
+            icon-size: Theme.bar-icon-size;
+            icon: @image-url("icons/power.svg");
+            tooltip: @tr("Close the browser and free its memory");
+            clicked => {
+                Actions.close-browser();
+            }
+        }
+        WindowButtonsSpace { }
+    }
+
+    if !root.open: ClosedPanel {
+        y: Theme.title-row-height;
+        height: parent.height - self.y;
+    }
+    if root.open: VerticalLayout {
+        y: Theme.title-row-height;
+        height: parent.height - self.y;
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-bottom: 8px;
+        spacing: 8px;
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+            for tab in BrowserView.tabs: TabChip {
+                tab: tab;
+                selected: tab.id == BrowserView.selected-tab;
+                activate => {
+                    Actions.browser-select-tab(tab.id);
+                }
+                close => {
+                    Actions.browser-close-tab(tab.id);
+                }
+            }
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 32px;
+                icon-size: 18px;
+                icon: @image-url("icons/plus.svg");
+                tooltip: @tr("New tab");
+                clicked => {
+                    Actions.browser-new-tab();
+                    address.edit();
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 4px;
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 34px;
+                icon-size: 18px;
+                icon: @image-url("icons/arrow-left.svg");
+                tooltip: @tr("Back");
+                enabled: BrowserView.can-go-back;
+                clicked => {
+                    Actions.browser-back();
+                }
+            }
+
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 34px;
+                icon-size: 18px;
+                icon: @image-url("icons/arrow-right.svg");
+                tooltip: @tr("Forward");
+                enabled: BrowserView.can-go-forward;
+                clicked => {
+                    Actions.browser-forward();
+                }
+            }
+
+            IconButton {
+                y: (parent.height - self.height) / 2;
+                size: 34px;
+                icon-size: 18px;
+                icon: BrowserView.loading ? @image-url("icons/x.svg") : @image-url("icons/refresh-cw.svg");
+                tooltip: BrowserView.loading ? @tr("Stop") : @tr("Reload");
+                enabled: BrowserView.selected-tab >= 0;
+                clicked => {
+                    if BrowserView.loading {
+                        Actions.browser-stop();
+                    } else {
+                        Actions.browser-reload();
+                    }
+                }
+            }
+
+            address := AddressField {
+                horizontal-stretch: 1;
+                entered => {
+                    page.focus-page();
+                }
+            }
+        }
+
+        page := PageView {
+            vertical-stretch: 1;
+        }
+    }
+}

@@ -8,8 +8,13 @@ use tokio_stream::{StreamExt as _, wrappers::ReceiverStream};
 use tonic::{Streaming, transport::Channel};
 use tufo_local_transport::{ConnectError, LocalEndpoint};
 use tufo_models::browser::{BrowserTabs, PageAddress, TabId};
+/// The contract a view exchanges with the browser.
+pub use tufo_wire::browser::{
+    KeyInput, KeyModifiers, MouseButton, PIXEL_BYTES, PixelRectangle, PointerShape, ScaleFactor,
+    ViewFrame, ViewInput, ViewOutput, ViewPoint, ViewSize,
+};
 use tufo_wire::{
-    browser::{PIXEL_BYTES, VIEW_PHYSICAL_PIXELS_MAX, ViewInput, ViewOutput},
+    browser::VIEW_PHYSICAL_PIXELS_MAX,
     pb::browser::{
         CloseTabRequest, GoBackRequest, GoForwardRequest, ReloadTabRequest, SelectTabRequest,
         StopLoadingTabRequest, ViewBrowserResponse, WatchBrowserRequest, WatchBrowserResponse,

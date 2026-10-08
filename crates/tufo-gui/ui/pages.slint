@@ -227,7 +227,7 @@ component PageScroll inherits Rectangle {
 }
 
 // Keeps a page's bar clear of the window's buttons, which lie over it, and sets them apart.
-component WindowButtonsSpace inherits HorizontalLayout {
+export component WindowButtonsSpace inherits HorizontalLayout {
     spacing: 8px;
     Rectangle {
         y: (parent.height - self.height) / 2;
@@ -251,7 +251,7 @@ component BarShadow inherits Rectangle {
     animate opacity { duration: Motion.hover; }
 }
 
-component Heading inherits Text {
+export component Heading inherits Text {
     font-family: Theme.display-font;
     font-size: Theme.heading;
     font-weight: Theme.display-weight;

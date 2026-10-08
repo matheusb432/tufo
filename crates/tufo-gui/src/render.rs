@@ -22,11 +22,12 @@ use crate::{
     sound_icons,
     ui::{
         AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
-        CollectionBackground, CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView,
-        LibraryView, LoopBadge, LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation,
-        OutputRow, OutputRowKind, Page, PlayerView, PlaylistChoice, Search, SearchResult, Session,
-        SongFolder, SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SongRow,
-        SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
+        BrowserPointer, BrowserState, BrowserTabView, BrowserView, CollectionBackground,
+        CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge,
+        LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation, OutputRow, OutputRowKind,
+        Page, PlayerView, PlaylistChoice, Search, SearchResult, Session, SongFolder,
+        SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SongRow, SoundChip,
+        SoundIcons, SoundTile, TrackRow, VoiceBadge,
     },
 };
 
@@ -297,6 +298,7 @@ pub(crate) fn library(
             PageKind::Playlist => Page::Playlist,
             PageKind::Soundboards => Page::Soundboards,
             PageKind::Soundboard => Page::Soundboard,
+            PageKind::Browser => Page::Browser,
         };
         let pages = window.global::<Navigation>();
         pages.set_collection_id(
@@ -757,4 +759,92 @@ pub(crate) fn report_text(report: &ImportReport) -> String {
         ));
     }
     sentences.join(" ")
+}
+
+pub(crate) fn browser_page(window: &slint::Weak<AppWindow>, view: presentation::BrowserPageView) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        let browser = window.global::<BrowserView>();
+        browser.set_state(match view.state {
+            presentation::BrowserStateView::Closed => BrowserState::Closed,
+            presentation::BrowserStateView::Starting => BrowserState::Starting,
+            presentation::BrowserStateView::Open => BrowserState::Open,
+            presentation::BrowserStateView::StoppedIdle => BrowserState::StoppedIdle,
+            presentation::BrowserStateView::Crashed => BrowserState::Crashed,
+            presentation::BrowserStateView::StartFailed => BrowserState::StartFailed,
+            presentation::BrowserStateView::Unavailable => BrowserState::Unavailable,
+        });
+        browser.set_tabs(model(
+            view.tabs
+                .into_iter()
+                .map(|tab| BrowserTabView {
+                    id: i32::try_from(tab.id).unwrap_or(-1),
+                    title: tab.title.into(),
+                    loading: tab.loading,
+                    audible: tab.audible,
+                })
+                .collect(),
+        ));
+        browser.set_selected_tab(
+            view.selected
+                .and_then(|id| i32::try_from(id).ok())
+                .unwrap_or(-1),
+        );
+        browser.set_address(view.address.into());
+        browser.set_loading(view.loading);
+        browser.set_can_go_back(view.can_go_back);
+        browser.set_can_go_forward(view.can_go_forward);
+        browser.set_failure(view.failure.into());
+        browser.set_volume(view.volume);
+        browser.set_muted(view.muted);
+        browser.set_audible(view.audible);
+    });
+}
+
+/// Shows the selected tab's latest pixels.
+pub(crate) fn browser_frame(
+    window: &slint::Weak<AppWindow>,
+    pixels: slint::SharedPixelBuffer<slint::Rgba8Pixel>,
+) {
+    let _ = window.upgrade_in_event_loop(move |window| {
+        window
+            .global::<BrowserView>()
+            .set_frame(slint::Image::from_rgba8_premultiplied(pixels));
+    });
+}
+
+pub(crate) fn clear_browser_frame(window: &slint::Weak<AppWindow>) {
+    let _ = window.upgrade_in_event_loop(|window| {
+        window
+            .global::<BrowserView>()
+            .set_frame(slint::Image::default());
+    });
+}
+
+pub(crate) fn browser_pointer(
+    window: &slint::Weak<AppWindow>,
+    shape: tufo_client::browser::PointerShape,
+) {
+    use tufo_client::browser::PointerShape;
+
+    let pointer = match shape {
+        PointerShape::Default => BrowserPointer::Default,
+        PointerShape::Hand => BrowserPointer::Hand,
+        PointerShape::Text => BrowserPointer::Text,
+        PointerShape::Wait => BrowserPointer::Wait,
+        PointerShape::Progress => BrowserPointer::Progress,
+        PointerShape::Crosshair => BrowserPointer::Crosshair,
+        PointerShape::Move => BrowserPointer::Move,
+        PointerShape::NotAllowed => BrowserPointer::NotAllowed,
+        PointerShape::Grab => BrowserPointer::Grab,
+        PointerShape::Grabbing => BrowserPointer::Grabbing,
+        PointerShape::Help => BrowserPointer::Help,
+        PointerShape::ColumnResize => BrowserPointer::ColumnResize,
+        PointerShape::RowResize => BrowserPointer::RowResize,
+        PointerShape::NeswResize => BrowserPointer::NeswResize,
+        PointerShape::NwseResize => BrowserPointer::NwseResize,
+        PointerShape::None => BrowserPointer::None,
+    };
+    let _ = window.upgrade_in_event_loop(move |window| {
+        window.global::<BrowserView>().set_pointer(pointer);
+    });
 }

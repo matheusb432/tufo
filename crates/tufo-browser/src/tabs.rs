@@ -6,7 +6,7 @@ use std::{cell::RefCell, num::NonZeroU32, path::PathBuf, sync::Arc, time::Durati
 
 use cef::{
     Browser, BrowserSettings, Client, ImplBrowser, ImplBrowserHost, ImplFrame, PaintElementType,
-    WindowInfo, browser_host_create_browser_sync, quit_message_loop,
+    ThreadId, WindowInfo, browser_host_create_browser_sync, currently_on, quit_message_loop,
 };
 use tokio::sync::watch;
 use tufo_models::browser::{BrowserTab, BrowserTabs, PageAddress, PageFailure, TabHistory, TabId};
@@ -139,9 +139,13 @@ fn with_tabs<T>(work: impl FnOnce(&mut Tabs) -> T) -> Option<T> {
     TABS.with(|state| state.borrow_mut().as_mut().map(work))
 }
 
-/// Applies a change reported by a CEF callback, at once or, when CEF called back from inside a
-/// change already under way, right after it.
+/// Applies a change reported by a CEF callback, at once or, when CEF called back from another
+/// thread or from inside a change already under way, right after it on the UI thread.
 pub(crate) fn update_tabs(work: impl FnOnce(&mut Tabs) + Send + 'static) {
+    if currently_on(ThreadId::UI) == 0 {
+        crate::ui::run_on_ui(move || update_tabs(work));
+        return;
+    }
     let applied = TABS.with(|state| match state.try_borrow_mut() {
         Ok(mut state) => {
             if let Some(tabs) = state.as_mut() {

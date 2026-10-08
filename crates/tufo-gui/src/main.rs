@@ -8,6 +8,7 @@ mod autostart;
 mod backgrounds;
 #[cfg(feature = "benchmark")]
 mod benchmark;
+mod browser_input;
 mod card_art;
 mod controller;
 mod drops;
@@ -48,7 +49,7 @@ use std::{cell::OnceCell, rc::Rc, time::Duration};
 
 use autostart::Launch;
 use card_art::Shade;
-use controller::Controller;
+use controller::{Controller, PaneGeometry, PanePointer};
 use presentation::PageKind;
 use slint::{
     CloseRequestResponse, ComponentHandle as _, Timer, TimerMode,
@@ -62,7 +63,10 @@ use slint::{
     },
 };
 use tray::{Tray, TrayCommand};
-use tufo_client::library::Background;
+use tufo_client::{
+    browser::{KeyModifiers, MouseButton},
+    library::Background,
+};
 use tufo_local_transport::{ActivationListener, GuiInstance, LocalEndpoint};
 use tufo_models::library::{CollectionId, CollectionKind};
 
@@ -142,6 +146,7 @@ fn run_desktop() -> anyhow::Result<()> {
         .inspect_err(|error| tracing::warn!(%error, "cannot start desktop media controls"))
         .ok();
     let hidden_in_tray = launch == Launch::AtLogin && tray.is_some();
+    controller.set_window_visible(!hidden_in_tray);
     bind_close_request(&window, controller.clone(), tray.is_some());
     let ticker = Timer::default();
     ticker.start(TimerMode::Repeated, PROGRESS_TICK, {
@@ -190,6 +195,7 @@ fn bind_close_request(window: &ui::AppWindow, controller: Controller, hides_to_t
         if !hides_to_tray {
             controller.quit();
         }
+        controller.set_window_visible(false);
         CloseRequestResponse::HideWindow
     });
 }
@@ -218,7 +224,8 @@ fn show_tray(requests: &WindowRequests) -> Option<Tray> {
         .ok()
 }
 
-/// The winit events handled here: file drops, and an exit the window didn't ask for.
+/// The winit events handled here: file drops, a hidden or shown window, and an exit the window
+/// didn't ask for.
 struct ApplicationEvents {
     drops: drops::DropHandler,
     /// Set once the window has a controller.
@@ -234,6 +241,17 @@ impl CustomApplicationHandler for ApplicationEvents {
         slint_window: Option<&slint::Window>,
         event: &WindowEvent,
     ) -> EventResult {
+        if let Some(controller) = self.controller.get() {
+            match event {
+                WindowEvent::Occluded(occluded) => controller.set_window_visible(!occluded),
+                // Narrowing an f64 scale such as 1.25 to Slint's f32 loses nothing that matters.
+                #[expect(clippy::cast_possible_truncation, reason = "scales are small")]
+                WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
+                    controller.set_scale_factor(*scale_factor as f32);
+                }
+                _ => {}
+            }
+        }
         self.drops
             .window_event(event_loop, window_id, winit_window, slint_window, event)
     }
@@ -274,11 +292,13 @@ impl WindowRequests {
             TrayCommand::ShowWindow => {
                 if let Some(window) = self.window.upgrade() {
                     show_window(&window);
+                    self.controller.set_window_visible(true);
                 }
             }
             TrayCommand::ShowMiniPlayer => {
                 if let Some(window) = self.window.upgrade() {
                     show_window(&window);
+                    self.controller.set_window_visible(true);
                     window
                         .global::<ui::WindowFrame>()
                         .invoke_set_mini_player(true);
@@ -407,6 +427,30 @@ fn loop_field_texts(fields: ui::LoopFieldTexts) -> loop_editor::LoopFieldTexts {
     }
 }
 
+fn pane_pointer(kind: ui::BrowserPointerKind, button: ui::BrowserButton) -> Option<PanePointer> {
+    let button = match button {
+        ui::BrowserButton::Left => Some(MouseButton::Left),
+        ui::BrowserButton::Middle => Some(MouseButton::Middle),
+        ui::BrowserButton::Right => Some(MouseButton::Right),
+        ui::BrowserButton::None => None,
+    };
+    match kind {
+        ui::BrowserPointerKind::Move => Some(PanePointer::Moved),
+        ui::BrowserPointerKind::Leave => Some(PanePointer::Left),
+        ui::BrowserPointerKind::Down => button.map(PanePointer::Pressed),
+        ui::BrowserPointerKind::Up => button.map(PanePointer::Released),
+    }
+}
+
+fn pane_modifiers(modifiers: &ui::BrowserModifiers) -> KeyModifiers {
+    KeyModifiers {
+        shift: modifiers.shift,
+        control: modifiers.control,
+        alt: modifiers.alt,
+        meta: modifiers.meta,
+    }
+}
+
 fn page(page: ui::Page) -> PageKind {
     match page {
         ui::Page::Home => PageKind::Home,
@@ -415,6 +459,7 @@ fn page(page: ui::Page) -> PageKind {
         ui::Page::Playlist => PageKind::Playlist,
         ui::Page::Soundboards => PageKind::Soundboards,
         ui::Page::Soundboard => PageKind::Soundboard,
+        ui::Page::Browser => PageKind::Browser,
     }
 }
 
@@ -547,6 +592,40 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_set_song_loop_import_replace, |replace| controller.set_song_loop_import_replace(replace));
     on!(controller => on_confirm_song_loop_import, | | controller.confirm_song_loop_import());
     on!(controller => on_close_song_loop_import, | | controller.close_song_loop_import());
+    on!(controller => on_open_browser, | | controller.open_browser());
+    on!(controller => on_close_browser, | | controller.close_browser());
+    on!(controller => on_browser_navigate, |typed| controller.browser_navigate(&typed));
+    on!(controller => on_browser_new_tab, | | controller.browser_new_tab());
+    on!(controller => on_browser_select_tab, |id| controller.browser_select_tab(id));
+    on!(controller => on_browser_close_tab, |id| controller.browser_close_tab(id));
+    on!(controller => on_browser_back, | | controller.browser_back());
+    on!(controller => on_browser_forward, | | controller.browser_forward());
+    on!(controller => on_browser_reload, | | controller.browser_reload());
+    on!(controller => on_browser_stop, | | controller.browser_stop());
+    let weak = window.as_weak();
+    on!(controller => on_browser_view_resized, |width, height| {
+        let scale_factor = weak.upgrade().map_or(1.0, |window| window.window().scale_factor());
+        controller.browser_pane_resized(PaneGeometry {
+            width,
+            height,
+            scale_factor,
+        });
+    });
+    on!(controller => on_browser_pointer, |kind, button, x, y, modifiers| {
+        if let Some(pointer) = pane_pointer(kind, button) {
+            controller.browser_pointer(pointer, x, y, pane_modifiers(&modifiers));
+        }
+    });
+    on!(controller => on_browser_scroll, |x, y, delta_x, delta_y, modifiers| {
+        controller.browser_scroll((x, y), (delta_x, delta_y), pane_modifiers(&modifiers));
+    });
+    on!(controller => on_browser_key, |text, pressed, repeat, modifiers| {
+        controller.browser_key(&text, pressed, repeat, pane_modifiers(&modifiers));
+    });
+    on!(controller => on_browser_focus, |focused| controller.browser_focus(focused));
+    on!(controller => on_browser_paste, |text| controller.browser_paste(&text));
+    on!(controller => on_set_browser_volume, |volume| controller.set_browser_volume(volume));
+    on!(controller => on_toggle_browser_mute, | | controller.toggle_browser_mute());
     let loop_editor = window.global::<ui::LoopEditorView>();
     loop_editor.on_waveform({
         let controller = controller.clone();

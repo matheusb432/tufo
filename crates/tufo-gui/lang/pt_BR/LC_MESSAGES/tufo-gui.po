@@ -2371,3 +2371,131 @@ msgstr "Escolha quando os guias aparecem"
 #: ui/tours/settings.slint
 msgid "Tours controls every guide icon. Always show keeps guides available to replay, Show unseen hides each icon after you start its guide, and Always hide hides all guide icons. You can change this setting here at any time."
 msgstr "Guias controla todos os ícones de guia. Sempre mostrar mantém os guias disponíveis para rever, Mostrar não vistos oculta cada ícone depois que você inicia o guia e Sempre ocultar oculta todos os ícones de guia. Você pode mudar esta configuração aqui a qualquer momento."
+
+#: ui/browser.slint
+msgid "Unmute the browser"
+msgstr "Ativar o som do navegador"
+
+#: ui/browser.slint
+msgid "Mute the browser"
+msgstr "Silenciar o navegador"
+
+#: ui/browser.slint
+msgid "Browser volume"
+msgstr "Volume do navegador"
+
+#: ui/browser.slint
+msgid "Loading… {0}"
+msgstr "Carregando… {0}"
+
+#: ui/browser.slint
+msgid "Close tab"
+msgstr "Fechar aba"
+
+#: ui/browser.slint
+msgid "Address"
+msgstr "Endereço"
+
+#: ui/browser.slint
+msgid "Type an address or words to search for"
+msgstr "Digite um endereço ou palavras para pesquisar"
+
+#: ui/browser.slint
+msgid "Reload"
+msgstr "Recarregar"
+
+#: ui/browser.slint
+msgid "Type an address or words to search for above."
+msgstr "Digite acima um endereço ou palavras para pesquisar."
+
+#: ui/browser.slint
+msgid "Starting the browser…"
+msgstr "Iniciando o navegador…"
+
+#: ui/browser.slint
+msgid "The browser closed to free memory after a while without sound or a visit. Opening it again restores its tabs; pages start over."
+msgstr "O navegador fechou para liberar memória depois de um tempo sem som nem visitas. Abri-lo de novo restaura as abas; as páginas recomeçam."
+
+#: ui/browser.slint
+msgid "The browser stopped unexpectedly. Opening it again restores its tabs."
+msgstr "O navegador parou inesperadamente. Abri-lo de novo restaura as abas."
+
+#: src/presentation.rs ui/browser.slint
+msgid "The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder."
+msgstr "O navegador não pôde iniciar. Confira o tufo-browser.log na pasta de logs do Tufo."
+
+#: src/presentation.rs ui/browser.slint
+msgid "This installation of Tufo has no browser. It runs on Linux for now."
+msgstr "Esta instalação do Tufo não tem navegador. Por enquanto, ele funciona só no Linux."
+
+#: ui/browser.slint
+msgid "Play music and ambience from websites through Tufo, on this computer or in Discord. The browser runs only while it’s open."
+msgstr "Toque música e ambientação de sites pelo Tufo, neste computador ou no Discord. O navegador só funciona enquanto está aberto."
+
+#: ui/browser.slint
+msgid "Try again"
+msgstr "Tentar de novo"
+
+#: ui/browser.slint
+msgid "Open the browser"
+msgstr "Abrir o navegador"
+
+#: ui/browser.slint ui/sidebar.slint
+msgid "Browser"
+msgstr "Navegador"
+
+#: ui/browser.slint
+msgid "Close the browser and free its memory"
+msgstr "Fechar o navegador e liberar a memória"
+
+#: src/presentation/browser.rs ui/browser.slint
+msgid "New tab"
+msgstr "Nova aba"
+
+#: ui/browser.slint
+msgid "Back"
+msgstr "Voltar"
+
+#: ui/browser.slint
+msgid "Forward"
+msgstr "Avançar"
+
+#: ui/browser.slint
+msgid "Stop"
+msgstr "Parar"
+
+#: src/presentation/browser.rs
+msgid "This page stopped working. Reload it to try again."
+msgstr "Esta página parou de funcionar. Recarregue-a para tentar de novo."
+
+#: src/presentation/browser.rs
+msgid "Tufo couldn’t find that site. Check the address."
+msgstr "O Tufo não encontrou esse site. Confira o endereço."
+
+#: src/presentation/browser.rs
+msgid "The site didn’t respond. Try again later."
+msgstr "O site não respondeu. Tente de novo mais tarde."
+
+#: src/presentation/browser.rs
+msgid "This computer is offline."
+msgstr "Este computador está sem internet."
+
+#: src/presentation/browser.rs
+msgid "The site’s security certificate isn’t valid, so Tufo didn’t open it."
+msgstr "O certificado de segurança do site não é válido, então o Tufo não o abriu."
+
+#: src/presentation/browser.rs
+msgid "The site refused to open here."
+msgstr "O site se recusou a abrir aqui."
+
+#: src/presentation/browser.rs
+msgid "This page couldn’t load."
+msgstr "Esta página não pôde carregar."
+
+#: src/controller/browser.rs
+msgid "Open the browser first."
+msgstr "Abra o navegador primeiro."
+
+#: src/controller/browser.rs
+msgid "The browser could not do that. Try again."
+msgstr "O navegador não conseguiu fazer isso. Tente de novo."

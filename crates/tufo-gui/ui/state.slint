@@ -2,7 +2,7 @@
 
 import { TourVisibility } from "tours/state.slint";
 
-export enum Page { home, songs, playlists, playlist, soundboards, soundboard }
+export enum Page { home, songs, playlists, playlist, soundboards, soundboard, browser }
 
 export enum CollectionKind { playlist, soundboard }
 
@@ -175,6 +175,54 @@ export struct SearchResult {
     section: string,
     title: string,
     subtitle: string,
+}
+
+// Whether the browser runs, and why it stopped when it closed on its own.
+export enum BrowserState { closed, starting, open, stopped-idle, crashed, start-failed, unavailable }
+
+// How the browser's pane draws the pointer over a page.
+export enum BrowserPointer {
+    default, hand, text, wait, progress, crosshair, move, not-allowed, grab, grabbing, help,
+    column-resize, row-resize, nesw-resize, nwse-resize, none,
+}
+
+export enum BrowserPointerKind { move, down, up, leave }
+
+export enum BrowserButton { none, left, middle, right }
+
+export struct BrowserModifiers {
+    shift: bool,
+    control: bool,
+    alt: bool,
+    meta: bool,
+}
+
+export struct BrowserTabView {
+    id: int,
+    title: string,
+    loading: bool,
+    audible: bool,
+}
+
+export global BrowserView {
+    in property <BrowserState> state;
+    in property <[BrowserTabView]> tabs;
+    // The selected tab's id, or -1.
+    in property <int> selected-tab: -1;
+    // The selected tab's address, empty for a blank tab.
+    in property <string> address;
+    in property <bool> loading;
+    in property <bool> can-go-back;
+    in property <bool> can-go-forward;
+    // Why the selected tab shows no page; empty while it shows one.
+    in property <string> failure;
+    // The selected tab's pixels, at the pane's physical size.
+    in property <image> frame;
+    in property <BrowserPointer> pointer;
+    in property <float> volume: 1.0;
+    in property <bool> muted;
+    // Some page plays now.
+    in property <bool> audible;
 }
 
 export global Session {
@@ -512,4 +560,30 @@ export global Actions {
     callback set-song-loop-import-replace(bool);
     callback confirm-song-loop-import();
     callback close-song-loop-import();
+
+    callback open-browser();
+    callback close-browser();
+    // What was typed into the address field: an address, a host, or words to search for.
+    callback browser-navigate(string);
+    callback browser-new-tab();
+    // A tab's id.
+    callback browser-select-tab(int);
+    callback browser-close-tab(int);
+    callback browser-back();
+    callback browser-forward();
+    callback browser-reload();
+    callback browser-stop();
+    // The pane's size.
+    callback browser-view-resized(length, length);
+    // Where in the pane, and which button for presses and releases.
+    callback browser-pointer(BrowserPointerKind, BrowserButton, length, length, BrowserModifiers);
+    // Where in the pane, then how far to scroll each way.
+    callback browser-scroll(length, length, length, length, BrowserModifiers);
+    // A key's text, whether it went down, and whether it repeats.
+    callback browser-key(string, bool, bool, BrowserModifiers);
+    callback browser-focus(bool);
+    // Text pasted into the page.
+    callback browser-paste(string);
+    callback set-browser-volume(float);
+    callback toggle-browser-mute();
 }
