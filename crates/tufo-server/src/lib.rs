@@ -22,6 +22,7 @@ use tufo_application::{
     playback::update_player_settings,
 };
 use tufo_infra::{
+    browser::ProcessBrowserLauncher,
     database, default_effects,
     discord::{DiscordCredentials, SongbirdDiscordClient},
     folder_watcher::NotifyFolderWatcher,
@@ -57,7 +58,11 @@ pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
             .await
             .context("loading the library")?,
     );
-    let player = EnginePlayer::start(discord.clone(), library.saved_song_loops());
+    let player = EnginePlayer::start(
+        discord.clone(),
+        library.saved_song_loops(),
+        ProcessBrowserLauncher::beside_database(&database_path, log_directory().as_deref()),
+    );
     seed_default_effects(&database_path, &library).await;
     if let Err(error) = update_player_settings::restore(player.as_ref(), library.database()).await {
         tracing::warn!(%error, "cannot restore the saved player settings");
@@ -142,6 +147,19 @@ fn start_discord(path: &Path) -> anyhow::Result<SongbirdDiscordClient> {
     let credentials = DiscordCredentials::load(path)
         .with_context(|| format!("loading Discord credentials from {}", path.display()))?;
     Ok(SongbirdDiscordClient::start(credentials))
+}
+
+/// Tufo's log folder: the state directory, or the local data directory where the platform has
+/// none.
+#[must_use]
+pub fn log_directory() -> Option<PathBuf> {
+    let directories = directories::ProjectDirs::from("", "", "tufo")?;
+    Some(
+        directories
+            .state_dir()
+            .unwrap_or_else(|| directories.data_local_dir())
+            .to_path_buf(),
+    )
 }
 
 fn default_discord_credentials() -> Option<PathBuf> {

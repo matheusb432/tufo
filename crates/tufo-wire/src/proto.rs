@@ -3,6 +3,7 @@
 //! Servers parse requests into domain values and reject malformed ones with
 //! `INVALID_ARGUMENT`; clients decode responses and treat malformed ones as protocol failures.
 
+pub mod browser;
 pub mod library;
 pub mod player;
 pub mod server;

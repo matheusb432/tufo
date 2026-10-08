@@ -23,9 +23,10 @@ mod security;
 
 const PIPE_BUSY_RETRY_INTERVAL: Duration = Duration::from_millis(10);
 const GUI_PIPE_SUFFIX: &str = "-gui";
+const BROWSER_PIPE_SUFFIX: &str = "-browser";
 
-/// A named pipe only the current user can reach: the local `tufo-server`'s, or the running
-/// GUI's.
+/// A named pipe only the current user can reach: the local `tufo-server`'s, the running GUI's, or
+/// the running browser host's.
 #[derive(Debug, Clone)]
 pub struct LocalEndpoint {
     name: String,
@@ -52,6 +53,15 @@ impl LocalEndpoint {
 
     pub fn gui_from_root(root: impl AsRef<Path>) -> io::Result<Self> {
         Self::from_root_with_suffix(root.as_ref(), GUI_PIPE_SUFFIX)
+    }
+
+    /// The running browser host's pipe, named like the server's.
+    pub fn browser_from_environment() -> io::Result<Self> {
+        Self::from_environment_with_suffix(BROWSER_PIPE_SUFFIX)
+    }
+
+    pub fn browser_from_root(root: impl AsRef<Path>) -> io::Result<Self> {
+        Self::from_root_with_suffix(root.as_ref(), BROWSER_PIPE_SUFFIX)
     }
 
     fn from_environment_with_suffix(suffix: &str) -> io::Result<Self> {

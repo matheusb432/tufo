@@ -11,10 +11,12 @@ use crate::{
     record,
 };
 
+mod browser;
 mod discord;
 mod output;
 mod settings;
 
+pub(crate) use browser::{BrowserCommand, run_browser};
 pub(crate) use discord::{DiscordCommand, run_discord};
 pub(crate) use output::{OutputCommand, run_output};
 use settings::{LayerUpdatePayload, SettingsCommand};

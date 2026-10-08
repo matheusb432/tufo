@@ -12,7 +12,8 @@ async fn player_settings_preserve_omitted_fields_and_reject_invalid_updates_atom
             &["player", "settings", "update"],
             json!({
                 "volume": 0.25, "effects_volume": 0.5, "muted": true, "shuffle": true,
-                "repeat": "playlist", "crossfade_ms": 500
+                "repeat": "playlist", "crossfade_ms": 500, "browser_volume": 0.5,
+                "browser_muted": true
             }),
         )
         .await?;
@@ -27,7 +28,8 @@ async fn player_settings_preserve_omitted_fields_and_reject_invalid_updates_atom
         settings,
         json!({
             "volume": 0.25, "effects_volume": 0.0, "muted": true, "shuffle": true,
-            "repeat": "playlist", "crossfade_ms": 500
+            "repeat": "playlist", "crossfade_ms": 500, "browser_volume": 0.5,
+            "browser_muted": true
         })
     );
     let state = session.player().await?;
@@ -66,6 +68,15 @@ async fn player_settings_preserve_omitted_fields_and_reject_invalid_updates_atom
     assert_eq!(cleared["repeat"], "off");
     assert_eq!(cleared["crossfade_ms"], 0);
     assert_eq!(cleared["volume"], settings["volume"]);
+
+    session.success(&["browser", "close"]).await?;
+    assert_eq!(
+        session.json(&["browser", "state"]).await?,
+        json!({
+            "status": "closed", "stop_reason": null, "volume": 0.5, "muted": true,
+            "audible": false
+        })
+    );
     Ok(())
 }
 

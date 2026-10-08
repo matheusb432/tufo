@@ -370,3 +370,37 @@ async fn queue_rpcs_reject_invalid_unknown_and_missing_songs() -> anyhow::Result
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn opening_a_missing_browser_is_unavailable_and_closing_succeeds() -> anyhow::Result<()> {
+    use tufo_models::playback::browser::{BrowserStatus, BrowserStopReason};
+
+    let server = TestServer::start().await?;
+    let client = server.client()?;
+
+    let opened = client.open_browser().await;
+    let mut states = client.watch_player().await?;
+    let stopped = states.next().await.transpose()?.unwrap();
+    let closed = client.close_browser().await;
+    let after_close = states.next().await.transpose()?.unwrap();
+    client
+        .update_player_settings(&UpdatePlayerSettings {
+            browser_volume: Some(Volume::try_new(0.4)?),
+            browser_muted: Some(true),
+            ..UpdatePlayerSettings::default()
+        })
+        .await?;
+    let adjusted = states.next().await.transpose()?.unwrap();
+    server.stop().await?;
+
+    assert_eq!(status_code(opened), Some(Code::Unavailable));
+    assert_eq!(
+        stopped.browser.status,
+        BrowserStatus::Stopped(BrowserStopReason::Unavailable)
+    );
+    assert!(closed.is_ok());
+    assert_eq!(after_close.browser.status, BrowserStatus::Closed);
+    assert_eq!(adjusted.browser.volume, Volume::try_new(0.4)?);
+    assert!(adjusted.browser.muted);
+    Ok(())
+}

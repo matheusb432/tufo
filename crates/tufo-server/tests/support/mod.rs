@@ -3,8 +3,8 @@ use std::{sync::Arc, time::Duration};
 use tufo_application::library::Library;
 use tufo_client::TufoClient;
 use tufo_infra::{
-    database::open_database, discord::SongbirdDiscordClient, library_files::DiskLibraryFiles,
-    player::EnginePlayer,
+    browser::UnavailableBrowser, database::open_database, discord::SongbirdDiscordClient,
+    library_files::DiskLibraryFiles, player::EnginePlayer,
 };
 use tufo_local_transport::{LocalEndpoint, LocalListener};
 use tufo_server::AppState;
@@ -32,7 +32,11 @@ impl TestServer {
         let library = Arc::new(Library::open(database, DiskLibraryFiles).await?);
         let discord = SongbirdDiscordClient::not_configured();
         let state = AppState::new(
-            EnginePlayer::start(discord.clone(), library.saved_song_loops()),
+            EnginePlayer::start(
+                discord.clone(),
+                library.saved_song_loops(),
+                UnavailableBrowser,
+            ),
             discord,
             library,
             directory.path().join("discord.toml"),

@@ -13,6 +13,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tokio = { workspace = true, features = ["sync", "time"] }
+tokio-stream = { workspace = true }
 tonic = { workspace = true, features = ["transport"] }
 tonic-health = { workspace = true }
 tufo-local-transport = { workspace = true }

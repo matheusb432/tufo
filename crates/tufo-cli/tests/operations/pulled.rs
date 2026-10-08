@@ -54,6 +54,7 @@ impl PulledServer {
             PulledOutputs { renderers },
             EngineTimings::default(),
             library.saved_song_loops(),
+            tufo_infra::browser::UnavailableBrowser,
         );
         let state = tufo_server::AppState::new(
             player,

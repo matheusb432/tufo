@@ -1,4 +1,8 @@
-use std::{fs, path::PathBuf, process::Command};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context as _, bail};
 use prost::Message as _;
@@ -10,17 +14,45 @@ fn main() -> anyhow::Result<()> {
         .ancestors()
         .nth(2)
         .context("tufo-wire must be two directories below the workspace root")?;
-    let descriptor_path = PathBuf::from(std::env::var("OUT_DIR")?).join("tufo_descriptor.bin");
+    let out_directory = PathBuf::from(std::env::var("OUT_DIR")?);
+    // The server's reflection lists only its own services, so they get a descriptor set of their
+    // own; the browser host serves `tufo.browser.v1`.
+    build_descriptor_set(
+        workspace_root,
+        "crates/tufo-wire/proto/tufo/v1",
+        &out_directory.join("tufo_descriptor.bin"),
+    )?;
+    let all_descriptors = build_descriptor_set(
+        workspace_root,
+        "crates/tufo-wire/proto/tufo",
+        &out_directory.join("all_descriptors.bin"),
+    )?;
+    // Clients connect through tufo-local-transport, so the wire crate stays transport-agnostic.
+    tonic_prost_build::configure()
+        .build_transport(false)
+        .compile_fds(all_descriptors)?;
+
+    for path in ["proto", "../../buf.yaml"] {
+        println!("cargo:rerun-if-changed={path}");
+    }
+    Ok(())
+}
+
+fn build_descriptor_set(
+    workspace_root: &Path,
+    proto_path: &str,
+    descriptor_path: &Path,
+) -> anyhow::Result<FileDescriptorSet> {
     let output = Command::new("buf")
         .current_dir(workspace_root)
         .args([
             "build",
             "--as-file-descriptor-set",
             "--path",
-            "crates/tufo-wire/proto/tufo/v1",
+            proto_path,
             "--output",
         ])
-        .arg(&descriptor_path)
+        .arg(descriptor_path)
         .output()
         .context("run `buf build`; install the repository's pinned tools with `just bootstrap`")?;
     if !output.status.success() {
@@ -29,18 +61,8 @@ fn main() -> anyhow::Result<()> {
             String::from_utf8_lossy(&output.stderr)
         );
     }
-
-    let descriptor_bytes = fs::read(&descriptor_path)
-        .with_context(|| format!("read {}", descriptor_path.display()))?;
-    let descriptors = FileDescriptorSet::decode(descriptor_bytes.as_slice())
-        .context("decode the Buf file descriptor set")?;
-    // Clients connect through tufo-local-transport, so the wire crate stays transport-agnostic.
-    tonic_prost_build::configure()
-        .build_transport(false)
-        .compile_fds(descriptors)?;
-
-    for path in ["proto", "../../buf.yaml"] {
-        println!("cargo:rerun-if-changed={path}");
-    }
-    Ok(())
+    let descriptor_bytes =
+        fs::read(descriptor_path).with_context(|| format!("read {}", descriptor_path.display()))?;
+    FileDescriptorSet::decode(descriptor_bytes.as_slice())
+        .context("decode the Buf file descriptor set")
 }

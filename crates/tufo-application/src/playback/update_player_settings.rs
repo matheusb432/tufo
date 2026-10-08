@@ -1,10 +1,11 @@
-//! Changing the player's volume, mute, shuffle, repeat, and crossfade, which survive restarts.
+//! Changing the player's volumes, mutes, shuffle, repeat, and crossfade, which survive restarts.
 
 use toasty::Db;
 use tufo_models::playback::player_settings::{PLAYER_SETTINGS_ID, SavedPlayerSettings};
 use tufo_wire::player::UpdatePlayerSettings;
 
 use super::{
+    control_browser::BrowserCommand,
     control_music::{self, ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
     player::Player,
@@ -43,6 +44,8 @@ pub async fn execute(
             .shuffle(state.modes.shuffle)
             .repeat(state.modes.repeat)
             .crossfade(state.crossfade)
+            .browser_volume(state.browser.volume)
+            .browser_muted(state.browser.muted)
             .exec(&mut database)
             .await
     } else {
@@ -54,6 +57,8 @@ pub async fn execute(
             shuffle: state.modes.shuffle,
             repeat: state.modes.repeat,
             crossfade: state.crossfade,
+            browser_volume: state.browser.volume,
+            browser_muted: state.browser.muted,
         })
         .exec(&mut database)
         .await
@@ -84,6 +89,8 @@ pub async fn restore(
             shuffle: Some(saved.shuffle),
             repeat: Some(saved.repeat),
             crossfade: Some(saved.crossfade),
+            browser_volume: Some(saved.browser_volume),
+            browser_muted: Some(saved.browser_muted),
         },
         player,
     )
@@ -102,6 +109,8 @@ async fn apply(
         shuffle,
         repeat,
         crossfade,
+        browser_volume,
+        browser_muted,
     } = update;
     let commands = [
         volume.map(MusicCommand::SetVolume),
@@ -117,6 +126,13 @@ async fn apply(
         player
             .control_sounds(SoundsCommand::SetVolume(volume))
             .await;
+    }
+    let browser_commands = [
+        browser_volume.map(BrowserCommand::SetVolume),
+        browser_muted.map(BrowserCommand::SetMuted),
+    ];
+    for command in browser_commands.into_iter().flatten() {
+        player.control_browser(command).await;
     }
     Ok(())
 }

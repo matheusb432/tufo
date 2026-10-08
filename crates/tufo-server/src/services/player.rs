@@ -2,12 +2,12 @@ use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::playback::{
-    add_music_layer, add_to_queue,
+    add_music_layer, add_to_queue, close_browser,
     control_music::{self, MusicCommand},
     control_sounds::{self, SoundsCommand},
-    get_diagnostics, play_collection, play_entry_sound, preview_song_loop, remove_from_queue,
-    resume_saved_loops, select_output, stand_by, stop_music_layer, stop_sound, update_music_layer,
-    update_player_settings, watch_player,
+    get_diagnostics, open_browser, play_collection, play_entry_sound, preview_song_loop,
+    remove_from_queue, resume_saved_loops, select_output, stand_by, stop_music_layer, stop_sound,
+    update_music_layer, update_player_settings, watch_player,
 };
 use tufo_infra::player::outputs::{AudioOutputs, DeviceOutputs};
 use tufo_models::playback::player_state::PlayerState;
@@ -286,6 +286,24 @@ impl<O: AudioOutputs> PlayerService for PlayerGrpcService<O> {
     ) -> Result<Response<pb::StandByResponse>, Status> {
         stand_by::execute(self.state.player.as_ref()).await;
         Ok(Response::new(pb::StandByResponse {}))
+    }
+
+    async fn open_browser(
+        &self,
+        _request: Request<pb::OpenBrowserRequest>,
+    ) -> Result<Response<pb::OpenBrowserResponse>, Status> {
+        open_browser::execute(self.state.player.as_ref())
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::OpenBrowserResponse {}))
+    }
+
+    async fn close_browser(
+        &self,
+        _request: Request<pb::CloseBrowserRequest>,
+    ) -> Result<Response<pb::CloseBrowserResponse>, Status> {
+        close_browser::execute(self.state.player.as_ref()).await;
+        Ok(Response::new(pb::CloseBrowserResponse {}))
     }
 
     async fn get_player_diagnostics(

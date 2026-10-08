@@ -4,6 +4,7 @@ use tufo_models::{
     library::CollectionEntryId,
     playback::{
         OutputTarget,
+        browser::{BrowserPlayback, BrowserStatus, BrowserStopReason},
         diagnostics::{PlayerDiagnostics, VoicePacing},
         music_layers::{MusicLayerState, MusicLayers},
         player_state::{ActiveSound, MusicState, PlayerState, VoiceConnectionState},
@@ -24,8 +25,33 @@ pub(crate) fn player(value: &PlayerState) -> Value {
         ),
         ("sounds".to_owned(), sounds(&value.sounds)),
         ("sounds_paused".to_owned(), json!(value.sounds_paused)),
+        ("browser".to_owned(), browser(value.browser)),
     ]);
     fields.into()
+}
+
+pub(crate) fn browser(value: BrowserPlayback) -> Value {
+    let (status, stop_reason) = match value.status {
+        BrowserStatus::Closed => ("closed", None),
+        BrowserStatus::Starting => ("starting", None),
+        BrowserStatus::Open => ("open", None),
+        BrowserStatus::Stopped(reason) => (
+            "stopped",
+            Some(match reason {
+                BrowserStopReason::Idle => "idle",
+                BrowserStopReason::Crashed => "crashed",
+                BrowserStopReason::StartFailed => "start_failed",
+                BrowserStopReason::Unavailable => "unavailable",
+            }),
+        ),
+    };
+    json!({
+        "status": status,
+        "stop_reason": stop_reason,
+        "volume": value.volume.into_inner(),
+        "muted": value.muted,
+        "audible": value.audible,
+    })
 }
 
 pub(crate) fn music_state(value: &PlayerState) -> Value {
@@ -59,6 +85,8 @@ fn settings_fields(value: &PlayerState) -> Map<String, Value> {
             "crossfade_ms",
             json!(duration_ms(value.crossfade.into_inner())),
         ),
+        ("browser_volume", json!(value.browser.volume.into_inner())),
+        ("browser_muted", json!(value.browser.muted)),
     ]
     .into_iter()
     .map(|(name, value)| (name.to_owned(), value))
@@ -114,6 +142,8 @@ pub(crate) fn diagnostics(value: &PlayerDiagnostics) -> Value {
         "sound_underrun_frames": value.sound_underrun_frames,
         "local_stream_errors": value.local_stream_errors,
         "local_stream_errors_discarded": value.local_stream_errors_discarded,
+        "browser_underrun_frames": value.browser_underrun_frames,
+        "browser_dropped_frames": value.browser_dropped_frames,
         "voice_pacing": value.voice_pacing.as_ref().map(voice_pacing),
     })
 }

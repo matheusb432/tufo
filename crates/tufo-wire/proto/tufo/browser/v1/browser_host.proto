@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package tufo.browser.v1;
+
+// What the browser host tells tufo-server, which started it, over a pipe. Each message follows
+// its encoded length as a 4-byte little-endian integer. The host exits when the server closes
+// its standard input.
+message BrowserHostEvent {
+  oneof event {
+    BrowserHostReady ready = 1;
+    BrowserAudioStarted audio_started = 2;
+    BrowserAudioPacket audio_packet = 3;
+    BrowserAudioStopped audio_stopped = 4;
+    BrowserViewChanged view_changed = 5;
+  }
+}
+
+// The host accepts views and commands on its endpoint.
+message BrowserHostReady {}
+
+// A page started sending audio. stream_id names the stream until it stops.
+message BrowserAudioStarted {
+  uint32 stream_id = 1;
+  uint32 sample_rate = 2;
+  uint32 channels = 3;
+}
+
+message BrowserAudioPacket {
+  uint32 stream_id = 1;
+  // Interleaved 32-bit float samples, little-endian, in whole frames.
+  bytes samples = 2;
+}
+
+message BrowserAudioStopped {
+  uint32 stream_id = 1;
+}
+
+// Whether a view shows the browser now.
+message BrowserViewChanged {
+  bool attached = 1;
+}

@@ -54,3 +54,8 @@ snapshot_name = "0009_snapshot.toml"
 id = 6926354756762600647
 name = "0010_song_loops.sql"
 snapshot_name = "0010_snapshot.toml"
+
+[[migrations]]
+id = 7196706648171374803
+name = "0011_browser_settings.sql"
+snapshot_name = "0011_snapshot.toml"

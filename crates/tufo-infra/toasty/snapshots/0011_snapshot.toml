@@ -1,0 +1,589 @@
+version = 1
+
+[schema]
+
+[[schema.tables]]
+id = 0
+name = "default_effects_seed"
+primary_key = { columns = [{ table = 0, index = 0 }], index = { table = 0, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 0 }
+name = "id"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 0, index = 1 }
+name = "seeded_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 0, index = 0 }
+name = "index_default_effects_seed_by_id"
+on = 0
+columns = [{ column = { table = 0, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 1
+name = "player_settings"
+primary_key = { columns = [{ table = 1, index = 0 }], index = { table = 1, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 0 }
+name = "id"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 1 }
+name = "volume"
+ty = "F32"
+storage_ty = { Float = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 2 }
+name = "effects_volume"
+ty = "F32"
+storage_ty = { Float = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 3 }
+name = "muted"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 4 }
+name = "shuffle"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 1, index = 5 }
+name = "repeat"
+ty = "String"
+storage_ty = { Enum = { name = "repeat_mode", variants = [{ name = "off" }, { name = "playlist" }, { name = "track" }] } }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 6 }
+name = "crossfade"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 7 }
+name = "browser_volume"
+ty = "F32"
+storage_ty = { Float = 4 }
+
+[[schema.tables.columns]]
+id = { table = 1, index = 8 }
+name = "browser_muted"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.indices]]
+id = { table = 1, index = 0 }
+name = "index_player_settings_by_id"
+on = 1
+columns = [{ column = { table = 1, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 2
+name = "song_loops"
+primary_key = { columns = [{ table = 2, index = 0 }], index = { table = 2, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 0 }
+name = "audio_file_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 2, index = 1 }
+name = "fingerprint"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 2, index = 2 }
+name = "sample_rate"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 3 }
+name = "frame_count"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 4 }
+name = "playback_start_frame"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 5 }
+name = "loop_start_frame"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 6 }
+name = "loop_end_frame"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 7 }
+name = "crossfade_frames"
+ty = "U64"
+storage_ty = { UnsignedInteger = 8 }
+
+[[schema.tables.columns]]
+id = { table = 2, index = 8 }
+name = "updated_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 2, index = 0 }
+name = "index_song_loops_by_audio_file_id"
+on = 2
+columns = [{ column = { table = 2, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 3
+name = "saved_loops"
+primary_key = { columns = [{ table = 3, index = 0 }], index = { table = 3, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 3, index = 0 }
+name = "collection_entry_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 3, index = 1 }
+name = "paused"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.indices]]
+id = { table = 3, index = 0 }
+name = "index_saved_loops_by_collection_entry_id"
+on = 3
+columns = [{ column = { table = 3, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 4
+name = "kenku_imports"
+primary_key = { columns = [{ table = 4, index = 0 }], index = { table = 4, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 1 }
+name = "source_folder"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 4, index = 2 }
+name = "state"
+ty = "String"
+storage_ty = { Enum = { name = "kenku_import_state", variants = [{ name = "reading" }, { name = "awaiting_choices" }, { name = "importing" }, { name = "succeeded" }, { name = "failed" }, { name = "interrupted" }] } }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 3 }
+name = "progress"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 4, index = 4 }
+name = "details"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 5 }
+name = "error_reason"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 4, index = 6 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 4, index = 7 }
+name = "updated_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 4, index = 0 }
+name = "index_kenku_imports_by_id"
+on = 4
+columns = [{ column = { table = 4, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 5
+name = "collection_entries"
+primary_key = { columns = [{ table = 5, index = 0 }], index = { table = 5, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 5, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 5, index = 1 }
+name = "collection_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 5, index = 2 }
+name = "audio_file_id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 5, index = 3 }
+name = "added_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 5, index = 4 }
+name = "looping"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 5, index = 5 }
+name = "volume"
+ty = "F32"
+storage_ty = { Float = 4 }
+
+[[schema.tables.columns]]
+id = { table = 5, index = 6 }
+name = "fade_in"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 5, index = 7 }
+name = "fade_out"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 5, index = 8 }
+name = "icon"
+ty = "String"
+storage_ty = { Enum = { name = "sound_icon", variants = [{ name = "audio_lines" }, { name = "anchor" }, { name = "axe" }, { name = "beer" }, { name = "bell" }, { name = "bird" }, { name = "bomb" }, { name = "bone" }, { name = "bow_arrow" }, { name = "bug" }, { name = "building" }, { name = "castle" }, { name = "cat" }, { name = "church" }, { name = "clock" }, { name = "cloud_fog" }, { name = "cloud_lightning" }, { name = "cloud_rain" }, { name = "cloud_snow" }, { name = "coffee" }, { name = "coins" }, { name = "crown" }, { name = "dices" }, { name = "dog" }, { name = "door_open" }, { name = "droplets" }, { name = "drum" }, { name = "fan" }, { name = "fish" }, { name = "flame" }, { name = "flame_kindling" }, { name = "flask_conical" }, { name = "footprints" }, { name = "ghost" }, { name = "guitar" }, { name = "hammer" }, { name = "heart_pulse" }, { name = "hourglass" }, { name = "house" }, { name = "key" }, { name = "landmark" }, { name = "moon" }, { name = "moon_star" }, { name = "mountain" }, { name = "mountain_snow" }, { name = "music" }, { name = "paw_print" }, { name = "piano" }, { name = "pickaxe" }, { name = "rabbit" }, { name = "rat" }, { name = "scroll" }, { name = "shield" }, { name = "ship" }, { name = "siren" }, { name = "skull" }, { name = "snowflake" }, { name = "sparkles" }, { name = "squirrel" }, { name = "sun" }, { name = "swords" }, { name = "tent" }, { name = "tornado" }, { name = "train_front" }, { name = "trees" }, { name = "venetian_mask" }, { name = "wand_sparkles" }, { name = "waves" }, { name = "wind" }, { name = "zap" }] } }
+
+[[schema.tables.indices]]
+id = { table = 5, index = 0 }
+name = "index_collection_entries_by_id"
+on = 5
+columns = [{ column = { table = 5, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 5, index = 1 }
+name = "index_collection_entries_by_collection_id"
+on = 5
+columns = [{ column = { table = 5, index = 1 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables.indices]]
+id = { table = 5, index = 2 }
+name = "index_collection_entries_by_audio_file_id"
+on = 5
+columns = [{ column = { table = 5, index = 2 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables]]
+id = 6
+name = "collections"
+primary_key = { columns = [{ table = 6, index = 0 }], index = { table = 6, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 6, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 6, index = 1 }
+name = "kind"
+ty = "String"
+storage_ty = { Enum = { name = "collection_kind", variants = [{ name = "playlist" }, { name = "soundboard" }] } }
+
+[[schema.tables.columns]]
+id = { table = 6, index = 2 }
+name = "title"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 6, index = 3 }
+name = "builtin_title"
+ty = "String"
+storage_ty = { Enum = { name = "builtin_title", variants = [{ name = "effects" }, { name = "imported" }, { name = "rain" }, { name = "storm" }, { name = "wind" }, { name = "waves" }, { name = "stream" }, { name = "birds" }, { name = "summer_night" }, { name = "fireplace" }] } }
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 4 }
+name = "background_preset"
+ty = "String"
+storage_ty = { Enum = { name = "background_preset", variants = [{ name = "autumn" }, { name = "battle" }, { name = "castle" }, { name = "cathedral" }, { name = "coast" }, { name = "desert" }, { name = "dragon" }, { name = "fire" }, { name = "forest" }, { name = "haunted" }, { name = "mountain" }, { name = "night" }, { name = "sky" }, { name = "skulls" }, { name = "storm" }, { name = "tavern" }, { name = "town" }, { name = "underworld" }, { name = "volcano" }, { name = "winter" }] } }
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 5 }
+name = "background_image"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 6 }
+name = "order_key"
+ty = "String"
+storage_ty = { Enum = { name = "entry_order_key", variants = [{ name = "title" }, { name = "duration" }, { name = "date_added" }] } }
+
+[[schema.tables.columns]]
+id = { table = 6, index = 7 }
+name = "order_descending"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.columns]]
+id = { table = 6, index = 8 }
+name = "library_folder_id"
+ty = "Bytes"
+storage_ty = "Blob"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 9 }
+name = "folder_path"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 10 }
+name = "folder_identity"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 11 }
+name = "folder_missing_since"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 12 }
+name = "hidden_at"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 6, index = 13 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 6, index = 0 }
+name = "index_collections_by_id"
+on = 6
+columns = [{ column = { table = 6, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 6, index = 1 }
+name = "index_collections_by_library_folder_id"
+on = 6
+columns = [{ column = { table = 6, index = 8 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables]]
+id = 7
+name = "library_folders"
+primary_key = { columns = [{ table = 7, index = 0 }], index = { table = 7, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 7, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 7, index = 1 }
+name = "kind"
+ty = "String"
+storage_ty = { Enum = { name = "collection_kind", variants = [{ name = "playlist" }, { name = "soundboard" }] } }
+
+[[schema.tables.columns]]
+id = { table = 7, index = 2 }
+name = "folder_path"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 7, index = 3 }
+name = "folder_identity"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 7, index = 4 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.indices]]
+id = { table = 7, index = 0 }
+name = "index_library_folders_by_id"
+on = 7
+columns = [{ column = { table = 7, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables]]
+id = 8
+name = "audio_files"
+primary_key = { columns = [{ table = 8, index = 0 }], index = { table = 8, index = 0 } }
+
+[[schema.tables.columns]]
+id = { table = 8, index = 0 }
+name = "id"
+ty = "Bytes"
+storage_ty = "Blob"
+
+[[schema.tables.columns]]
+id = { table = 8, index = 1 }
+name = "file_path"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 8, index = 2 }
+name = "file_identity"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 8, index = 3 }
+name = "size_bytes"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 8, index = 4 }
+name = "modified_ns"
+ty = "I64"
+storage_ty = { Integer = 8 }
+
+[[schema.tables.columns]]
+id = { table = 8, index = 5 }
+name = "fingerprint"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 8, index = 6 }
+name = "duration_ms"
+ty = "U32"
+storage_ty = { UnsignedInteger = 4 }
+
+[[schema.tables.columns]]
+id = { table = 8, index = 7 }
+name = "title"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 8, index = 8 }
+name = "builtin_title"
+ty = "String"
+storage_ty = { Enum = { name = "builtin_title", variants = [{ name = "effects" }, { name = "imported" }, { name = "rain" }, { name = "storm" }, { name = "wind" }, { name = "waves" }, { name = "stream" }, { name = "birds" }, { name = "summer_night" }, { name = "fireplace" }] } }
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 8, index = 9 }
+name = "missing_since"
+ty = "String"
+storage_ty = "Text"
+nullable = true
+
+[[schema.tables.columns]]
+id = { table = 8, index = 10 }
+name = "created_at"
+ty = "String"
+storage_ty = "Text"
+
+[[schema.tables.columns]]
+id = { table = 8, index = 11 }
+name = "song_source"
+ty = "Bool"
+storage_ty = "Boolean"
+
+[[schema.tables.indices]]
+id = { table = 8, index = 0 }
+name = "index_audio_files_by_id"
+on = 8
+columns = [{ column = { table = 8, index = 0 }, op = "Eq", scope = "Partition" }]
+unique = true
+primary_key = true
+
+[[schema.tables.indices]]
+id = { table = 8, index = 1 }
+name = "index_audio_files_by_file_path"
+on = 8
+columns = [{ column = { table = 8, index = 1 }, op = "Eq", scope = "Partition" }]
+unique = true
+
+[[schema.tables.indices]]
+id = { table = 8, index = 2 }
+name = "index_audio_files_by_file_identity"
+on = 8
+columns = [{ column = { table = 8, index = 2 }, op = "Eq", scope = "Partition" }]
+
+[[schema.tables.indices]]
+id = { table = 8, index = 3 }
+name = "index_audio_files_by_fingerprint"
+on = 8
+columns = [{ column = { table = 8, index = 5 }, op = "Eq", scope = "Partition" }]

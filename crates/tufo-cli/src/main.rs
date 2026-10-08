@@ -104,6 +104,9 @@ async fn run(
         command::Command::Discord { command } => {
             return player_command::run_discord(command, json).await;
         }
+        command::Command::Browser { command } => {
+            return player_command::run_browser(command, json).await;
+        }
         command::Command::Loop { command } => {
             return loop_command::run_loop(command, json).await;
         }

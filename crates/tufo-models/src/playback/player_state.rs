@@ -8,6 +8,7 @@ use crate::{
     library::{CollectionEntryId, CollectionId, SoundSettings, Volume, song_loop::LoopRegion},
     playback::{
         AudioFilePath, OutputTarget,
+        browser::BrowserPlayback,
         music_layers::{MusicLayerState, MusicLayers},
         queue::{QueueEntry, QueueModes},
     },
@@ -51,6 +52,7 @@ pub struct PlayerState {
     /// Sounds playing now, ordered by entry id.
     pub sounds: Vec<ActiveSound>,
     pub sounds_paused: bool,
+    pub browser: BrowserPlayback,
 }
 
 impl PlayerState {
@@ -77,6 +79,7 @@ impl Default for PlayerState {
             crossfade: CrossfadeDuration::default(),
             sounds: Vec::new(),
             sounds_paused: false,
+            browser: BrowserPlayback::default(),
         }
     }
 }

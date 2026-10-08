@@ -15,14 +15,15 @@ use crate::input::deserialize_present;
 
 #[derive(Debug, Subcommand)]
 pub(crate) enum SettingsCommand {
-    /// Read music/effects volume, mute, shuffle, repeat, and crossfade.
+    /// Read music/effects/browser volume, mutes, shuffle, repeat, and crossfade.
     Get,
     /// Update the supplied settings; omitted fields keep their current values.
     #[command(after_long_help = r#"Examples:
   tufo player settings update '{"volume":0.7,"effects_volume":0.5,"muted":false}'
   tufo music settings update '{"shuffle":true,"repeat":"playlist","crossfade_ms":2000}'
+  tufo player settings update '{"browser_volume":0.4,"browser_muted":false}'
 
-Volume and effects_volume are linear gains from 0 to 1.
+Volume, effects_volume, and browser_volume are linear gains from 0 to 1.
 Repeat accepts off, playlist, or track. Crossfade is 0 to 10000 milliseconds.
 Omit fields to preserve them. Use 0, false, or repeat:off to reset a setting."#)]
     Update {
@@ -51,6 +52,10 @@ struct SettingsJson {
     repeat: Option<String>,
     #[serde(default, deserialize_with = "deserialize_present")]
     crossfade_ms: Option<u64>,
+    #[serde(default, deserialize_with = "deserialize_present")]
+    browser_volume: Option<f32>,
+    #[serde(default, deserialize_with = "deserialize_present")]
+    browser_muted: Option<bool>,
 }
 
 impl TryFrom<SettingsJson> for SettingsPayload {
@@ -67,6 +72,11 @@ impl TryFrom<SettingsJson> for SettingsPayload {
             .map(Volume::try_new)
             .transpose()
             .map_err(|error| format!("invalid effects_volume: {error}"))?;
+        let browser_volume = json
+            .browser_volume
+            .map(Volume::try_new)
+            .transpose()
+            .map_err(|error| format!("invalid browser_volume: {error}"))?;
         let crossfade = json
             .crossfade_ms
             .map(|milliseconds| CrossfadeDuration::try_new(Duration::from_millis(milliseconds)))
@@ -79,6 +89,8 @@ impl TryFrom<SettingsJson> for SettingsPayload {
             shuffle: json.shuffle,
             repeat: json.repeat.as_deref().map(parse_repeat).transpose()?,
             crossfade,
+            browser_volume,
+            browser_muted: json.browser_muted,
         }))
     }
 }

@@ -65,6 +65,11 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: crate::player_command::EffectCommand,
     },
+    /// Open or close the browser whose pages play through Tufo.
+    Browser {
+        #[command(subcommand)]
+        command: crate::player_command::BrowserCommand,
+    },
     /// Inspect or select the playback output.
     Output {
         #[command(subcommand)]

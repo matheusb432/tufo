@@ -2,9 +2,12 @@
 
 pub mod add_music_layer;
 pub mod add_to_queue;
+pub mod close_browser;
+pub mod control_browser;
 pub mod control_music;
 pub mod control_sounds;
 pub mod get_diagnostics;
+pub mod open_browser;
 pub mod play_collection;
 pub mod play_entry_sound;
 pub mod play_queue;

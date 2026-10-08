@@ -10692,6 +10692,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-stream",
  "toml",
  "tonic",
  "tonic-health",
@@ -10831,6 +10832,7 @@ dependencies = [
  "serde",
  "thiserror 2.0.21",
  "toasty",
+ "url",
  "uuid",
 ]
 
@@ -10870,6 +10872,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "jiff",
+ "nutype",
  "prost",
  "prost-types",
  "serde",

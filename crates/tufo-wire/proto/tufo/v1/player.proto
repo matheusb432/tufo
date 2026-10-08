@@ -66,6 +66,13 @@ service PlayerService {
   // repeating both sides of its seam. Music playing on the local device pauses meanwhile and
   // resumes afterwards. A newer preview ends this one.
   rpc PreviewSongLoop(PreviewSongLoopRequest) returns (stream PreviewSongLoopResponse);
+  // Starts the browser, which restores the tabs it last had open; its status turns open once it
+  // serves BrowserService. Opening a starting or open browser succeeds. UNAVAILABLE when this
+  // installation has no browser or it cannot start.
+  rpc OpenBrowser(OpenBrowserRequest) returns (OpenBrowserResponse);
+  // Saves the open tabs, then ends the browser and every page process it started. Closing a
+  // closed browser succeeds.
+  rpc CloseBrowser(CloseBrowserRequest) returns (CloseBrowserResponse);
 }
 
 message WatchPlayerRequest {}
@@ -93,6 +100,31 @@ message PlayerState {
   repeated string queued_collection_entry_ids = 12;
   // Multiplies every effect's individual volume, independently of music volume and mute.
   float effects_volume = 13;
+  BrowserPlayback browser = 14;
+}
+
+// The browser's part in playback.
+message BrowserPlayback {
+  BrowserStatus status = 1;
+  // A linear gain from 0 to 1 for every page's audio, independent of music and effects.
+  float volume = 2;
+  bool muted = 3;
+  // Some page sends audio now.
+  bool audible = 4;
+}
+
+// Whether the browser runs. Stopped statuses closed without a request; opening clears them.
+enum BrowserStatus {
+  BROWSER_STATUS_UNSPECIFIED = 0;
+  BROWSER_STATUS_CLOSED = 1;
+  BROWSER_STATUS_STARTING = 2;
+  BROWSER_STATUS_OPEN = 3;
+  // No page played and no view showed the browser for a while, so it released its memory.
+  BROWSER_STATUS_STOPPED_IDLE = 4;
+  BROWSER_STATUS_STOPPED_CRASHED = 5;
+  BROWSER_STATUS_STOPPED_START_FAILED = 6;
+  // This installation has no browser.
+  BROWSER_STATUS_STOPPED_UNAVAILABLE = 7;
 }
 
 message MusicLayerState {
@@ -255,6 +287,9 @@ message UpdatePlayerSettingsRequest {
   optional google.protobuf.Duration crossfade = 5;
   // A linear multiplier from 0 to 1 for every effect's individual volume.
   optional float effects_volume = 6;
+  // A linear gain from 0 to 1 for every page's audio.
+  optional float browser_volume = 7;
+  optional bool browser_muted = 8;
 }
 
 message UpdatePlayerSettingsResponse {}
@@ -310,6 +345,11 @@ message PlayerDiagnostics {
   uint64 local_stream_errors = 4;
   // Local stream errors lost when CPAL or Kira's error queues filled.
   uint64 local_stream_errors_discarded = 5;
+  // Frames of silence browser audio inserted because a page's packets arrived late.
+  uint64 browser_underrun_frames = 6;
+  // Browser frames discarded because they arrived faster than the output played them, or while
+  // the output changed.
+  uint64 browser_dropped_frames = 7;
 }
 
 // How late songbird ran its 20 ms voice ticks.
@@ -352,3 +392,11 @@ message PreviewSongLoopResponse {
   // How long one seam repetition lasts, including the silence after it.
   optional google.protobuf.Duration seam_cycle = 2;
 }
+
+message OpenBrowserRequest {}
+
+message OpenBrowserResponse {}
+
+message CloseBrowserRequest {}
+
+message CloseBrowserResponse {}

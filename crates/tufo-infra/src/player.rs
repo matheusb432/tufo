@@ -4,8 +4,10 @@
 //! files runs on blocking threads outside it, and a music change applies only if no later change
 //! superseded it meanwhile. A tick every [`TICK_INTERVAL`] follows the deck: it records the track
 //! changes the deck made on its own, arms the next track ahead of time, clears finished sounds,
-//! and lets go of the output once nothing plays.
+//! and lets go of the output once nothing plays. The [`browser`] host's pages play on the same
+//! output.
 
+mod browser;
 mod layers;
 mod music;
 pub mod outputs;
@@ -24,6 +26,8 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use browser::BrowserSession;
+pub use browser::BrowserTimings;
 use layers::MusicLayer;
 use music::{
     Music, MusicTrack, OpenedTrack, TrackSource, open_track, play_audio_error, probe_track,
@@ -31,12 +35,14 @@ use music::{
 };
 use outputs::{AudioOutputs, DeviceOutputs, OpenedOutput};
 use sounds::{FiredSound, SoundPlayback, decoded_sound, volume_gain};
-use tokio::sync::{Mutex, oneshot, watch};
+use tokio::sync::{Mutex, mpsc::UnboundedSender, oneshot, watch};
 use tufo_application::playback::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
     add_to_queue::QueueSongError,
+    control_browser::BrowserCommand,
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
+    open_browser::OpenBrowserError,
     play_queue::PlayQueueError,
     player::{PlayAudioError, Player, PreviewId, PreviewSession, SongLoops, SongPreview},
     select_output::SelectOutputError,
@@ -45,6 +51,7 @@ use tufo_models::{
     library::{CollectionEntryId, SoundSettings, Volume, song_loop::LoopRegion},
     playback::{
         AudioFilePath, OutputTarget,
+        browser::BrowserStatus,
         diagnostics::PlayerDiagnostics,
         music_layers::MusicLayers,
         player_state::{
@@ -61,11 +68,13 @@ use tufo_models::{
 use crate::{
     audio::{
         LocalStreamErrors,
+        browser_input::BrowserAudioCounters,
         buffered_track::{BufferedTrack, DecodeOptions},
         music_deck::{DeckState, DeckTrack, MusicDeckHandle},
         sound_cache::{LoadedSound, SoundCache, SoundKey, SoundLoadOptions, load_sound},
         streamed_sound::streamed_sound,
     },
+    browser::{BrowserLauncher, BrowserNotice},
     discord::{SongbirdDiscordClient, VoiceAvailability},
 };
 
@@ -89,6 +98,7 @@ pub struct EngineTimings {
     /// How long the local device stays open with nothing playing before the engine closes it and
     /// drops its decoded sounds.
     pub idle_release_delay: Duration,
+    pub browser: BrowserTimings,
 }
 
 impl Default for EngineTimings {
@@ -96,6 +106,7 @@ impl Default for EngineTimings {
         Self {
             reconnect_policy: ReconnectPolicy::default(),
             idle_release_delay: Duration::from_mins(5),
+            browser: BrowserTimings::default(),
         }
     }
 }
@@ -120,11 +131,17 @@ impl Default for ReconnectPolicy {
     }
 }
 
-/// Plays music and sound effects on the local device or one Discord voice channel.
+/// Plays music, sound effects, and the browser's pages on the local device or one Discord voice
+/// channel.
 pub struct EnginePlayer<O: AudioOutputs> {
     outputs: O,
     timings: EngineTimings,
     song_loops: Box<dyn SongLoops>,
+    browser_launcher: Arc<dyn BrowserLauncher>,
+    /// Serializes opening and closing the browser, which wait outside the engine lock.
+    browser_lifecycle: Mutex<()>,
+    browser_notices: UnboundedSender<BrowserNotice>,
+    browser_counters: Arc<BrowserAudioCounters>,
     engine: Mutex<Engine>,
     state: watch::Sender<PlayerState>,
     /// Updated by the tick, so diagnostics never wait for the engine lock.
@@ -138,11 +155,16 @@ pub struct EnginePlayer<O: AudioOutputs> {
 impl EnginePlayer<DeviceOutputs> {
     /// Starts on the local output. Must run inside a tokio runtime.
     #[must_use]
-    pub fn start(discord: SongbirdDiscordClient, song_loops: impl SongLoops) -> Arc<Self> {
+    pub fn start(
+        discord: SongbirdDiscordClient,
+        song_loops: impl SongLoops,
+        browser_launcher: impl BrowserLauncher,
+    ) -> Arc<Self> {
         Self::with_outputs(
             DeviceOutputs::new(discord),
             EngineTimings::default(),
             song_loops,
+            browser_launcher,
         )
     }
 }
@@ -155,6 +177,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         outputs: O,
         timings: EngineTimings,
         song_loops: impl SongLoops,
+        browser_launcher: impl BrowserLauncher,
     ) -> Arc<Self> {
         let sound_underrun_frames = Arc::new(AtomicU64::new(0));
         let engine = Engine {
@@ -181,12 +204,18 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             release_at: None,
             preview: None,
             last_preview_id: 0,
+            browser: BrowserSession::default(),
         };
         let state = watch::Sender::new(engine.snapshot());
+        let (browser_notices, browser_notice_receiver) = tokio::sync::mpsc::unbounded_channel();
         let player = Arc::new_cyclic(|this| Self {
             outputs,
             timings,
             song_loops: Box::new(song_loops),
+            browser_launcher: Arc::new(browser_launcher),
+            browser_lifecycle: Mutex::new(()),
+            browser_notices,
+            browser_counters: Arc::default(),
             engine: Mutex::new(engine),
             state,
             music_underrun_frames: AtomicU64::new(0),
@@ -196,12 +225,17 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             this: this.clone(),
         });
         tokio::spawn(run_ticks(Arc::downgrade(&player)));
+        tokio::spawn(browser::run_browser_notices(
+            Arc::downgrade(&player),
+            browser_notice_receiver,
+        ));
         player
     }
 
-    /// Stops all audio, leaves any voice channel so the bot disappears from it immediately, and
-    /// logs the playback diagnostics.
+    /// Stops all audio, ends the browser, leaves any voice channel so the bot disappears from it
+    /// immediately, and logs the playback diagnostics.
     pub async fn shut_down(&self) {
+        self.close_browser_host().await;
         let mut engine = self.engine.lock().await;
         self.discard_preview(&mut engine).await;
         engine.music_generation += 1;
@@ -280,6 +314,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         }
         let sample_rate = opened.mixer.sample_rate();
         engine.output = Some(opened);
+        self.attach_browser(engine);
         self.restore_music(engine, sample_rate).await;
         self.restore_layers(engine, sample_rate).await;
         self.restore_sounds(engine).await;
@@ -291,6 +326,9 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let Some(output) = engine.take_output() else {
             return;
         };
+        if let Some(host) = engine.browser.host() {
+            host.detach();
+        }
         engine.output_generation += 1;
         engine.music_generation += 1;
         let mut retired_underruns = 0;
@@ -719,6 +757,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         changed |= self.follow_deck(&mut engine);
         self.arm_if_due(&mut engine);
         changed |= self.release_if_due(&mut engine).await;
+        changed |= self.release_browser_if_due(&mut engine);
         self.update_diagnostics(&mut engine);
         if changed {
             self.publish(&engine);
@@ -1187,8 +1226,21 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             }
         }
         engine.unpause_when_no_sounds_left();
+        engine.browser.retire(BrowserStatus::Closed);
         engine.release_at = Some(Instant::now() + STOP_FADE);
         self.publish(&engine);
+    }
+
+    async fn open_browser(&self) -> Result<(), OpenBrowserError> {
+        self.open_browser_host().await
+    }
+
+    async fn close_browser(&self) {
+        self.close_browser_host().await;
+    }
+
+    async fn control_browser(&self, command: BrowserCommand) {
+        self.control_browser_gain(command).await;
     }
 
     async fn start_preview(&self, preview: SongPreview) -> Result<PreviewSession, PlayAudioError> {
@@ -1211,6 +1263,11 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             local_stream_errors_discarded: self
                 .local_stream_errors_discarded
                 .load(Ordering::Relaxed),
+            browser_underrun_frames: self
+                .browser_counters
+                .underrun_frames
+                .load(Ordering::Relaxed),
+            browser_dropped_frames: self.browser_counters.dropped_frames.load(Ordering::Relaxed),
             voice_pacing: self.outputs.voice_pacing(),
         }
     }
@@ -1278,6 +1335,7 @@ struct Engine {
     release_at: Option<Instant>,
     preview: Option<preview::Preview>,
     last_preview_id: u64,
+    browser: BrowserSession,
 }
 
 impl Engine {
@@ -1333,7 +1391,10 @@ impl Engine {
     }
 
     fn has_audio(&self) -> bool {
-        self.music.is_some() || !self.music_layers.is_empty() || !self.sounds.is_empty()
+        self.music.is_some()
+            || !self.music_layers.is_empty()
+            || !self.sounds.is_empty()
+            || self.browser.is_audible()
     }
 
     /// The fade for a track change someone asked for: the crossfade, clamped between a click-free
@@ -1552,6 +1613,7 @@ impl Engine {
             crossfade: self.crossfade,
             sounds: self.sounds.values().map(FiredSound::active_sound).collect(),
             sounds_paused: self.sounds_paused_at.is_some(),
+            browser: self.browser.playback(),
         }
     }
 }

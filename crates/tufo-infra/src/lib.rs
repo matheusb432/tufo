@@ -1,6 +1,7 @@
 //! Concrete audio, Discord, and data providers for Tufo.
 
 pub mod audio;
+pub mod browser;
 pub mod database;
 pub mod default_effects;
 pub mod discord;

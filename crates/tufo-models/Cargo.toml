@@ -14,6 +14,7 @@ nutype = { workspace = true }
 serde = { workspace = true }
 thiserror = { workspace = true }
 toasty = { workspace = true, features = ["jiff"] }
+url = { workspace = true }
 uuid = { workspace = true, features = ["serde"] }
 
 [lints]

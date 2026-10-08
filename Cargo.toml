@@ -73,6 +73,7 @@ thiserror = "2.0.20"
 tokio = "1.53.1"
 tokio-stream = "0.1.19"
 toml = "1.1.6"
+url = "2.5.8"
 toasty = { version = "0.10.0", default-features = false }
 toasty-cli = "0.10.0"
 toasty-core = "0.10.0"

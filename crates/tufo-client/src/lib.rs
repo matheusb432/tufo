@@ -4,6 +4,7 @@
 
 use std::time::Duration;
 
+pub mod browser;
 pub mod desktop;
 pub mod import_resources;
 pub mod process;
@@ -50,6 +51,8 @@ const SELECT_OUTPUT_TIMEOUT: Duration = Duration::from_secs(20);
 /// Covers scanning and fingerprinting a large dropped folder; the server reads about 50 files a
 /// second.
 const IMPORT_TIMEOUT: Duration = Duration::from_mins(10);
+/// Covers the browser's grace period to save its tabs, then killing what remains.
+const BROWSER_CLOSE_TIMEOUT: Duration = Duration::from_secs(15);
 /// Covers decoding a long song in full.
 const SONG_ANALYSIS_TIMEOUT: Duration = Duration::from_mins(2);
 /// A library snapshot carries every entry, so it may be large.
@@ -610,6 +613,20 @@ impl TufoClient {
     pub async fn stand_by(&self) -> Result<(), ClientError> {
         let request = with_timeout(pb::StandByRequest {}, QUICK_REQUEST_TIMEOUT);
         self.player.clone().stand_by(request).await?;
+        Ok(())
+    }
+
+    /// Starts the browser unless it runs; the player state reports when it accepts views.
+    pub async fn open_browser(&self) -> Result<(), ClientError> {
+        let request = with_timeout(pb::OpenBrowserRequest {}, QUICK_REQUEST_TIMEOUT);
+        self.player.clone().open_browser(request).await?;
+        Ok(())
+    }
+
+    /// Returns once every process the browser started is gone.
+    pub async fn close_browser(&self) -> Result<(), ClientError> {
+        let request = with_timeout(pb::CloseBrowserRequest {}, BROWSER_CLOSE_TIMEOUT);
+        self.player.clone().close_browser(request).await?;
         Ok(())
     }
 

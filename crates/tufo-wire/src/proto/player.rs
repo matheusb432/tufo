@@ -7,6 +7,7 @@ use tufo_models::{
     library::{AudioFileId, CollectionEntryId, CollectionId, Volume},
     playback::{
         AudioFilePath, OutputTarget,
+        browser::{BrowserPlayback, BrowserStatus, BrowserStopReason},
         diagnostics::{PlayerDiagnostics, VoicePacing},
         music_layers::{MusicLayerState, MusicLayers},
         player_state::{
@@ -92,20 +93,18 @@ pub fn seek_music_request(request: pb::SeekMusicRequest) -> Result<Duration, Sta
 pub fn update_player_settings_request(
     request: pb::UpdatePlayerSettingsRequest,
 ) -> Result<UpdatePlayerSettings, Status> {
+    let volume = |field, volume: Option<f32>| {
+        volume
+            .map(|volume| {
+                Volume::try_new(volume).map_err(|_| invalid(field, "must be between 0 and 1"))
+            })
+            .transpose()
+    };
     Ok(UpdatePlayerSettings {
-        effects_volume: request
-            .effects_volume
-            .map(|volume| {
-                Volume::try_new(volume)
-                    .map_err(|_| invalid("effects_volume", "must be between 0 and 1"))
-            })
-            .transpose()?,
-        volume: request
-            .volume
-            .map(|volume| {
-                Volume::try_new(volume).map_err(|_| invalid("volume", "must be between 0 and 1"))
-            })
-            .transpose()?,
+        effects_volume: volume("effects_volume", request.effects_volume)?,
+        volume: volume("volume", request.volume)?,
+        browser_volume: volume("browser_volume", request.browser_volume)?,
+        browser_muted: request.browser_muted,
         muted: request.muted,
         shuffle: request.shuffle,
         repeat: request
@@ -166,6 +165,7 @@ pub fn watch_player_response(state: &PlayerState) -> pb::WatchPlayerResponse {
             crossfade: Some(duration_message(state.crossfade.into_inner())),
             sounds: state.sounds.iter().map(sound_message).collect(),
             sounds_paused: state.sounds_paused,
+            browser: Some(browser_playback_message(state.browser)),
         }),
     }
 }
@@ -178,6 +178,8 @@ pub fn diagnostics_response(diagnostics: &PlayerDiagnostics) -> pb::GetPlayerDia
             sound_underrun_frames: diagnostics.sound_underrun_frames,
             local_stream_errors: diagnostics.local_stream_errors,
             local_stream_errors_discarded: diagnostics.local_stream_errors_discarded,
+            browser_underrun_frames: diagnostics.browser_underrun_frames,
+            browser_dropped_frames: diagnostics.browser_dropped_frames,
             voice_pacing: diagnostics.voice_pacing.map(|pacing| pb::VoicePacing {
                 ticks: pacing.ticks,
                 late_ticks: pacing.late_ticks,
@@ -218,6 +220,8 @@ pub fn update_player_settings_message(
     pb::UpdatePlayerSettingsRequest {
         volume: update.volume.map(Volume::into_inner),
         effects_volume: update.effects_volume.map(Volume::into_inner),
+        browser_volume: update.browser_volume.map(Volume::into_inner),
+        browser_muted: update.browser_muted,
         muted: update.muted,
         shuffle: update.shuffle,
         repeat: update
@@ -313,6 +317,7 @@ pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, In
             .map(active_sound)
             .collect::<Result<_, _>>()?,
         sounds_paused: state.sounds_paused,
+        browser: browser_playback(state.browser.ok_or(invalid("browser"))?)?,
     })
 }
 
@@ -345,6 +350,8 @@ pub fn player_diagnostics(
         sound_underrun_frames: diagnostics.sound_underrun_frames,
         local_stream_errors: diagnostics.local_stream_errors,
         local_stream_errors_discarded: diagnostics.local_stream_errors_discarded,
+        browser_underrun_frames: diagnostics.browser_underrun_frames,
+        browser_dropped_frames: diagnostics.browser_dropped_frames,
         voice_pacing,
     })
 }
@@ -487,6 +494,52 @@ fn voice_state(message: pb::VoiceConnection) -> Result<VoiceConnectionState, Inv
     )
 }
 
+fn browser_playback_message(browser: BrowserPlayback) -> pb::BrowserPlayback {
+    let status = match browser.status {
+        BrowserStatus::Closed => pb::BrowserStatus::Closed,
+        BrowserStatus::Starting => pb::BrowserStatus::Starting,
+        BrowserStatus::Open => pb::BrowserStatus::Open,
+        BrowserStatus::Stopped(BrowserStopReason::Idle) => pb::BrowserStatus::StoppedIdle,
+        BrowserStatus::Stopped(BrowserStopReason::Crashed) => pb::BrowserStatus::StoppedCrashed,
+        BrowserStatus::Stopped(BrowserStopReason::StartFailed) => {
+            pb::BrowserStatus::StoppedStartFailed
+        }
+        BrowserStatus::Stopped(BrowserStopReason::Unavailable) => {
+            pb::BrowserStatus::StoppedUnavailable
+        }
+    };
+    pb::BrowserPlayback {
+        status: status.into(),
+        volume: browser.volume.into_inner(),
+        muted: browser.muted,
+        audible: browser.audible,
+    }
+}
+
+fn browser_playback(message: pb::BrowserPlayback) -> Result<BrowserPlayback, InvalidMessage> {
+    let invalid = |field| InvalidMessage { field };
+    let status = match pb::BrowserStatus::try_from(message.status) {
+        Ok(pb::BrowserStatus::Closed) => BrowserStatus::Closed,
+        Ok(pb::BrowserStatus::Starting) => BrowserStatus::Starting,
+        Ok(pb::BrowserStatus::Open) => BrowserStatus::Open,
+        Ok(pb::BrowserStatus::StoppedIdle) => BrowserStatus::Stopped(BrowserStopReason::Idle),
+        Ok(pb::BrowserStatus::StoppedCrashed) => BrowserStatus::Stopped(BrowserStopReason::Crashed),
+        Ok(pb::BrowserStatus::StoppedStartFailed) => {
+            BrowserStatus::Stopped(BrowserStopReason::StartFailed)
+        }
+        Ok(pb::BrowserStatus::StoppedUnavailable) => {
+            BrowserStatus::Stopped(BrowserStopReason::Unavailable)
+        }
+        Ok(pb::BrowserStatus::Unspecified) | Err(_) => return Err(invalid("browser.status")),
+    };
+    Ok(BrowserPlayback {
+        status,
+        volume: Volume::try_new(message.volume).map_err(|_| invalid("browser.volume"))?,
+        muted: message.muted,
+        audible: message.audible,
+    })
+}
+
 fn repeat_mode(repeat: i32) -> Result<RepeatMode, &'static str> {
     match pb::RepeatMode::try_from(repeat) {
         Ok(pb::RepeatMode::Off) => Ok(RepeatMode::Off),
@@ -547,6 +600,8 @@ mod tests {
             sound_underrun_frames: 256,
             local_stream_errors: 3,
             local_stream_errors_discarded: 4,
+            browser_underrun_frames: 5,
+            browser_dropped_frames: 6,
             voice_pacing: None,
         };
 
@@ -616,6 +671,12 @@ mod tests {
                 CollectionEntryId::from_uuid(id),
             ],
             music_layers: MusicLayers::default(),
+            browser: BrowserPlayback {
+                status: BrowserStatus::Stopped(BrowserStopReason::Crashed),
+                volume: Volume::try_new(0.3).unwrap(),
+                muted: true,
+                audible: true,
+            },
         };
 
         state
@@ -640,6 +701,10 @@ mod tests {
             volume: Some(2.0),
             ..pb::UpdatePlayerSettingsRequest::default()
         });
+        let loud_browser = update_player_settings_request(pb::UpdatePlayerSettingsRequest {
+            browser_volume: Some(1.5),
+            ..pb::UpdatePlayerSettingsRequest::default()
+        });
         let long_crossfade = update_player_settings_request(pb::UpdatePlayerSettingsRequest {
             crossfade: Some(duration_message(Duration::from_secs(11))),
             ..pb::UpdatePlayerSettingsRequest::default()
@@ -648,6 +713,7 @@ mod tests {
             update_player_settings_request(pb::UpdatePlayerSettingsRequest::default()).unwrap();
 
         assert_eq!(loud.unwrap_err().code(), Code::InvalidArgument);
+        assert_eq!(loud_browser.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(long_crossfade.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(untouched, UpdatePlayerSettings::default());
     }

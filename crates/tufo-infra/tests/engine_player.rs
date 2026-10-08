@@ -22,6 +22,7 @@ use tufo_application::{
     playback::{
         add_music_layer::{AddMusicLayerError, MusicLayerCue},
         add_to_queue::{self, QueueSongError},
+        control_browser::BrowserCommand,
         control_music::{ControlMusicError, MusicCommand},
         control_sounds::{self, SoundsCommand},
         play_entry_sound,
@@ -33,11 +34,12 @@ use tufo_application::{
 };
 use tufo_infra::{
     audio::Mixer,
+    browser::{BrowserLauncher, BrowserProcess, LaunchBrowserError, LaunchedBrowser},
     database::open_database,
     discord::VoiceAvailability,
     library_files::DiskLibraryFiles,
     player::{
-        EnginePlayer, EngineTimings, ReconnectPolicy,
+        BrowserTimings, EnginePlayer, EngineTimings, ReconnectPolicy,
         outputs::{AudioOutputs, OpenedOutput},
     },
 };
@@ -50,6 +52,7 @@ use tufo_models::{
     path::LocalPath,
     playback::{
         AudioFilePath, OutputTarget,
+        browser::{BrowserStatus, BrowserStopReason},
         diagnostics::VoicePacing,
         player_state::{
             ActiveSound, CrossfadeDuration, PlayerState, SoundCue, VoiceConnectionState,
@@ -58,6 +61,7 @@ use tufo_models::{
     },
 };
 use tufo_wire::{
+    browser_host::{AudioStreamId, HostEvent, write_host_event},
     library::{ImportPaths, UpdateCollectionEntry},
     song_loops::PreviewMode,
 };
@@ -246,6 +250,68 @@ fn lock(captures: &Captures) -> std::sync::MutexGuard<'_, Vec<Vec<f32>>> {
     captures.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
+/// Starts fake browser hosts whose pipes the test writes, like a host reporting to the server.
+#[derive(Clone, Default)]
+struct TestBrowser(Arc<Mutex<Vec<TestBrowserHost>>>);
+
+#[derive(Clone)]
+struct TestBrowserHost {
+    events: Arc<Mutex<std::io::PipeWriter>>,
+    exited: Arc<AtomicBool>,
+    exit_requested: Arc<AtomicBool>,
+}
+
+impl TestBrowser {
+    fn host(&self, launch: usize) -> anyhow::Result<TestBrowserHost> {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(launch)
+            .cloned()
+            .with_context(|| format!("the engine never launched browser {launch}"))
+    }
+
+    fn launches(&self) -> usize {
+        self.0.lock().unwrap_or_else(PoisonError::into_inner).len()
+    }
+}
+
+impl BrowserLauncher for TestBrowser {
+    fn launch(&self) -> Result<LaunchedBrowser, LaunchBrowserError> {
+        let (reader, writer) = std::io::pipe().map_err(LaunchBrowserError::Spawn)?;
+        let host = TestBrowserHost {
+            events: Arc::new(Mutex::new(writer)),
+            exited: Arc::default(),
+            exit_requested: Arc::default(),
+        };
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(host.clone());
+        Ok(LaunchedBrowser {
+            events: Box::new(reader),
+            process: Box::new(TestBrowserProcess(host)),
+        })
+    }
+}
+
+struct TestBrowserProcess(TestBrowserHost);
+
+impl BrowserProcess for TestBrowserProcess {
+    fn request_exit(&mut self) {
+        self.0.exit_requested.store(true, Ordering::SeqCst);
+        self.0.exited.store(true, Ordering::SeqCst);
+    }
+
+    fn has_exited(&mut self) -> bool {
+        self.0.exited.load(Ordering::SeqCst)
+    }
+
+    fn kill(&mut self) {
+        self.0.exited.store(true, Ordering::SeqCst);
+    }
+}
+
 #[derive(Clone, Default)]
 struct TestSongLoops(Arc<Mutex<HashMap<AudioFileId, LoopRegion>>>);
 
@@ -262,6 +328,7 @@ impl SongLoops for TestSongLoops {
 struct Rig {
     player: Arc<EnginePlayer<TestOutputs>>,
     controls: Arc<OutputControls>,
+    browser: TestBrowser,
     song_loops: TestSongLoops,
     sound_card: SoundCard,
     states: watch::Receiver<PlayerState>,
@@ -284,6 +351,7 @@ impl Rig {
         let (sender, receiver) = mpsc::channel();
         let controls = Arc::new(OutputControls::default());
         let song_loops = TestSongLoops::default();
+        let browser = TestBrowser::default();
         let player = EnginePlayer::with_outputs(
             TestOutputs {
                 controls: Arc::clone(&controls),
@@ -291,11 +359,13 @@ impl Rig {
             },
             timings,
             song_loops.clone(),
+            browser.clone(),
         );
         let states = player.watch_player();
         Ok(Self {
             player,
             controls,
+            browser,
             song_loops,
             sound_card: SoundCard::start(receiver),
             states,
@@ -1764,4 +1834,207 @@ async fn a_newer_preview_ends_the_previous_one_and_keeps_the_music_paused() -> a
             .is_some_and(|music| !music.paused)
     );
     Ok(())
+}
+
+impl TestBrowserHost {
+    async fn wait_for_exit_request(&self) -> anyhow::Result<()> {
+        tokio::time::timeout(WAIT_TIMEOUT, async {
+            while !self.exit_requested.load(Ordering::SeqCst) {
+                tokio::time::sleep(POLL_INTERVAL).await;
+            }
+        })
+        .await
+        .context("the engine never asked the browser to exit")
+    }
+
+    fn send(&self, event: &HostEvent) -> anyhow::Result<()> {
+        let mut events = self.events.lock().unwrap_or_else(PoisonError::into_inner);
+        Ok(write_host_event(&mut *events, event)?)
+    }
+
+    fn start_stream(&self, stream: AudioStreamId) -> anyhow::Result<()> {
+        self.send(&HostEvent::AudioStarted {
+            stream,
+            sample_rate: NonZeroU32::new(SAMPLE_RATE).context("zero rate")?,
+            channels: NonZeroU32::new(2).context("zero channels")?,
+        })
+    }
+
+    fn send_tone_until(&self, stream: AudioStreamId, level: f32, stop: &AtomicBool) {
+        let packet = HostEvent::AudioPacket {
+            stream,
+            samples: vec![level; SAMPLE_RATE as usize / 100 * 2],
+        };
+        let started = std::time::Instant::now();
+        let mut sent = 0_u32;
+        while !stop.load(Ordering::Relaxed) && self.send(&packet).is_ok() {
+            sent += 1;
+            let due = started + Duration::from_millis(10) * sent;
+            thread::sleep(due.saturating_duration_since(std::time::Instant::now()));
+        }
+    }
+
+    /// Sends 10 ms packets of a constant stereo level in real time until the returned tone drops.
+    fn play_tone(&self, stream: AudioStreamId, level: f32) -> Tone {
+        let stop = Arc::new(AtomicBool::new(false));
+        let thread = thread::spawn({
+            let host = self.clone();
+            let stop = Arc::clone(&stop);
+            move || host.send_tone_until(stream, level, &stop)
+        });
+        Tone {
+            stop,
+            thread: Some(thread),
+        }
+    }
+}
+
+struct Tone {
+    stop: Arc<AtomicBool>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl Drop for Tone {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
+fn browser_stream() -> AudioStreamId {
+    AudioStreamId(NonZeroU32::MIN)
+}
+
+impl Rig {
+    /// Opens the browser and has its host report ready.
+    async fn open_browser(&mut self) -> anyhow::Result<TestBrowserHost> {
+        self.player.open_browser().await?;
+        let host = self.browser.host(self.browser.launches() - 1)?;
+        host.send(&HostEvent::Ready)?;
+        self.wait_for(|state| state.browser.status == BrowserStatus::Open)
+            .await?;
+        Ok(host)
+    }
+
+    async fn control_browser(&self, command: BrowserCommand) {
+        self.player.control_browser(command).await;
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn browser_pages_play_at_the_browser_gain_and_follow_output_changes() -> anyhow::Result<()> {
+    let mut rig = Rig::with_timings(EngineTimings {
+        idle_release_delay: Duration::from_millis(200),
+        ..EngineTimings::default()
+    })?;
+    let host = rig.open_browser().await?;
+    host.start_stream(browser_stream())?;
+    let _tone = host.play_tone(browser_stream(), 0.5);
+    rig.wait_for(|state| state.browser.audible).await?;
+
+    let full = recorded_level(&rig, 0).await?;
+    rig.control_browser(BrowserCommand::SetVolume(Volume::try_new(0.5)?))
+        .await;
+    let halved = recorded_level(&rig, 0).await?;
+    rig.player.select_output(voice_channel()).await?;
+    let on_voice = recorded_level(&rig, 1).await?;
+    rig.control_browser(BrowserCommand::SetMuted(true)).await;
+    let muted = recorded_level(&rig, 1).await?;
+
+    support::assert_near(full, 0.5, 0.01);
+    support::assert_near(halved, 0.25, 0.01);
+    support::assert_near(on_voice, 0.25, 0.01);
+    support::assert_near(muted, 0.0, 0.001);
+    // Playing pages keep the local device past its idle delay.
+    assert_eq!(rig.closes(), 1);
+    let state = rig.state();
+    assert!(state.browser.audible && state.browser.muted);
+    assert_eq!(state.browser.volume, Volume::try_new(0.5)?);
+    assert_eq!(rig.player.diagnostics().browser_underrun_frames, 0);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn standing_by_closes_the_browser_and_reopening_starts_another_host() -> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let first = rig.open_browser().await?;
+
+    rig.player.stand_by().await;
+    let closed = rig
+        .wait_for(|state| state.browser.status == BrowserStatus::Closed)
+        .await?;
+    let second = rig.open_browser().await?;
+
+    assert!(!closed.browser.audible);
+    first.wait_for_exit_request().await?;
+    assert!(!second.exit_requested.load(Ordering::SeqCst));
+    assert_eq!(rig.browser.launches(), 2);
+    rig.player.close_browser().await;
+    assert!(second.exited.load(Ordering::SeqCst));
+    assert_eq!(rig.state().browser.status, BrowserStatus::Closed);
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_browser_that_exits_on_its_own_reports_a_crash() -> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let host = rig.open_browser().await?;
+    host.start_stream(browser_stream())?;
+    rig.wait_for(|state| state.browser.audible).await?;
+
+    host.exited.store(true, Ordering::SeqCst);
+    drop(host);
+    let stopped = rig
+        .wait_for(|state| {
+            state.browser.status == BrowserStatus::Stopped(BrowserStopReason::Crashed)
+        })
+        .await?;
+
+    assert!(!stopped.browser.audible);
+    rig.open_browser().await?;
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn an_unused_browser_unloads_after_the_idle_delay_unless_a_view_shows_it()
+-> anyhow::Result<()> {
+    let mut rig = Rig::with_timings(EngineTimings {
+        browser: BrowserTimings {
+            idle_unload_delay: Duration::from_millis(300),
+            ..BrowserTimings::default()
+        },
+        ..EngineTimings::default()
+    })?;
+    let viewed = rig.open_browser().await?;
+    viewed.send(&HostEvent::ViewChanged { attached: true })?;
+    tokio::time::sleep(Duration::from_millis(600)).await;
+    assert_eq!(rig.state().browser.status, BrowserStatus::Open);
+
+    viewed.send(&HostEvent::ViewChanged { attached: false })?;
+    rig.wait_for(|state| state.browser.status == BrowserStatus::Stopped(BrowserStopReason::Idle))
+        .await?;
+
+    viewed.wait_for_exit_request().await
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_host_that_never_becomes_ready_stops_after_the_timeout() -> anyhow::Result<()> {
+    let mut rig = Rig::with_timings(EngineTimings {
+        browser: BrowserTimings {
+            ready_timeout: Duration::from_millis(200),
+            ..BrowserTimings::default()
+        },
+        ..EngineTimings::default()
+    })?;
+
+    rig.player.open_browser().await?;
+    assert_eq!(rig.state().browser.status, BrowserStatus::Starting);
+    rig.wait_for(|state| {
+        state.browser.status == BrowserStatus::Stopped(BrowserStopReason::StartFailed)
+    })
+    .await?;
+
+    rig.browser.host(0)?.wait_for_exit_request().await
 }

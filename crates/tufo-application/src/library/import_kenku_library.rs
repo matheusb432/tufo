@@ -335,6 +335,8 @@ fn settings_update(kenku: KenkuPlayerSettings, songs_queued: bool) -> UpdatePlay
         shuffle,
         repeat: repeat.filter(|repeat| !(songs_queued && *repeat == RepeatMode::Track)),
         crossfade: None,
+        browser_volume: None,
+        browser_muted: None,
     }
 }
 

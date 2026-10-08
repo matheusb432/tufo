@@ -1,0 +1,250 @@
+syntax = "proto3";
+
+package tufo.browser.v1;
+
+// The pages of the browser that tufo-server starts on demand. The browser serves this on its own
+// private endpoint, next to the server's, while it runs. PlayerService opens and closes it.
+service BrowserService {
+  // Streams the tabs, then each change. A slow reader skips to the latest state. The stream ends
+  // when the browser closes.
+  rpc WatchBrowser(WatchBrowserRequest) returns (stream WatchBrowserResponse);
+  // Shows the selected tab for as long as the call lasts. The first request gives the view's
+  // size; later requests resize the view or carry input. Responses carry the pixels that changed
+  // and the pointer's shape. Pages paint only while a view is attached, and a newer view ends an
+  // older one.
+  rpc ViewBrowser(stream ViewBrowserRequest) returns (stream ViewBrowserResponse);
+  // Opens a tab after the others and selects it.
+  rpc OpenTab(OpenTabRequest) returns (OpenTabResponse);
+  // Closes a tab, selecting a neighbour if it was selected. Closing an absent tab succeeds.
+  rpc CloseTab(CloseTabRequest) returns (CloseTabResponse);
+  // Shows a tab in the view. NOT_FOUND for an absent tab.
+  rpc SelectTab(SelectTabRequest) returns (SelectTabResponse);
+  // Loads an address in a tab. NOT_FOUND for an absent tab.
+  rpc NavigateTab(NavigateTabRequest) returns (NavigateTabResponse);
+  // Goes back in a tab's history; does nothing at its start. NOT_FOUND for an absent tab.
+  rpc GoBack(GoBackRequest) returns (GoBackResponse);
+  // Goes forward in a tab's history; does nothing at its end. NOT_FOUND for an absent tab.
+  rpc GoForward(GoForwardRequest) returns (GoForwardResponse);
+  // Loads a tab's page again, starting a new renderer after a crash. NOT_FOUND for an absent tab.
+  rpc ReloadTab(ReloadTabRequest) returns (ReloadTabResponse);
+  // Stops loading a tab's page. NOT_FOUND for an absent tab.
+  rpc StopLoadingTab(StopLoadingTabRequest) returns (StopLoadingTabResponse);
+}
+
+message WatchBrowserRequest {}
+
+message WatchBrowserResponse {
+  // In the order the tab strip shows them.
+  repeated BrowserTab tabs = 1;
+  // Absent without tabs.
+  optional uint32 selected_tab_id = 2;
+}
+
+message BrowserTab {
+  // Non-zero, and unique while the browser runs.
+  uint32 tab_id = 1;
+  // The address the page committed, which redirects can change from the one requested.
+  string address = 2;
+  string title = 3;
+  bool loading = 4;
+  bool can_go_back = 5;
+  bool can_go_forward = 6;
+  // The page sends audio now.
+  bool audible = 7;
+  // Absent while the page shows.
+  optional PageFailure failure = 8;
+}
+
+// Why a tab shows no page.
+enum PageFailure {
+  PAGE_FAILURE_UNSPECIFIED = 0;
+  PAGE_FAILURE_NAME_NOT_RESOLVED = 1;
+  // The connection was refused, reset, closed, or timed out.
+  PAGE_FAILURE_CONNECTION_FAILED = 2;
+  PAGE_FAILURE_OFFLINE = 3;
+  PAGE_FAILURE_INVALID_CERTIFICATE = 4;
+  PAGE_FAILURE_BLOCKED = 5;
+  PAGE_FAILURE_LOAD_FAILED = 6;
+  // The page's renderer stopped; reloading starts another.
+  PAGE_FAILURE_CRASHED = 7;
+}
+
+message ViewBrowserRequest {
+  oneof input {
+    ViewSize size = 1;
+    PointerMoved pointer_moved = 2;
+    PointerLeft pointer_left = 3;
+    PointerButton pointer_button = 4;
+    PointerWheel pointer_wheel = 5;
+    KeyInput key = 6;
+    ViewFocus focus = 7;
+    TextInsertion text = 8;
+  }
+}
+
+// The view's size in logical pixels. Pages lay out in logical pixels and paint
+// scale_factor times as many physical pixels in each direction.
+message ViewSize {
+  uint32 width = 1;
+  uint32 height = 2;
+  float scale_factor = 3;
+}
+
+message KeyModifiers {
+  bool shift = 1;
+  bool control = 2;
+  bool alt = 3;
+  bool meta = 4;
+}
+
+// Pointer positions are logical pixels from the view's top-left corner.
+message PointerMoved {
+  int32 x = 1;
+  int32 y = 2;
+  KeyModifiers modifiers = 3;
+}
+
+message PointerLeft {}
+
+message PointerButton {
+  int32 x = 1;
+  int32 y = 2;
+  MouseButton button = 3;
+  bool pressed = 4;
+  // 1 for a single click, 2 for the second press of a double click.
+  uint32 click_count = 5;
+  KeyModifiers modifiers = 6;
+}
+
+enum MouseButton {
+  MOUSE_BUTTON_UNSPECIFIED = 0;
+  MOUSE_BUTTON_LEFT = 1;
+  MOUSE_BUTTON_MIDDLE = 2;
+  MOUSE_BUTTON_RIGHT = 3;
+}
+
+// Logical pixels to scroll; positive values move the content right and down.
+message PointerWheel {
+  int32 x = 1;
+  int32 y = 2;
+  float delta_x = 3;
+  float delta_y = 4;
+  KeyModifiers modifiers = 5;
+}
+
+message KeyInput {
+  // The DOM keyCode, which matches the Windows virtual-key code.
+  uint32 key_code = 1;
+  // What the key types, empty for keys that type nothing.
+  string text = 2;
+  bool pressed = 3;
+  bool repeat = 4;
+  KeyModifiers modifiers = 5;
+}
+
+message ViewFocus {
+  bool focused = 1;
+}
+
+// Text typed into the focused field at once, such as pasted text.
+message TextInsertion {
+  string text = 1;
+}
+
+message ViewBrowserResponse {
+  oneof output {
+    ViewFrame frame = 1;
+    PointerShapeChange pointer_shape = 2;
+  }
+}
+
+// New pixels in a frame of width × height physical pixels.
+message ViewFrame {
+  uint32 width = 1;
+  uint32 height = 2;
+  // The changed rectangle. A frame after attaching, resizing, or selecting a tab covers the whole
+  // frame.
+  uint32 x = 3;
+  uint32 y = 4;
+  uint32 rectangle_width = 5;
+  uint32 rectangle_height = 6;
+  // rectangle_width × rectangle_height premultiplied RGBA pixels, row by row.
+  bytes pixels = 7;
+}
+
+message PointerShapeChange {
+  PointerShape shape = 1;
+}
+
+enum PointerShape {
+  POINTER_SHAPE_UNSPECIFIED = 0;
+  POINTER_SHAPE_DEFAULT = 1;
+  POINTER_SHAPE_HAND = 2;
+  POINTER_SHAPE_TEXT = 3;
+  POINTER_SHAPE_WAIT = 4;
+  POINTER_SHAPE_PROGRESS = 5;
+  POINTER_SHAPE_CROSSHAIR = 6;
+  POINTER_SHAPE_MOVE = 7;
+  POINTER_SHAPE_NOT_ALLOWED = 8;
+  POINTER_SHAPE_GRAB = 9;
+  POINTER_SHAPE_GRABBING = 10;
+  POINTER_SHAPE_HELP = 11;
+  POINTER_SHAPE_COLUMN_RESIZE = 12;
+  POINTER_SHAPE_ROW_RESIZE = 13;
+  POINTER_SHAPE_NESW_RESIZE = 14;
+  POINTER_SHAPE_NWSE_RESIZE = 15;
+  POINTER_SHAPE_NONE = 16;
+}
+
+message OpenTabRequest {
+  // An http or https URL; a blank tab when absent.
+  optional string address = 1;
+}
+
+message OpenTabResponse {
+  uint32 tab_id = 1;
+}
+
+message CloseTabRequest {
+  uint32 tab_id = 1;
+}
+
+message CloseTabResponse {}
+
+message SelectTabRequest {
+  uint32 tab_id = 1;
+}
+
+message SelectTabResponse {}
+
+message NavigateTabRequest {
+  uint32 tab_id = 1;
+  // An http or https URL.
+  string address = 2;
+}
+
+message NavigateTabResponse {}
+
+message GoBackRequest {
+  uint32 tab_id = 1;
+}
+
+message GoBackResponse {}
+
+message GoForwardRequest {
+  uint32 tab_id = 1;
+}
+
+message GoForwardResponse {}
+
+message ReloadTabRequest {
+  uint32 tab_id = 1;
+}
+
+message ReloadTabResponse {}
+
+message StopLoadingTabRequest {
+  uint32 tab_id = 1;
+}
+
+message StopLoadingTabResponse {}

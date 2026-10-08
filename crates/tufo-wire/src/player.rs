@@ -14,6 +14,8 @@ pub struct UpdatePlayerSettings {
     pub shuffle: Option<bool>,
     pub repeat: Option<RepeatMode>,
     pub crossfade: Option<CrossfadeDuration>,
+    pub browser_volume: Option<Volume>,
+    pub browser_muted: Option<bool>,
 }
 
 /// Changes only the settings present; a stopped extra layer is ignored.

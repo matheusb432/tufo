@@ -9,6 +9,7 @@ build = "build.rs"
 
 [dependencies]
 jiff = { workspace = true }
+nutype = { workspace = true }
 uuid = { workspace = true }
 prost = { workspace = true }
 prost-types = { workspace = true }

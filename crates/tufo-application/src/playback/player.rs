@@ -17,8 +17,10 @@ use tufo_wire::song_loops::{PreviewMode, PreviewStarted};
 use super::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
     add_to_queue::QueueSongError,
+    control_browser::BrowserCommand,
     control_music::{ControlMusicError, MusicCommand},
     control_sounds::SoundsCommand,
+    open_browser::OpenBrowserError,
     play_queue::PlayQueueError,
     select_output::SelectOutputError,
 };
@@ -89,9 +91,19 @@ pub trait Player: Send + Sync {
         target: OutputTarget,
     ) -> impl Future<Output = Result<(), SelectOutputError>> + Send;
 
-    /// Fades out the music and every sound, then closes the output, leaving any voice channel,
-    /// until something plays again.
+    /// Fades out the music and every sound and closes the browser, then closes the output,
+    /// leaving any voice channel, until something plays again.
     fn stand_by(&self) -> impl Future<Output = ()> + Send;
+
+    /// Starts the browser unless it is starting or open. Its pages' audio plays on the output.
+    fn open_browser(&self) -> impl Future<Output = Result<(), OpenBrowserError>> + Send;
+
+    /// Ends the browser and every page process it started. Closing a closed browser does
+    /// nothing.
+    fn close_browser(&self) -> impl Future<Output = ()> + Send;
+
+    /// Changes the browser's volume or mute, whether or not it runs.
+    fn control_browser(&self, command: BrowserCommand) -> impl Future<Output = ()> + Send;
 
     /// Publishes whether voice channels can be joined, after the Discord connection is disabled
     /// or enabled. Does nothing while a voice channel is the output.

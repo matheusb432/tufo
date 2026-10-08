@@ -1,8 +1,10 @@
 //! The audio client: decodes files ahead of playback and mixes them with kira on one output.
 //!
 //! Every mixer has the same shape. A music track holds the [`music_deck`], a sounds track holds
-//! the sound effects, and the main track limits their sum so it never clips.
+//! the sound effects, a browser track holds the pages' [`browser_input`], and the main track
+//! limits their sum so it never clips.
 
+pub mod browser_input;
 pub mod buffered_track;
 pub(crate) mod codecs;
 mod envelope;
@@ -14,10 +16,14 @@ pub mod sound_cache;
 pub mod streamed_sound;
 
 use std::{
-    sync::mpsc::{Receiver, sync_channel},
+    sync::{
+        Arc,
+        mpsc::{Receiver, sync_channel},
+    },
     time::Duration,
 };
 
+use browser_input::{BrowserAudioCounters, BrowserInputHandle};
 use cpal::{
     BufferSize, StreamConfig,
     traits::{DeviceTrait as _, HostTrait as _},
@@ -81,6 +87,7 @@ pub struct Mixer {
     music_layers: [(MusicDeckHandle, TrackHandle); MUSIC_LAYERS_EXTRA_MAX],
     music_track: TrackHandle,
     sounds_track: TrackHandle,
+    browser_track: TrackHandle,
 }
 
 enum MixerManager {
@@ -238,6 +245,24 @@ impl Mixer {
     ) -> Result<(), MixerFullError> {
         self.sounds_track.play(sound).map_err(|_| MixerFullError)
     }
+
+    /// Sets the browser's gain, a linear value from silence (0) to full level (1). The browser
+    /// track starts silent.
+    pub(crate) fn set_browser_volume(&mut self, volume: f32) {
+        self.browser_track
+            .set_volume(decibels(volume), linear_tween(VOLUME_TWEEN));
+    }
+
+    /// Adds an input for the browser's streams to the browser track. An input whose handle
+    /// dropped leaves once its streams end.
+    pub fn attach_browser_input(
+        &mut self,
+        counters: Arc<BrowserAudioCounters>,
+    ) -> Result<BrowserInputHandle, MixerFullError> {
+        let (sound, handle) = browser_input::browser_input(self.sample_rate, counters);
+        self.browser_track.play(sound).map_err(|_| MixerFullError)?;
+        Ok(handle)
+    }
 }
 
 #[cfg(target_os = "linux")]
@@ -297,6 +322,7 @@ struct MixerTracks {
     music_layers: [(MusicDeckHandle, TrackHandle); MUSIC_LAYERS_EXTRA_MAX],
     music_track: TrackHandle,
     sounds_track: TrackHandle,
+    browser_track: TrackHandle,
 }
 
 impl MixerTracks {
@@ -309,6 +335,7 @@ impl MixerTracks {
         // Setting gain after construction interpolates from full volume for one buffer.
         let sounds_track = manager
             .add_sub_track(TrackBuilder::new().volume(decibels(effects_volume.into_inner())))?;
+        let browser_track = manager.add_sub_track(TrackBuilder::new().volume(Decibels::SILENCE))?;
         let (deck, music) = music_deck::music_deck(sample_rate);
         music_track.play(deck).map_err(|_| ResourceLimitReached)?;
         let mut add_layer = || {
@@ -323,6 +350,7 @@ impl MixerTracks {
             music_layers,
             music_track,
             sounds_track,
+            browser_track,
         })
     }
 
@@ -335,6 +363,7 @@ impl MixerTracks {
             music_layers: self.music_layers,
             music_track: self.music_track,
             sounds_track: self.sounds_track,
+            browser_track: self.browser_track,
         }
     }
 }

@@ -218,11 +218,13 @@ mod tests {
                 "DROP TABLE song_loops;
              DROP TABLE kenku_imports;
              ALTER TABLE player_settings DROP COLUMN effects_volume;
+             ALTER TABLE player_settings DROP COLUMN browser_volume;
+             ALTER TABLE player_settings DROP COLUMN browser_muted;
              ALTER TABLE collections DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN song_source;
              DELETE FROM __toasty_migrations
-             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql');",
+             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -280,8 +282,10 @@ mod tests {
                 "DROP TABLE song_loops;
              DROP TABLE kenku_imports;
              ALTER TABLE player_settings DROP COLUMN effects_volume;
+             ALTER TABLE player_settings DROP COLUMN browser_volume;
+             ALTER TABLE player_settings DROP COLUMN browser_muted;
              ALTER TABLE audio_files DROP COLUMN song_source;
-             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql');",
+             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql');",
             )
             .unwrap();
         drop(legacy);

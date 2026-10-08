@@ -87,11 +87,7 @@ fn map_large_allocations_separately() {
 /// Opens the log in Tufo's state directory, or its local data directory where the platform has
 /// no state directory, rotating a log that grew too large.
 fn open_log_file() -> Option<(File, PathBuf)> {
-    let directories = directories::ProjectDirs::from("", "", "tufo")?;
-    let folder = directories
-        .state_dir()
-        .unwrap_or_else(|| directories.data_local_dir())
-        .to_path_buf();
+    let folder = tufo_server::log_directory()?;
     std::fs::create_dir_all(&folder).ok()?;
     let path = folder.join(LOG_FILE_NAME);
     let too_large =

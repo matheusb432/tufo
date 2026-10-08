@@ -19,9 +19,10 @@ use listener::LocalListener;
 
 const SOCKET_FILE_NAME: &str = "tufo.sock";
 const GUI_SOCKET_FILE_NAME: &str = "tufo-gui.sock";
+const BROWSER_SOCKET_FILE_NAME: &str = "tufo-browser.sock";
 
-/// A socket path inside a directory only the current user may use: the local `tufo-server`'s, or
-/// the running GUI's.
+/// A socket path inside a directory only the current user may use: the local `tufo-server`'s, the
+/// running GUI's, or the running browser host's.
 #[derive(Debug, Clone)]
 pub struct LocalEndpoint {
     root: PathBuf,
@@ -48,6 +49,15 @@ impl LocalEndpoint {
 
     pub fn gui_from_root(root: impl AsRef<Path>) -> io::Result<Self> {
         Self::from_root_and_file_name(root.as_ref(), GUI_SOCKET_FILE_NAME)
+    }
+
+    /// The running browser host's socket, next to the server's.
+    pub fn browser_from_environment() -> io::Result<Self> {
+        Self::browser_from_root(runtime_root_from_environment())
+    }
+
+    pub fn browser_from_root(root: impl AsRef<Path>) -> io::Result<Self> {
+        Self::from_root_and_file_name(root.as_ref(), BROWSER_SOCKET_FILE_NAME)
     }
 
     fn from_root_and_file_name(root: &Path, file_name: &str) -> io::Result<Self> {
