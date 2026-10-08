@@ -17,10 +17,10 @@ setup *args:
     cargo fetch {{ args }}
     mise exec -- buf build >/dev/null
 
-# Build the GUI, server, and tufo command.
+# Build the GUI, server, tufo command, and browser host.
 [group('build')]
 build:
-    cargo build --release -p tufo-gui -p tufo-server -p tufo-cli
+    cargo build --release -p tufo-gui -p tufo-server -p tufo-cli -p tufo-browser
 
 # Install all binaries and the desktop launcher, then start the installed server.
 [group('build')]

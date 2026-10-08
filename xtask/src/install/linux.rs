@@ -1,6 +1,7 @@
 //! `~/.local/bin` for the binaries, and a desktop entry with its icon under `~/.local/share`,
 //! which GNOME's search and dock read: the scalable art, and PNGs of the small-size art for 16 to
-//! 32 px, which GNOME prefers over scaling the SVG down.
+//! 32 px, which GNOME prefers over scaling the SVG down. A built browser host goes to
+//! `~/.local/lib/tufo/browser` with Chromium's runtime.
 
 use std::{
     fs,
@@ -12,6 +13,7 @@ use anyhow::{Context as _, Result};
 use super::{BINARY_NAMES, remove_files, replace_file};
 use crate::app_icon::{self, ICONS_DIR, SMALL_ICON_SVG};
 
+mod browser;
 mod session;
 
 /// The GUI's application ID, which names its window for the desktop; `tufo-gui` sets the same.
@@ -67,11 +69,27 @@ impl Homes {
     fn binary(&self, name: &str) -> PathBuf {
         self.binaries.join(name)
     }
+
+    /// `lib/tufo/browser` beside the binaries' folder.
+    fn browser(&self) -> PathBuf {
+        self.binaries
+            .parent()
+            .unwrap_or(&self.binaries)
+            .join("lib/tufo/browser")
+    }
 }
 
 pub(super) fn install(workspace_root: &Path, release_dir: &Path) -> Result<PathBuf> {
     let homes = Homes::for_current_user()?;
+    let browser = browser::find_source(workspace_root, release_dir)?;
     install_into(&homes, release_dir, &workspace_root.join(ICONS_DIR))?;
+    match browser {
+        Some(source) => {
+            browser::install(&source, &homes.browser(), &homes.binaries)?;
+            println!("installed the browser in {}", homes.browser().display());
+        }
+        None => println!("no tufo-browser build; Tufo installs without its browser"),
+    }
     println!(
         "installed {} and the launcher {}",
         homes.binary("tufo").display(),
@@ -91,6 +109,7 @@ pub(super) fn uninstall() -> Result<()> {
     paths.push(homes.desktop_entry());
     paths.extend(homes.icons());
     remove_files(&paths.iter().map(PathBuf::as_path).collect::<Vec<_>>())?;
+    browser::uninstall(&homes.browser(), &homes.binaries)?;
     refresh_icon_theme(&homes.data)
 }
 
