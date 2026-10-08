@@ -6,7 +6,7 @@ use std::{cell::RefCell, num::NonZeroU32, path::PathBuf, sync::Arc, time::Durati
 
 use cef::{
     Browser, BrowserSettings, Client, ImplBrowser, ImplBrowserHost, ImplFrame, PaintElementType,
-    ThreadId, WindowInfo, browser_host_create_browser_sync, currently_on, quit_message_loop,
+    Range, ThreadId, WindowInfo, browser_host_create_browser_sync, currently_on, quit_message_loop,
 };
 use tokio::sync::watch;
 use tufo_models::browser::{BrowserTab, BrowserTabs, PageAddress, PageFailure, TabHistory, TabId};
@@ -29,6 +29,11 @@ const FRAMES_PER_SECOND: i32 = 30;
 /// How long closing pages may take before the host quits regardless.
 const CLOSE_GRACE: Duration = Duration::from_secs(3);
 const OPAQUE_WHITE: u32 = 0xFFFF_FFFF;
+/// Inserts committed text at the caret; CEF drops a commit without a range.
+const CARET_RANGE: Range = Range {
+    from: u32::MAX,
+    to: u32::MAX,
+};
 
 thread_local! {
     static TABS: RefCell<Option<Tabs>> = const { RefCell::new(None) };
@@ -414,7 +419,7 @@ pub(crate) fn apply_input(viewer: ViewerId, input: ViewInput) {
             PageEvent::Key(event) => browser_host.send_key_event(Some(&event)),
             PageEvent::Focus(focused) => browser_host.set_focus(i32::from(focused)),
             PageEvent::CommitText(text) => {
-                browser_host.ime_commit_text(Some(&text.as_str().into()), None, 0);
+                browser_host.ime_commit_text(Some(&text.as_str().into()), Some(&CARET_RANGE), 0);
             }
         }
     }
