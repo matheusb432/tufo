@@ -1,0 +1,3 @@
+[env]
+# One CEF download, unpacked under target/cef, serves every profile and target directory.
+CEF_PATH = { value = "target/cef", relative = true }

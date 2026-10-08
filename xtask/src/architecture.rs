@@ -8,7 +8,7 @@ struct PackagePolicy {
     dependencies: &'static [&'static str],
 }
 
-const PACKAGE_POLICIES: [PackagePolicy; 12] = [
+const PACKAGE_POLICIES: [PackagePolicy; 13] = [
     PackagePolicy {
         package: "field",
         dependencies: &[],
@@ -46,6 +46,10 @@ const PACKAGE_POLICIES: [PackagePolicy; 12] = [
             "tufo-models",
             "tufo-wire",
         ],
+    },
+    PackagePolicy {
+        package: "tufo-browser",
+        dependencies: &["tufo-local-transport", "tufo-models", "tufo-wire"],
     },
     PackagePolicy {
         package: "tufo-client",
@@ -222,6 +226,10 @@ mod tests {
                     "tufo-cli",
                     "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
                 ),
+                (
+                    "tufo-browser",
+                    "[dependencies]\ntufo-local-transport = { path = \"../tufo-local-transport\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
+                ),
                 ("xtask", ""),
             ],
         );
@@ -270,6 +278,10 @@ mod tests {
                 (
                     "tufo-cli",
                     "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
+                ),
+                (
+                    "tufo-browser",
+                    "[dependencies]\ntufo-local-transport = { path = \"../tufo-local-transport\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
                 ),
                 ("xtask", ""),
             ],
@@ -337,6 +349,10 @@ mod tests {
                     "tufo-cli",
                     "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
                 ),
+                (
+                    "tufo-browser",
+                    "[dependencies]\ntufo-local-transport = { path = \"../tufo-local-transport\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
+                ),
                 ("xtask", ""),
             ],
         );
@@ -388,6 +404,10 @@ mod tests {
                 (
                     "tufo-cli",
                     "[dependencies]\ntufo-client = { path = \"../tufo-client\" }\ntufo-models = { path = \"../tufo-models\" }\n",
+                ),
+                (
+                    "tufo-browser",
+                    "[dependencies]\ntufo-local-transport = { path = \"../tufo-local-transport\" }\ntufo-models = { path = \"../tufo-models\" }\ntufo-wire = { path = \"../tufo-wire\" }\n",
                 ),
                 ("xtask", ""),
                 ("other-support", ""),

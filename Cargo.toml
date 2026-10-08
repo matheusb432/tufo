@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "crates/tufo-application",
+    "crates/tufo-browser",
     "crates/tufo-cli",
     "crates/tufo-client",
     "crates/tufo-gui",
@@ -107,6 +108,12 @@ symphonia-for-songbird = { package = "symphonia", version = "0.5.5", default-fea
 twilight-gateway = "0.17.1"
 twilight-http = "0.17.1"
 twilight-model = "0.17.1"
+
+# Browser host.
+# Chromium through CEF's C API; the host loads it only when someone opens the browser. Linux
+# needs no sandbox bootstrap, so the default features stay off.
+cef = { version = "=154.5.0", default-features = false }
+cef-dll-sys = { version = "=154.5.0", default-features = false }
 
 # GUI.
 # The software renderer draws Tufo's window in about 30 MB of RSS. GPU renderers load the graphics

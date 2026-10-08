@@ -1,0 +1,35 @@
+[package]
+name = "tufo-browser"
+version = "0.1.0"
+description = "The browser host tufo-server starts on demand for the pages whose audio it mixes"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+build = "build.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread", "sync", "time"] }
+tokio-stream = { workspace = true }
+tonic = { workspace = true, features = ["router", "server"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tufo-local-transport = { workspace = true }
+tufo-models = { workspace = true }
+tufo-wire = { workspace = true }
+
+# Chromium runs only on Linux for now; elsewhere the executable reports it is unsupported.
+[target.'cfg(target_os = "linux")'.dependencies]
+cef = { workspace = true }
+# Named directly so the build script receives the CEF directory it unpacked.
+cef-dll-sys = { workspace = true }
+libc = { workspace = true }
+
+[lints]
+workspace = true
