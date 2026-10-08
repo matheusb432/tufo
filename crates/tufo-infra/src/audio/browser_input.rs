@@ -2,8 +2,8 @@
 //! stream from wait-free rings.
 //!
 //! Pages and the output keep separate clocks, so each stream plays behind a small cushion. A
-//! stream that runs dry plays silence until its cushion refills; one that runs ahead past the
-//! latency limit skips back to the cushion. Neither changes tempo or pitch. Streams the sound
+//! stream that runs dry plays silence until a doubled cushion refills; one that runs ahead past the
+//! latency limit skips back to its cushion. Neither changes tempo or pitch. Streams the sound
 //! lets go travel back through a second queue, so their rings are freed off the audio thread.
 
 use std::{
@@ -31,6 +31,8 @@ const COMMAND_CAPACITY: usize = 32;
 const RETIRED_CAPACITY: usize = BROWSER_STREAMS_MAX * 2;
 /// Audio buffered before a stream plays, which absorbs packet jitter and the output's period.
 pub const BROWSER_CUSHION: Duration = Duration::from_millis(80);
+/// The cushion a stream grows to as it runs dry, since a loaded host sends packets late in bursts.
+pub const BROWSER_CUSHION_MAX: Duration = Duration::from_millis(160);
 /// Buffered audio beyond which a stream skips back to its cushion.
 pub const BROWSER_LATENCY_MAX: Duration = Duration::from_millis(250);
 /// Each stream's ring, which holds what arrives between two output periods.
@@ -54,7 +56,7 @@ pub struct BrowserInputBusy;
 /// Frame counts at one mixer's sample rate.
 #[derive(Debug, Clone, Copy)]
 struct StreamTimings {
-    cushion_frames: usize,
+    cushion_max_frames: usize,
     latency_max_frames: usize,
     starvation_gap_max_frames: u64,
 }
@@ -62,7 +64,7 @@ struct StreamTimings {
 impl StreamTimings {
     fn at(sample_rate: u32) -> Self {
         Self {
-            cushion_frames: frames_in(BROWSER_CUSHION, sample_rate),
+            cushion_max_frames: frames_in(BROWSER_CUSHION_MAX, sample_rate),
             latency_max_frames: frames_in(BROWSER_LATENCY_MAX, sample_rate),
             starvation_gap_max_frames: u64::try_from(frames_in(STARVATION_GAP_MAX, sample_rate))
                 .unwrap_or(u64::MAX),
@@ -113,6 +115,7 @@ impl BrowserInputHandle {
         let stream = LiveStream {
             id,
             consumer,
+            cushion_frames: frames_in(BROWSER_CUSHION, self.sample_rate),
             playing: false,
             finishing: false,
             starved_frames: 0,
@@ -146,6 +149,7 @@ enum BrowserInputCommand {
 struct LiveStream {
     id: AudioStreamId,
     consumer: Consumer<Frame>,
+    cushion_frames: usize,
     /// Past its cushion; otherwise silent until the cushion fills.
     playing: bool,
     /// The page stopped, so the stream ends once its ring is empty.
@@ -175,14 +179,14 @@ impl LiveStream {
             return progress;
         }
         if available > timings.latency_max_frames {
-            let excess = available - timings.cushion_frames;
+            let excess = available - self.cushion_frames;
             if let Ok(chunk) = self.consumer.read_chunk(excess) {
                 chunk.commit_all();
             }
             counters
                 .dropped_frames
                 .fetch_add(excess as u64, Ordering::Relaxed);
-            available = timings.cushion_frames;
+            available = self.cushion_frames;
         }
         let count = available.min(out.len());
         if let Ok(chunk) = self.consumer.read_chunk(count) {
@@ -198,6 +202,7 @@ impl LiveStream {
             }
             self.playing = false;
             self.starved_frames = (out.len() - count) as u64;
+            self.cushion_frames = (self.cushion_frames * 2).min(timings.cushion_max_frames);
         }
         StreamProgress::Continues
     }
@@ -216,7 +221,7 @@ impl LiveStream {
         if self.finishing && available == 0 {
             return Some(StreamProgress::Ended);
         }
-        if available < timings.cushion_frames && !self.finishing {
+        if available < self.cushion_frames && !self.finishing {
             if self.starved_frames > 0 {
                 self.starved_frames += period_frames as u64;
             }
@@ -357,15 +362,33 @@ mod tests {
 
         let mut played = render(&mut input, 20);
         assert_eq!(played.split_off(10), [0.0; 10]);
-        push(&mut producer, 0.5, 80);
+        push(&mut producer, 0.5, 160);
         render(&mut input, 10);
         assert_eq!(counters.underrun_frames.load(Ordering::Relaxed), 10);
 
-        render(&mut input, 80);
+        render(&mut input, 150);
         render(&mut input, 600);
-        push(&mut producer, 0.5, 80);
+        push(&mut producer, 0.5, 160);
         render(&mut input, 10);
         assert_eq!(counters.underrun_frames.load(Ordering::Relaxed), 10);
+    }
+
+    #[test]
+    fn streams_that_run_dry_buffer_twice_as_much_before_playing_again() {
+        let (mut input, mut handle, counters) = input();
+        let mut producer = handle.add_stream(stream_id(1)).unwrap();
+        push(&mut producer, 0.5, 80);
+        render(&mut input, 90);
+
+        push(&mut producer, 0.5, 80);
+        assert_eq!(render(&mut input, 10), [0.0; 10]);
+        push(&mut producer, 0.5, 80);
+        assert_eq!(render(&mut input, 10), [0.5; 10]);
+        assert_eq!(counters.underrun_frames.load(Ordering::Relaxed), 20);
+
+        render(&mut input, 160);
+        push(&mut producer, 0.5, 160);
+        assert_eq!(render(&mut input, 10), [0.5; 10]);
     }
 
     #[test]
