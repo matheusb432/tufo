@@ -250,6 +250,8 @@ component PageView inherits Rectangle {
     }
 
     keys := FocusScope {
+        // The pointer's press focuses it; taking the press itself would keep it from the page.
+        focus-on-click: false;
         key-pressed(event) => {
             if event.modifiers.control && !event.modifiers.alt && (event.text == "v" || event.text == "V") {
                 clipboard.paste();

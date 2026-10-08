@@ -1978,22 +1978,45 @@ async fn standing_by_closes_the_browser_and_reopening_starts_another_host() -> a
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn a_browser_that_exits_on_its_own_reports_a_crash() -> anyhow::Result<()> {
+async fn a_browser_that_exits_on_its_own_reports_a_crash_and_the_music_plays_on()
+-> anyhow::Result<()> {
     let mut rig = Rig::start()?;
+    let music = rig.file("music.wav", &constant(0.2, SAMPLE_RATE as usize * 12))?;
+    rig.play_once(entry(music, "Music")).await?;
     let host = rig.open_browser().await?;
     host.start_stream(browser_stream())?;
+    let tone = host.play_tone(browser_stream(), 0.3);
     rig.wait_for(|state| state.browser.audible).await?;
+    let together = recorded_level(&rig, 0).await?;
 
     host.exited.store(true, Ordering::SeqCst);
+    drop(tone);
     drop(host);
     let stopped = rig
         .wait_for(|state| {
             state.browser.status == BrowserStatus::Stopped(BrowserStopReason::Crashed)
         })
         .await?;
+    let music_alone = recorded_level(&rig, 0).await?;
 
+    support::assert_near(together, 0.5, 0.01);
+    support::assert_near(music_alone, 0.2, 0.01);
     assert!(!stopped.browser.audible);
+    assert!(stopped.music.is_some());
     rig.open_browser().await?;
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn shutting_down_closes_the_browser_before_the_output() -> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let host = rig.open_browser().await?;
+
+    rig.player.shut_down().await;
+
+    assert!(host.exit_requested.load(Ordering::SeqCst));
+    assert!(host.exited.load(Ordering::SeqCst));
+    assert_eq!(rig.state().browser.status, BrowserStatus::Closed);
     Ok(())
 }
 

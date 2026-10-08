@@ -178,7 +178,9 @@ impl Controller {
         let session = &mut shared.browser;
         let size = session.pane.and_then(view_size);
         let (Some(client), true, Some(size)) = (session.client.clone(), showing, size) else {
-            session.view = None;
+            if session.view.take().is_some() {
+                tracing::debug!("detached the browser view");
+            }
             return;
         };
         if let Some(view) = &mut session.view {
@@ -192,6 +194,7 @@ impl Controller {
         let task = self
             .runtime
             .spawn(self.clone().show_browser_view(client, receiver));
+        tracing::debug!(?size, "attached the browser view");
         session.view = Some(AttachedView { inputs, size, task });
     }
 
@@ -221,8 +224,12 @@ impl Controller {
     }
 
     fn send_view_input(&self, input: ViewInput) {
-        if let Some(view) = &self.lock().browser.view {
-            let _ = view.inputs.try_send(input);
+        let shared = self.lock();
+        let Some(view) = &shared.browser.view else {
+            return;
+        };
+        if let Err(error) = view.inputs.try_send(input) {
+            tracing::debug!(%error, "the browser view dropped the input");
         }
     }
 

@@ -379,6 +379,7 @@ pub(crate) fn detach_view(viewer: ViewerId) {
 pub(crate) fn apply_input(viewer: ViewerId, input: ViewInput) {
     let Some((events, selected)) = with_tabs(|tabs| {
         if tabs.host.view.viewer() != Some(viewer) {
+            tracing::debug!(viewer, "input from a replaced view");
             return None;
         }
         Some((tabs.translator.translate(input), tabs.selected_browser()?))
