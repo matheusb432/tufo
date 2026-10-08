@@ -2444,6 +2444,10 @@ msgstr ""
 msgid "Browser"
 msgstr ""
 
+#: ui/sidebar.slint
+msgid "Browser is open"
+msgstr ""
+
 #: ui/browser.slint
 msgid "Close the browser and free its memory"
 msgstr ""

@@ -326,37 +326,41 @@ component PageView inherits Rectangle {
 // The browser while it isn't open: why, and how to open it.
 component ClosedPanel inherits Rectangle {
     property <string> message: BrowserView.state == BrowserState.starting ? @tr("Starting the browser…") : BrowserView.state == BrowserState.stopped-idle ? @tr("The browser closed to free memory after a while without sound or a visit. Opening it again restores its tabs; pages start over.") : BrowserView.state == BrowserState.crashed ? @tr("The browser stopped unexpectedly. Opening it again restores its tabs.") : BrowserView.state == BrowserState.start-failed ? @tr("The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder.") : BrowserView.state == BrowserState.unavailable ? @tr("This installation of Tufo has no browser. It runs on Linux for now.") : @tr("Play music and ambience from websites through Tufo, on this computer or in Discord. The browser runs only while it’s open.");
-    VerticalLayout {
+    HorizontalLayout {
         alignment: center;
-        spacing: 18px;
         padding: PageMetrics.padding;
-        HorizontalLayout {
+        VerticalLayout {
             alignment: center;
-            Icon {
-                width: 56px;
-                height: 56px;
-                source: @image-url("icons/globe.svg");
-                tint: BrowserView.state == BrowserState.crashed || BrowserView.state == BrowserState.start-failed ? Theme.error : Theme.accent;
-            }
-        }
-
-        Text {
-            text: root.message;
-            color: Theme.text-secondary;
-            font-size: Theme.body;
-            wrap: word-wrap;
-            horizontal-alignment: center;
+            spacing: 18px;
             max-width: 520px;
-        }
+            horizontal-stretch: 1;
+            HorizontalLayout {
+                alignment: center;
+                Icon {
+                    width: 56px;
+                    height: 56px;
+                    source: @image-url("icons/globe.svg");
+                    tint: BrowserView.state == BrowserState.crashed || BrowserView.state == BrowserState.start-failed ? Theme.error : Theme.accent;
+                }
+            }
 
-        if BrowserView.state != BrowserState.starting && BrowserView.state != BrowserState.unavailable: HorizontalLayout {
-            alignment: center;
-            Button {
-                kind: ButtonKind.primary;
-                text: BrowserView.state == BrowserState.start-failed ? @tr("Try again") : @tr("Open the browser");
-                icon: @image-url("icons/globe.svg");
-                clicked => {
-                    Actions.open-browser();
+            Text {
+                text: root.message;
+                color: Theme.text-secondary;
+                font-size: Theme.body;
+                wrap: word-wrap;
+                horizontal-alignment: center;
+            }
+
+            if BrowserView.state != BrowserState.starting && BrowserView.state != BrowserState.unavailable: HorizontalLayout {
+                alignment: center;
+                Button {
+                    kind: ButtonKind.primary;
+                    text: BrowserView.state == BrowserState.start-failed ? @tr("Try again") : @tr("Open the browser");
+                    icon: @image-url("icons/globe.svg");
+                    clicked => {
+                        Actions.open-browser();
+                    }
                 }
             }
         }
@@ -402,8 +406,8 @@ export component BrowserPage inherits Rectangle {
     if root.open: VerticalLayout {
         y: Theme.title-row-height;
         height: parent.height - self.y;
-        padding-left: 12px;
-        padding-right: 12px;
+        padding-left: PageMetrics.padding;
+        padding-right: PageMetrics.padding;
         padding-bottom: 8px;
         spacing: 8px;
         HorizontalLayout {

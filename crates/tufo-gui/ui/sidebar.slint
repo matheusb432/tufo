@@ -7,7 +7,7 @@ import { GuidedTours } from "tours/state.slint";
 import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
-    Actions, CollectionKind, CurrentOutput, LibraryView, NavItem, Navigation, OutputRow,
+    Actions, BrowserState, BrowserView, CollectionKind, CurrentOutput, LibraryView, NavItem, Navigation, OutputRow,
     OutputRowKind, Page, PlayerView, Session, VoiceBadge,
 } from "state.slint";
 import { Equalizer, Icon, IconButton, Logo, MenuSurface, TextLink, TooltipBubble } from "widgets.slint";
@@ -17,6 +17,7 @@ component NavRow inherits Rectangle {
     in property <image> icon;
     in property <string> text;
     in property <bool> active;
+    in property <bool> running;
     in property <bool> collapsible;
     in property <bool> expanded;
     in property <bool> can-add;
@@ -46,7 +47,7 @@ component NavRow inherits Rectangle {
             width: Theme.bar-icon-size;
             height: Theme.bar-icon-size;
             source: root.icon;
-            tint: root.active ? Theme.accent : Theme.text-secondary;
+            tint: root.active || root.running ? Theme.accent : Theme.text-secondary;
         }
 
         Text {
@@ -56,6 +57,18 @@ component NavRow inherits Rectangle {
             font-size: Theme.body;
             font-weight: 700;
             color: root.active ? Theme.text : Theme.text-secondary;
+        }
+
+        if root.running: Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: 20px;
+            height: 20px;
+            Rectangle {
+                width: 8px;
+                height: 8px;
+                border-radius: 4px;
+                background: Theme.lit;
+            }
         }
 
         if root.collapsible: Icon {
@@ -472,6 +485,8 @@ component FullSidebar inherits SidebarForm {
                     icon: @image-url("icons/globe.svg");
                     text: @tr("Browser");
                     active: root.page == Page.browser;
+                    running: BrowserView.state == BrowserState.open;
+                    accessible-description: self.running ? @tr("Browser is open") : "";
                     clicked => {
                         root.open-page(Page.browser, "");
                     }
@@ -592,11 +607,22 @@ component FullSidebar inherits SidebarForm {
 
 component RailButton inherits IconButton {
     in property <bool> active;
+    in property <bool> running;
     size: Theme.bar-button-size;
     icon-size: Theme.bar-icon-size;
     border-radius: Theme.radius-row;
     background: root.active ? Theme.selected : root.has-hover ? Theme.hover : transparent;
-    tint: root.active ? Theme.accent : Theme.text-secondary;
+    tint: root.active || root.running ? Theme.accent : Theme.text-secondary;
+    if root.running: Rectangle {
+        x: parent.width - self.width - 2px;
+        y: 2px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        border-width: 2px;
+        border-color: Theme.sidebar;
+        background: Theme.lit;
+    }
 }
 
 component Rail inherits SidebarForm {
@@ -629,8 +655,9 @@ component Rail inherits SidebarForm {
             alignment: center;
             RailButton {
                 icon: button.icon;
-                tooltip: button.label;
+                tooltip: self.running ? @tr("Browser is open") : button.label;
                 tooltip-enabled: root.shown;
+                running: index == 4 && BrowserView.state == BrowserState.open;
                 active: index == 2 ? root.page == Page.home : index == 3 ? root.page == Page.songs : index == 4 ? root.page == Page.browser : index == 5 ? root.page == Page.playlists || root.page == Page.playlist : index == 6 ? root.page == Page.soundboards || root.page == Page.soundboard : false;
                 clicked => {
                     if index == 0 {
