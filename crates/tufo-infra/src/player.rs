@@ -91,6 +91,7 @@ const STOP_FADE: Duration = Duration::from_millis(250);
 const RESTORE_FADE_IN: Duration = Duration::from_millis(50);
 /// About three minutes of 48 kHz audio; longer loops stream.
 const SOUND_CACHE_BYTES_MAX: usize = 32 * 1024 * 1024;
+const SOUND_CACHE_IDLE_MAX: Duration = Duration::from_mins(10);
 
 /// How the engine paces what it does on its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,7 +198,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             crossfade: CrossfadeDuration::default(),
             sounds: BTreeMap::new(),
             sounds_paused_at: None,
-            sound_cache: SoundCache::new(SOUND_CACHE_BYTES_MAX),
+            sound_cache: SoundCache::new(SOUND_CACHE_BYTES_MAX, SOUND_CACHE_IDLE_MAX),
             sound_underrun_frames: Arc::clone(&sound_underrun_frames),
             local_stream_errors_retired: LocalStreamErrors::default(),
             last_token: 0,
@@ -435,12 +436,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         cue: &SoundCue,
     ) -> Result<LoadedSound, PlayAudioError> {
         let key = read_sound_key(&cue.path).await?;
-        if let Some(sound) = engine.sound_cache.get(&key) {
+        if let Some(sound) = engine.sound_cache.get(&key, Instant::now()) {
             return Ok(LoadedSound::Decoded(sound));
         }
         let loaded = load_sound_blocking(&cue.path, cue.settings.looping).await?;
         if let LoadedSound::Decoded(sound) = &loaded {
-            engine.sound_cache.insert(key, sound.clone());
+            engine
+                .sound_cache
+                .insert(key, sound.clone(), Instant::now());
         }
         Ok(loaded)
     }
@@ -751,6 +754,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     async fn tick(self: &Arc<Self>) {
         let mut engine = self.engine.lock().await;
         let mut changed = engine.reap_finished_sounds();
+        engine.sound_cache.evict_idle(Instant::now());
         changed |= engine.reap_finished_layers();
         if let Some(deck) = engine.deck() {
             deck.drop_retired();
@@ -1078,14 +1082,21 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
 
     async fn play_sound(&self, cue: SoundCue) -> Result<(), PlayAudioError> {
         let key = read_sound_key(&cue.path).await?;
-        let cached = self.engine.lock().await.sound_cache.get(&key);
+        let cached = self
+            .engine
+            .lock()
+            .await
+            .sound_cache
+            .get(&key, Instant::now());
         let loaded = match cached {
             Some(sound) => LoadedSound::Decoded(sound),
             None => load_sound_blocking(&cue.path, cue.settings.looping).await?,
         };
         let mut engine = self.engine.lock().await;
         if let LoadedSound::Decoded(sound) = &loaded {
-            engine.sound_cache.insert(key, sound.clone());
+            engine
+                .sound_cache
+                .insert(key, sound.clone(), Instant::now());
         }
         self.ensure_output(&mut engine).await?;
         if let Some(mut previous) = engine.sounds.remove(&cue.entry_id)

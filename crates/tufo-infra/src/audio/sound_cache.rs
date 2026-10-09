@@ -8,7 +8,7 @@ use std::{
     io,
     path::{Path, PathBuf},
     sync::Arc,
-    time::{Duration, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 
 use super::{
@@ -79,6 +79,11 @@ impl DecodedSound {
     fn bytes(&self) -> usize {
         size_of_val(self.frames())
     }
+
+    /// Whether a clone, such as a playing sound's, holds the frames too.
+    fn is_shared(&self) -> bool {
+        Arc::strong_count(&self.frames) > 1
+    }
 }
 
 /// A sound ready to play: decoded in memory, or too long for that and opened for streaming.
@@ -115,35 +120,61 @@ pub fn load_sound(path: &Path, options: SoundLoadOptions) -> Result<LoadedSound,
     }
 }
 
-/// Decoded sounds, evicting the least recently used once they exceed a byte budget.
+/// Decoded sounds, evicting the least recently used once they exceed a byte budget, and any left
+/// unused for longer than an idle limit.
 pub struct SoundCache {
     sounds: HashMap<SoundKey, CachedSound>,
     bytes_used: usize,
     bytes_max: usize,
+    idle_max: Duration,
     uses: u64,
 }
 
 struct CachedSound {
     sound: DecodedSound,
     last_use: u64,
+    last_used_at: Instant,
 }
 
 impl SoundCache {
     #[must_use]
-    pub fn new(bytes_max: usize) -> Self {
+    pub fn new(bytes_max: usize, idle_max: Duration) -> Self {
         Self {
             sounds: HashMap::new(),
             bytes_used: 0,
             bytes_max,
+            idle_max,
             uses: 0,
         }
     }
 
-    pub fn get(&mut self, key: &SoundKey) -> Option<DecodedSound> {
+    pub fn get(&mut self, key: &SoundKey, now: Instant) -> Option<DecodedSound> {
         self.uses += 1;
         let cached = self.sounds.get_mut(key)?;
         cached.last_use = self.uses;
+        cached.last_used_at = now;
         Some(cached.sound.clone())
+    }
+
+    /// Drops sounds unused for the idle limit. A playing sound counts as used, since dropping it
+    /// would free nothing.
+    pub fn evict_idle(&mut self, now: Instant) {
+        let Self {
+            sounds,
+            bytes_used,
+            idle_max,
+            ..
+        } = self;
+        sounds.retain(|_, cached| {
+            if cached.sound.is_shared() {
+                cached.last_used_at = now;
+            }
+            let idle = now.saturating_duration_since(cached.last_used_at) >= *idle_max;
+            if idle {
+                *bytes_used -= cached.sound.bytes();
+            }
+            !idle
+        });
     }
 
     pub fn clear(&mut self) {
@@ -152,7 +183,7 @@ impl SoundCache {
     }
 
     /// Keeps `sound` unless it alone exceeds the budget.
-    pub fn insert(&mut self, key: SoundKey, sound: DecodedSound) {
+    pub fn insert(&mut self, key: SoundKey, sound: DecodedSound, now: Instant) {
         let bytes = sound.bytes();
         if bytes > self.bytes_max {
             return;
@@ -180,6 +211,7 @@ impl SoundCache {
             CachedSound {
                 sound,
                 last_use: self.uses,
+                last_used_at: now,
             },
         );
     }
@@ -188,6 +220,8 @@ impl SoundCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const IDLE_MAX: Duration = Duration::from_mins(10);
 
     fn key(name: &str) -> SoundKey {
         SoundKey {
@@ -203,27 +237,48 @@ mod tests {
 
     #[test]
     fn the_least_recently_used_sound_leaves_first() {
+        let now = Instant::now();
         let frame_bytes = size_of::<PackedFrame>();
-        let mut cache = SoundCache::new(100 * frame_bytes);
-        cache.insert(key("door"), sound(40));
-        cache.insert(key("sword"), sound(40));
-        cache.get(&key("door"));
+        let mut cache = SoundCache::new(100 * frame_bytes, IDLE_MAX);
+        cache.insert(key("door"), sound(40), now);
+        cache.insert(key("sword"), sound(40), now);
+        cache.get(&key("door"), now);
 
-        cache.insert(key("thunder"), sound(40));
+        cache.insert(key("thunder"), sound(40), now);
 
-        assert!(cache.get(&key("door")).is_some());
-        assert!(cache.get(&key("sword")).is_none());
-        assert!(cache.get(&key("thunder")).is_some());
+        assert!(cache.get(&key("door"), now).is_some());
+        assert!(cache.get(&key("sword"), now).is_none());
+        assert!(cache.get(&key("thunder"), now).is_some());
     }
 
     #[test]
     fn a_sound_larger_than_the_budget_is_not_kept() {
-        let mut cache = SoundCache::new(10 * size_of::<PackedFrame>());
-        cache.insert(key("door"), sound(5));
+        let now = Instant::now();
+        let mut cache = SoundCache::new(10 * size_of::<PackedFrame>(), IDLE_MAX);
+        cache.insert(key("door"), sound(5), now);
 
-        cache.insert(key("storm"), sound(11));
+        cache.insert(key("storm"), sound(11), now);
 
-        assert!(cache.get(&key("storm")).is_none());
-        assert!(cache.get(&key("door")).is_some());
+        assert!(cache.get(&key("storm"), now).is_none());
+        assert!(cache.get(&key("door"), now).is_some());
+    }
+
+    #[test]
+    fn sounds_unused_for_the_idle_limit_leave_unless_they_play() {
+        let start = Instant::now();
+        let frame_bytes = size_of::<PackedFrame>();
+        let mut cache = SoundCache::new(10 * frame_bytes, IDLE_MAX);
+        cache.insert(key("door"), sound(5), start);
+        cache.insert(key("rain"), sound(5), start);
+        let playing_rain = cache.get(&key("rain"), start);
+
+        cache.evict_idle(start + IDLE_MAX);
+        drop(playing_rain);
+        cache.evict_idle(start + IDLE_MAX + IDLE_MAX / 2);
+        cache.insert(key("storm"), sound(5), start);
+
+        assert!(cache.get(&key("door"), start).is_none());
+        assert!(cache.get(&key("rain"), start).is_some());
+        assert!(cache.get(&key("storm"), start).is_some());
     }
 }
