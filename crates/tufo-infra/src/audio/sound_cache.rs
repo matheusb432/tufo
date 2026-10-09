@@ -7,15 +7,14 @@ use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
+    sync::Arc,
     time::{Duration, SystemTime},
 };
 
-use kira::{
-    Frame,
-    sound::static_sound::{StaticSoundData, StaticSoundSettings},
+use super::{
+    buffered_track::{AudioFile, OpenTrackError, duration_of_frames, frame_count, frames_in},
+    packed_frame::PackedFrame,
 };
-
-use super::buffered_track::{AudioFile, OpenTrackError, frames_in};
 
 /// The longest one-shot sound decoded in memory.
 pub const STATIC_SOUND_DURATION_MAX: Duration = Duration::from_secs(20);
@@ -46,9 +45,45 @@ impl SoundKey {
     }
 }
 
+/// A sound decoded whole at its own rate. Clones share the frames.
+#[derive(Debug, Clone)]
+pub struct DecodedSound {
+    sample_rate: u32,
+    frames: Arc<Vec<PackedFrame>>,
+}
+
+impl DecodedSound {
+    #[must_use]
+    pub fn new(sample_rate: u32, frames: Vec<PackedFrame>) -> Self {
+        Self {
+            sample_rate,
+            frames: Arc::new(frames),
+        }
+    }
+
+    #[must_use]
+    pub fn sample_rate(&self) -> u32 {
+        self.sample_rate
+    }
+
+    #[must_use]
+    pub fn frames(&self) -> &[PackedFrame] {
+        &self.frames
+    }
+
+    #[must_use]
+    pub fn duration(&self) -> Duration {
+        duration_of_frames(frame_count(self.frames.len()), self.sample_rate)
+    }
+
+    fn bytes(&self) -> usize {
+        size_of_val(self.frames())
+    }
+}
+
 /// A sound ready to play: decoded in memory, or too long for that and opened for streaming.
 pub enum LoadedSound {
-    Decoded(Box<StaticSoundData>),
+    Decoded(DecodedSound),
     Streamed(AudioFile),
 }
 
@@ -58,9 +93,9 @@ pub fn load_sound(path: &Path, options: SoundLoadOptions) -> Result<LoadedSound,
     let file = AudioFile::open(path)?;
     let sample_rate = file.source_sample_rate();
     let frames_max = if options.looping {
-        options.bytes_max / size_of::<Frame>()
+        options.bytes_max / size_of::<PackedFrame>()
     } else {
-        (options.bytes_max / size_of::<Frame>())
+        (options.bytes_max / size_of::<PackedFrame>())
             .min(frames_in(STATIC_SOUND_DURATION_MAX, sample_rate))
     };
     if file
@@ -75,12 +110,7 @@ pub fn load_sound(path: &Path, options: SoundLoadOptions) -> Result<LoadedSound,
         .decode_whole(frames_max)
         .map_err(OpenTrackError::Unsupported)?
     {
-        Some(frames) => Ok(LoadedSound::Decoded(Box::new(StaticSoundData {
-            sample_rate,
-            frames: frames.into(),
-            settings: StaticSoundSettings::default(),
-            slice: None,
-        }))),
+        Some(frames) => Ok(LoadedSound::Decoded(DecodedSound::new(sample_rate, frames))),
         None => AudioFile::reopen(reopened).map(LoadedSound::Streamed),
     }
 }
@@ -94,8 +124,7 @@ pub struct SoundCache {
 }
 
 struct CachedSound {
-    data: StaticSoundData,
-    bytes: usize,
+    sound: DecodedSound,
     last_use: u64,
 }
 
@@ -110,11 +139,11 @@ impl SoundCache {
         }
     }
 
-    pub fn get(&mut self, key: &SoundKey) -> Option<StaticSoundData> {
+    pub fn get(&mut self, key: &SoundKey) -> Option<DecodedSound> {
         self.uses += 1;
-        let sound = self.sounds.get_mut(key)?;
-        sound.last_use = self.uses;
-        Some(sound.data.clone())
+        let cached = self.sounds.get_mut(key)?;
+        cached.last_use = self.uses;
+        Some(cached.sound.clone())
     }
 
     pub fn clear(&mut self) {
@@ -122,14 +151,14 @@ impl SoundCache {
         self.bytes_used = 0;
     }
 
-    /// Keeps `data` unless it alone exceeds the budget.
-    pub fn insert(&mut self, key: SoundKey, data: StaticSoundData) {
-        let bytes = data.frames.len() * size_of::<Frame>();
+    /// Keeps `sound` unless it alone exceeds the budget.
+    pub fn insert(&mut self, key: SoundKey, sound: DecodedSound) {
+        let bytes = sound.bytes();
         if bytes > self.bytes_max {
             return;
         }
         if let Some(replaced) = self.sounds.remove(&key) {
-            self.bytes_used -= replaced.bytes;
+            self.bytes_used -= replaced.sound.bytes();
         }
         while self.bytes_used + bytes > self.bytes_max {
             let Some(oldest) = self
@@ -141,7 +170,7 @@ impl SoundCache {
                 break;
             };
             if let Some(evicted) = self.sounds.remove(&oldest) {
-                self.bytes_used -= evicted.bytes;
+                self.bytes_used -= evicted.sound.bytes();
             }
         }
         self.uses += 1;
@@ -149,8 +178,7 @@ impl SoundCache {
         self.sounds.insert(
             key,
             CachedSound {
-                data,
-                bytes,
+                sound,
                 last_use: self.uses,
             },
         );
@@ -169,18 +197,13 @@ mod tests {
         }
     }
 
-    fn sound(frames: usize) -> StaticSoundData {
-        StaticSoundData {
-            sample_rate: 48_000,
-            frames: vec![Frame::ZERO; frames].into(),
-            settings: StaticSoundSettings::default(),
-            slice: None,
-        }
+    fn sound(frames: usize) -> DecodedSound {
+        DecodedSound::new(48_000, vec![PackedFrame::default(); frames])
     }
 
     #[test]
     fn the_least_recently_used_sound_leaves_first() {
-        let frame_bytes = size_of::<Frame>();
+        let frame_bytes = size_of::<PackedFrame>();
         let mut cache = SoundCache::new(100 * frame_bytes);
         cache.insert(key("door"), sound(40));
         cache.insert(key("sword"), sound(40));
@@ -195,7 +218,7 @@ mod tests {
 
     #[test]
     fn a_sound_larger_than_the_budget_is_not_kept() {
-        let mut cache = SoundCache::new(10 * size_of::<Frame>());
+        let mut cache = SoundCache::new(10 * size_of::<PackedFrame>());
         cache.insert(key("door"), sound(5));
 
         cache.insert(key("storm"), sound(11));

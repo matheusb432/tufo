@@ -25,6 +25,8 @@ use rtrb::{Consumer, RingBuffer};
 pub use track_file::TrackFile;
 use tufo_models::library::song_loop::{LoopRegion, SourceFrames, nearest_frames};
 
+use super::packed_frame::{PackedFrame, unpack_into};
+
 const BUFFER_DURATION: Duration = Duration::from_secs(30);
 const PREFILL_TIMEOUT: Duration = Duration::from_secs(2);
 const PREFILL_POLL_INTERVAL: Duration = Duration::from_millis(2);
@@ -188,7 +190,7 @@ impl BufferedTrack {
 
 /// The audio thread's end of a track: copies decoded frames without blocking or allocating.
 pub struct TrackReader {
-    consumer: Consumer<Frame>,
+    consumer: Consumer<PackedFrame>,
     shared: Arc<TrackShared>,
     frames_played: u64,
     /// The frames left in the first pass, as the container or loop region declares its length.
@@ -209,8 +211,8 @@ impl TrackReader {
         let copied = match self.consumer.read_chunk(count) {
             Ok(chunk) => {
                 let (first, second) = chunk.as_slices();
-                out[..first.len()].copy_from_slice(first);
-                out[first.len()..count].copy_from_slice(second);
+                unpack_into(first, out);
+                unpack_into(second, &mut out[first.len()..count]);
                 chunk.commit_all();
                 count
             }
@@ -477,7 +479,7 @@ mod tests {
         let total = Arc::new(AtomicU64::new(0));
         for expected in [3, 6] {
             let (mut producer, consumer) = RingBuffer::new(4);
-            producer.push(Frame::new(0.25, 0.25)).unwrap();
+            producer.push(PackedFrame::new(0.25, 0.25)).unwrap();
             let shared = Arc::new(TrackShared::default());
             let mut reader = TrackReader {
                 consumer,

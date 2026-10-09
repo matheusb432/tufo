@@ -34,7 +34,7 @@ use music::{
     start_position,
 };
 use outputs::{AudioOutputs, DeviceOutputs, OpenedOutput};
-use sounds::{FiredSound, SoundPlayback, decoded_sound, volume_gain};
+use sounds::{FiredSound, volume_gain};
 use tokio::sync::{Mutex, mpsc::UnboundedSender, oneshot, watch};
 use tufo_application::playback::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
@@ -70,9 +70,9 @@ use crate::{
         LocalStreamErrors,
         browser_input::BrowserAudioCounters,
         buffered_track::{BufferedTrack, DecodeOptions},
+        effect_sound::{EffectSource, effect_sound},
         music_deck::{DeckState, DeckTrack, MusicDeckHandle},
         sound_cache::{LoadedSound, SoundCache, SoundKey, SoundLoadOptions, load_sound},
-        streamed_sound::streamed_sound,
     },
     browser::{BrowserLauncher, BrowserNotice},
     discord::{SongbirdDiscordClient, VoiceAvailability},
@@ -89,7 +89,8 @@ const PAUSE_FADE: Duration = Duration::from_millis(100);
 const STOP_FADE: Duration = Duration::from_millis(250);
 /// How music fades back in after moving to another output.
 const RESTORE_FADE_IN: Duration = Duration::from_millis(50);
-const SOUND_CACHE_BYTES_MAX: usize = 64 * 1024 * 1024;
+/// About three minutes of 48 kHz audio; longer loops stream.
+const SOUND_CACHE_BYTES_MAX: usize = 32 * 1024 * 1024;
 
 /// How the engine paces what it does on its own.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -434,12 +435,12 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         cue: &SoundCue,
     ) -> Result<LoadedSound, PlayAudioError> {
         let key = read_sound_key(&cue.path).await?;
-        if let Some(data) = engine.sound_cache.get(&key) {
-            return Ok(LoadedSound::Decoded(Box::new(data)));
+        if let Some(sound) = engine.sound_cache.get(&key) {
+            return Ok(LoadedSound::Decoded(sound));
         }
         let loaded = load_sound_blocking(&cue.path, cue.settings.looping).await?;
-        if let LoadedSound::Decoded(data) = &loaded {
-            engine.sound_cache.insert(key, data.as_ref().clone());
+        if let LoadedSound::Decoded(sound) = &loaded {
+            engine.sound_cache.insert(key, sound.clone());
         }
         Ok(loaded)
     }
@@ -1079,12 +1080,12 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         let key = read_sound_key(&cue.path).await?;
         let cached = self.engine.lock().await.sound_cache.get(&key);
         let loaded = match cached {
-            Some(data) => LoadedSound::Decoded(Box::new(data)),
+            Some(sound) => LoadedSound::Decoded(sound),
             None => load_sound_blocking(&cue.path, cue.settings.looping).await?,
         };
         let mut engine = self.engine.lock().await;
-        if let LoadedSound::Decoded(data) = &loaded {
-            engine.sound_cache.insert(key, data.as_ref().clone());
+        if let LoadedSound::Decoded(sound) = &loaded {
+            engine.sound_cache.insert(key, sound.clone());
         }
         self.ensure_output(&mut engine).await?;
         if let Some(mut previous) = engine.sounds.remove(&cue.entry_id)
@@ -1665,20 +1666,11 @@ async fn fire_sound(
         .output
         .as_mut()
         .ok_or_else(|| PlayAudioError::OutputUnavailable(anyhow::anyhow!("no output is open")))?;
-    let full =
-        |error: crate::audio::MixerFullError| PlayAudioError::OutputUnavailable(error.into());
-    let (duration, playback) = match loaded {
-        LoadedSound::Decoded(data) => {
-            let duration = data.duration();
-            let handle = output
-                .mixer
-                .play_decoded_sound(decoded_sound(&data, cue.settings))
-                .map_err(full)?;
-            (duration, SoundPlayback::Decoded(handle))
-        }
+    let sample_rate = output.mixer.sample_rate();
+    let (duration, source) = match loaded {
+        LoadedSound::Decoded(sound) => (sound.duration(), EffectSource::Decoded(sound)),
         LoadedSound::Streamed(file) => {
             let duration = file.duration().unwrap_or_default();
-            let sample_rate = output.mixer.sample_rate();
             let options = DecodeOptions {
                 start_position: Duration::ZERO,
                 looping: cue.settings.looping,
@@ -1693,21 +1685,19 @@ async fn fire_sound(
             track
                 .reader
                 .count_underruns_in(Arc::clone(&engine.sound_underrun_frames));
-            let (sound, handle) = streamed_sound(
-                track,
-                cue.settings.volume.into_inner(),
-                cue.settings.fade_in.into_inner(),
-                sample_rate,
-            );
-            output.mixer.play_streamed_sound(sound).map_err(full)?;
-            (duration, SoundPlayback::Streamed(handle))
+            (duration, EffectSource::Streamed(track))
         }
     };
+    let (sound, handle) = effect_sound(source, cue.settings, sample_rate);
+    output
+        .mixer
+        .play_effect(sound)
+        .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?;
     Ok(FiredSound {
         cue,
         started_at: SystemTime::now(),
         duration,
-        playback: Some(playback),
+        playback: Some(handle),
     })
 }
 

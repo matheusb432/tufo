@@ -78,7 +78,7 @@ impl Fixture {
     fn new(runtime: &tokio::runtime::Runtime) -> anyhow::Result<Self> {
         let (mut mixer, renderer) = Mixer::open_pulled(DISCORD_SAMPLE_RATE, Volume::default())?;
         for frequency in [440.0, 660.0, 880.0] {
-            mixer.play_decoded_sound(tone(frequency))?;
+            mixer.play_static_sound(tone(frequency))?;
         }
         let driver = mixer::Mixer::mock(runtime.handle().clone(), true);
         let totals = Arc::new(PacingTotals::default());
@@ -287,10 +287,10 @@ fn voice_packets_preserve_samples_and_apply_controls_on_the_next_tick() -> anyho
 
     let sound = tone(440.0);
     let (mut mixer, renderer) = Mixer::open_pulled(DISCORD_SAMPLE_RATE, Volume::default())?;
-    mixer.play_decoded_sound(sound.clone())?;
+    mixer.play_static_sound(sound.clone())?;
     let (mut reference, renderer_reference) =
         Mixer::open_pulled(DISCORD_SAMPLE_RATE, Volume::default())?;
-    reference.play_decoded_sound(sound)?;
+    reference.play_static_sound(sound)?;
     let mut renderer_reference = renderer_reference.recv_timeout(Duration::from_secs(1))?;
     let totals = Arc::new(PacingTotals::default());
     let input = voice_input(renderer, Arc::default(), Arc::clone(&totals))?;

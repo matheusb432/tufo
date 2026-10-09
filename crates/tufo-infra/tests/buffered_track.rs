@@ -6,12 +6,17 @@ use std::{
 
 use anyhow::Context as _;
 use kira::Frame;
-use tufo_infra::audio::buffered_track::{AudioFile, BufferedTrack, DecodeOptions, TrackReader};
+use tufo_infra::audio::{
+    buffered_track::{AudioFile, BufferedTrack, DecodeOptions, TrackReader},
+    packed_frame::PACKED_SAMPLE_STEP,
+};
 use tufo_models::library::song_loop::{LoopMarkers, LoopRegion, SourceFrames, SourceTiming};
 
 mod support;
 
-use support::{SAMPLE_RATE, constant, correlation, ramp, stereo_sine, write_ogg_opus, write_wav};
+use support::{
+    SAMPLE_RATE, constant, correlation, ramp, stereo_sine, stored, write_ogg_opus, write_wav,
+};
 
 #[test]
 fn a_started_stream_holds_thirty_seconds_without_needing_the_decoder() -> anyhow::Result<()> {
@@ -171,6 +176,7 @@ fn a_region_plays_its_intro_once_then_repeats_its_loop_frame_for_frame() -> anyh
 
     let played = read_left(&mut reader, 95_000 + passes * 48_000);
 
+    let samples = stored(&samples);
     let mut expected = samples[1_000..96_000].to_vec();
     for _ in 0..passes {
         expected.extend_from_slice(&samples[48_000..96_000]);
@@ -191,7 +197,7 @@ fn a_region_that_does_not_loop_ends_at_its_loop_end() -> anyhow::Result<()> {
 
     let played = read_left(&mut reader, samples.len());
 
-    assert_eq!(played, samples[4_800..72_000]);
+    assert_eq!(played, stored(&samples[4_800..72_000]));
     assert!(reader.is_exhausted());
     Ok(())
 }
@@ -216,14 +222,14 @@ fn the_audio_before_the_loop_start_fades_in_over_the_loop_end() -> anyhow::Resul
         let lead_gain = (offset as f32 + 0.5) / crossfade as f32;
         let expected = tail + (lead_in - tail) * lead_gain;
         assert!(
-            (played[72_000 - crossfade + offset] - expected).abs() < 1e-6,
+            (played[72_000 - crossfade + offset] - expected).abs() <= PACKED_SAMPLE_STEP / 2.0,
             "frame {offset} of the crossfade"
         );
     }
-    assert_eq!(played[72_000..72_100], samples[24_000..24_100]);
+    assert_eq!(played[72_000..72_100], stored(&samples[24_000..24_100]));
     assert_eq!(
         played[72_000 + 48_000 - crossfade - 10..72_000 + 48_000 - crossfade],
-        samples[72_000 - crossfade - 10..72_000 - crossfade]
+        stored(&samples[72_000 - crossfade - 10..72_000 - crossfade])
     );
     Ok(())
 }

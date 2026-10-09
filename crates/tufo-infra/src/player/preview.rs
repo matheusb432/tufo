@@ -58,7 +58,7 @@ impl PreviewPlayback {
             }
             Self::SeamClip(clip) => {
                 mixer
-                    .play_decoded_sound(clip.sound.volume(decibels(gain)))
+                    .play_static_sound(clip.sound.volume(decibels(gain)))
                     .map_err(|error| unavailable(error.into()))?;
                 Ok(Some(clip.cycle))
             }

@@ -73,7 +73,12 @@ fn a_streamed_effect_plays_its_second_pass_frame_for_frame_like_its_first() -> a
     else {
         anyhow::bail!("Fireplace fits the loop cache budget");
     };
-    assert_eq!(first_mismatch(&cached.frames, &first_pass), None);
+    let cached = cached
+        .frames()
+        .iter()
+        .map(|&frame| Frame::from(frame))
+        .collect::<Vec<_>>();
+    assert_eq!(first_mismatch(&cached, &first_pass), None);
     let looped = read_frames(
         &mut decode(fireplace.path.as_ref(), true)?,
         2 * first_pass.len(),

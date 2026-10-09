@@ -7,13 +7,14 @@
 pub mod browser_input;
 pub mod buffered_track;
 pub(crate) mod codecs;
+pub mod effect_sound;
 mod envelope;
 pub mod limiter;
 pub mod music_deck;
+pub mod packed_frame;
 pub mod pull_backend;
 pub(crate) mod seam;
 pub mod sound_cache;
-pub mod streamed_sound;
 
 use std::{
     sync::{
@@ -28,6 +29,7 @@ use cpal::{
     BufferSize, StreamConfig,
     traits::{DeviceTrait as _, HostTrait as _},
 };
+use effect_sound::EffectSound;
 use kira::{
     AudioManager, AudioManagerSettings, Decibels, ResourceLimitReached, StartTime, Tween,
     backend::{
@@ -40,7 +42,6 @@ use kira::{
 use limiter::LimiterBuilder;
 use music_deck::MusicDeckHandle;
 use pull_backend::{PullBackend, PullBackendError, PullBackendSettings};
-use streamed_sound::StreamedSound;
 use tufo_models::{library::Volume, playback::music_layers::MUSIC_LAYERS_EXTRA_MAX};
 
 /// Requested local callback size: about 43 ms at 48 kHz. ALSA uses two periods; native
@@ -232,17 +233,14 @@ impl Mixer {
         self.sounds_track.resume(linear_tween(fade));
     }
 
-    pub fn play_decoded_sound(
+    pub fn play_static_sound(
         &mut self,
         sound: StaticSoundData,
     ) -> Result<StaticSoundHandle, MixerFullError> {
         self.sounds_track.play(sound).map_err(|_| MixerFullError)
     }
 
-    pub(crate) fn play_streamed_sound(
-        &mut self,
-        sound: StreamedSound,
-    ) -> Result<(), MixerFullError> {
+    pub fn play_effect(&mut self, sound: EffectSound) -> Result<(), MixerFullError> {
         self.sounds_track.play(sound).map_err(|_| MixerFullError)
     }
 

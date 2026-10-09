@@ -1,9 +1,11 @@
 use kira::Frame;
 use tufo_infra::audio::{
     Mixer,
+    effect_sound::{EffectSource, effect_sound},
+    packed_frame::PackedFrame,
     sound_cache::{LoadedSound, SoundLoadOptions, load_sound},
 };
-use tufo_models::library::Volume;
+use tufo_models::library::{SoundSettings, Volume};
 
 mod support;
 
@@ -27,7 +29,7 @@ fn short_sounds_decode_into_memory_and_long_ones_stream() -> anyhow::Result<()> 
     let door = load_sound(&door, LOAD_OPTIONS)?;
     let rain = load_sound(&rain, LOAD_OPTIONS)?;
 
-    assert!(matches!(door, LoadedSound::Decoded(data) if data.frames.len() == 48_000));
+    assert!(matches!(door, LoadedSound::Decoded(sound) if sound.frames().len() == 48_000));
     assert!(matches!(rain, LoadedSound::Streamed(_)));
     Ok(())
 }
@@ -40,18 +42,19 @@ fn long_loops_decode_only_when_their_frames_fit_the_byte_budget() -> anyhow::Res
     write_wav(&path, 8_000, &constant(0.25, frames))?;
     let options = SoundLoadOptions {
         looping: true,
-        bytes_max: frames * size_of::<Frame>(),
+        bytes_max: frames * size_of::<PackedFrame>(),
     };
 
-    let LoadedSound::Decoded(data) = load_sound(&path, options)? else {
+    let LoadedSound::Decoded(sound) = load_sound(&path, options)? else {
         anyhow::bail!("the loop fits exactly in the byte budget");
     };
 
-    assert_eq!(data.frames.len(), frames);
+    assert_eq!(sound.frames().len(), frames);
     assert!(
-        data.frames
+        sound
+            .frames()
             .iter()
-            .all(|frame| *frame == Frame::new(0.25, 0.25))
+            .all(|&frame| Frame::from(frame) == Frame::new(0.25, 0.25))
     );
     assert!(matches!(
         load_sound(
@@ -71,7 +74,7 @@ fn a_cached_loop_keeps_its_pitch_and_seam_at_another_output_rate() -> anyhow::Re
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("ambience.wav");
     std::fs::write(&path, wav_bytes(21, 440.0, None))?;
-    let LoadedSound::Decoded(data) = load_sound(
+    let LoadedSound::Decoded(sound) = load_sound(
         &path,
         SoundLoadOptions {
             looping: true,
@@ -84,7 +87,12 @@ fn a_cached_loop_keeps_its_pitch_and_seam_at_another_output_rate() -> anyhow::Re
     std::fs::remove_file(&path)?;
     let (mut mixer, renderer) = Mixer::open_pulled(SAMPLE_RATE, Volume::default())?;
     let mut renderer = renderer.recv()?;
-    mixer.play_decoded_sound(data.loop_region(..))?;
+    let looping = SoundSettings {
+        looping: true,
+        ..SoundSettings::default()
+    };
+    let (sound, _handle) = effect_sound(EffectSource::Decoded(sound), looping, SAMPLE_RATE);
+    mixer.play_effect(sound)?;
     let loop_frame = 21 * SAMPLE_RATE as usize;
     let window_frames = SAMPLE_RATE as usize / 10;
 
@@ -111,15 +119,15 @@ fn opus_sounds_decode_to_exactly_their_samples() -> anyhow::Result<()> {
     let original = stereo_sine(48_000, 1_000.0, 0.5);
     write_ogg_opus(&chime, 2, &original)?;
 
-    let LoadedSound::Decoded(data) = load_sound(&chime, LOAD_OPTIONS)? else {
+    let LoadedSound::Decoded(sound) = load_sound(&chime, LOAD_OPTIONS)? else {
         anyhow::bail!("a one-second sound streamed");
     };
 
-    assert_eq!(data.frames.len(), 48_000);
-    let decoded_left = data
-        .frames
+    assert_eq!(sound.frames().len(), 48_000);
+    let decoded_left = sound
+        .frames()
         .iter()
-        .map(|frame| frame.left)
+        .map(|&frame| Frame::from(frame).left)
         .collect::<Vec<_>>();
     let original_left = original.iter().step_by(2).copied().collect::<Vec<_>>();
     let similarity = correlation(&decoded_left, &original_left);

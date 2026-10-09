@@ -20,7 +20,7 @@ use tufo_models::library::Volume;
 
 mod support;
 
-use support::{SAMPLE_RATE, assert_near, constant, ramp, render, write_wav};
+use support::{SAMPLE_RATE, assert_near, constant, ramp, render, stored, write_wav};
 
 const TRACK_FRAMES: usize = 9_600;
 const FIRST: NonZeroU64 = NonZeroU64::MIN;
@@ -185,7 +185,7 @@ fn pausing_holds_the_position_and_resuming_continues_from_it() -> anyhow::Result
 
     assert!(all_equal(&paused, 0.0));
     assert_eq!(played_while_paused, Duration::from_millis(50));
-    assert_near(resumed[0], ramp(2_401)[2_400], 1e-7);
+    assert_near(resumed[0], stored(&ramp(2_401))[2_400], 1e-7);
     Ok(())
 }
 
@@ -207,7 +207,7 @@ fn a_track_can_start_partway_through_its_file() -> anyhow::Result<()> {
 
     let output = fixture.render(TRACK_FRAMES);
 
-    assert_near(output[0], ramp(4_801)[4_800], 1e-7);
+    assert_near(output[0], stored(&ramp(4_801))[4_800], 1e-7);
     assert!(all_equal(&output[TRACK_FRAMES / 2..], 0.0));
     Ok(())
 }
@@ -232,6 +232,7 @@ fn a_looping_track_wraps_from_its_last_frame_to_its_first() -> anyhow::Result<()
 
     let output = fixture.render(2 * frames + 100);
 
+    let samples = stored(&samples);
     assert_eq!(output[..frames], samples[..]);
     assert_eq!(output[frames..2 * frames], samples[..]);
     assert_eq!(output[2 * frames..], samples[..100]);
@@ -256,7 +257,7 @@ fn the_limiter_keeps_music_plus_sounds_below_full_scale() -> anyhow::Result<()> 
         settings: StaticSoundSettings::default(),
         slice: None,
     };
-    fixture.mixer.play_decoded_sound(sound)?;
+    fixture.mixer.play_static_sound(sound)?;
 
     let output = fixture.render(TRACK_FRAMES);
 

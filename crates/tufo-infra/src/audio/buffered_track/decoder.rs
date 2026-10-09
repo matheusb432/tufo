@@ -3,7 +3,6 @@
 use std::{io, ops::ControlFlow, sync::atomic::Ordering, thread, time::Duration};
 
 use anyhow::Context as _;
-use kira::Frame;
 use rtrb::Producer;
 use rubato::{
     Fft, FixedSync, Indexing, Resampler as _, audioadapter_buffers::direct::InterleavedSlice,
@@ -25,7 +24,7 @@ use super::{
     TrackShared, duration_of_frames, frame_count, frames_in,
     track_file::{TrackFile, TrackFileReader},
 };
-use crate::audio::{codecs, seam};
+use crate::audio::{codecs, packed_frame::PackedFrame, seam};
 
 const STEREO: usize = 2;
 const RESAMPLER_CHUNK_FRAMES: usize = 1024;
@@ -138,8 +137,11 @@ impl ProbedTrack {
     }
 
     /// Decodes the file into stereo frames at its own rate, or returns `None` once it runs past
-    /// `frames_max`. Blocks the calling thread.
-    pub(crate) fn decode_whole(mut self, frames_max: usize) -> anyhow::Result<Option<Vec<Frame>>> {
+    /// `frames_max`. The frames' allocation fits them exactly. Blocks the calling thread.
+    pub(crate) fn decode_whole(
+        mut self,
+        frames_max: usize,
+    ) -> anyhow::Result<Option<Vec<PackedFrame>>> {
         let mut decoded = Vec::new();
         let mut stereo = Vec::new();
         let frames_expected = self
@@ -165,9 +167,10 @@ impl ProbedTrack {
                     .as_chunks::<STEREO>()
                     .0
                     .iter()
-                    .map(|&[left, right]| Frame::new(left, right)),
+                    .map(|&[left, right]| PackedFrame::new(left, right)),
             );
         }
+        frames.shrink_to_fit();
         Ok(Some(frames))
     }
 
@@ -379,7 +382,7 @@ impl RegionCursor {
 }
 
 impl TrackDecoder {
-    pub(super) fn run(mut self, mut producer: Producer<Frame>, shared: &TrackShared) {
+    pub(super) fn run(mut self, mut producer: Producer<PackedFrame>, shared: &TrackShared) {
         let mut writer = FrameWriter {
             producer: &mut producer,
             shared,
@@ -514,7 +517,7 @@ fn downmix_to_stereo(interleaved: &[f32], channel_count: usize, stereo: &mut Vec
 }
 
 struct FrameWriter<'a> {
-    producer: &'a mut Producer<Frame>,
+    producer: &'a mut Producer<PackedFrame>,
     shared: &'a TrackShared,
 }
 
@@ -529,7 +532,7 @@ impl FrameWriter<'_> {
             .as_chunks::<STEREO>()
             .0
             .iter()
-            .map(|&[left, right]| Frame::new(left, right));
+            .map(|&[left, right]| PackedFrame::new(left, right));
         let mut remaining = stereo.len() / STEREO;
         while remaining > 0 {
             if self.should_stop() {

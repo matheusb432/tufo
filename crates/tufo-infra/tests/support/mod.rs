@@ -7,7 +7,8 @@
 
 use std::{io::Write as _, path::Path};
 
-use kira::backend::Renderer;
+use kira::{Frame, backend::Renderer};
+use tufo_infra::audio::packed_frame::PackedFrame;
 
 mod ogg_opus;
 
@@ -55,6 +56,14 @@ pub fn constant(value: f32, frames: usize) -> Vec<f32> {
 )]
 pub fn ramp(frames: usize) -> Vec<f32> {
     (0..frames).map(|frame| frame as f32 / 480_000.0).collect()
+}
+
+/// `samples` as buffered tracks and decoded sounds store them.
+pub fn stored(samples: &[f32]) -> Vec<f32> {
+    samples
+        .iter()
+        .map(|&sample| Frame::from(PackedFrame::new(sample, sample)).left)
+        .collect()
 }
 
 /// The position a ramp sample names, in seconds.
