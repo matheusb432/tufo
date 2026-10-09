@@ -10,6 +10,11 @@ use tracing_subscriber::fmt::writer::MakeWriterExt as _;
 /// glibc's initial mmap threshold, which it would otherwise raise up to 32 MB.
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 const MMAP_THRESHOLD_BYTES: libc::c_int = 128 * 1024;
+/// glibc otherwise allows eight malloc arenas per core, and each keeps the memory freed into it.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+const MALLOC_ARENAS_MAX: libc::c_int = 2;
+/// The server's tasks mostly wait on sockets and timers; audio runs on its own threads.
+const RUNTIME_WORKER_THREADS: usize = 2;
 /// A log past this size moves aside to `tufo-server.log.1` when the server starts.
 const LOG_ROTATE_BYTES: u64 = 10 * 1024 * 1024;
 const LOG_FILE_NAME: &str = "tufo-server.log";
@@ -38,7 +43,13 @@ enum Command {
 fn main() -> anyhow::Result<()> {
     #[cfg(target_os = "linux")]
     configure_pipewire_client();
-    tokio::runtime::Runtime::new()?.block_on(run())
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    limit_malloc_arenas();
+    tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(RUNTIME_WORKER_THREADS)
+        .enable_all()
+        .build()?
+        .block_on(run())
 }
 
 #[cfg(target_os = "linux")]
@@ -70,6 +81,14 @@ async fn run() -> anyhow::Result<()> {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     map_large_allocations_separately();
     tufo_server::run(arguments.discord_credentials).await
+}
+
+/// Each thread that allocates gets an arena of its own until the cap, so threads that come and go,
+/// like decoders and the blocking pool's, would leave dozens of mostly empty arenas resident.
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+fn limit_malloc_arenas() {
+    // SAFETY: mallopt only tunes the allocator and is safe to call at any time.
+    unsafe { libc::mallopt(libc::M_ARENA_MAX, MALLOC_ARENAS_MAX) };
 }
 
 /// After freeing a large block, glibc serves blocks of that size from heaps it rarely shrinks, so
