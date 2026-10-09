@@ -18,8 +18,19 @@ use support::{
     SAMPLE_RATE, constant, correlation, ramp, stereo_sine, stored, write_ogg_opus, write_wav,
 };
 
+const READ_TIMEOUT: Duration = Duration::from_secs(30);
+
+/// Waits until the decoder has buffered `frames` ahead of the reader.
+fn wait_for_buffered(reader: &TrackReader, frames: usize) {
+    let deadline = Instant::now() + READ_TIMEOUT;
+    while reader.buffered_frames() < frames {
+        assert!(Instant::now() < deadline, "the decoder stalled");
+        thread::sleep(Duration::from_millis(1));
+    }
+}
+
 #[test]
-fn a_started_stream_holds_thirty_seconds_without_needing_the_decoder() -> anyhow::Result<()> {
+fn a_started_stream_fills_thirty_seconds_ahead_of_playback() -> anyhow::Result<()> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("ambience.wav");
     write_wav(
@@ -34,6 +45,7 @@ fn a_started_stream_holds_thirty_seconds_without_needing_the_decoder() -> anyhow
     )?;
     let mut frames = vec![Frame::ZERO; 30 * SAMPLE_RATE as usize];
 
+    wait_for_buffered(&track.reader, frames.len());
     let copied = track.reader.read(&mut frames);
 
     assert_eq!(copied, frames.len());
@@ -54,6 +66,7 @@ fn enabling_a_loop_after_prefill_restarts_a_decoder_that_reached_eof() -> anyhow
         SAMPLE_RATE,
         DecodeOptions::default(),
     )?;
+    wait_for_buffered(&track.reader, pass_frames);
     track.handle.set_looping(true);
     let mut copied = 0;
     let mut out = [Frame::ZERO; 1_024];
@@ -93,6 +106,7 @@ fn disabling_a_loop_discards_prefetched_repeats_after_the_current_pass() -> anyh
         },
     )?;
     let mut half_pass = vec![Frame::ZERO; SAMPLE_RATE as usize / 2];
+    wait_for_buffered(&track.reader, 2 * half_pass.len());
     assert_eq!(track.reader.read(&mut half_pass), half_pass.len());
     track.handle.set_looping(false);
 
@@ -103,8 +117,6 @@ fn disabling_a_loop_discards_prefetched_repeats_after_the_current_pass() -> anyh
     assert_eq!(track.handle.underrun_frames(), 0);
     Ok(())
 }
-
-const READ_TIMEOUT: Duration = Duration::from_secs(30);
 
 fn loop_region(frame_count: usize, markers: [u64; 4]) -> anyhow::Result<LoopRegion> {
     let [playback_start, loop_start, loop_end, crossfade] = markers.map(SourceFrames);

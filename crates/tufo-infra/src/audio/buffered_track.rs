@@ -28,6 +28,7 @@ use tufo_models::library::song_loop::{LoopRegion, SourceFrames, nearest_frames};
 use super::packed_frame::{PackedFrame, unpack_into};
 
 const BUFFER_DURATION: Duration = Duration::from_secs(30);
+const PREFILL_DURATION: Duration = Duration::from_millis(500);
 const PREFILL_TIMEOUT: Duration = Duration::from_secs(2);
 const PREFILL_POLL_INTERVAL: Duration = Duration::from_millis(2);
 
@@ -105,9 +106,9 @@ pub struct BufferedTrack {
 }
 
 impl BufferedTrack {
-    /// Starts decoding `file` at `output_sample_rate`, filling up to [`BUFFER_DURATION`] before
-    /// returning. Short files return at EOF; a slow decoder gets at most [`PREFILL_TIMEOUT`] to
-    /// prefill. Blocks the calling thread.
+    /// Starts decoding `file` at `output_sample_rate` and returns once [`PREFILL_DURATION`] is
+    /// buffered, while the decoder goes on to fill [`BUFFER_DURATION`]. Short files return at EOF;
+    /// a slow decoder gets at most [`PREFILL_TIMEOUT`] to prefill. Blocks the calling thread.
     pub fn start(
         file: AudioFile,
         output_sample_rate: u32,
@@ -175,7 +176,7 @@ impl BufferedTrack {
             declared_frames: pass_ends.first(),
             underrun_frames_total: None,
         };
-        reader.wait_for_prefill(frames_in(BUFFER_DURATION, output_sample_rate));
+        reader.wait_for_prefill(frames_in(PREFILL_DURATION, output_sample_rate));
         Ok(Self {
             reader,
             handle: TrackHandle {
@@ -232,6 +233,12 @@ impl TrackReader {
             }
         }
         copied
+    }
+
+    /// Frames decoded and waiting to be read.
+    #[must_use]
+    pub fn buffered_frames(&self) -> usize {
+        self.consumer.slots()
     }
 
     pub(crate) fn count_underruns_in(&mut self, total: Arc<AtomicU64>) {
