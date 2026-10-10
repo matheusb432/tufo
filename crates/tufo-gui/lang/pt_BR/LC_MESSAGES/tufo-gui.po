@@ -82,8 +82,8 @@ msgid "Audio keeps playing after the GUI closes."
 msgstr "O áudio continua tocando depois que a interface fecha."
 
 #: ui/dialogs.slint
-msgid "Automatically start Tufo when you log in."
-msgstr "Inicia o Tufo automaticamente quando você entra no sistema."
+msgid "Starts when you log in."
+msgstr "Inicia quando você entra no sistema."
 
 #: src/presentation.rs
 msgid "Autumn"
@@ -270,8 +270,8 @@ msgid "Court"
 msgstr "Corte"
 
 #: ui/dialogs.slint
-msgid "Crossfade: {0} s"
-msgstr "Transição entre faixas: {0} s"
+msgid "Crossfade"
+msgstr "Transição entre faixas"
 
 #: src/presentation.rs
 msgid "David Teniers the Younger, 1658"
@@ -2503,3 +2503,27 @@ msgstr "Abra o navegador primeiro."
 #: src/controller/browser.rs
 msgid "The browser could not do that. Try again."
 msgstr "O navegador não conseguiu fazer isso. Tente de novo."
+
+#: ui/dialogs.slint
+msgid "Playback"
+msgstr "Reprodução"
+
+#: ui/dialogs.slint
+msgid "General"
+msgstr "Geral"
+
+#: ui/dialogs.slint
+msgid "Library"
+msgstr "Biblioteca"
+
+#: ui/dialogs.slint
+msgid "{0} s"
+msgstr "{0} s"
+
+#: ui/dialogs.slint
+msgid "How long consecutive songs overlap."
+msgstr "Por quanto tempo músicas consecutivas se sobrepõem."
+
+#: ui/dialogs.slint
+msgid "When guide icons appear."
+msgstr "Quando os ícones de guia aparecem."

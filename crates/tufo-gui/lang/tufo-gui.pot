@@ -82,7 +82,7 @@ msgid "Audio keeps playing after the GUI closes."
 msgstr ""
 
 #: ui/dialogs.slint
-msgid "Automatically start Tufo when you log in."
+msgid "Starts when you log in."
 msgstr ""
 
 #: src/presentation.rs
@@ -270,7 +270,7 @@ msgid "Court"
 msgstr ""
 
 #: ui/dialogs.slint
-msgid "Crossfade: {0} s"
+msgid "Crossfade"
 msgstr ""
 
 #: src/presentation.rs
@@ -2502,4 +2502,28 @@ msgstr ""
 
 #: src/controller/browser.rs
 msgid "The browser could not do that. Try again."
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Playback"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "General"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "Library"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "{0} s"
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "How long consecutive songs overlap."
+msgstr ""
+
+#: ui/dialogs.slint
+msgid "When guide icons appear."
 msgstr ""

@@ -372,6 +372,7 @@ export component Slider inherits Rectangle {
     in property <brush> track: Theme.track;
     in property <length> track-height: 4px;
     in property <bool> show-thumb: true;
+    in property <bool> thumb-always-visible;
     // Fires on the press and while dragging.
     callback changed(float);
     callback released(float);
@@ -430,7 +431,7 @@ export component Slider inherits Rectangle {
         height: self.width;
         border-radius: self.width / 2;
         background: root.fill;
-        opacity: touch.has-hover || touch.pressed ? 1 : 0;
+        opacity: root.thumb-always-visible || touch.has-hover || touch.pressed ? 1 : 0;
         animate opacity, width { duration: 120ms; }
     }
 

@@ -577,44 +577,137 @@ export component EditEntryDialog inherits DialogFrame {
     }
 }
 
-component SwitchSetting inherits HorizontalLayout {
+// A titled panel of settings rows.
+component SettingsSection inherits VerticalLayout {
+    in property <string> title;
+    spacing: 8px;
+    Text {
+        text: root.title;
+        font-size: Theme.body-small;
+        font-weight: 800;
+        color: Theme.text-secondary;
+    }
+
+    Rectangle {
+        background: Theme.field;
+        border-radius: Theme.radius-row;
+        VerticalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            @children
+        }
+    }
+}
+
+component SettingsDivider inherits Rectangle {
+    height: 1px;
+    background: Theme.divider;
+}
+
+// A setting's name over what it does.
+component SettingLabel inherits VerticalLayout {
+    in property <string> title;
+    in property <string> description;
+    spacing: 2px;
+    Text {
+        text: root.title;
+        font-size: Theme.body;
+        font-weight: 700;
+        color: Theme.text;
+        wrap: word-wrap;
+    }
+
+    if root.description != "": Text {
+        text: root.description;
+        font-size: Theme.caption;
+        color: Theme.text-secondary;
+        wrap: word-wrap;
+    }
+}
+
+// A setting's name and what it does, beside its controls.
+component SettingRow inherits Rectangle {
     in property <string> tour-anchor;
+    in property <string> title;
+    in property <string> description;
     TourTarget {
         anchor: root.tour-anchor;
         available: root.tour-anchor != "";
         scroll: TourScroll.dialog;
         bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
     }
-    in property <string> title;
-    in property <string> description;
-    in-out property <bool> checked;
-    callback toggled(bool);
-    spacing: 16px;
-    VerticalLayout {
-        spacing: 4px;
-        Text {
-            text: root.title;
-            font-size: Theme.body;
-            font-weight: 700;
-            color: Theme.text;
-            wrap: word-wrap;
+
+    HorizontalLayout {
+        padding-top: 12px;
+        padding-bottom: 12px;
+        spacing: 16px;
+        SettingLabel {
+            alignment: center;
+            horizontal-stretch: 1;
+            title: root.title;
+            description: root.description;
         }
 
-        Text {
-            text: root.description;
-            font-size: Theme.caption;
-            color: Theme.text-secondary;
-            wrap: word-wrap;
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 0;
+            HorizontalLayout {
+                spacing: 8px;
+                @children
+            }
         }
+    }
+}
+
+component SwitchSetting inherits SettingRow {
+    in-out property <bool> checked;
+    callback toggled(bool);
+    Switch {
+        label: root.title;
+        checked <=> root.checked;
+        toggled(checked) => {
+            root.toggled(checked);
+        }
+    }
+}
+
+// Saves when the slider is released.
+component CrossfadeSetting inherits Rectangle {
+    property <int> crossfade-ms-max: 10000;
+    TourTarget {
+        anchor: SettingsTour.crossfade;
+        scroll: TourScroll.dialog;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
     }
 
     VerticalLayout {
-        alignment: center;
-        Switch {
-            label: root.title;
-            checked <=> root.checked;
-            toggled(checked) => {
-                root.toggled(checked);
+        padding-top: 12px;
+        padding-bottom: 14px;
+        spacing: 12px;
+        HorizontalLayout {
+            spacing: 16px;
+            SettingLabel {
+                horizontal-stretch: 1;
+                title: @tr("Crossfade");
+                description: @tr("How long consecutive songs overlap.");
+            }
+
+            Text {
+                text: @tr("{0} s", Math.round(slider.shown-value * root.crossfade-ms-max / 100) / 10);
+                vertical-alignment: center;
+                font-size: Theme.body;
+                font-weight: 700;
+                color: Theme.accent;
+            }
+        }
+
+        slider := Slider {
+            value: Session.crossfade-ms / root.crossfade-ms-max;
+            step: 0.05;
+            fill: Theme.accent;
+            thumb-always-visible: true;
+            released(value) => {
+                Actions.set-crossfade(Math.round(value * root.crossfade-ms-max));
             }
         }
     }
@@ -622,8 +715,10 @@ component SwitchSetting inherits HorizontalLayout {
 
 struct TourVisibilityOption { visibility: TourVisibility, label: string }
 
-component TourVisibilitySetting inherits VerticalLayout {
-    spacing: 8px;
+component TourVisibilitySetting inherits SettingRow {
+    tour-anchor: SettingsTour.tours;
+    title: @tr("Tours");
+    description: @tr("When guide icons appear.");
     property <[TourVisibilityOption]> options: [
         { visibility: TourVisibility.always-show, label: @tr("Always show") },
         { visibility: TourVisibility.show-unseen, label: @tr("Show unseen") },
@@ -640,18 +735,9 @@ component TourVisibilitySetting inherits VerticalLayout {
         Actions.set-tour-visibility(visibility);
         picker-keys.focus();
     }
-    TourTarget {
-        anchor: SettingsTour.tours;
-        scroll: TourScroll.dialog;
-        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
-    }
-    Text {
-        text: @tr("Tours");
-        font-size: Theme.body;
-        font-weight: 700;
-        color: Theme.text;
-    }
     picker := Button {
+        // Fits every option, so the button keeps its width as the choice changes.
+        min-width: 160px;
         text: root.options[root.selected-index].label;
         icon: @image-url("icons/chevron-down.svg");
         accessible-label: @tr("Tours: {0}", self.text);
@@ -673,37 +759,36 @@ component TourVisibilitySetting inherits VerticalLayout {
                 reject
             }
         }
-    }
-    menu := PopupWindow {
-        width: picker.width;
-        x: picker.x;
-        y: picker.y + picker.height + 4px;
-        MenuSurface {
+        menu := PopupWindow {
             width: picker.width;
-            forward-focus: option-keys;
-            init => { option-keys.focus(); }
-            for option[index] in root.options: MenuItem {
-                text: option.label;
-                highlighted: index == root.keyboard-index;
-                activated => { root.select(option.visibility); }
-            }
-            option-keys := FocusScope {
-                focus-on-click: false;
-                key-pressed(event) => {
-                    if event.text == Key.UpArrow || event.text == Key.DownArrow {
-                        root.keyboard-index = clamp(root.keyboard-index + (event.text == Key.DownArrow ? 1 : -1), 0, root.options.length - 1);
-                        return accept;
+            y: picker.height + 4px;
+            MenuSurface {
+                width: picker.width;
+                forward-focus: option-keys;
+                init => { option-keys.focus(); }
+                for option[index] in root.options: MenuItem {
+                    text: option.label;
+                    highlighted: index == root.keyboard-index;
+                    activated => { root.select(option.visibility); }
+                }
+                option-keys := FocusScope {
+                    focus-on-click: false;
+                    key-pressed(event) => {
+                        if event.text == Key.UpArrow || event.text == Key.DownArrow {
+                            root.keyboard-index = clamp(root.keyboard-index + (event.text == Key.DownArrow ? 1 : -1), 0, root.options.length - 1);
+                            return accept;
+                        }
+                        if event.text == Key.Return || event.text == " " {
+                            root.select(root.options[root.keyboard-index].visibility);
+                            return accept;
+                        }
+                        if event.text == Key.Escape || event.text == Key.Tab {
+                            menu.close();
+                            picker-keys.focus();
+                            return accept;
+                        }
+                        reject
                     }
-                    if event.text == Key.Return || event.text == " " {
-                        root.select(root.options[root.keyboard-index].visibility);
-                        return accept;
-                    }
-                    if event.text == Key.Escape || event.text == Key.Tab {
-                        menu.close();
-                        picker-keys.focus();
-                        return accept;
-                    }
-                    reject
                 }
             }
         }
@@ -714,9 +799,9 @@ component TourVisibilitySetting inherits VerticalLayout {
 // restarts tufo-server.
 export component SettingsDialog inherits DialogFrame {
     guide: SettingsTour.guide;
-    property <float> crossfade: Session.crossfade-ms / 10000;
     title: @tr("Settings");
     closable: true;
+    card-width-max: 520px;
 
     function save-token() {
         if token.text != "" {
@@ -725,126 +810,94 @@ export component SettingsDialog inherits DialogFrame {
         }
     }
 
-    Text {
-        text: @tr("Discord");
-        font-size: Theme.body;
-        font-weight: 700;
-        color: Theme.text;
-    }
-
-    HorizontalLayout {
-        spacing: 8px;
-        token := TextField {
+    SettingsSection {
+        title: @tr("Discord");
+        Rectangle {
             TourTarget {
                 anchor: SettingsTour.discord-token;
                 scroll: TourScroll.dialog;
                 bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
             }
-            horizontal-stretch: 1;
-            label: @tr("Bot token");
-            password: true;
-            secret-saved: Session.discord-configured;
-            placeholder: Session.discord-configured ? @tr("Paste a new token") : @tr("Paste your bot's token");
-            accepted => {
-                root.save-token();
-            }
-        }
 
-        VerticalLayout {
-            alignment: end;
-            padding-bottom: 3px;
-            Button {
-                text: @tr("Save and restart");
-                kind: ButtonKind.primary;
-                enabled: token.text != "";
-                clicked => {
-                    root.save-token();
+            HorizontalLayout {
+                padding-top: 12px;
+                padding-bottom: 14px;
+                spacing: 8px;
+                token := TextField {
+                    horizontal-stretch: 1;
+                    label: @tr("Bot token");
+                    password: true;
+                    secret-saved: Session.discord-configured;
+                    placeholder: Session.discord-configured ? @tr("Paste a new token") : @tr("Paste your bot's token");
+                    accepted => {
+                        root.save-token();
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: end;
+                    padding-bottom: 3px;
+                    Button {
+                        text: @tr("Save and restart");
+                        kind: ButtonKind.primary;
+                        enabled: token.text != "";
+                        clicked => {
+                            root.save-token();
+                        }
+                    }
                 }
             }
         }
-    }
 
-    if Session.discord-configured: SwitchSetting {
-        tour-anchor: SettingsTour.discord-disable;
-        title: @tr("Disable Discord connection");
-        description: @tr("Logs the bot out.");
-        checked: Session.discord-disabled;
-        toggled(checked) => {
-            Actions.set-discord-connection-disabled(checked);
-        }
-    }
-
-    Text {
-        text: @tr("Crossfade: {0} s", Math.round(root.crossfade * 100) / 10);
-        font-size: Theme.body;
-        font-weight: 700;
-        color: Theme.text;
-    }
-
-    Slider {
-        TourTarget {
-            anchor: SettingsTour.crossfade;
-            scroll: TourScroll.dialog;
-            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
-        }
-        value: root.crossfade;
-        step: 0.05;
-        changed(value) => {
-            root.crossfade = value;
-        }
-        released(value) => {
-            Actions.set-crossfade(Math.round(value * 10000));
-        }
-    }
-
-    SwitchSetting {
-        tour-anchor: SettingsTour.quit-behavior;
-        title: @tr("Keep playing after quitting");
-        description: @tr("Audio keeps playing after the GUI closes.");
-        checked: Session.keep-playing-after-quit;
-        toggled(checked) => {
-            Actions.set-keep-playing-after-quit(checked);
-        }
-    }
-
-    SwitchSetting {
-        tour-anchor: SettingsTour.startup;
-        title: @tr("Run at startup");
-        description: @tr("Automatically start Tufo when you log in.");
-        checked: Session.start-at-login;
-        toggled(checked) => {
-            Actions.set-start-at-login(checked);
-        }
-    }
-
-    TourVisibilitySetting { }
-
-    HorizontalLayout {
-        TourTarget {
-            anchor: SettingsTour.kenku-launch;
-            scroll: TourScroll.dialog;
-            bounds: GuidedTours.bounds(parent.absolute-position, parent.width, parent.height);
-        }
-        spacing: 16px;
-        VerticalLayout {
-            spacing: 4px;
-            Text {
-                text: @tr("Kenku FM");
-                font-size: Theme.body;
-                font-weight: 700;
-                color: Theme.text;
+        if Session.discord-configured: SettingsDivider { }
+        if Session.discord-configured: SwitchSetting {
+            tour-anchor: SettingsTour.discord-disable;
+            title: @tr("Disable Discord connection");
+            description: @tr("Logs the bot out.");
+            checked: Session.discord-disabled;
+            toggled(checked) => {
+                Actions.set-discord-connection-disabled(checked);
             }
+        }
+    }
 
-            Text {
-                text: @tr("Imports your library and settings.");
-                font-size: Theme.caption;
-                color: Theme.text-secondary;
-                wrap: word-wrap;
+    SettingsSection {
+        title: @tr("Playback");
+        CrossfadeSetting { }
+        SettingsDivider { }
+        SwitchSetting {
+            tour-anchor: SettingsTour.quit-behavior;
+            title: @tr("Keep playing after quitting");
+            description: @tr("Audio keeps playing after the GUI closes.");
+            checked: Session.keep-playing-after-quit;
+            toggled(checked) => {
+                Actions.set-keep-playing-after-quit(checked);
+            }
+        }
+    }
+
+    SettingsSection {
+        title: @tr("General");
+        SwitchSetting {
+            tour-anchor: SettingsTour.startup;
+            title: @tr("Run at startup");
+            description: @tr("Starts when you log in.");
+            checked: Session.start-at-login;
+            toggled(checked) => {
+                Actions.set-start-at-login(checked);
             }
         }
 
-        VerticalLayout {
-            alignment: center;
+        SettingsDivider { }
+        TourVisibilitySetting { }
+    }
+
+    SettingsSection {
+        title: @tr("Library");
+        SettingRow {
+            tour-anchor: SettingsTour.kenku-launch;
+            title: @tr("Kenku FM");
+            description: @tr("Imports your library and settings.");
             Button {
                 text: KenkuImportView.available ? @tr("View import") : @tr("Import");
                 clicked => {
@@ -853,41 +906,32 @@ export component SettingsDialog inherits DialogFrame {
                 }
             }
         }
-    }
 
-    VerticalLayout {
-        spacing: 10px;
+        SettingsDivider { }
         VerticalLayout {
-            spacing: 4px;
-            Text {
-                text: @tr("Song loops");
-                font-size: Theme.body;
-                font-weight: 700;
-                color: Theme.text;
+            padding-top: 12px;
+            padding-bottom: 12px;
+            spacing: 10px;
+            SettingLabel {
+                title: @tr("Song loops");
+                description: @tr("Moves saved loops between libraries as a file; importing checks each song’s audio first.");
             }
 
-            Text {
-                text: @tr("Moves saved loops between libraries as a file; importing checks each song’s audio first.");
-                font-size: Theme.caption;
-                color: Theme.text-secondary;
-                wrap: word-wrap;
-            }
-        }
-
-        HorizontalLayout {
-            alignment: start;
-            spacing: 8px;
-            Button {
-                text: @tr("Import…");
-                clicked => {
-                    Actions.import-song-loops();
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+                Button {
+                    text: @tr("Import…");
+                    clicked => {
+                        Actions.import-song-loops();
+                    }
                 }
-            }
 
-            Button {
-                text: @tr("Export…");
-                clicked => {
-                    Actions.export-song-loops();
+                Button {
+                    text: @tr("Export…");
+                    clicked => {
+                        Actions.export-song-loops();
+                    }
                 }
             }
         }
