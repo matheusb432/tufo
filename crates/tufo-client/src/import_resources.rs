@@ -803,6 +803,7 @@ mod tests {
             order: EntryOrder::default(),
             source,
             entries,
+            pinned: true,
         })
     }
 

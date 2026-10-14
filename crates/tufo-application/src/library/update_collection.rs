@@ -1,4 +1,5 @@
-//! Retitling a collection, changing its background, or reordering its entries.
+//! Retitling a collection, changing its background, reordering its entries, or pinning it to the
+//! sidebar.
 
 use tufo_models::library::{BuiltinTitle, Collection, CollectionId, EntryOrder};
 use tufo_wire::library::{EntryOrderPatch, UpdateCollection};
@@ -43,10 +44,11 @@ pub async fn execute<F: LibraryFiles>(
         background,
         order,
         order_patch,
+        pinned,
     } = request;
     let order =
         order.or_else(|| order_patch.and_then(|patch| apply_order_patch(current.order(), patch)));
-    if title.is_none() && background.is_none() && order.is_none() {
+    if title.is_none() && background.is_none() && order.is_none() && pinned.is_none() {
         return Ok(());
     }
     let mut update = Collection::update_by_id(id);
@@ -61,6 +63,9 @@ pub async fn execute<F: LibraryFiles>(
         update = update
             .order_key(order.key)
             .order_descending(order.descending);
+    }
+    if let Some(pinned) = pinned {
+        update = update.pinned(pinned);
     }
     update
         .exec(&mut database)

@@ -106,8 +106,9 @@ mod tests {
     use tufo_models::{
         library::{
             AudioFile, AudioFingerprint, Collection, CollectionEntry, CollectionKind,
-            EntryOrderKey, FadeDuration, FileIdentity, SoundIcon, Title, Volume,
+            EntryOrderKey, FadeDuration, FileIdentity, LibraryFolder, SoundIcon, Title, Volume,
         },
+        path::FolderPath,
         playback::AudioFilePath,
     };
 
@@ -136,6 +137,14 @@ mod tests {
     }
 
     async fn insert_manual_collection(database: &mut Db, kind: CollectionKind) -> Collection {
+        insert_collection_created_at(database, kind, Timestamp::now()).await
+    }
+
+    async fn insert_collection_created_at(
+        database: &mut Db,
+        kind: CollectionKind,
+        created_at: Timestamp,
+    ) -> Collection {
         toasty::create!(Collection {
             kind,
             title: Title::try_new("Tavern night".to_owned()).unwrap(),
@@ -147,7 +156,8 @@ mod tests {
             folder_identity: None,
             folder_missing_since: None,
             hidden_at: None,
-            created_at: Timestamp::now(),
+            created_at,
+            pinned: false,
         })
         .exec(database)
         .await
@@ -220,11 +230,12 @@ mod tests {
              ALTER TABLE player_settings DROP COLUMN effects_volume;
              ALTER TABLE player_settings DROP COLUMN browser_volume;
              ALTER TABLE player_settings DROP COLUMN browser_muted;
+             ALTER TABLE collections DROP COLUMN pinned;
              ALTER TABLE collections DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN song_source;
              DELETE FROM __toasty_migrations
-             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql');",
+             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -285,7 +296,8 @@ mod tests {
              ALTER TABLE player_settings DROP COLUMN browser_volume;
              ALTER TABLE player_settings DROP COLUMN browser_muted;
              ALTER TABLE audio_files DROP COLUMN song_source;
-             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql');",
+             ALTER TABLE collections DROP COLUMN pinned;
+             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -300,6 +312,96 @@ mod tests {
             .collect::<std::collections::HashMap<_, _>>();
         assert!(song_sources[&song.id]);
         assert!(!song_sources[&sound.id]);
+    }
+
+    #[tokio::test]
+    async fn the_five_newest_shown_collections_of_each_kind_start_pinned() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(DATABASE_FILE_NAME);
+        let mut database = open_database(&path).await.unwrap();
+        let first_created_at = Timestamp::from_second(1_790_000_000).unwrap();
+        let created_at = |offset_ms: i64| {
+            first_created_at
+                .checked_add(jiff::SignedDuration::from_millis(offset_ms))
+                .unwrap()
+        };
+        // The cut falls between a whole second and the half second after it, which only a
+        // fixed-width timestamp text orders correctly.
+        let mut playlists = Vec::new();
+        for offset_ms in [0, 1_000, 1_500, 2_000, 2_500, 3_000, 3_500] {
+            playlists.push(
+                insert_collection_created_at(
+                    &mut database,
+                    CollectionKind::Playlist,
+                    created_at(offset_ms),
+                )
+                .await
+                .id,
+            );
+        }
+        let music = FolderPath::try_new(std::env::temp_dir().join("rpg")).unwrap();
+        let identity = FileIdentity::try_new("unix:1:3".to_owned()).unwrap();
+        let library_folder = toasty::create!(LibraryFolder {
+            kind: CollectionKind::Playlist,
+            folder_path: music.clone(),
+            folder_identity: identity.clone(),
+            created_at: created_at(0),
+        })
+        .exec(&mut database)
+        .await
+        .unwrap();
+        let deleted_newest = insert_collection_created_at(
+            &mut database,
+            CollectionKind::Playlist,
+            created_at(4_000),
+        )
+        .await
+        .id;
+        Collection::update_by_id(deleted_newest)
+            .library_folder_id(Some(library_folder.id))
+            .folder_path(Some(music))
+            .folder_identity(Some(identity))
+            .hidden_at(Some(created_at(5_000)))
+            .exec(&mut database)
+            .await
+            .unwrap();
+        let mut soundboards = Vec::new();
+        for offset_ms in [100, 200] {
+            soundboards.push(
+                insert_collection_created_at(
+                    &mut database,
+                    CollectionKind::Soundboard,
+                    created_at(offset_ms),
+                )
+                .await
+                .id,
+            );
+        }
+        drop(database);
+        let legacy = rusqlite::Connection::open(&path).unwrap();
+        legacy
+            .execute_batch(
+                "ALTER TABLE collections DROP COLUMN pinned;
+             DELETE FROM __toasty_migrations WHERE name = '0012_pinned_collections.sql';",
+            )
+            .unwrap();
+        drop(legacy);
+
+        let mut migrated = open_database(&path).await.unwrap();
+        let pinned = Collection::all()
+            .exec(&mut migrated)
+            .await
+            .unwrap()
+            .into_iter()
+            .filter(|collection| collection.pinned)
+            .map(|collection| collection.id)
+            .collect::<std::collections::HashSet<_>>();
+        let expected = playlists[2..]
+            .iter()
+            .chain(&soundboards)
+            .copied()
+            .collect::<std::collections::HashSet<_>>();
+        assert_eq!(pinned, expected);
     }
 
     #[tokio::test]

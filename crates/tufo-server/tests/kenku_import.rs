@@ -147,9 +147,11 @@ async fn a_kenku_library_imports_its_folders_sounds_settings_and_token() {
         Background::Preset(BackgroundPreset::Battle)
     );
     assert_eq!(playlist.entries.len(), 2);
+    assert!(playlist.pinned);
 
     let soundboard = &library.collections[1];
     assert_eq!(soundboard.source, CollectionSource::Manual);
+    assert!(soundboard.pinned);
     let door = &soundboard.entries[0];
     assert_eq!(door.title.as_str(), "Front Door");
     assert!(door.sound.looping);

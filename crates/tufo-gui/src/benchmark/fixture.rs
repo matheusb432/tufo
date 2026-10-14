@@ -24,6 +24,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
                 background: Background::Preset(BackgroundPreset::ALL[index]),
                 playing: base == 100 && index == 1,
                 missing: false,
+                pinned: true,
             })
             .collect::<Vec<_>>()
     };
@@ -58,6 +59,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
             .map(|card| NavItemView {
                 id: card.id,
                 title: card.title.clone(),
+                background: card.background.clone(),
                 playing: card.playing,
                 missing: false,
             })
@@ -70,6 +72,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
             background: playlists[4].background.clone(),
             linked_folder: None,
             missing: false,
+            pinned: true,
             order_key: 0,
             order_descending: false,
             tracks: (0..13)

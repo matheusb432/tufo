@@ -75,13 +75,16 @@ pub(crate) struct CardView {
     pub(crate) background: Background,
     pub(crate) playing: bool,
     pub(crate) missing: bool,
+    pub(crate) pinned: bool,
 }
 
-/// A collection in the sidebar's lists.
+/// A pinned collection in the sidebar's lists.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct NavItemView {
     pub(crate) id: CollectionId,
     pub(crate) title: String,
+    /// For the row's thumbnail.
+    pub(crate) background: Background,
     pub(crate) playing: bool,
     pub(crate) missing: bool,
 }
@@ -233,6 +236,7 @@ pub(crate) struct CollectionPageView {
     pub(crate) background: Background,
     pub(crate) linked_folder: Option<String>,
     pub(crate) missing: bool,
+    pub(crate) pinned: bool,
     /// 0 title, 1 duration, 2 date added.
     pub(crate) order_key: i32,
     pub(crate) order_descending: bool,
@@ -291,7 +295,8 @@ pub(crate) struct LibraryPageView {
     pub(crate) soundboards: Vec<CardView>,
     pub(crate) playlist_count: usize,
     pub(crate) soundboard_count: usize,
-    /// Every collection of each kind, whatever the filter, for the sidebar.
+    /// The pinned collections of each kind in library order, whatever the filter, for the
+    /// sidebar.
     pub(crate) nav_playlists: Vec<NavItemView>,
     pub(crate) nav_soundboards: Vec<NavItemView>,
     pub(crate) collection: Option<CollectionPageView>,
@@ -332,10 +337,11 @@ pub(crate) fn library_page(
         snapshot
             .collections
             .iter()
-            .filter(|collection| collection.kind == kind)
+            .filter(|collection| collection.kind == kind && collection.pinned)
             .map(|collection| NavItemView {
                 id: collection.id,
                 title: collection.title.as_str().to_owned(),
+                background: collection.background.clone(),
                 playing: collection_plays(collection, player),
                 missing: linked_folder_missing(collection),
             })
@@ -585,6 +591,7 @@ fn card(collection: &CollectionView, player: &PlayerState) -> CardView {
         background: collection.background.clone(),
         playing: collection_plays(collection, player),
         missing: linked_folder_missing(collection),
+        pinned: collection.pinned,
     }
 }
 
@@ -658,6 +665,7 @@ fn collection_page(
         background: collection.background.clone(),
         linked_folder,
         missing,
+        pinned: collection.pinned,
         order_key: match collection.order.key {
             EntryOrderKey::Title => 0,
             EntryOrderKey::Duration => 1,

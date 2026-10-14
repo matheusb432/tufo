@@ -55,6 +55,7 @@ fn collection(
         order: EntryOrder::default(),
         source: CollectionSource::Manual,
         entries,
+        pinned: true,
     }
 }
 
@@ -509,8 +510,15 @@ fn queued_songs_leave_repeating_one_track_out_of_the_cycle() {
 }
 
 #[test]
-fn the_sidebar_lists_every_collection_whatever_the_filter_and_marks_what_plays() {
-    let snapshot = snapshot();
+fn the_sidebar_lists_pinned_collections_whatever_the_filter_and_marks_what_plays() {
+    let mut snapshot = snapshot();
+    snapshot.collections.insert(
+        1,
+        CollectionView {
+            pinned: false,
+            ..collection(4, CollectionKind::Playlist, "Dungeon", Vec::new())
+        },
+    );
 
     let view = library_page(
         &snapshot,
@@ -530,6 +538,7 @@ fn the_sidebar_lists_every_collection_whatever_the_filter_and_marks_what_plays()
         .collect::<Vec<_>>();
     assert_eq!(playlists, [("Boss fights", true), ("Tavern", false)]);
     assert_eq!(view.nav_soundboards.len(), 1);
+    assert_eq!(view.playlist_count, 3);
     assert_eq!(view.playlists[0].count_label, "1 track");
 }
 

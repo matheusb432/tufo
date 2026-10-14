@@ -59,3 +59,8 @@ snapshot_name = "0010_snapshot.toml"
 id = 7196706648171374803
 name = "0011_browser_settings.sql"
 snapshot_name = "0011_snapshot.toml"
+
+[[migrations]]
+id = 5283931948480649882
+name = "0012_pinned_collections.sql"
+snapshot_name = "0012_snapshot.toml"

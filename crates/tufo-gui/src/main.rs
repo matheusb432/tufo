@@ -528,6 +528,7 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
         }
     });
     on!(controller => on_delete_collection, |id| controller.delete_collection(&id));
+    on!(controller => on_set_collection_pinned, |id, pinned| controller.set_collection_pinned(&id, pinned));
     on!(controller => on_set_order, |key, descending| controller.set_order(key, descending));
     on!(controller => on_add_files, |id| controller.add_files(&id));
     on!(controller => on_play_collection, |id| controller.play_collection(&id));

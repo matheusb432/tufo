@@ -53,12 +53,16 @@ export struct CollectionCard {
     // A playlist whose music is playing now, or a soundboard with a sound playing.
     playing: bool,
     missing: bool,
+    // The sidebar lists it.
+    pinned: bool,
 }
 
-// A collection as the sidebar lists it.
+// A pinned collection as the sidebar lists it.
 export struct NavItem {
     id: string,
     title: string,
+    // For its thumbnail, drawn by `Art.painting` with the id.
+    background: CollectionBackground,
     playing: bool,
     missing: bool,
 }
@@ -266,7 +270,8 @@ export global LibraryView {
     in property <[CollectionCard]> soundboards;
     in property <int> playlist-count;
     in property <int> soundboard-count;
-    // Every collection, unfiltered, for the sidebar.
+    // The pinned collections in the Playlists and Soundboards pages' order, unfiltered, for the
+    // sidebar.
     in property <[NavItem]> nav-playlists;
     in property <[NavItem]> nav-soundboards;
     in property <string> collection-title;
@@ -277,6 +282,7 @@ export global LibraryView {
     in property <bool> collection-linked;
     in property <string> collection-folder;
     in property <bool> collection-missing;
+    in property <bool> collection-pinned;
     in property <int> order-key;
     in property <bool> order-descending;
     in property <[TrackRow]> tracks;
@@ -484,6 +490,8 @@ export global Actions {
     callback pick-background(BackgroundTarget, CollectionBackground);
     callback choose-background-file(BackgroundTarget);
     callback delete-collection(string);
+    // Lists the collection in the sidebar, or stops listing it.
+    callback set-collection-pinned(string, bool);
     callback set-order(int, bool);
     callback add-files(string);
 

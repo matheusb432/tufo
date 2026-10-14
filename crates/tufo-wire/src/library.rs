@@ -61,6 +61,8 @@ pub struct CollectionView {
     pub order: EntryOrder,
     pub source: CollectionSource,
     pub entries: Vec<EntryView>,
+    /// The sidebar lists it.
+    pub pinned: bool,
 }
 
 /// What a collection's card and page show behind it.
@@ -254,6 +256,7 @@ pub struct UpdateCollection {
     pub order: Option<EntryOrder>,
     /// Mutually exclusive with `order`.
     pub order_patch: Option<EntryOrderPatch>,
+    pub pinned: Option<bool>,
 }
 
 /// Each omitted ordering property keeps its current value.

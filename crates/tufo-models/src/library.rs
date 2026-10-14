@@ -542,6 +542,8 @@ pub struct Collection {
     /// When you deleted this linked collection. The row stays so rescans don't recreate it.
     pub hidden_at: Option<Timestamp>,
     pub created_at: Timestamp,
+    /// The sidebar lists it.
+    pub pinned: bool,
 }
 
 impl Collection {

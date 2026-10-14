@@ -41,6 +41,7 @@ pub(crate) fn collection(value: &CollectionView) -> Value {
             "descending": value.order.descending,
         },
         "source": collection_source(&value.source),
+        "pinned": value.pinned,
         "entries": value.entries.iter().map(entry).collect::<Vec<_>>(),
     })
 }

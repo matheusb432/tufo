@@ -135,6 +135,7 @@ pub(super) async fn apply_changes(
             folder_missing_since: None,
             hidden_at: None,
             created_at: now,
+            pinned: true,
         })
         .exec(&mut transaction)
         .await?;
@@ -367,6 +368,7 @@ pub(super) async fn create_manual_collection(
         folder_missing_since: None,
         hidden_at: None,
         created_at: Timestamp::now(),
+        pinned: true,
     })
     .exec(executor)
     .await?)

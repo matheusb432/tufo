@@ -227,6 +227,7 @@ mod tests {
             order: EntryOrder::default(),
             source: CollectionSource::Manual,
             entries,
+            pinned: true,
         }
     }
 

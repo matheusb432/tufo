@@ -61,13 +61,15 @@ haunted, mountain, night, sky, skulls, storm, tavern, town, underworld, volcano,
         #[arg(value_name = "JSON_PAYLOAD")]
         payload: AddPayload,
     },
-    /// Change title, background, or entry ordering; omitted fields stay as they are.
+    /// Change title, background, entry ordering, or pinning; omitted fields stay as they are.
     #[command(after_long_help = r#"Examples (use an ID from collection list):
   tufo collection update COLLECTION_ID '{"title":"Night travel","order":{"key":"duration","descending":true}}'
   tufo collection update COLLECTION_ID '{"background":null}'
+  tufo collection update COLLECTION_ID '{"pinned":false}'
 
 Order keys: title, duration, date_added. Omitted order properties are preserved.
 background accepts the same objects as collection add; null restores the gradient.
+pinned lists the collection in the GUI's sidebar; new collections start pinned.
 Other fields cannot be null. Unknown fields, including nested fields, are rejected.
 Nested updates require matching current binaries; after updating them, run tufo server restart."#)]
     Update {
@@ -232,6 +234,8 @@ struct UpdateJson {
     background: NullableField<BackgroundJson>,
     #[serde(default, deserialize_with = "deserialize_present")]
     order: Option<OrderJson>,
+    #[serde(default, deserialize_with = "deserialize_present")]
+    pinned: Option<bool>,
 }
 
 impl FromStr for UpdatePayload {
@@ -251,6 +255,7 @@ impl FromStr for UpdatePayload {
                 NullableField::Set(background) => Some(Background::try_from(background)?),
             },
             order_patch: input.order.map(EntryOrderPatch::try_from).transpose()?,
+            pinned: input.pinned,
             ..UpdateCollection::default()
         }))
     }
@@ -385,9 +390,11 @@ mod tests {
         assert!(omitted.0.title.is_none());
         assert!(omitted.0.background.is_none());
         assert!(omitted.0.order.is_none() && omitted.0.order_patch.is_none());
+        assert!(omitted.0.pinned.is_none());
         let payload: UpdatePayload =
-            r#"{"background":null,"order":{"descending":false}}"#.parse()?;
+            r#"{"background":null,"order":{"descending":false},"pinned":false}"#.parse()?;
         assert_eq!(payload.0.background, Some(Background::Gradient));
+        assert_eq!(payload.0.pinned, Some(false));
         assert!(payload.0.order.is_none());
         let order = payload.0.order_patch.ok_or("order patch was omitted")?;
         assert_eq!(order.key, None);
@@ -405,6 +412,8 @@ mod tests {
             r#"{"order":{"descending":null}}"#,
             r#"{"order":{"extra":true}}"#,
             r#"{"order":null}"#,
+            r#"{"pinned":null}"#,
+            r#"{"pinned":"yes"}"#,
         ] {
             assert!(payload.parse::<UpdatePayload>().is_err(), "{payload}");
         }

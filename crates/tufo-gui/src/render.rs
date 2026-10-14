@@ -152,6 +152,7 @@ fn card(card: &CardView) -> CollectionCard {
         background: collection_background(&card.background),
         playing: card.playing,
         missing: card.missing,
+        pinned: card.pinned,
     }
 }
 
@@ -159,6 +160,7 @@ fn nav_item(item: &NavItemView) -> NavItem {
     NavItem {
         id: item.id.to_string().into(),
         title: item.title.as_str().into(),
+        background: collection_background(&item.background),
         playing: item.playing,
         missing: item.missing,
     }
@@ -352,6 +354,7 @@ fn collection_page(library: &LibraryView<'_>, collection: CollectionPageView) {
     library.set_collection_linked(collection.linked_folder.is_some());
     library.set_collection_folder(collection.linked_folder.unwrap_or_default().into());
     library.set_collection_missing(collection.missing);
+    library.set_collection_pinned(collection.pinned);
     library.set_order_key(collection.order_key);
     library.set_order_descending(collection.order_descending);
     library.set_tracks(model(

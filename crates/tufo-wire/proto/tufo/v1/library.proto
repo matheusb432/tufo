@@ -147,6 +147,8 @@ message Collection {
   // In the collection's order.
   repeated CollectionEntry entries = 8;
   optional BuiltinTitle builtin_title = 9;
+  // The sidebar lists it. New collections start pinned, including imported ones.
+  bool pinned = 10;
 }
 
 enum CollectionKind {
@@ -384,6 +386,7 @@ message UpdateCollectionRequest {
   optional EntryOrder order = 4;
   // Mutually exclusive with order; omitted nested properties keep their current values.
   optional EntryOrderPatch order_patch = 5;
+  optional bool pinned = 6;
 }
 
 message UpdateCollectionResponse {}

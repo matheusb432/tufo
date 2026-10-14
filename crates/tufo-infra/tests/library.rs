@@ -278,6 +278,13 @@ async fn a_deleted_linked_playlist_stays_deleted_until_its_folder_is_dropped_aga
         .await
         .unwrap();
     let boss = titled(&fixture.snapshot(), "boss").unwrap().id;
+    let unpin = UpdateCollection {
+        pinned: Some(false),
+        ..UpdateCollection::default()
+    };
+    update_collection::execute(boss, unpin, &fixture.library)
+        .await
+        .unwrap();
 
     delete_collection::execute(boss, &fixture.library)
         .await
@@ -297,7 +304,54 @@ async fn a_deleted_linked_playlist_stays_deleted_until_its_folder_is_dropped_aga
     let restored = fixture.snapshot();
     assert_eq!(titled(&restored, "boss").unwrap().id, boss);
     assert_eq!(titled(&restored, "boss").unwrap().entries.len(), 2);
+    assert!(titled(&restored, "boss").unwrap().pinned);
     assert!(fs::exists(fixture.music.path().join("rpg/boss/dragon.wav")).unwrap());
+}
+
+#[tokio::test]
+async fn new_collections_start_pinned_and_unpin_without_other_changes() {
+    let fixture = Fixture::new().await.unwrap();
+    fixture.write_track("rpg/boss/dragon.wav", 440.0).unwrap();
+    fixture.write_track("loose/door.wav", 500.0).unwrap();
+    fixture
+        .import(CollectionKind::Playlist, &["rpg"])
+        .await
+        .unwrap();
+    fixture
+        .import(CollectionKind::Soundboard, &["loose/door.wav"])
+        .await
+        .unwrap();
+    let tavern = fixture.create_playlist("Tavern").await.unwrap();
+    let created = fixture.snapshot();
+    assert_eq!(created.collections.len(), 3);
+    assert!(
+        created
+            .collections
+            .iter()
+            .all(|collection| collection.pinned)
+    );
+
+    let unpin = UpdateCollection {
+        pinned: Some(false),
+        ..UpdateCollection::default()
+    };
+    update_collection::execute(tavern, unpin, &fixture.library)
+        .await
+        .unwrap();
+
+    let unpinned = fixture.snapshot();
+    let before = titled(&created, "Tavern").unwrap();
+    let after = titled(&unpinned, "Tavern").unwrap();
+    assert!(!after.pinned);
+    assert_eq!(
+        CollectionView {
+            pinned: true,
+            ..after.clone()
+        },
+        *before
+    );
+    assert!(titled(&unpinned, "boss").unwrap().pinned);
+    assert!(unpinned.revision > created.revision);
 }
 
 #[tokio::test]

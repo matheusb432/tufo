@@ -95,9 +95,11 @@ async fn existing_player_settings_default_effects_and_browser_to_full_volume() -
          ALTER TABLE player_settings DROP COLUMN effects_volume;
          ALTER TABLE player_settings DROP COLUMN browser_volume;
          ALTER TABLE player_settings DROP COLUMN browser_muted;
+         ALTER TABLE collections DROP COLUMN pinned;
          DELETE FROM __toasty_migrations
          WHERE name IN (
-             '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql'
+             '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql',
+             '0012_pinned_collections.sql'
          );",
     )?;
     drop(legacy);

@@ -29,6 +29,7 @@ async fn collections_return_discoverable_ids_and_preserve_omitted_update_fields(
         original["background"],
         json!({"kind": "preset", "preset": "tavern"})
     );
+    assert_eq!(original["pinned"], true);
     let trailing_json = session
         .success(&["collection", "get", id, "--json"])
         .await?;
@@ -66,13 +67,18 @@ async fn collections_return_discoverable_ids_and_preserve_omitted_update_fields(
         ordered["order"],
         json!({"key": "date_added", "descending": true})
     );
+    assert_eq!(ordered["pinned"], true);
     session
-        .mutation(&["collection", "update", id], json!({"background": null}))
+        .mutation(
+            &["collection", "update", id],
+            json!({"background": null, "pinned": false}),
+        )
         .await?;
     let cleared = session.json(&["collection", "get", id]).await?;
     assert_eq!(cleared["background"], json!({"kind": "gradient"}));
     assert_eq!(cleared["title"], original["title"]);
     assert_eq!(cleared["order"], ordered["order"]);
+    assert_eq!(cleared["pinned"], false);
 
     let invalid = session
         .failure(
@@ -87,29 +93,24 @@ async fn collections_return_discoverable_ids_and_preserve_omitted_update_fields(
         .await?;
     assert!(String::from_utf8(invalid.stderr)?.contains("unknown field"));
     assert_eq!(session.json(&["collection", "get", id]).await?, cleared);
-    assert!(
-        session
-            .library()
-            .await?
-            .collections
-            .iter()
-            .any(|collection| collection.id.to_string() == id)
-    );
+    assert!(library_lists_collection(&session, id).await?);
 
     let deleted = session.json(&["collection", "delete", id]).await?;
     assert_eq!(deleted["id"], id);
     session
         .failure(&["--json", "collection", "get", id], 1)
         .await?;
-    assert!(
-        !session
-            .library()
-            .await?
-            .collections
-            .iter()
-            .any(|collection| collection.id.to_string() == id)
-    );
+    assert!(!library_lists_collection(&session, id).await?);
     Ok(())
+}
+
+async fn library_lists_collection(session: &Session, id: &str) -> anyhow::Result<bool> {
+    Ok(session
+        .library()
+        .await?
+        .collections
+        .iter()
+        .any(|collection| collection.id.to_string() == id))
 }
 
 #[tokio::test]

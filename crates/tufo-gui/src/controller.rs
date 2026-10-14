@@ -597,6 +597,24 @@ impl Controller {
         );
     }
 
+    pub(crate) fn set_collection_pinned(&self, id: &str, pinned: bool) {
+        let Some(id) = collection_id(id) else {
+            return;
+        };
+        if presentation::find_collection(&self.lock().snapshot, id)
+            .is_none_or(|collection| collection.pinned == pinned)
+        {
+            return;
+        }
+        self.update_collection(
+            id,
+            UpdateCollection {
+                pinned: Some(pinned),
+                ..UpdateCollection::default()
+            },
+        );
+    }
+
     fn update_collection(&self, id: CollectionId, update: UpdateCollection) {
         self.run(move |client| async move { client.update_collection(id, &update).await });
     }

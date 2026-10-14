@@ -129,6 +129,7 @@ pub fn update_collection_request(
             .order_patch
             .map(|patch| entry_order_patch(patch).map_err(|reason| invalid("order_patch", reason)))
             .transpose()?,
+        pinned: request.pinned,
     };
     Ok((collection_id(&request.collection_id)?, update))
 }
@@ -433,6 +434,7 @@ pub fn update_collection_message(
         background: update.background.as_ref().map(background_message),
         order: update.order.map(entry_order_message),
         order_patch: update.order_patch.map(entry_order_patch_message),
+        pinned: update.pinned,
     }
 }
 
@@ -616,6 +618,7 @@ fn collection_message(collection: &CollectionView) -> pb::Collection {
         order: Some(entry_order_message(collection.order)),
         source: Some(source),
         entries: collection.entries.iter().map(entry_message).collect(),
+        pinned: collection.pinned,
     }
 }
 
@@ -668,6 +671,7 @@ fn collection_view(message: pb::Collection) -> Result<CollectionView, InvalidMes
             .into_iter()
             .map(entry_view)
             .collect::<Result<_, _>>()?,
+        pinned: message.pinned,
     })
 }
 
@@ -1179,6 +1183,7 @@ mod tests {
                     icon: SoundIcon::CloudLightning,
                     saved_loop: None,
                 }],
+                pinned: true,
             }],
             songs: vec![
                 SongView {
@@ -1287,16 +1292,22 @@ mod tests {
     #[test]
     fn absent_update_fields_leave_their_properties_alone() {
         let id = CollectionId::from_uuid(uuid::Uuid::from_u128(9));
-        let update = UpdateCollection {
-            order: Some(EntryOrder::default()),
-            ..UpdateCollection::default()
-        };
+        for update in [
+            UpdateCollection {
+                order: Some(EntryOrder::default()),
+                ..UpdateCollection::default()
+            },
+            UpdateCollection {
+                pinned: Some(false),
+                ..UpdateCollection::default()
+            },
+        ] {
+            let (parsed_id, parsed) =
+                update_collection_request(update_collection_message(id, &update)).unwrap();
 
-        let (parsed_id, parsed) =
-            update_collection_request(update_collection_message(id, &update)).unwrap();
-
-        assert_eq!(parsed_id, id);
-        assert_eq!(parsed, update);
+            assert_eq!(parsed_id, id);
+            assert_eq!(parsed, update);
+        }
     }
 
     #[test]

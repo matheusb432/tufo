@@ -203,6 +203,7 @@ fn collection_view(collection: Collection, entries: Vec<EntryView>) -> Collectio
         order,
         source,
         entries,
+        pinned: collection.pinned,
     }
 }
 

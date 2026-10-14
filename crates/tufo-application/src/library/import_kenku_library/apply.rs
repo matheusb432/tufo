@@ -586,6 +586,9 @@ async fn destination(
                 .background_preset(preset)
                 .background_image(image)
                 .hidden_at(None::<Timestamp>);
+            if previous.hidden_at.is_some() {
+                update = update.pinned(true);
+            }
             if let Some((root, folder)) = linked {
                 update = update
                     .library_folder_id(Some(root.id))
@@ -642,7 +645,8 @@ async fn create_linked(
         folder_identity: Some(identity),
         folder_missing_since: None,
         hidden_at: None,
-        created_at: now
+        created_at: now,
+        pinned: true,
     })
     .exec(executor)
     .await?)

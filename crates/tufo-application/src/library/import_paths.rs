@@ -146,7 +146,8 @@ async fn absorb_library_folder(
     Ok(())
 }
 
-/// Un-hides the deleted linked collections of `kind` at or under `folder`.
+/// Un-hides and pins the deleted linked collections of `kind` at or under `folder`, as an import
+/// pins the collections it creates.
 async fn refollow_collections_under(
     database: &mut Db,
     folder: &FolderPath,
@@ -167,6 +168,7 @@ async fn refollow_collections_under(
     for collection in hidden {
         Collection::update_by_id(collection.id)
             .hidden_at(None::<Timestamp>)
+            .pinned(true)
             .exec(database)
             .await?;
     }
