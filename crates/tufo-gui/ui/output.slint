@@ -135,6 +135,8 @@ export component OutputPicker inherits MenuSurface {
 
 // The output the audio goes to now, which opens the picker.
 export component OutputChip inherits Rectangle {
+    // Where the page is narrow, only the output's icon shows, and its name moves to a tooltip.
+    in property <bool> compact;
     TourTarget {
         anchor: PlaybackTour.output;
         bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
@@ -181,7 +183,7 @@ export component OutputChip inherits Rectangle {
             tint: Theme.text-secondary;
         }
 
-        Text {
+        if !root.compact: Text {
             text: root.title;
             vertical-alignment: center;
             overflow: elide;
@@ -213,11 +215,11 @@ export component OutputChip inherits Rectangle {
     Rectangle {
         width: root.width;
         height: root.height;
-        visible: root.channel && Session.voice-status != "" && !root.tooltip-dismissed;
+        visible: (root.compact || (root.channel && Session.voice-status != "")) && !root.tooltip-dismissed;
         Tooltip {
             TooltipBubble {
                 text: root.title;
-                detail: Session.voice-status;
+                detail: root.channel ? Session.voice-status : "";
             }
         }
     }

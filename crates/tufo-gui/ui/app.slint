@@ -699,6 +699,7 @@ export component AppWindow inherits Window {
         }
         if LibraryView.loaded: OutputChip {
             y: (parent.height - self.height) / 2;
+            compact: !root.sidebar-fits;
             open-settings => {
                 root.open-settings();
             }
