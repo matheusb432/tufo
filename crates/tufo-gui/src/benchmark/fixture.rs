@@ -6,8 +6,8 @@ use tufo_models::library::{
 
 use crate::{
     presentation::{
-        CardView, CollectionPageView, LibraryPageView, NavItemView, PageKind, SoundTileView,
-        TrackRowView,
+        CardView, CollectionPageView, LibraryPageView, LoopBadgeView, NavItemView, PageKind,
+        SoundTileView, TrackRowView,
     },
     ui::{AppWindow, Clock, PlayerView, Session, SoundChip},
 };
@@ -84,6 +84,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
                     current: false,
                     playing: false,
                     queue_number: None,
+                    loop_badge: LoopBadgeView::None,
                 })
                 .collect(),
             sounds: (0..14)
