@@ -1,15 +1,15 @@
-// The sidebar, on the tray's rim: the logo, search, the pages, every collection, and the
-// connection. It collapses to a rail of icons.
+// The sidebar, on the tray's rim: the logo, search, the pages you keep in it with the collections
+// pinned under them, and the connection. It collapses to a rail of icons and pinned paintings.
 
 import { HomeTour } from "tours/home.slint";
 import { GuidedTours } from "tours/state.slint";
 import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
-    Actions, BrowserState, BrowserView, CollectionKind, LibraryView, NavItem, Navigation, Page, PlayerView, Session,
-    WindowFrame,
+    Actions, Art, BrowserState, BrowserView, CollectionKind, LibraryView, NavItem, Navigation, Page, PlayerView, Session,
+    SidebarHiddenPages, SidebarPage, WindowFrame,
 } from "state.slint";
-import { Equalizer, Icon, IconButton, Logo } from "widgets.slint";
+import { Equalizer, Icon, IconButton, Logo, MenuItem, MenuSurface, TooltipBubble } from "widgets.slint";
 import { WindowDragArea } from "frame.slint";
 
 // Marks the open page's row with a sunlit bar along its left edge.
@@ -19,33 +19,46 @@ component SunEdge inherits Rectangle {
     background: Theme.lit;
 }
 
+// A press of the right button, at its place in the window.
+component RowTouch inherits TouchArea {
+    callback context-menu(Point);
+    mouse-cursor: MouseCursor.pointer;
+    pointer-event(event) => {
+        if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+            root.context-menu({ x: self.absolute-position.x + self.mouse-x, y: self.absolute-position.y + self.mouse-y });
+        }
+    }
+}
+
+// A page's row. Its right-click menu hides it from the sidebar.
 component NavRow inherits Rectangle {
     in property <image> icon;
     in property <string> text;
     in property <bool> active;
     in property <bool> running;
-    in property <bool> collapsible;
-    in property <bool> expanded;
     in property <bool> can-add;
     in property <string> add-label;
     callback clicked();
     callback add();
+    callback context-menu(Point);
     height: 36px;
     border-radius: Theme.radius-row;
     background: touch.has-hover && !root.active ? Theme.wood-hover : transparent;
     animate background { duration: Motion.hover; }
     accessible-role: button;
     accessible-label: root.text;
+    accessible-action-default => { root.clicked(); }
     if root.active: SunEdge {
         x: 0;
         y: 5px;
         height: root.height - 10px;
     }
-    accessible-action-default => { root.clicked(); }
-    touch := TouchArea {
-        mouse-cursor: MouseCursor.pointer;
+    touch := RowTouch {
         clicked => {
             root.clicked();
+        }
+        context-menu(position) => {
+            root.context-menu(position);
         }
     }
 
@@ -82,14 +95,6 @@ component NavRow inherits Rectangle {
             }
         }
 
-        if root.collapsible: Icon {
-            y: (parent.height - self.height) / 2;
-            width: 12px;
-            height: 12px;
-            source: root.expanded ? @image-url("icons/chevron-up.svg") : @image-url("icons/chevron-down.svg");
-            tint: Theme.text-faint;
-        }
-
         if root.can-add: IconButton {
             y: (parent.height - self.height) / 2;
             size: 28px;
@@ -104,50 +109,75 @@ component NavRow inherits Rectangle {
     }
 }
 
-component SectionRow inherits NavRow {
-    collapsible: true;
-    accessible-expanded: root.expanded;
-}
-
+// A pinned collection's row, led by its painting. Its right-click menu unpins it.
 component CollectionLink inherits Rectangle {
     in property <NavItem> item;
     in property <bool> active;
     callback clicked();
-    height: 30px;
+    callback context-menu(Point);
+    height: 36px;
     border-radius: Theme.radius-row;
     background: touch.has-hover && !root.active ? Theme.wood-hover : transparent;
     animate background { duration: Motion.hover; }
     accessible-role: button;
     accessible-label: root.item.title;
+    accessible-action-default => { root.clicked(); }
     if root.active: SunEdge {
         x: 0;
-        y: 5px;
-        height: root.height - 10px;
+        y: 6px;
+        height: root.height - 12px;
     }
-    accessible-action-default => { root.clicked(); }
-    touch := TouchArea {
-        mouse-cursor: MouseCursor.pointer;
+    touch := RowTouch {
         clicked => {
             root.clicked();
+        }
+        context-menu(position) => {
+            root.context-menu(position);
         }
     }
 
     HorizontalLayout {
-        padding-left: Theme.sidebar-label-padding;
+        // The painting centers on the pages' icons, so the titles line up with theirs.
+        padding-left: Theme.sidebar-icon-padding - (Theme.pin-thumbnail-size - Theme.bar-icon-size) / 2;
         padding-right: 10px;
-        spacing: 8px;
+        spacing: Theme.sidebar-icon-spacing - (Theme.pin-thumbnail-size - Theme.bar-icon-size) / 2;
+        Image {
+            y: (parent.height - self.height) / 2;
+            width: Theme.pin-thumbnail-size;
+            height: Theme.pin-thumbnail-size;
+            source: Art.painting(root.item.id, root.item.background, Theme.pin-thumbnail-size, Theme.pin-thumbnail-size, Theme.radius-pin, Art.pictures-revision);
+            image-fit: fill;
+            opacity: root.item.missing ? 0.5 : 1;
+        }
+
         Text {
             text: root.item.title;
             vertical-alignment: center;
             horizontal-stretch: 1;
             overflow: elide;
             font-size: Theme.body-small;
+            font-weight: 500;
             color: root.item.missing ? Theme.text-faint : root.active ? Theme.lit : touch.has-hover ? Theme.text : Theme.text-secondary;
         }
 
         if root.item.playing: Equalizer {
             y: (parent.height - self.height) / 2;
         }
+    }
+}
+
+// Says how to pin, under a section with nothing pinned.
+component PinHint inherits HorizontalLayout {
+    in property <string> text;
+    padding-left: Theme.sidebar-label-padding;
+    padding-right: 8px;
+    padding-top: 2px;
+    padding-bottom: 6px;
+    Text {
+        text: root.text;
+        wrap: word-wrap;
+        font-size: Theme.caption;
+        color: Theme.text-faint;
     }
 }
 
@@ -173,9 +203,28 @@ component FullSidebar inherits SidebarForm {
     callback open-settings();
     callback add(CollectionKind);
     property <Page> page: Navigation.page;
-    property <bool> playlists-expanded: true;
-    property <bool> soundboards-expanded: true;
+    property <SidebarHiddenPages> hidden: Navigation.hidden-pages;
+    // The right-clicked row: a page, or a pinned collection when `menu-collection-id` is set.
+    property <SidebarPage> menu-page;
+    property <string> menu-collection-id;
+    property <Point> menu-position;
     width: Theme.sidebar-width;
+
+    function show-page-menu(page: SidebarPage, position: Point) {
+        root.menu-page = page;
+        root.menu-collection-id = "";
+        root.show-menu(position);
+    }
+
+    function show-pin-menu(id: string, position: Point) {
+        root.menu-collection-id = id;
+        root.show-menu(position);
+    }
+
+    function show-menu(position: Point) {
+        root.menu-position = { x: position.x - root.absolute-position.x, y: position.y - root.absolute-position.y };
+        row-menu.show();
+    }
     VerticalLayout {
         HorizontalLayout {
             height: Theme.title-row-height;
@@ -252,25 +301,31 @@ component FullSidebar inherits SidebarForm {
                 padding-bottom: 8px;
                 spacing: 2px;
                 alignment: start;
-                NavRow {
+                if !root.hidden.home: NavRow {
                     icon: @image-url("icons/house.svg");
                     text: @tr("Home");
                     active: root.page == Page.home;
                     clicked => {
                         root.open-page(Page.home, "");
                     }
+                    context-menu(position) => {
+                        root.show-page-menu(SidebarPage.home, position);
+                    }
                 }
 
-                NavRow {
+                if !root.hidden.songs: NavRow {
                     icon: @image-url("icons/music.svg");
                     text: @tr("Songs");
                     active: root.page == Page.songs;
                     clicked => {
                         root.open-page(Page.songs, "");
                     }
+                    context-menu(position) => {
+                        root.show-page-menu(SidebarPage.songs, position);
+                    }
                 }
 
-                NavRow {
+                if !root.hidden.browser: NavRow {
                     icon: @image-url("icons/globe.svg");
                     text: @tr("Browser");
                     active: root.page == Page.browser;
@@ -279,69 +334,82 @@ component FullSidebar inherits SidebarForm {
                     clicked => {
                         root.open-page(Page.browser, "");
                     }
+                    context-menu(position) => {
+                        root.show-page-menu(SidebarPage.browser, position);
+                    }
                 }
 
-                SectionRow {
-                    icon: @image-url("icons/list-music.svg");
-                    text: @tr("Playlists");
-                    active: root.page == Page.playlists;
-                    expanded: root.playlists-expanded;
-                    can-add: Session.connected;
-                    add-label: @tr("Add Playlist");
-                    clicked => {
-                        if root.page == Page.playlists {
-                            root.playlists-expanded = !root.playlists-expanded;
-                        } else {
-                            root.playlists-expanded = true;
+                if !root.hidden.playlists: VerticalLayout {
+                    padding-top: 6px;
+                    spacing: 2px;
+                    NavRow {
+                        icon: @image-url("icons/list-music.svg");
+                        text: @tr("Playlists");
+                        active: root.page == Page.playlists;
+                        can-add: Session.connected;
+                        add-label: @tr("Add Playlist");
+                        clicked => {
                             root.open-page(Page.playlists, "");
                         }
-                    }
-                    add => {
-                        root.add(CollectionKind.playlist);
-                    }
-                }
-
-                for item in (root.playlists-expanded ? LibraryView.nav-playlists : []): CollectionLink {
-                    item: item;
-                    active: root.page == Page.playlist && Navigation.collection-id == item.id;
-                    clicked => {
-                        root.open-page(Page.playlist, item.id);
-                    }
-                }
-                Rectangle {
-                    height: 6px;
-                }
-
-                SectionRow {
-                    icon: @image-url("icons/layout-grid.svg");
-                    text: @tr("Soundboards");
-                    active: root.page == Page.soundboards;
-                    expanded: root.soundboards-expanded;
-                    can-add: Session.connected;
-                    add-label: @tr("Add Soundboard");
-                    clicked => {
-                        if root.page == Page.soundboards {
-                            root.soundboards-expanded = !root.soundboards-expanded;
-                        } else {
-                            root.soundboards-expanded = true;
-                            root.open-page(Page.soundboards, "");
+                        add => {
+                            root.add(CollectionKind.playlist);
+                        }
+                        context-menu(position) => {
+                            root.show-page-menu(SidebarPage.playlists, position);
                         }
                     }
-                    add => {
-                        root.add(CollectionKind.soundboard);
+
+                    for item in LibraryView.nav-playlists: CollectionLink {
+                        item: item;
+                        active: root.page == Page.playlist && Navigation.collection-id == item.id;
+                        clicked => {
+                            root.open-page(Page.playlist, item.id);
+                        }
+                        context-menu(position) => {
+                            root.show-pin-menu(item.id, position);
+                        }
+                    }
+                    if LibraryView.nav-playlists.length == 0 && LibraryView.playlists.length > 0: PinHint {
+                        text: @tr("Right-click a playlist to pin it here.");
                     }
                 }
 
-                for item in (root.soundboards-expanded ? LibraryView.nav-soundboards : []): CollectionLink {
-                    item: item;
-                    active: root.page == Page.soundboard && Navigation.collection-id == item.id;
-                    clicked => {
-                        root.open-page(Page.soundboard, item.id);
+                if !root.hidden.soundboards: VerticalLayout {
+                    padding-top: 6px;
+                    spacing: 2px;
+                    NavRow {
+                        icon: @image-url("icons/layout-grid.svg");
+                        text: @tr("Soundboards");
+                        active: root.page == Page.soundboards;
+                        can-add: Session.connected;
+                        add-label: @tr("Add Soundboard");
+                        clicked => {
+                            root.open-page(Page.soundboards, "");
+                        }
+                        add => {
+                            root.add(CollectionKind.soundboard);
+                        }
+                        context-menu(position) => {
+                            root.show-page-menu(SidebarPage.soundboards, position);
+                        }
+                    }
+
+                    for item in LibraryView.nav-soundboards: CollectionLink {
+                        item: item;
+                        active: root.page == Page.soundboard && Navigation.collection-id == item.id;
+                        clicked => {
+                            root.open-page(Page.soundboard, item.id);
+                        }
+                        context-menu(position) => {
+                            root.show-pin-menu(item.id, position);
+                        }
+                    }
+                    if LibraryView.nav-soundboards.length == 0 && LibraryView.soundboards.length > 0: PinHint {
+                        text: @tr("Right-click a soundboard to pin it here.");
                     }
                 }
             }
         }
-
         VerticalLayout {
             padding-left: Theme.sidebar-row-padding;
             padding-right: Theme.sidebar-row-padding;
@@ -385,6 +453,28 @@ component FullSidebar inherits SidebarForm {
             }
         }
     }
+
+    row-menu := PopupWindow {
+        x: root.menu-position.x;
+        y: root.menu-position.y;
+        close-policy: close-on-click-outside;
+        MenuSurface {
+            if root.menu-collection-id == "": MenuItem {
+                text: @tr("Hide from the sidebar");
+                activated => {
+                    Actions.set-sidebar-page-hidden(root.menu-page, true);
+                    row-menu.close();
+                }
+            }
+            if root.menu-collection-id != "": MenuItem {
+                text: @tr("Unpin from the sidebar");
+                activated => {
+                    Actions.set-collection-pinned(root.menu-collection-id, false);
+                    row-menu.close();
+                }
+            }
+        }
+    }
 }
 
 component RailButton inherits IconButton {
@@ -397,8 +487,8 @@ component RailButton inherits IconButton {
     tint: root.active ? Theme.lit : root.running ? Theme.accent : Theme.text-secondary;
     if root.active: SunEdge {
         x: 0;
-        y: 5px;
-        height: root.height - 10px;
+        y: 6px;
+        height: root.height - 12px;
     }
     if root.running: Rectangle {
         x: parent.width - self.width - 2px;
@@ -409,6 +499,74 @@ component RailButton inherits IconButton {
         border-width: 2px;
         border-color: Theme.wood;
         background: Theme.lit;
+    }
+}
+
+// A pinned collection's painting on the rail, ringed in sunlight while its page is open.
+component RailPin inherits Rectangle {
+    in property <NavItem> item;
+    in property <bool> active;
+    in property <bool> tooltip-enabled;
+    callback clicked();
+    property <bool> tooltip-dismissed;
+    width: Theme.rail-pin-size;
+    height: Theme.rail-pin-size;
+    accessible-role: button;
+    accessible-label: root.item.title;
+    accessible-action-default => { root.clicked(); }
+    Image {
+        width: Theme.rail-pin-size;
+        height: Theme.rail-pin-size;
+        source: Art.painting(root.item.id, root.item.background, Theme.rail-pin-size, Theme.rail-pin-size, Theme.radius-pin, Art.pictures-revision);
+        image-fit: fill;
+        opacity: root.item.missing ? 0.5 : 1;
+    }
+
+    if root.active || touch.has-hover: Rectangle {
+        x: -3px;
+        y: -3px;
+        width: parent.width + 6px;
+        height: parent.height + 6px;
+        border-radius: Theme.radius-pin + 3px;
+        border-width: 2px;
+        border-color: root.active ? Theme.lit : Theme.wood-hover.with-alpha(0.3);
+    }
+    if root.item.playing: Rectangle {
+        x: parent.width - self.width + 3px;
+        y: parent.height - self.height + 3px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        border-width: 2px;
+        border-color: Theme.wood;
+        background: Theme.lit;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.tooltip-dismissed = true;
+            }
+        }
+        changed has-hover => {
+            if !self.has-hover {
+                root.tooltip-dismissed = false;
+            }
+        }
+        clicked => {
+            root.clicked();
+        }
+    }
+
+    // Slint 1.18 reenters popup cleanup if a visible tooltip is destroyed inside a popup.
+    Rectangle {
+        visible: touch.has-hover && root.tooltip-enabled && !root.tooltip-dismissed;
+        Tooltip {
+            TooltipBubble {
+                text: root.item.title;
+            }
+        }
     }
 }
 
@@ -423,54 +581,140 @@ component Rail inherits SidebarForm {
     callback open-search();
     callback open-settings();
     property <Page> page: Navigation.page;
+    property <SidebarHiddenPages> hidden: Navigation.hidden-pages;
     width: Theme.rail-width;
     VerticalLayout {
         padding-top: Theme.title-row-height;
-        padding-bottom: 10px;
+        padding-bottom: 8px;
         spacing: 4px;
-        alignment: start;
-        for button[index] in [
-            { icon: @image-url("icons/panel-left-open.svg"), label: @tr("Expand (Ctrl+B)") },
-            { icon: @image-url("icons/search.svg"), label: @tr("Search everything (Ctrl+Shift+F)") },
-            { icon: @image-url("icons/house.svg"), label: @tr("Home") },
-            { icon: @image-url("icons/music.svg"), label: @tr("Songs") },
-            { icon: @image-url("icons/globe.svg"), label: @tr("Browser") },
-            { icon: @image-url("icons/list-music.svg"), label: @tr("Playlists") },
-            { icon: @image-url("icons/layout-grid.svg"), label: @tr("Soundboards") },
-        ]: HorizontalLayout {
+        HorizontalLayout {
             alignment: center;
             RailButton {
-                icon: button.icon;
-                tooltip: self.running ? @tr("Browser is open") : button.label;
+                icon: @image-url("icons/panel-left-open.svg");
+                tooltip: @tr("Expand (Ctrl+B)");
                 tooltip-enabled: root.shown;
-                running: index == 4 && BrowserView.state == BrowserState.open;
-                active: index == 2 ? root.page == Page.home : index == 3 ? root.page == Page.songs : index == 4 ? root.page == Page.browser : index == 5 ? root.page == Page.playlists || root.page == Page.playlist : index == 6 ? root.page == Page.soundboards || root.page == Page.soundboard : false;
                 clicked => {
-                    if index == 0 {
-                        root.expand();
-                    } else if index == 1 {
-                        root.open-search();
-                    } else if index == 2 {
-                        root.open-page(Page.home, "");
-                    } else if index == 3 {
-                        root.open-page(Page.songs, "");
-                    } else if index == 4 {
-                        root.open-page(Page.browser, "");
-                    } else if index == 5 {
-                        root.open-page(Page.playlists, "");
-                    } else {
-                        root.open-page(Page.soundboards, "");
+                    root.expand();
+                }
+            }
+        }
+
+        HorizontalLayout {
+            alignment: center;
+            RailButton {
+                icon: @image-url("icons/search.svg");
+                tooltip: @tr("Search everything (Ctrl+Shift+F)");
+                tooltip-enabled: root.shown;
+                clicked => {
+                    root.open-search();
+                }
+            }
+        }
+
+        Flickable {
+            mouse-drag-pan-enabled: false;
+            vertical-stretch: 1;
+            content-height: pages.preferred-height;
+            pages := VerticalLayout {
+                padding-top: 10px;
+                spacing: 4px;
+                alignment: start;
+                if !root.hidden.home: HorizontalLayout {
+                    alignment: center;
+                    RailButton {
+                        icon: @image-url("icons/house.svg");
+                        tooltip: @tr("Home");
+                        tooltip-enabled: root.shown;
+                        active: root.page == Page.home;
+                        clicked => {
+                            root.open-page(Page.home, "");
+                        }
+                    }
+                }
+                if !root.hidden.songs: HorizontalLayout {
+                    alignment: center;
+                    RailButton {
+                        icon: @image-url("icons/music.svg");
+                        tooltip: @tr("Songs");
+                        tooltip-enabled: root.shown;
+                        active: root.page == Page.songs;
+                        clicked => {
+                            root.open-page(Page.songs, "");
+                        }
+                    }
+                }
+                if !root.hidden.browser: HorizontalLayout {
+                    alignment: center;
+                    RailButton {
+                        icon: @image-url("icons/globe.svg");
+                        tooltip: self.running ? @tr("Browser is open") : @tr("Browser");
+                        tooltip-enabled: root.shown;
+                        active: root.page == Page.browser;
+                        running: BrowserView.state == BrowserState.open;
+                        clicked => {
+                            root.open-page(Page.browser, "");
+                        }
+                    }
+                }
+                if !root.hidden.playlists: VerticalLayout {
+                    padding-top: 6px;
+                    spacing: 6px;
+                    HorizontalLayout {
+                        alignment: center;
+                        RailButton {
+                            icon: @image-url("icons/list-music.svg");
+                            tooltip: @tr("Playlists");
+                            tooltip-enabled: root.shown;
+                            active: root.page == Page.playlists;
+                            clicked => {
+                                root.open-page(Page.playlists, "");
+                            }
+                        }
+                    }
+
+                    for item in LibraryView.nav-playlists: HorizontalLayout {
+                        alignment: center;
+                        RailPin {
+                            item: item;
+                            active: root.page == Page.playlist && Navigation.collection-id == item.id;
+                            tooltip-enabled: root.shown;
+                            clicked => {
+                                root.open-page(Page.playlist, item.id);
+                            }
+                        }
+                    }
+                }
+                if !root.hidden.soundboards: VerticalLayout {
+                    padding-top: 6px;
+                    spacing: 6px;
+                    HorizontalLayout {
+                        alignment: center;
+                        RailButton {
+                            icon: @image-url("icons/layout-grid.svg");
+                            tooltip: @tr("Soundboards");
+                            tooltip-enabled: root.shown;
+                            active: root.page == Page.soundboards;
+                            clicked => {
+                                root.open-page(Page.soundboards, "");
+                            }
+                        }
+                    }
+
+                    for item in LibraryView.nav-soundboards: HorizontalLayout {
+                        alignment: center;
+                        RailPin {
+                            item: item;
+                            active: root.page == Page.soundboard && Navigation.collection-id == item.id;
+                            tooltip-enabled: root.shown;
+                            clicked => {
+                                root.open-page(Page.soundboard, item.id);
+                            }
+                        }
                     }
                 }
             }
         }
-    }
 
-    VerticalLayout {
-        y: parent.height - self.height;
-        height: self.preferred-height;
-        padding-bottom: 8px;
-        spacing: 4px;
         HorizontalLayout {
             alignment: center;
             IconButton {

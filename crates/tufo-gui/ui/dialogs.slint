@@ -10,7 +10,7 @@ import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
-    KenkuImportView, Navigation, PlaylistChoice, Session, SoundIcons,
+    KenkuImportView, Navigation, PlaylistChoice, Session, SidebarPage, SoundIcons,
 } from "state.slint";
 import {
     Button, ButtonKind, Icon, IconButton, MenuItem, MenuSurface, Scrim, ScrollThumb, Slider, Switch, TextField, TextLink,
@@ -890,6 +890,53 @@ export component SettingsDialog inherits DialogFrame {
 
         SettingsDivider { }
         TourVisibilitySetting { }
+    }
+
+    SettingsSection {
+        title: @tr("Sidebar");
+        SwitchSetting {
+            title: @tr("Home");
+            checked: !Navigation.hidden-pages.home;
+            toggled(checked) => {
+                Actions.set-sidebar-page-hidden(SidebarPage.home, !checked);
+            }
+        }
+
+        SettingsDivider { }
+        SwitchSetting {
+            title: @tr("Songs");
+            checked: !Navigation.hidden-pages.songs;
+            toggled(checked) => {
+                Actions.set-sidebar-page-hidden(SidebarPage.songs, !checked);
+            }
+        }
+
+        SettingsDivider { }
+        SwitchSetting {
+            title: @tr("Browser");
+            checked: !Navigation.hidden-pages.browser;
+            toggled(checked) => {
+                Actions.set-sidebar-page-hidden(SidebarPage.browser, !checked);
+            }
+        }
+
+        SettingsDivider { }
+        SwitchSetting {
+            title: @tr("Playlists");
+            checked: !Navigation.hidden-pages.playlists;
+            toggled(checked) => {
+                Actions.set-sidebar-page-hidden(SidebarPage.playlists, !checked);
+            }
+        }
+
+        SettingsDivider { }
+        SwitchSetting {
+            title: @tr("Soundboards");
+            checked: !Navigation.hidden-pages.soundboards;
+            toggled(checked) => {
+                Actions.set-sidebar-page-hidden(SidebarPage.soundboards, !checked);
+            }
+        }
     }
 
     SettingsSection {

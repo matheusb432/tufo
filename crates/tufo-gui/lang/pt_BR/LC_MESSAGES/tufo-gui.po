@@ -509,7 +509,7 @@ msgstr "Batimentos cardíacos"
 msgid "Hendrick Avercamp, about 1608"
 msgstr "Hendrick Avercamp, por volta de 1608"
 
-#: ui/sidebar.slint
+#: ui/sidebar.slint ui/dialogs.slint ui/pages.slint
 msgid "Home"
 msgstr "Início"
 
@@ -839,7 +839,7 @@ msgstr "Tocar em"
 msgid "Playlist"
 msgstr "Playlist"
 
-#: ui/pages.slint ui/sidebar.slint
+#: ui/pages.slint ui/sidebar.slint ui/dialogs.slint
 msgid "Playlists"
 msgstr "Playlists"
 
@@ -997,7 +997,7 @@ msgstr "Som"
 msgid "Soundboard"
 msgstr "Painel de sons"
 
-#: ui/pages.slint ui/sidebar.slint
+#: ui/pages.slint ui/sidebar.slint ui/dialogs.slint
 msgid "Soundboards"
 msgstr "Painéis de sons"
 
@@ -1427,7 +1427,7 @@ msgstr "Origem"
 msgid "Title"
 msgstr "Título"
 
-#: ui/pages.slint ui/sidebar.slint
+#: ui/pages.slint ui/sidebar.slint ui/dialogs.slint
 msgid "Songs"
 msgstr "Músicas"
 
@@ -2050,8 +2050,8 @@ msgid "The output picker sends audio to this machine or one Discord voice channe
 msgstr "O seletor de saída envia áudio para este computador ou um canal de voz do Discord. Atualizar renova os canais de voz. Selecionar outro canal altera a saída."
 
 #: ui/tours/home.slint
-msgid "The sidebar opens Home, Songs, Playlists and Soundboards. Ctrl+B switches between the sidebar and its narrow rail."
-msgstr "A barra lateral abre Início, Músicas, Playlists e Painéis de sons. Ctrl+B alterna entre a barra lateral e sua versão estreita."
+msgid "The sidebar opens your pages and the playlists and soundboards pinned under them. Right-click a page to hide it, or a collection to pin or unpin it. Ctrl+B switches between the sidebar and its narrow rail."
+msgstr "A barra lateral abre suas páginas e as playlists e painéis de sons fixados nelas. Clique com o botão direito em uma página para ocultá-la, ou em uma coleção para fixá-la ou desafixá-la. Ctrl+B alterna entre a barra lateral e sua versão estreita."
 
 #: ui/tours/collection.slint
 msgid "Tufo keeps this playlist in sync with its folder. The folder and any missing state appear in the large header. Folder-followed playlists do not take individual additions or removals."
@@ -2440,7 +2440,7 @@ msgstr "Tentar de novo"
 msgid "Open the browser"
 msgstr "Abrir o navegador"
 
-#: ui/browser.slint ui/sidebar.slint
+#: ui/browser.slint ui/sidebar.slint ui/dialogs.slint
 msgid "Browser"
 msgstr "Navegador"
 
@@ -2527,3 +2527,27 @@ msgstr "Por quanto tempo músicas consecutivas se sobrepõem."
 #: ui/dialogs.slint
 msgid "When guide icons appear."
 msgstr "Quando os ícones de guia aparecem."
+
+#: ui/sidebar.slint
+msgid "Hide from the sidebar"
+msgstr "Ocultar da barra lateral"
+
+#: ui/pages.slint ui/sidebar.slint
+msgid "Unpin from the sidebar"
+msgstr "Desafixar da barra lateral"
+
+#: ui/pages.slint
+msgid "Pin to the sidebar"
+msgstr "Fixar na barra lateral"
+
+#: ui/sidebar.slint
+msgid "Right-click a playlist to pin it here."
+msgstr "Clique com o botão direito em uma playlist para fixá-la aqui."
+
+#: ui/sidebar.slint
+msgid "Right-click a soundboard to pin it here."
+msgstr "Clique com o botão direito em um painel de sons para fixá-lo aqui."
+
+#: ui/dialogs.slint
+msgid "Sidebar"
+msgstr "Barra lateral"

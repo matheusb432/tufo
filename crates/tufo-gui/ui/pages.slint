@@ -52,10 +52,32 @@ component CardView inherits Rectangle {
         animate opacity { duration: Motion.hover; }
     }
 
+    property <Point> menu-position;
     touch := TouchArea {
         mouse-cursor: MouseCursor.pointer;
         clicked => {
             Actions.open-page(root.kind == CollectionKind.playlist ? Page.playlist : Page.soundboard, root.card.id);
+        }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.menu-position = { x: self.mouse-x, y: self.mouse-y };
+                card-menu.show();
+            }
+        }
+    }
+
+    card-menu := PopupWindow {
+        x: root.menu-position.x;
+        y: root.menu-position.y;
+        close-policy: close-on-click-outside;
+        MenuSurface {
+            MenuAction {
+                text: root.card.pinned ? @tr("Unpin from the sidebar") : @tr("Pin to the sidebar");
+                activated => {
+                    Actions.set-collection-pinned(root.card.id, !root.card.pinned);
+                    card-menu.close();
+                }
+            }
         }
     }
 
@@ -557,6 +579,14 @@ component CollectionTools inherits HorizontalLayout {
                 text: @tr("Edit");
                 activated => {
                     root.edit();
+                    menu.close();
+                }
+            }
+
+            MenuAction {
+                text: LibraryView.collection-pinned ? @tr("Unpin from the sidebar") : @tr("Pin to the sidebar");
+                activated => {
+                    Actions.set-collection-pinned(Navigation.collection-id, !LibraryView.collection-pinned);
                     menu.close();
                 }
             }
