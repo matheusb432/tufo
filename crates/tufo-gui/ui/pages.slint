@@ -67,7 +67,7 @@ component CardView inherits Rectangle {
         spacing: 2px;
         Text {
             text: root.card.title;
-            font-size: 16px;
+            font-size: Theme.card-title;
             font-weight: 800;
             color: Theme.text;
             wrap: word-wrap;
@@ -1414,7 +1414,7 @@ component SoundTileView inherits Rectangle {
         x: 14px;
         y: 12px;
         text: @tr("File missing");
-        font-size: 11.5px;
+        font-size: Theme.micro;
         font-weight: 700;
         color: Theme.error;
     }
@@ -1745,7 +1745,7 @@ export component ConnectingPage inherits Rectangle {
         Text {
             text: @tr("Starting the audio server");
             font-family: Theme.display-font;
-            font-size: 26px;
+            font-size: Theme.heading;
             font-weight: Theme.display-weight;
             color: Theme.text;
             horizontal-alignment: center;

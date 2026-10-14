@@ -6,7 +6,7 @@ Tufo's own code is [MIT licensed](LICENSE). Bundled material retains its own ter
 | --- | --- |
 | Collection paintings | Public domain or CC0; [credits](assets/backgrounds/CREDITS.md) and [original sources](assets/backgrounds/SOURCES.md) |
 | Built-in ambience | CC0, public domain, or CC BY 4.0; authors, edits, sources, and license links in [effect credits](assets/effects/CREDITS.md) |
-| Nunito font | [SIL Open Font License 1.1](crates/tufo-gui/fonts/OFL-Nunito.txt), with the font's copyright notice |
+| Alegreya Sans font | [SIL Open Font License 1.1](crates/tufo-gui/fonts/OFL-AlegreyaSans.txt), with the font's copyright notice; subset to Latin, Greek, and Cyrillic |
 | Lucide interface icons | [ISC license and attribution](crates/tufo-gui/ui/icons/LICENSE) |
 | Lucide sound icons | [ISC license and attribution](crates/tufo-gui/icons/sounds/LICENSE) |
 | field 0.1.0 | [MIT](shared/field/LICENSE-MIT) or [Apache-2.0](shared/field/LICENSE-APACHE); [vendoring provenance](shared/field/VENDORING.md) |

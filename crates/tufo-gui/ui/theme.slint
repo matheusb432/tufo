@@ -1,7 +1,10 @@
 // A rainforest in late afternoon: everything rests in green shade, and only what plays catches the
 // low sun.
 
-import "../fonts/Nunito.ttf";
+import "../fonts/AlegreyaSans-Regular.ttf";
+import "../fonts/AlegreyaSans-Medium.ttf";
+import "../fonts/AlegreyaSans-Bold.ttf";
+import "../fonts/AlegreyaSans-ExtraBold.ttf";
 
 export global Theme {
     // The sun on whatever plays, and the primary action.
@@ -94,15 +97,19 @@ export global Theme {
     // Three bar buttons, 2 px apart.
     out property <length> window-buttons-width: 112px;
 
-    out property <string> font: "Nunito";
-    out property <string> display-font: "Nunito";
+    // Alegreya Sans sets small for its size, so the scale runs larger than a geometric face's.
+    out property <string> font: "Alegreya Sans";
+    out property <string> display-font: "Alegreya Sans";
     out property <int> display-weight: 800;
-    out property <length> title: 34px;
-    out property <length> heading: 22px;
-    out property <length> subheading: 18px;
-    out property <length> body: 15px;
-    out property <length> body-small: 14px;
-    out property <length> caption: 12.5px;
+    out property <length> title: 37px;
+    out property <length> heading: 24px;
+    out property <length> subheading: 19.5px;
+    out property <length> card-title: 17.5px;
+    out property <length> body: 16.5px;
+    out property <length> body-small: 15px;
+    out property <length> label: 14px;
+    out property <length> caption: 13.5px;
+    out property <length> micro: 12.5px;
 }
 
 export global Motion {

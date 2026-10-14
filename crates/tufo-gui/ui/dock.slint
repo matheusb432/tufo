@@ -52,7 +52,7 @@ component SoundChipView inherits Rectangle {
 
         Text {
             text: root.chip.title;
-            font-size: 13px;
+            font-size: Theme.label;
             font-weight: 700;
             vertical-alignment: center;
             overflow: elide;
@@ -391,7 +391,7 @@ component SeekBar inherits Rectangle {
 
 component TimeText inherits Text {
     min-width: 34px;
-    font-size: 11.5px;
+    font-size: Theme.micro;
     color: Theme.text-faint;
     vertical-alignment: center;
 }
@@ -701,7 +701,7 @@ component SoundsButton inherits Rectangle {
         }
         if root.sound-count > 0: Text {
             text: root.sound-count;
-            font-size: 13px;
+            font-size: Theme.label;
             font-weight: 800;
             color: PlayerView.sounds-paused ? Theme.text-faint : Theme.text;
             vertical-alignment: center;

@@ -80,7 +80,7 @@ component TabChip inherits Rectangle {
             text: root.tab.loading ? @tr("Loading… {0}", root.tab.title) : root.tab.title;
             color: root.selected ? Theme.text : Theme.text-secondary;
             font-size: Theme.body-small;
-            font-weight: root.selected ? 700 : 600;
+            font-weight: root.selected ? 700 : 500;
             vertical-alignment: center;
             overflow: elide;
         }
