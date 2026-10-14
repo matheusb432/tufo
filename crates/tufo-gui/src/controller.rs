@@ -16,7 +16,7 @@ pub(crate) use browser::{PaneGeometry, PanePointer};
 use slint::ComponentHandle as _;
 use tufo_client::{
     ClientError, Code, LocalEndpoint, TufoClient,
-    desktop::{DesktopSettingsUpdate, TourVisibility},
+    desktop::{DesktopSettingsUpdate, SidebarPage, SidebarPagesPatch, TourVisibility},
     library::{
         AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CreateCollection,
         ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
@@ -1344,6 +1344,21 @@ impl Controller {
         };
         self.save_desktop_settings(DesktopSettingsUpdate {
             tours: Some(tours),
+            ..DesktopSettingsUpdate::default()
+        });
+    }
+
+    /// Leaves the page open when its row hides.
+    pub(crate) fn set_sidebar_page_hidden(&self, page: ui::SidebarPage, hidden: bool) {
+        let page = match page {
+            ui::SidebarPage::Home => SidebarPage::Home,
+            ui::SidebarPage::Songs => SidebarPage::Songs,
+            ui::SidebarPage::Browser => SidebarPage::Browser,
+            ui::SidebarPage::Playlists => SidebarPage::Playlists,
+            ui::SidebarPage::Soundboards => SidebarPage::Soundboards,
+        };
+        self.save_desktop_settings(DesktopSettingsUpdate {
+            sidebar_hidden_pages: SidebarPagesPatch::default().set(page, hidden),
             ..DesktopSettingsUpdate::default()
         });
     }

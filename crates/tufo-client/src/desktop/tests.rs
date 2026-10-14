@@ -12,6 +12,7 @@ fn a_missing_file_holds_the_defaults() -> anyhow::Result<()> {
     assert_eq!(settings.quit_behavior, QuitBehavior::StandBy);
     assert_eq!(settings.language, Language::System);
     assert_eq!(settings.tours, TourVisibility::ShowUnseen);
+    assert_eq!(settings.sidebar_hidden_pages.iter().count(), 0);
     assert!(!file.path.exists());
     Ok(())
 }
@@ -76,10 +77,12 @@ fn a_contended_settings_lock_times_out_and_can_be_reacquired_after_release() -> 
 fn partial_updates_preserve_omitted_fields_and_allow_defaults() -> anyhow::Result<()> {
     let directory = tempfile::tempdir()?;
     let file = settings_file(&directory);
+    let hidden_pages = SidebarPages::default().with(SidebarPage::Browser, true);
     file.update(DesktopSettingsUpdate {
         language: Some(Language::PortugueseBrazil),
         quit_behavior: Some(QuitBehavior::KeepPlaying),
         tours: Some(TourVisibility::AlwaysHide),
+        sidebar_hidden_pages: SidebarPagesPatch::replace(hidden_pages),
     })?;
 
     let settings = file.update(DesktopSettingsUpdate {
@@ -89,6 +92,7 @@ fn partial_updates_preserve_omitted_fields_and_allow_defaults() -> anyhow::Resul
     assert_eq!(settings.language, Language::PortugueseBrazil);
     assert_eq!(settings.quit_behavior, QuitBehavior::StandBy);
     assert_eq!(settings.tours, TourVisibility::AlwaysHide);
+    assert_eq!(settings.sidebar_hidden_pages, hidden_pages);
     assert_eq!(file.load()?, settings);
 
     file.update(DesktopSettingsUpdate {
@@ -130,6 +134,49 @@ fn unknown_settings_fields_and_languages_are_rejected() {
     assert!(parse("langauge = \"en\"\n").is_err());
     assert!(parse("[quit]\nkeep_playing = true\nunknown = true\n").is_err());
     assert!(parse("tours = \"sometimes\"\n").is_err());
+    assert!(parse("[sidebar]\nhidden_pages = [\"settings\"]\n").is_err());
+    assert!(parse("[sidebar]\nhidden_pages = \"songs\"\n").is_err());
+    assert!(parse("[sidebar]\nhiden_pages = [\"songs\"]\n").is_err());
+}
+
+#[test]
+fn hiding_one_sidebar_page_keeps_the_others_and_every_other_setting() -> anyhow::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let file = settings_file(&directory);
+    std::fs::create_dir_all(directory.path().join("tufo"))?;
+    std::fs::write(
+        &file.path,
+        "language = \"pt-BR\"\n[quit]\nkeep_playing = true\n\
+         [sidebar]\nhidden_pages = [\"soundboards\", \"home\", \"home\"]\n",
+    )?;
+    let hidden =
+        |settings: DesktopSettings| settings.sidebar_hidden_pages.iter().collect::<Vec<_>>();
+    assert_eq!(
+        hidden(file.load()?),
+        [SidebarPage::Home, SidebarPage::Soundboards]
+    );
+
+    let settings = file.update(DesktopSettingsUpdate {
+        sidebar_hidden_pages: SidebarPagesPatch::default()
+            .set(SidebarPage::Songs, true)
+            .set(SidebarPage::Home, false),
+        ..DesktopSettingsUpdate::default()
+    })?;
+    assert_eq!(
+        hidden(settings),
+        [SidebarPage::Songs, SidebarPage::Soundboards]
+    );
+    assert_eq!(settings.language, Language::PortugueseBrazil);
+    assert_eq!(settings.quit_behavior, QuitBehavior::KeepPlaying);
+    assert_eq!(file.load()?, settings);
+
+    let settings = file.update(DesktopSettingsUpdate {
+        sidebar_hidden_pages: SidebarPagesPatch::replace(SidebarPages::default()),
+        ..DesktopSettingsUpdate::default()
+    })?;
+    assert_eq!(hidden(settings), []);
+    assert_eq!(file.load()?, settings);
+    Ok(())
 }
 
 #[test]

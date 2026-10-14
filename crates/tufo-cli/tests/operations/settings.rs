@@ -84,7 +84,7 @@ async fn player_settings_preserve_omitted_fields_and_reject_invalid_updates_atom
 #[tokio::test]
 async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Result<()> {
     use anyhow::Context as _;
-    use tufo_client::desktop::{Language, QuitBehavior, SettingsFile, TourVisibility};
+    use tufo_client::desktop::{Language, QuitBehavior, SettingsFile, SidebarPage, TourVisibility};
 
     let session = Session::new()?;
     let config = session.path("XDG_CONFIG_HOME/tufo/config.toml");
@@ -92,12 +92,12 @@ async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Re
     let defaults = session.json(&["desktop", "get"]).await?;
     assert_eq!(
         defaults,
-        json!({"language": "system", "keep_playing_after_quit": false, "tours": "show-unseen", "autostart": false})
+        json!({"language": "system", "keep_playing_after_quit": false, "tours": "show-unseen", "sidebar_hidden_pages": [], "autostart": false})
     );
     session
         .mutation(
             &["desktop", "update"],
-            json!({"language": "pt-BR", "keep_playing_after_quit": true, "tours": "always-hide"}),
+            json!({"language": "pt-BR", "keep_playing_after_quit": true, "tours": "always-hide", "sidebar_hidden_pages": ["browser", "songs"]}),
         )
         .await?;
     session
@@ -106,12 +106,13 @@ async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Re
     let settings = session.json(&["desktop", "get"]).await?;
     assert_eq!(
         settings,
-        json!({"language": "en", "keep_playing_after_quit": true, "tours": "always-hide", "autostart": false})
+        json!({"language": "en", "keep_playing_after_quit": true, "tours": "always-hide", "sidebar_hidden_pages": ["songs", "browser"], "autostart": false})
     );
     let shared = SettingsFile::at(config.clone()).load()?;
     assert_eq!(shared.language, Language::English);
     assert_eq!(shared.quit_behavior, QuitBehavior::KeepPlaying);
     assert_eq!(shared.tours, TourVisibility::AlwaysHide);
+    assert!(shared.sidebar_hidden_pages.contains(SidebarPage::Browser));
     let saved_bytes = std::fs::read(&config)?;
     for payload in [
         r#"{"language":"invalid","autostart":true}"#,
@@ -147,7 +148,7 @@ async fn desktop_settings_update_offline_in_the_isolated_profile() -> anyhow::Re
     session
         .mutation(
             &["desktop", "update"],
-            json!({"language": "system", "keep_playing_after_quit": false, "tours": "show-unseen"}),
+            json!({"language": "system", "keep_playing_after_quit": false, "tours": "show-unseen", "sidebar_hidden_pages": []}),
         )
         .await?;
     assert_eq!(session.json(&["desktop", "get"]).await?, defaults);

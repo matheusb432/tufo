@@ -5,6 +5,19 @@ import { TourVisibility } from "tours/state.slint";
 
 export enum Page { home, songs, playlists, playlist, soundboards, soundboard, browser }
 
+// A sidebar row the user can hide. Search and Settings always show.
+export enum SidebarPage { home, songs, browser, playlists, soundboards }
+
+// The sidebar rows the user hid. A hidden row's page still opens from elsewhere and stays open
+// when its row hides. Hiding Playlists or Soundboards hides their pinned collections too.
+export struct SidebarHiddenPages {
+    home: bool,
+    songs: bool,
+    browser: bool,
+    playlists: bool,
+    soundboards: bool,
+}
+
 export enum CollectionKind { playlist, soundboard }
 
 export enum OutputRowKind { local, guild, channel }
@@ -261,6 +274,7 @@ export global Session {
 export global Navigation {
     in-out property <Page> page: Page.home;
     in-out property <string> collection-id;
+    in property <SidebarHiddenPages> hidden-pages;
 }
 
 export global LibraryView {
@@ -543,6 +557,8 @@ export global Actions {
     callback set-crossfade(int);
     callback set-keep-playing-after-quit(bool);
     callback set-tour-visibility(TourVisibility);
+    // Hides the page's sidebar row, or shows it again.
+    callback set-sidebar-page-hidden(SidebarPage, bool);
     callback set-start-at-login(bool);
     // Restarts tufo-server, so its bot logs in with the new token.
     callback save-discord-token(string);

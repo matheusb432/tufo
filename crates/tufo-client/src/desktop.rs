@@ -84,11 +84,125 @@ impl TourVisibility {
     }
 }
 
+/// A sidebar row the user can hide. Search and Settings always show.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum SidebarPage {
+    Home,
+    Songs,
+    Browser,
+    Playlists,
+    Soundboards,
+}
+
+impl SidebarPage {
+    /// In the sidebar's order.
+    pub const ALL: [Self; 5] = [
+        Self::Home,
+        Self::Songs,
+        Self::Browser,
+        Self::Playlists,
+        Self::Soundboards,
+    ];
+
+    #[must_use]
+    pub const fn config_name(self) -> &'static str {
+        match self {
+            Self::Home => "home",
+            Self::Songs => "songs",
+            Self::Browser => "browser",
+            Self::Playlists => "playlists",
+            Self::Soundboards => "soundboards",
+        }
+    }
+
+    const fn index(self) -> usize {
+        self as usize
+    }
+}
+
+/// A set of sidebar pages.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(from = "Vec<SidebarPage>")]
+pub struct SidebarPages {
+    included_by_page: [bool; SidebarPage::ALL.len()],
+}
+
+impl SidebarPages {
+    #[must_use]
+    pub const fn contains(self, page: SidebarPage) -> bool {
+        self.included_by_page[page.index()]
+    }
+
+    #[must_use]
+    pub const fn with(mut self, page: SidebarPage, included: bool) -> Self {
+        self.included_by_page[page.index()] = included;
+        self
+    }
+
+    /// In the sidebar's order.
+    pub fn iter(self) -> impl Iterator<Item = SidebarPage> {
+        SidebarPage::ALL
+            .into_iter()
+            .filter(move |page| self.contains(*page))
+    }
+}
+
+impl FromIterator<SidebarPage> for SidebarPages {
+    fn from_iter<I: IntoIterator<Item = SidebarPage>>(pages: I) -> Self {
+        pages
+            .into_iter()
+            .fold(Self::default(), |set, page| set.with(page, true))
+    }
+}
+
+impl From<Vec<SidebarPage>> for SidebarPages {
+    fn from(pages: Vec<SidebarPage>) -> Self {
+        pages.into_iter().collect()
+    }
+}
+
+/// Adds pages to a set or removes them; pages it doesn't name keep their membership.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SidebarPagesPatch {
+    included_by_page: [Option<bool>; SidebarPage::ALL.len()],
+}
+
+impl SidebarPagesPatch {
+    #[must_use]
+    pub const fn set(mut self, page: SidebarPage, included: bool) -> Self {
+        self.included_by_page[page.index()] = Some(included);
+        self
+    }
+
+    /// Makes the set exactly `pages`.
+    #[must_use]
+    pub fn replace(pages: SidebarPages) -> Self {
+        SidebarPage::ALL
+            .into_iter()
+            .fold(Self::default(), |patch, page| {
+                patch.set(page, pages.contains(page))
+            })
+    }
+
+    fn apply(self, current: SidebarPages) -> SidebarPages {
+        SidebarPage::ALL.into_iter().fold(current, |set, page| {
+            match self.included_by_page[page.index()] {
+                Some(included) => set.with(page, included),
+                None => set,
+            }
+        })
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct DesktopSettings {
     pub quit_behavior: QuitBehavior,
     pub language: Language,
     pub tours: TourVisibility,
+    /// Rows the sidebar leaves out; their pages still open from elsewhere. Hiding Playlists or
+    /// Soundboards also hides their pinned collections.
+    pub sidebar_hidden_pages: SidebarPages,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -96,6 +210,7 @@ pub struct DesktopSettingsUpdate {
     pub quit_behavior: Option<QuitBehavior>,
     pub language: Option<Language>,
     pub tours: Option<TourVisibility>,
+    pub sidebar_hidden_pages: SidebarPagesPatch,
 }
 
 impl DesktopSettingsUpdate {
@@ -104,6 +219,9 @@ impl DesktopSettingsUpdate {
             quit_behavior: self.quit_behavior.unwrap_or(current.quit_behavior),
             language: self.language.unwrap_or(current.language),
             tours: self.tours.unwrap_or(current.tours),
+            sidebar_hidden_pages: self
+                .sidebar_hidden_pages
+                .apply(current.sidebar_hidden_pages),
         }
     }
 }
@@ -118,6 +236,8 @@ struct SettingsDocument {
     tours: TourVisibility,
     #[serde(default)]
     quit: QuitSection,
+    #[serde(default)]
+    sidebar: SidebarSection,
 }
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -125,6 +245,13 @@ struct SettingsDocument {
 struct QuitSection {
     #[serde(default)]
     keep_playing: bool,
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SidebarSection {
+    #[serde(default)]
+    hidden_pages: SidebarPages,
 }
 
 impl From<SettingsDocument> for DesktopSettings {
@@ -138,6 +265,7 @@ impl From<SettingsDocument> for DesktopSettings {
             quit_behavior,
             language: document.language,
             tours: document.tours,
+            sidebar_hidden_pages: document.sidebar.hidden_pages,
         }
     }
 }
@@ -276,6 +404,8 @@ fn render(settings: DesktopSettings) -> String {
     let language = settings.language.config_name();
     let tours = settings.tours.config_name();
     let keep_playing = settings.quit_behavior == QuitBehavior::KeepPlaying;
+    let hidden_pages = quoted_page_names(settings.sidebar_hidden_pages.iter());
+    let hideable_pages = quoted_page_names(SidebarPage::ALL.into_iter());
     format!(
         "# Tufo's desktop settings. Changing a setting in Tufo rewrites this file.\n\
          \n\
@@ -284,8 +414,19 @@ fn render(settings: DesktopSettings) -> String {
          \n\
          [quit]\n\
          # Leave the music and sounds playing after Tufo quits.\n\
-         keep_playing = {keep_playing}\n"
+         keep_playing = {keep_playing}\n\
+         \n\
+         [sidebar]\n\
+         # Pages the sidebar doesn't list, among {hideable_pages}.\n\
+         hidden_pages = [{hidden_pages}]\n"
     )
+}
+
+fn quoted_page_names(pages: impl Iterator<Item = SidebarPage>) -> String {
+    pages
+        .map(|page| format!("\"{}\"", page.config_name()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 #[cfg(test)]

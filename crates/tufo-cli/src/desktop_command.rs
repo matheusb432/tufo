@@ -4,29 +4,35 @@ use anyhow::Context as _;
 use clap::Subcommand;
 use serde::Deserialize;
 use tufo_client::desktop::{
-    DesktopSettingsUpdate, Language, QuitBehavior, SettingsFile, TourVisibility, autostart,
+    DesktopSettingsUpdate, Language, QuitBehavior, SettingsFile, SidebarPage, SidebarPages,
+    SidebarPagesPatch, TourVisibility, autostart,
 };
 
 use crate::input::deserialize_present;
 
 #[derive(Subcommand)]
 pub(crate) enum DesktopCommand {
-    /// Read local language, quit behavior, tours, and autostart without contacting the server.
+    /// Read local language, quit behavior, tours, hidden sidebar pages, and autostart without
+    /// contacting the server.
     Get,
     /// Update supplied desktop settings without contacting the server.
     #[command(after_long_help = r#"Examples:
   tufo desktop update '{"language":"pt-BR","keep_playing_after_quit":true}'
   tufo desktop update '{"language":"system","autostart":false}'
   tufo desktop update '{"tours":"always-hide"}'
+  tufo desktop update '{"sidebar_hidden_pages":["songs","browser"]}'
 
 Omitted fields keep their current values. Languages: system, en, pt-BR.
 Tours: always-show, show-unseen (default), always-hide.
-Use "system" to restore system locale selection and false to disable a boolean setting.
+sidebar_hidden_pages replaces the hidden set; pages: home, songs, browser, playlists, soundboards.
+Use "system" to restore system locale selection, false to disable a boolean setting, and []
+to show every sidebar page.
 Null values and unknown fields are errors.
 The GUI loads desktop settings at startup; restart it to apply external changes.
 Autostart registers tufo-gui --at-login; enabling it requires tufo-gui beside tufo or on PATH."#)]
     Update {
-        /// One JSON object with `language`, `keep_playing_after_quit`, `tours`, or `autostart`.
+        /// One JSON object with `language`, `keep_playing_after_quit`, `tours`,
+        /// `sidebar_hidden_pages`, or `autostart`.
         #[arg(value_name = "JSON_PAYLOAD")]
         payload: DesktopUpdatePayload,
     },
@@ -48,6 +54,8 @@ struct DesktopUpdateJson {
     #[serde(default, deserialize_with = "deserialize_present")]
     keep_playing_after_quit: Option<bool>,
     #[serde(default, deserialize_with = "deserialize_present")]
+    sidebar_hidden_pages: Option<SidebarPages>,
+    #[serde(default, deserialize_with = "deserialize_present")]
     autostart: Option<bool>,
 }
 
@@ -67,6 +75,10 @@ impl FromStr for DesktopUpdatePayload {
                         QuitBehavior::StandBy
                     }
                 }),
+                sidebar_hidden_pages: document
+                    .sidebar_hidden_pages
+                    .map(SidebarPagesPatch::replace)
+                    .unwrap_or_default(),
             },
             autostart: document.autostart,
         })
@@ -99,6 +111,11 @@ fn get() -> anyhow::Result<serde_json::Value> {
         "language": settings.language.config_name(),
         "tours": settings.tours.config_name(),
         "keep_playing_after_quit": settings.quit_behavior == QuitBehavior::KeepPlaying,
+        "sidebar_hidden_pages": settings
+            .sidebar_hidden_pages
+            .iter()
+            .map(SidebarPage::config_name)
+            .collect::<Vec<_>>(),
         "autostart": autostart,
     }))
 }
@@ -130,7 +147,7 @@ mod tests {
         let cli = DesktopCli::try_parse_from([
             "tufo",
             "update",
-            r#"{"language":"pt-BR","keep_playing_after_quit":true,"tours":"always-hide","autostart":false}"#,
+            r#"{"language":"pt-BR","keep_playing_after_quit":true,"tours":"always-hide","sidebar_hidden_pages":["browser"],"autostart":false}"#,
         ])?;
         let DesktopCommand::Update { payload } = cli.command else {
             anyhow::bail!("desktop update selected a different command");
@@ -142,6 +159,10 @@ mod tests {
             payload.settings.quit_behavior,
             Some(QuitBehavior::KeepPlaying)
         );
+        assert_eq!(
+            payload.settings.sidebar_hidden_pages,
+            SidebarPagesPatch::replace(SidebarPages::default().with(SidebarPage::Browser, true))
+        );
         assert_eq!(payload.autostart, Some(false));
         Ok(())
     }
@@ -149,16 +170,19 @@ mod tests {
     #[test]
     fn omitted_fields_and_explicit_defaults_are_distinct() -> anyhow::Result<()> {
         let omitted: DesktopUpdatePayload = "{}".parse().map_err(anyhow::Error::msg)?;
-        let reset: DesktopUpdatePayload =
-            r#"{"language":"system","keep_playing_after_quit":false,"tours":"show-unseen"}"#
-                .parse()
-                .map_err(anyhow::Error::msg)?;
+        let reset: DesktopUpdatePayload = r#"{"language":"system","keep_playing_after_quit":false,"tours":"show-unseen","sidebar_hidden_pages":[]}"#
+            .parse()
+            .map_err(anyhow::Error::msg)?;
 
         assert_eq!(omitted.settings, DesktopSettingsUpdate::default());
         assert_eq!(omitted.autostart, None);
         assert_eq!(reset.settings.language, Some(Language::System));
         assert_eq!(reset.settings.tours, Some(TourVisibility::ShowUnseen));
         assert_eq!(reset.settings.quit_behavior, Some(QuitBehavior::StandBy));
+        assert_eq!(
+            reset.settings.sidebar_hidden_pages,
+            SidebarPagesPatch::replace(SidebarPages::default())
+        );
         assert_eq!(reset.autostart, None);
         Ok(())
     }
@@ -177,6 +201,9 @@ mod tests {
             r#"{"autostart":null}"#,
             r#"{"keep_playing_after_quit":"true"}"#,
             r#"{"autostart":1}"#,
+            r#"{"sidebar_hidden_pages":null}"#,
+            r#"{"sidebar_hidden_pages":"songs"}"#,
+            r#"{"sidebar_hidden_pages":["search"]}"#,
             r#"{"unknown":true}"#,
             r#"{"autostart":{"enabled":true,"unknown":true}}"#,
             r#"{"language":{"code":"en","unknown":true}}"#,

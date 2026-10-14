@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use slint::{ComponentHandle as _, Model as _, ModelRc, SharedString, Timer, TimerMode, VecModel};
 use tufo_client::{
-    desktop::TourVisibility,
+    desktop::{SidebarPage, TourVisibility},
     library::{Background, ImportReport, KenkuImportStatus},
 };
 use tufo_models::{kenku_import::KenkuImportState, library::SoundIcon};
@@ -25,9 +25,9 @@ use crate::{
         BrowserPointer, BrowserState, BrowserTabView, BrowserView, CollectionBackground,
         CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge,
         LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation, OutputRow, OutputRowKind,
-        Page, PlayerView, PlaylistChoice, Search, SearchResult, Session, SongFolder,
-        SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SongRow, SoundChip,
-        SoundIcons, SoundTile, TrackRow, VoiceBadge,
+        Page, PlayerView, PlaylistChoice, Search, SearchResult, Session, SidebarHiddenPages,
+        SongFolder, SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SongRow,
+        SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
     },
 };
 
@@ -606,6 +606,16 @@ pub(crate) fn desktop_settings(window: &slint::Weak<AppWindow>, settings: Deskto
         window
             .global::<Session>()
             .set_keep_playing_after_quit(settings.quit_behavior == QuitBehavior::KeepPlaying);
+        let hidden = settings.sidebar_hidden_pages;
+        window
+            .global::<Navigation>()
+            .set_hidden_pages(SidebarHiddenPages {
+                home: hidden.contains(SidebarPage::Home),
+                songs: hidden.contains(SidebarPage::Songs),
+                browser: hidden.contains(SidebarPage::Browser),
+                playlists: hidden.contains(SidebarPage::Playlists),
+                soundboards: hidden.contains(SidebarPage::Soundboards),
+            });
         let guides = window.global::<crate::ui::GuidedTours>();
         let visibility = match settings.tours {
             TourVisibility::AlwaysShow => crate::ui::TourVisibility::AlwaysShow,

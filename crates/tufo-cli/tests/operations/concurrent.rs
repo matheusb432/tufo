@@ -78,7 +78,7 @@ async fn concurrent_offline_desktop_updates_preserve_language_and_quit_behavior(
     assert_eq!(settings.tours, TourVisibility::AlwaysHide);
     assert_eq!(
         session.json(&["desktop", "get"]).await?,
-        json!({"language": "pt-BR", "keep_playing_after_quit": true, "tours": "always-hide", "autostart": false})
+        json!({"language": "pt-BR", "keep_playing_after_quit": true, "tours": "always-hide", "sidebar_hidden_pages": [], "autostart": false})
     );
     assert!(
         !session

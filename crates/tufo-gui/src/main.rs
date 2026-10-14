@@ -567,6 +567,9 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_set_tour_visibility, |visibility| {
         controller.set_tour_visibility(visibility);
     });
+    on!(controller => on_set_sidebar_page_hidden, |page, hidden| {
+        controller.set_sidebar_page_hidden(page, hidden);
+    });
     on!(controller => on_set_start_at_login, |start_at_login| {
         controller.set_start_at_login(start_at_login);
     });
