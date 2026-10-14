@@ -24,7 +24,9 @@ export global Theme {
     out property <color> still-light: #43502c;
     out property <color> still-canopy: #173d27;
     out property <color> still-shade: #0b1e15;
-    out property <brush> sidebar: @linear-gradient(180deg, rgba(9, 27, 19, 0.82) 0%, rgba(8, 24, 17, 0.92) 100%);
+    out property <color> sidebar-top: rgba(9, 27, 19, 0.82);
+    out property <color> sidebar-bottom: rgba(8, 24, 17, 0.92);
+    out property <brush> sidebar: @linear-gradient(180deg, Theme.sidebar-top 0%, Theme.sidebar-bottom 100%);
     // The sidebar over the page, where the page mustn't show through.
     out property <color> sidebar-overlaid: #09190f;
     out property <color> sidebar-edge: rgba(245, 238, 220, 0.05);
@@ -67,6 +69,8 @@ export global Theme {
     out property <length> radius-panel: 18px;
     out property <length> radius-row: 12px;
     out property <length> radius-small: 8px;
+    // The frameless window's corners, where the desktop shows through them.
+    out property <length> radius-window: 12px;
     out property <length> sidebar-width: 232px;
     out property <length> rail-width: 64px;
     // The narrowest page the expanded sidebar sits beside rather than over.

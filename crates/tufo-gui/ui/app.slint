@@ -57,7 +57,7 @@ export component AppWindow inherits Window {
     max-width: Session.mini-player ? Theme.mini-player-width-max : Theme.window-size-unbounded;
     max-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-size-unbounded;
     always-on-top: Session.mini-player && Session.mini-player-pinned && Session.always-on-top-supported;
-    background: Theme.still-shade;
+    background: WindowFrame.corners-rounded ? transparent : Theme.still-shade;
     default-font-family: Theme.font;
     no-frame: true;
     resize-border-width: root.fills-screen ? 0 : 6px;
@@ -292,12 +292,14 @@ export component AppWindow inherits Window {
         height: parent.height;
         preferred-width: 0px;
         preferred-height: 0px;
-        source: Art.backdrop(root.width, root.height, Theme.still-light, Theme.still-canopy, Theme.still-shade, Art.backdrop-revision);
+        source: Art.backdrop(root.width, root.height, WindowFrame.corner-radius, Theme.still-light, Theme.still-canopy, Theme.still-shade, Art.backdrop-revision);
         image-fit: fill;
     }
 
+    // The software renderer can't round a gradient, so rounded corners wait on the plain shade.
     if backdrop.source.width == 0: Rectangle {
-        background: @radial-gradient(circle root.still-glow-radius at root.still-glow-x 0px, Theme.still-light 0%, Theme.still-canopy 38%, Theme.still-shade 100%);
+        border-radius: WindowFrame.corner-radius;
+        background: WindowFrame.corners-rounded ? Theme.still-shade : @radial-gradient(circle root.still-glow-radius at root.still-glow-x 0px, Theme.still-light 0%, Theme.still-canopy 38%, Theme.still-shade 100%);
     }
 
     shortcuts := FocusScope {
@@ -449,6 +451,8 @@ export component AppWindow inherits Window {
                 }
                 if Session.drop-hover: Rectangle {
                     background: Theme.scrim;
+                    border-top-right-radius: WindowFrame.corner-radius;
+                    border-bottom-right-radius: WindowFrame.corner-radius;
                     VerticalLayout {
                         alignment: center;
                         spacing: 12px;
@@ -473,6 +477,8 @@ export component AppWindow inherits Window {
             Scrim {
                 x: Theme.rail-width;
                 width: parent.width - self.x;
+                border-top-left-radius: 0;
+                border-bottom-left-radius: 0;
                 progress: root.sidebar-overlaid ? 1 : 0;
                 animate progress { duration: Motion.sidebar-slide; }
                 clicked => {
@@ -665,6 +671,7 @@ export component AppWindow inherits Window {
     if !root.fills-screen: Rectangle {
         border-width: 1px;
         border-color: Theme.window-edge;
+        border-radius: WindowFrame.corner-radius;
     }
 
     // Swallows clicks while the form on show fades out.

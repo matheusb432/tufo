@@ -8,7 +8,7 @@ import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, BrowserState, BrowserView, CollectionKind, CurrentOutput, LibraryView, NavItem, Navigation, OutputRow,
-    OutputRowKind, Page, PlayerView, Session, VoiceBadge,
+    OutputRowKind, Page, PlayerView, Session, VoiceBadge, WindowFrame,
 } from "state.slint";
 import { Equalizer, Icon, IconButton, Logo, MenuSurface, TextLink, TooltipBubble } from "widgets.slint";
 import { WindowDragArea } from "frame.slint";
@@ -737,8 +737,35 @@ export component Sidebar inherits Rectangle {
         duration: Motion.sidebar-slide;
         easing: Motion.sidebar-slide-easing;
     }
-    background: root.overlaid ? Theme.sidebar-overlaid : Theme.sidebar;
+    // A rectangle rounds at most half its height, and the software renderer rounds only solid
+    // colors: solid caps of the gradient's end colors meet the window's rounded corners.
+    property <length> cap-height: 2 * WindowFrame.corner-radius;
+    background: root.overlaid ? Theme.sidebar-overlaid : transparent;
+    border-top-left-radius: WindowFrame.corner-radius;
+    border-bottom-left-radius: WindowFrame.corner-radius;
     clip: true;
+
+    if !root.overlaid: Rectangle {
+        Rectangle {
+            y: 0;
+            height: root.cap-height;
+            background: Theme.sidebar-top;
+            border-top-left-radius: WindowFrame.corner-radius;
+        }
+
+        Rectangle {
+            y: root.cap-height;
+            height: parent.height - 2 * root.cap-height;
+            background: Theme.sidebar;
+        }
+
+        Rectangle {
+            y: parent.height - root.cap-height;
+            height: root.cap-height;
+            background: Theme.sidebar-bottom;
+            border-bottom-left-radius: WindowFrame.corner-radius;
+        }
+    }
 
     WindowDragArea {
         y: 0;

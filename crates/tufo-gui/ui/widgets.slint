@@ -1,7 +1,7 @@
 // Small controls.
 
 import { Motion, Theme } from "theme.slint";
-import { Clock } from "state.slint";
+import { Clock, WindowFrame } from "state.slint";
 
 // A quiet, determinate progress bar. The caller owns the work and the estimate.
 export component LoadingProgress inherits Rectangle {
@@ -67,11 +67,12 @@ export component Presence {
 }
 
 // Dims what lies under an overlay as far as `progress` goes. A click on it usually closes the
-// overlay.
+// overlay. It rounds its corners like the window's, whose corners it usually covers.
 export component Scrim inherits Rectangle {
     in property <float> progress: 1;
     callback clicked();
     background: Theme.scrim.transparentize(1 - root.progress);
+    border-radius: WindowFrame.corner-radius;
     visible: root.progress > 0;
     TouchArea {
         clicked => {

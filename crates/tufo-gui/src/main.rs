@@ -252,6 +252,10 @@ impl CustomApplicationHandler for ApplicationEvents {
                 _ => {}
             }
         }
+        #[cfg(target_os = "linux")]
+        if let Some(winit_window) = winit_window {
+            frame::window_event(winit_window, event);
+        }
         self.drops
             .window_event(event_loop, window_id, winit_window, slint_window, event)
     }
@@ -349,13 +353,19 @@ fn bind_art(window: &ui::AppWindow) {
     art.on_painting(background_art(window, Shade::None));
     art.on_backdrop({
         let window = window.as_weak();
-        move |width, height, light, canopy, shade, _revision| {
+        move |width, height, corner_radius, light, canopy, shade, _revision| {
             let scale = window
                 .upgrade()
                 .map_or(1.0, |window| window.window().scale_factor());
+            let corner_radius = if corner_radius > 0.0 {
+                physical_pixels(corner_radius, scale)
+            } else {
+                0
+            };
             backgrounds::backdrop::image(
                 physical_pixels(width, scale),
                 physical_pixels(height, scale),
+                corner_radius,
                 [light, canopy, shade],
             )
         }

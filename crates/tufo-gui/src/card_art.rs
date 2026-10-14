@@ -79,8 +79,9 @@ pub(crate) fn card(base: &Base<'_>, shade: Shade, width: u32, height: u32, radiu
     }
 }
 
-/// The window's radial gradient, with its glow at the top right and the middle stop at 38%.
-pub(crate) fn backdrop(colors: [Rgb; 3], width: u32, height: u32) -> Pixels {
+/// The window's radial gradient, with its glow at the top right and the middle stop at 38%, and
+/// corners of `corner_radius` pixels, transparent outside the curve.
+pub(crate) fn backdrop(colors: [Rgb; 3], width: u32, height: u32, corner_radius: f32) -> Pixels {
     let radius = width.max(height) as f32 * 1.15;
     let center_x = width as f32 * 0.92;
     let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
@@ -99,7 +100,7 @@ pub(crate) fn backdrop(colors: [Rgb; 3], width: u32, height: u32) -> Pixels {
                 channel(start.0, end.0),
                 channel(start.1, end.1),
                 channel(start.2, end.2),
-                255,
+                to_byte(corner_coverage(x, y, width, height, corner_radius) * 255.0),
             ]);
         }
     }
@@ -248,6 +249,22 @@ mod tests {
         }
         assert_eq!(alpha_at(&pixels, 32, 20), 255);
         assert_eq!(alpha_at(&pixels, 32, 0), 255);
+    }
+
+    #[test]
+    fn the_backdrop_rounds_its_corners_only_with_a_radius() {
+        let colors = [Rgb(67, 80, 44), Rgb(23, 61, 39), Rgb(11, 30, 21)];
+
+        let rounded = backdrop(colors, 80, 50, 12.0);
+        for (x, y) in [(0, 0), (79, 0), (0, 49), (79, 49)] {
+            assert_eq!(alpha_at(&rounded, x, y), 0, "corner ({x}, {y})");
+        }
+        assert_eq!(alpha_at(&rounded, 40, 0), 255);
+        assert_eq!(alpha_at(&rounded, 0, 25), 255);
+
+        let square = backdrop(colors, 80, 50, 0.0);
+        let (square_pixels, _) = square.rgba.as_chunks::<4>();
+        assert!(square_pixels.iter().all(|[_, _, _, alpha]| *alpha == 255));
     }
 
     #[test]

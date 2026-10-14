@@ -1,6 +1,8 @@
 //! The window's own frame: the desktop draws none, so the window's buttons and title row reach
 //! the window here.
 
+#[cfg(target_os = "linux")]
+use std::cell::RefCell;
 use std::time::Duration;
 
 use slint::{
@@ -10,6 +12,12 @@ use slint::{
 };
 
 use crate::ui::{AppWindow, WindowFrame};
+
+#[cfg(target_os = "linux")]
+thread_local! {
+    /// The window whose corners follow the native window's state.
+    static WINDOW: RefCell<Option<slint::Weak<AppWindow>>> = const { RefCell::new(None) };
+}
 
 /// Keeps the shadow and rounded corners that Windows drops from a window without decorations.
 #[cfg(windows)]
@@ -21,6 +29,8 @@ pub(crate) fn with_shadow(
 }
 
 pub(crate) fn install(window: &AppWindow) {
+    #[cfg(target_os = "linux")]
+    WINDOW.with(|slot| *slot.borrow_mut() = Some(window.as_weak()));
     let frame = window.global::<WindowFrame>();
     let window = window.as_weak();
     frame.on_minimize({
@@ -41,6 +51,32 @@ pub(crate) fn install(window: &AppWindow) {
         }
     });
     frame.on_show_menu(move |x, y| show_menu(&window, LogicalPosition::new(x, y)));
+}
+
+/// Rounds the window's corners on Wayland while it doesn't fill the screen, letting the desktop
+/// show through them. Slint calls it on the UI thread before it handles each event.
+///
+/// Wayland surfaces are opaque unless winit marks them transparent, which also costs the
+/// compositor the blending of the whole window, so a window that fills the screen stays opaque.
+#[cfg(target_os = "linux")]
+pub(crate) fn window_event(
+    winit_window: &winit::window::Window,
+    event: &winit::event::WindowEvent,
+) {
+    if !matches!(event, winit::event::WindowEvent::Resized(_))
+        || !crate::wayland::is_wayland(winit_window)
+    {
+        return;
+    }
+    let corners_rounded = !winit_window.is_maximized() && winit_window.fullscreen().is_none();
+    winit_window.set_transparent(corners_rounded);
+    WINDOW.with(|slot| {
+        if let Some(window) = slot.borrow().as_ref().and_then(slint::Weak::upgrade) {
+            window
+                .global::<WindowFrame>()
+                .set_corners_rounded(corners_rounded);
+        }
+    });
 }
 
 #[cfg(not(target_os = "linux"))]

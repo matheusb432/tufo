@@ -1,0 +1,2 @@
+# Upstream code keeps its own style, so ast-grep and other ignore-aware tools skip it.
+*

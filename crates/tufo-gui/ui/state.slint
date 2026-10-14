@@ -1,5 +1,6 @@
 // State the host pushes into the window, and the actions the window asks the host to run.
 
+import { Theme } from "theme.slint";
 import { TourVisibility } from "tours/state.slint";
 
 export enum Page { home, songs, playlists, playlist, soundboards, soundboard, browser }
@@ -350,7 +351,8 @@ export global Art {
     // Holds existing artwork through the sidebar's slide; ending it requests settled sizes.
     callback layout-moving(bool);
     in property <int> backdrop-revision;
-    pure callback backdrop(length, length, color, color, color, int) -> image;
+    // The window's backdrop at its size, with corners of the given radius left transparent.
+    pure callback backdrop(length, length, length, color, color, color, int) -> image;
     // Rises whenever the worker delivers a picture, or pictures that failed may decode now.
     in property <int> pictures-revision;
     // A collection's background with rounded corners, at the given size: its preset or image,
@@ -382,6 +384,10 @@ export global WindowFrame {
     callback set-mini-player(bool);
     // The window's size changed while it wasn't maximized.
     callback resized(length, length);
+    // The desktop shows through the window's transparent pixels, and the window doesn't fill the
+    // screen. Whatever touches a corner of the window rounds it by `corner-radius`.
+    in property <bool> corners-rounded;
+    out property <length> corner-radius: root.corners-rounded ? Theme.radius-window : 0px;
     in-out property <FormSwitch> form-switch;
     // Fades the form on show out, then switches the window to the other one.
     public function switch-form() {
