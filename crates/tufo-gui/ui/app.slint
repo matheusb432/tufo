@@ -127,6 +127,9 @@ export component AppWindow inherits Window {
     changed guide-form-switch => { GuidedTours.close(); }
     property <bool> fills-screen: root.maximized || root.full-screen;
     property <bool> sidebar-fits: root.width >= Theme.sidebar-width + Theme.page-width-min;
+    // The output and the window's buttons at their widest, which must clear the sidebar's top row
+    // when it lies over the page.
+    property <length> title-controls-width-max: Theme.output-chip-width-max + 8px + Theme.window-buttons-width;
     property <bool> sidebar-expanded: Session.drawer-pinned && root.sidebar-fits;
     // Where the sidebar doesn't fit beside the page, expanding it lays it over the page until
     // a page opens.
@@ -350,9 +353,17 @@ export component AppWindow inherits Window {
                         background: Theme.felt-rim-shade;
                     }
 
+                    // The rim's top edge moves the window, beside the sidebar's own.
+                    WindowDragArea {
+                        x: root.page-x;
+                        y: 0;
+                        width: parent.width - self.x;
+                        height: Theme.title-row-height;
+                    }
+
                     felt := Rectangle {
                         x: root.page-x;
-                        y: Theme.felt-margin;
+                        y: Theme.title-row-height;
                         width: parent.width - self.x - Theme.felt-margin;
                         height: parent.height - self.y;
                         felt-backdrop := Image {
@@ -683,23 +694,17 @@ export component AppWindow inherits Window {
         height: Theme.title-row-height;
     }
 
-    // Where the audio goes, and the window's buttons, over the felt's top right corner.
+    // Where the audio goes, and the window's buttons, on the rim's top right.
     if full-form.present && !root.mini-player: HorizontalLayout {
         opacity: full-form.progress;
-        x: parent.width - self.width - Theme.felt-margin - 8px;
-        y: Theme.felt-margin + (Theme.title-row-height - self.height) / 2;
+        x: parent.width - self.width - Theme.felt-margin;
+        y: (Theme.title-row-height - self.height) / 2;
         width: self.preferred-width;
         height: self.preferred-height;
         spacing: 8px;
-        init => {
-            WindowFrame.title-controls-width = self.preferred-width;
-        }
-        changed preferred-width => {
-            WindowFrame.title-controls-width = self.preferred-width;
-        }
         if LibraryView.loaded: OutputChip {
             y: (parent.height - self.height) / 2;
-            compact: !root.sidebar-fits;
+            compact: root.width < root.title-controls-width-max + Theme.sidebar-width + 3 * Theme.felt-margin;
             open-settings => {
                 root.open-settings();
             }

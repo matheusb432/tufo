@@ -10,7 +10,7 @@ import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, CollectionCard, CollectionKind, LibraryView, LoopBadge, Navigation, Page,
-    PlayerView, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow, WindowFrame,
+    PlayerView, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
 } from "state.slint";
 import {
     Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem as MenuAction, MenuSurface, ScrollThumb, Slider,
@@ -248,21 +248,6 @@ component PageScroll inherits Rectangle {
     }
 }
 
-// Keeps a page's bar clear of the window's buttons, which lie over it, and sets them apart.
-export component WindowButtonsSpace inherits HorizontalLayout {
-    spacing: 8px;
-    Rectangle {
-        y: (parent.height - self.height) / 2;
-        width: 1px;
-        height: 24px;
-        background: Theme.divider;
-    }
-
-    Rectangle {
-        width: WindowFrame.title-controls-width;
-    }
-}
-
 // Falls from the page's bar once content scrolls under it.
 component BarShadow inherits Rectangle {
     in property <bool> shown;
@@ -371,7 +356,6 @@ export component HomePage inherits Rectangle {
         Heading { text: @tr("Home"); }
         TourButton { y: (parent.height - self.height) / 2; guide: HomeTour.guide; label: @tr("Home"); }
         Rectangle { horizontal-stretch: 1; }
-        WindowButtonsSpace { }
     }
     scroll := PageScroll {
         tour-scroll: TourScroll.home;
@@ -471,7 +455,6 @@ export component GridPage inherits Rectangle {
                 root.add(root.kind);
             }
         }
-        WindowButtonsSpace { }
     }
 
     scroll := PageScroll {
@@ -659,8 +642,6 @@ component CollectionBar inherits Rectangle {
                 root.add-files();
             }
         }
-
-        WindowButtonsSpace { }
     }
 }
 
@@ -1688,7 +1669,6 @@ export component SongsPage inherits Rectangle {
                 Actions.follow-folder(CollectionKind.playlist);
             }
         }
-        WindowButtonsSpace { }
     }
 
     scroll := PageScroll {

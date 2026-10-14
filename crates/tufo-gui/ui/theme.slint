@@ -77,7 +77,8 @@ export global Theme {
     out property <length> radius-small: 8px;
     // The frameless window's corners, where the desktop shows through them.
     out property <length> radius-window: 12px;
-    // The felt sits this far inside the rim's top and right edges, and the player's ledge.
+    // The felt sits this far inside the rim's right edge; the rim's top row holds the window's
+    // buttons above it, and the player's ledge runs below it.
     out property <length> felt-margin: 8px;
     out property <length> radius-felt: 14px;
     // How far the rim's shadow reaches across the felt.
@@ -113,6 +114,7 @@ export global Theme {
     out property <length> window-buttons-width: 3 * Theme.window-button-width + 2 * Theme.window-buttons-padding;
     out property <length> window-buttons-height: Theme.window-button-height + 2 * Theme.window-buttons-padding;
     out property <length> window-button-icon-size: 15px;
+    out property <length> output-chip-width-max: 240px;
 
     // Alegreya Sans sets small for its size, so the scale runs larger than a geometric face's.
     out property <string> font: "Alegreya Sans";

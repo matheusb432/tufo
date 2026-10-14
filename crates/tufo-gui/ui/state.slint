@@ -409,8 +409,6 @@ export global WindowFrame {
     // screen. Whatever touches a corner of the window rounds it by `corner-radius`.
     in property <bool> corners-rounded;
     out property <length> corner-radius: root.corners-rounded ? Theme.radius-window : 0px;
-    // How much of the page's bar the output and the window's buttons cover at its right end.
-    in-out property <length> title-controls-width: Theme.window-buttons-width;
     in-out property <FormSwitch> form-switch;
     // Fades the form on show out, then switches the window to the other one.
     public function switch-form() {
