@@ -1,5 +1,5 @@
-// The player, docked under the page: the playing sounds as chips, then what plays, the transport
-// with its seek bar, and the volume. In a narrow window it collapses into one slim row, and the
+// The player, on the tray's ledge under the page: the playing sounds as chips, then what plays, the
+// transport with its seek bar, and the volume. In a narrow window it collapses into one slim row, and the
 // mini player shows a smaller set of its controls in a small window.
 
 import { PlaybackTour } from "tours/playback.slint";
@@ -550,18 +550,14 @@ export component Dock inherits Rectangle {
     // In a narrow window, shows only what plays, in one slim row.
     in property <bool> collapsed;
     callback set-collapsed(bool);
-    background: Theme.dock;
-    border-radius: Theme.radius-tile;
-    border-width: 1px;
-    border-color: Theme.panel-edge;
     height: layout.preferred-height;
     // Swallows clicks between the controls, so they don't reach the page under the dock.
     TouchArea { }
     layout := VerticalLayout {
         padding-top: 8px;
-        padding-bottom: 8px;
-        padding-left: 12px;
-        padding-right: root.wide ? 16px : 8px;
+        padding-bottom: 10px;
+        padding-left: 14px;
+        padding-right: root.wide ? 18px : 10px;
         spacing: 8px;
         if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): PlayingSounds { }
         if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): Rectangle {
@@ -884,7 +880,7 @@ export component MiniPlayer inherits Rectangle {
                 tint: Theme.text-faint;
                 tooltip: @tr("Close");
                 background: self.has-hover ? Theme.window-close-hover : transparent;
-                hover-tint: Theme.text;
+                hover-tint: Theme.window-close-hover-icon;
                 clicked => {
                     root.close();
                 }

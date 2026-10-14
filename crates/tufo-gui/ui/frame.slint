@@ -23,40 +23,48 @@ export component WindowDragArea inherits WindowMoveArea {
     }
 }
 
-export component WindowButtons inherits HorizontalLayout {
+// One button of the window's capsule.
+component WindowButton inherits IconButton {
+    width: Theme.window-button-width;
+    height: Theme.window-button-height;
+    border-radius: self.height / 2;
+    icon-size: Theme.window-button-icon-size;
+}
+
+// Minimize, maximize, and close, sharing one quiet capsule.
+export component WindowButtons inherits Rectangle {
     in property <bool> maximized;
     callback close();
     width: Theme.window-buttons-width;
-    spacing: 2px;
-    IconButton {
-        size: Theme.bar-button-size;
-        icon-size: Theme.bar-icon-size;
-        icon: @image-url("icons/minus.svg");
-        tooltip: @tr("Minimize");
-        clicked => {
-            WindowFrame.minimize();
+    height: Theme.window-buttons-height;
+    border-radius: self.height / 2;
+    background: Theme.window-controls;
+    HorizontalLayout {
+        padding: Theme.window-buttons-padding;
+        WindowButton {
+            icon: @image-url("icons/minus.svg");
+            tooltip: @tr("Minimize");
+            clicked => {
+                WindowFrame.minimize();
+            }
         }
-    }
 
-    IconButton {
-        size: Theme.bar-button-size;
-        icon-size: Theme.bar-icon-size;
-        icon: root.maximized ? @image-url("icons/copy.svg") : @image-url("icons/square.svg");
-        tooltip: root.maximized ? @tr("Restore") : @tr("Maximize");
-        clicked => {
-            WindowFrame.toggle-maximized();
+        WindowButton {
+            icon: root.maximized ? @image-url("icons/copy.svg") : @image-url("icons/square.svg");
+            tooltip: root.maximized ? @tr("Restore") : @tr("Maximize");
+            clicked => {
+                WindowFrame.toggle-maximized();
+            }
         }
-    }
 
-    IconButton {
-        size: Theme.bar-button-size;
-        icon-size: Theme.bar-icon-size;
-        icon: @image-url("icons/x.svg");
-        tooltip: @tr("Close");
-        background: self.has-hover ? Theme.window-close-hover : transparent;
-        hover-tint: Theme.text;
-        clicked => {
-            root.close();
+        WindowButton {
+            icon: @image-url("icons/x.svg");
+            tooltip: @tr("Close");
+            background: self.has-hover ? Theme.window-close-hover : transparent;
+            hover-tint: Theme.window-close-hover-icon;
+            clicked => {
+                root.close();
+            }
         }
     }
 }

@@ -25,6 +25,7 @@ import {
 import { BackgroundGallery } from "gallery.slint";
 import { SearchPalette } from "search.slint";
 import { WindowButtons, WindowDragArea } from "frame.slint";
+import { OutputChip } from "output.slint";
 import { Icon, Presence, Scrim } from "widgets.slint";
 import { KenkuImportDialog } from "kenku-import.slint";
 import { LoopEditorDialog } from "loop-editor.slint";
@@ -57,7 +58,7 @@ export component AppWindow inherits Window {
     max-width: Session.mini-player ? Theme.mini-player-width-max : Theme.window-size-unbounded;
     max-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-size-unbounded;
     always-on-top: Session.mini-player && Session.mini-player-pinned && Session.always-on-top-supported;
-    background: WindowFrame.corners-rounded ? transparent : Theme.still-shade;
+    background: WindowFrame.corners-rounded ? transparent : Theme.wood;
     default-font-family: Theme.font;
     no-frame: true;
     resize-border-width: root.fills-screen ? 0 : 6px;
@@ -174,8 +175,6 @@ export component AppWindow inherits Window {
     changed height => {
         root.report-size();
     }
-    property <length> still-glow-radius: max(root.width, root.height) * 1.15;
-    property <length> still-glow-x: root.width * 0.92;
 
     // The picker that takes an image dropped on the window, if a dialog shows one.
     public pure function background-drop-target() -> BackgroundTarget {
@@ -287,19 +286,10 @@ export component AppWindow inherits Window {
         }
     }
 
-    backdrop := Image {
-        width: parent.width;
-        height: parent.height;
-        preferred-width: 0px;
-        preferred-height: 0px;
-        source: Art.backdrop(root.width, root.height, WindowFrame.corner-radius, Theme.still-light, Theme.still-canopy, Theme.still-shade, Art.backdrop-revision);
-        image-fit: fill;
-    }
-
-    // The software renderer can't round a gradient, so rounded corners wait on the plain shade.
-    if backdrop.source.width == 0: Rectangle {
+    // The tray's rim of dark wood, under everything; pages lie on felt set into it.
+    Rectangle {
         border-radius: WindowFrame.corner-radius;
-        background: WindowFrame.corners-rounded ? Theme.still-shade : @radial-gradient(circle root.still-glow-radius at root.still-glow-x 0px, Theme.still-light 0%, Theme.still-canopy 38%, Theme.still-shade 100%);
+        background: Theme.wood;
     }
 
     shortcuts := FocusScope {
@@ -337,139 +327,175 @@ export component AppWindow inherits Window {
         }
         if full-form.present && !root.mini-player: Rectangle {
             opacity: full-form.progress;
-            main := Rectangle {
-                x: root.page-x;
-                width: parent.width - self.x;
-                WindowDragArea {
-                    y: 0;
-                    height: Theme.title-row-height;
-                }
+            tray := VerticalLayout {
+                upper := Rectangle {
+                    vertical-stretch: 1;
+                    // The rim's edge around the felt: lit where it drops to the felt below, shaded where it
+                    // rises above.
+                    Rectangle {
+                        x: felt.x;
+                        y: felt.y + 1px;
+                        width: felt.width;
+                        height: felt.height;
+                        border-radius: Theme.radius-felt;
+                        background: Theme.felt-lip;
+                    }
 
-                VerticalLayout {
-                    page-area := Rectangle {
-                        // Small enough that a collection's page trades its plate for a slim header.
-                        property <bool> compact: self.width < 680px || self.height < 520px;
-                        vertical-stretch: 1;
-                        clip: true;
-                        if !LibraryView.loaded: ConnectingPage { }
-                        if LibraryView.loaded && Navigation.page == Page.home: HomePage {
-                            add(kind) => {
-                                root.open-add(kind);
-                            }
+                    Rectangle {
+                        x: felt.x;
+                        y: felt.y - 1px;
+                        width: felt.width;
+                        height: felt.height;
+                        border-radius: Theme.radius-felt;
+                        background: Theme.felt-rim-shade;
+                    }
+
+                    felt := Rectangle {
+                        x: root.page-x;
+                        y: Theme.felt-margin;
+                        width: parent.width - self.x - Theme.felt-margin;
+                        height: parent.height - self.y;
+                        felt-backdrop := Image {
+                            width: parent.width;
+                            height: parent.height;
+                            preferred-width: 0px;
+                            preferred-height: 0px;
+                            source: Art.backdrop(self.width, self.height, Theme.radius-felt, Theme.felt-recess-depth, Theme.still-light, Theme.still-canopy, Theme.still-shade, Art.backdrop-revision);
+                            image-fit: fill;
                         }
-                        if LibraryView.loaded && Navigation.page == Page.songs: SongsPage {
-                            add-to-playlist(id, title) => {
-                                root.open-add-to-playlist(id, title);
-                            }
+
+                        // The software renderer can't round a gradient, so the felt waits on its plain shade.
+                        if felt-backdrop.source.width == 0: Rectangle {
+                            border-radius: Theme.radius-felt;
+                            background: Theme.still-shade;
                         }
-                        if LibraryView.loaded && Navigation.page == Page.playlists: GridPage {
-                            kind: CollectionKind.playlist;
-                            add(kind) => {
-                                root.open-add(kind);
+
+                        main := Rectangle {
+                            WindowDragArea {
+                                y: 0;
+                                height: Theme.title-row-height;
                             }
-                        }
-                        if LibraryView.loaded && Navigation.page == Page.soundboards: GridPage {
-                            kind: CollectionKind.soundboard;
-                            add(kind) => {
-                                root.open-add(kind);
+
+                            page-area := Rectangle {
+                                // Small enough that a collection's page trades its plate for a slim header.
+                                property <bool> compact: self.width < 680px || self.height < 520px;
+                                clip: true;
+                                if !LibraryView.loaded: ConnectingPage { }
+                                if LibraryView.loaded && Navigation.page == Page.home: HomePage {
+                                    add(kind) => {
+                                        root.open-add(kind);
+                                    }
+                                }
+                                if LibraryView.loaded && Navigation.page == Page.songs: SongsPage {
+                                    add-to-playlist(id, title) => {
+                                        root.open-add-to-playlist(id, title);
+                                    }
+                                }
+                                if LibraryView.loaded && Navigation.page == Page.playlists: GridPage {
+                                    kind: CollectionKind.playlist;
+                                    add(kind) => {
+                                        root.open-add(kind);
+                                    }
+                                }
+                                if LibraryView.loaded && Navigation.page == Page.soundboards: GridPage {
+                                    kind: CollectionKind.soundboard;
+                                    add(kind) => {
+                                        root.open-add(kind);
+                                    }
+                                }
+                                if LibraryView.loaded && Navigation.page == Page.playlist: PlaylistPage {
+                                    compact: page-area.compact;
+                                    edit-collection => {
+                                        root.dialog = DialogKind.edit-collection;
+                                    }
+                                    edit-entry(id, title) => {
+                                        root.entry-id = id;
+                                        root.entry-title = title;
+                                        root.entry-is-sound = false;
+                                        root.dialog = DialogKind.edit-entry;
+                                    }
+                                    add-files => {
+                                        Actions.add-files(Navigation.collection-id);
+                                    }
+                                    add-to-playlist(id, title) => {
+                                        root.open-add-to-playlist(id, title);
+                                    }
+                                }
+                                if LibraryView.loaded && Navigation.page == Page.browser: BrowserPage { }
+                                if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
+                                    compact: page-area.compact;
+                                    edit-collection => {
+                                        root.dialog = DialogKind.edit-collection;
+                                    }
+                                    edit-sound(tile) => {
+                                        root.entry-id = tile.id;
+                                        root.entry-title = tile.title;
+                                        root.entry-is-sound = true;
+                                        root.entry-fade-in-ms = tile.fade-in-ms;
+                                        root.entry-fade-out-ms = tile.fade-out-ms;
+                                        root.entry-icon = tile.icon;
+                                        root.dialog = DialogKind.edit-entry;
+                                    }
+                                    add-files => {
+                                        Actions.add-files(Navigation.collection-id);
+                                    }
+                                }
                             }
-                        }
-                        if LibraryView.loaded && Navigation.page == Page.playlist: PlaylistPage {
-                            compact: page-area.compact;
-                            edit-collection => {
-                                root.dialog = DialogKind.edit-collection;
+
+                            if Session.toast != "": Rectangle {
+                                x: (parent.width - self.width) / 2;
+                                y: 16px;
+                                width: min(toast-text.preferred-width + 36px, parent.width - 32px);
+                                height: toast-text.preferred-height + 24px;
+                                border-radius: Theme.radius-row;
+                                background: Session.toast-is-error ? #5a2a2a : Theme.raised;
+                                border-width: 1px;
+                                border-color: Session.toast-is-error ? Theme.error.with-alpha(0.4) : Theme.raised-edge;
+                                // Swallows clicks, so they don't reach the page under the toast.
+                                TouchArea { }
+                                toast-text := Text {
+                                    text: Session.toast;
+                                    width: parent.width - 36px;
+                                    wrap: word-wrap;
+                                    horizontal-alignment: center;
+                                    color: Theme.text;
+                                    font-size: Theme.body-small;
+                                    font-weight: 500;
+                                }
                             }
-                            edit-entry(id, title) => {
-                                root.entry-id = id;
-                                root.entry-title = title;
-                                root.entry-is-sound = false;
-                                root.dialog = DialogKind.edit-entry;
-                            }
-                            add-files => {
-                                Actions.add-files(Navigation.collection-id);
-                            }
-                            add-to-playlist(id, title) => {
-                                root.open-add-to-playlist(id, title);
-                            }
-                        }
-                        if LibraryView.loaded && Navigation.page == Page.browser: BrowserPage { }
-                        if LibraryView.loaded && Navigation.page == Page.soundboard: SoundboardPage {
-                            compact: page-area.compact;
-                            edit-collection => {
-                                root.dialog = DialogKind.edit-collection;
-                            }
-                            edit-sound(tile) => {
-                                root.entry-id = tile.id;
-                                root.entry-title = tile.title;
-                                root.entry-is-sound = true;
-                                root.entry-fade-in-ms = tile.fade-in-ms;
-                                root.entry-fade-out-ms = tile.fade-out-ms;
-                                root.entry-icon = tile.icon;
-                                root.dialog = DialogKind.edit-entry;
-                            }
-                            add-files => {
-                                Actions.add-files(Navigation.collection-id);
+                            if Session.drop-hover: Rectangle {
+                                background: Theme.scrim;
+                                border-radius: Theme.radius-felt;
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 12px;
+                                    Icon {
+                                        width: 64px;
+                                        height: 64px;
+                                        source: @image-url("icons/folder.svg");
+                                        tint: Theme.lit;
+                                    }
+
+                                    Text {
+                                        text: Session.drop-label;
+                                        font-size: Theme.heading;
+                                        font-weight: 800;
+                                        color: Theme.text;
+                                        horizontal-alignment: center;
+                                    }
+                                }
                             }
                         }
                     }
-
-                    if LibraryView.loaded: HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        padding-bottom: 10px;
-                        Dock {
-                            wide: main.width >= 680px;
-                            collapsed: Session.player-collapsed;
-                            set-collapsed(collapsed) => {
-                                Session.player-collapsed = collapsed;
-                                Actions.set-player-collapsed(collapsed);
-                            }
-                        }
-                    }
                 }
 
-                if Session.toast != "": Rectangle {
-                    x: (parent.width - self.width) / 2;
-                    y: 16px;
-                    width: min(toast-text.preferred-width + 36px, parent.width - 32px);
-                    height: toast-text.preferred-height + 24px;
-                    border-radius: Theme.radius-row;
-                    background: Session.toast-is-error ? #5a2a2a : Theme.raised;
-                    border-width: 1px;
-                    border-color: Session.toast-is-error ? Theme.error.with-alpha(0.4) : Theme.raised-edge;
-                    // Swallows clicks, so they don't reach the page under the toast.
-                    TouchArea { }
-                    toast-text := Text {
-                        text: Session.toast;
-                        width: parent.width - 36px;
-                        wrap: word-wrap;
-                        horizontal-alignment: center;
-                        color: Theme.text;
-                        font-size: Theme.body-small;
-                        font-weight: 500;
-                    }
-                }
-                if Session.drop-hover: Rectangle {
-                    background: Theme.scrim;
-                    border-top-right-radius: WindowFrame.corner-radius;
-                    border-bottom-right-radius: WindowFrame.corner-radius;
-                    VerticalLayout {
-                        alignment: center;
-                        spacing: 12px;
-                        Icon {
-                            width: 64px;
-                            height: 64px;
-                            source: @image-url("icons/folder.svg");
-                            tint: Theme.lit;
-                        }
-
-                        Text {
-                            text: Session.drop-label;
-                            font-size: Theme.heading;
-                            font-weight: 800;
-                            color: Theme.text;
-                            horizontal-alignment: center;
-                        }
+                // The player, on the rim's ledge under the sidebar and the felt.
+                if LibraryView.loaded: Dock {
+                    wide: root.width >= Theme.sidebar-width + 680px;
+                    collapsed: Session.player-collapsed;
+                    set-collapsed(collapsed) => {
+                        Session.player-collapsed = collapsed;
+                        Actions.set-player-collapsed(collapsed);
                     }
                 }
             }
@@ -489,7 +515,7 @@ export component AppWindow inherits Window {
             Sidebar {
                 x: 0;
                 y: 0;
-                height: parent.height;
+                height: upper.height;
                 expanded: root.sidebar-expanded || root.sidebar-overlaid;
                 overlaid: root.sidebar-overlaid;
                 page-opened => {
@@ -657,14 +683,32 @@ export component AppWindow inherits Window {
         height: Theme.title-row-height;
     }
 
-    if full-form.present && !root.mini-player: WindowButtons {
+    // Where the audio goes, and the window's buttons, over the felt's top right corner.
+    if full-form.present && !root.mini-player: HorizontalLayout {
         opacity: full-form.progress;
-        x: parent.width - self.width - 8px;
-        y: (Theme.title-row-height - self.height) / 2;
+        x: parent.width - self.width - Theme.felt-margin - 8px;
+        y: Theme.felt-margin + (Theme.title-row-height - self.height) / 2;
+        width: self.preferred-width;
         height: self.preferred-height;
-        maximized: root.maximized;
-        close => {
-            root.close();
+        spacing: 8px;
+        init => {
+            WindowFrame.title-controls-width = self.preferred-width;
+        }
+        changed preferred-width => {
+            WindowFrame.title-controls-width = self.preferred-width;
+        }
+        if LibraryView.loaded: OutputChip {
+            y: (parent.height - self.height) / 2;
+            open-settings => {
+                root.open-settings();
+            }
+        }
+        WindowButtons {
+            y: (parent.height - self.height) / 2;
+            maximized: root.maximized;
+            close => {
+                root.close();
+            }
         }
     }
 

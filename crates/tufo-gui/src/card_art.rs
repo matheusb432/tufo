@@ -79,9 +79,95 @@ pub(crate) fn card(base: &Base<'_>, shade: Shade, width: u32, height: u32, radiu
     }
 }
 
-/// The window's radial gradient, with its glow at the top right and the middle stop at 38%, and
-/// corners of `corner_radius` pixels, transparent outside the curve.
-pub(crate) fn backdrop(colors: [Rgb; 3], width: u32, height: u32, corner_radius: f32) -> Pixels {
+/// The rim's shadow on the felt set into it, as an inset shadow would cast it: heaviest along the
+/// top, lighter along the left, with a dark hairline at the edge.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct Recess {
+    /// The top shadow's blur in pixels; the other shadows scale with it. Zero casts no shadow.
+    pub(crate) depth: f32,
+}
+
+/// One of the rim's shadows, with its offset into the felt and its blur as fractions of the
+/// recess's depth.
+struct InsetShadow {
+    offset_x: f32,
+    offset_y: f32,
+    blur: f32,
+    opacity: f32,
+}
+
+const RECESS_SHADOWS: [InsetShadow; 2] = [
+    InsetShadow {
+        offset_x: 0.0,
+        offset_y: 5.0 / 22.0,
+        blur: 1.0,
+        opacity: 0.62,
+    },
+    InsetShadow {
+        offset_x: 4.0 / 22.0,
+        offset_y: 0.0,
+        blur: 14.0 / 22.0,
+        opacity: 0.3,
+    },
+];
+const RECESS_HAIRLINE_WIDTH: f32 = 1.0 / 22.0;
+const RECESS_HAIRLINE_OPACITY: f32 = 0.5;
+/// Past this many depths from the edge, every shadow has faded out.
+const RECESS_REACH: f32 = 2.0;
+
+impl Recess {
+    /// How much the rim darkens the felt's pixel at `x`, `y`, from 0 to 1.
+    fn shade(self, x: u32, y: u32, width: u32, height: u32, corner_radius: f32) -> f32 {
+        if self.depth <= 0.0 {
+            return 0.0;
+        }
+        let (center_x, center_y) = (x as f32 + 0.5, y as f32 + 0.5);
+        let inside = inside_distance(center_x, center_y, width, height, corner_radius);
+        if inside > RECESS_REACH * self.depth {
+            return 0.0;
+        }
+        let hairline_width = (RECESS_HAIRLINE_WIDTH * self.depth).max(1.0);
+        let hairline = RECESS_HAIRLINE_OPACITY * (1.0 - inside / hairline_width).clamp(0.0, 1.0);
+        let light = RECESS_SHADOWS.iter().fold(1.0 - hairline, |light, shadow| {
+            let distance = inside_distance(
+                center_x - shadow.offset_x * self.depth,
+                center_y - shadow.offset_y * self.depth,
+                width,
+                height,
+                corner_radius,
+            );
+            let deviation = shadow.blur * self.depth / 2.0;
+            light * (1.0 - shadow.opacity * blurred_edge(distance / deviation))
+        });
+        1.0 - light
+    }
+}
+
+/// How far inside the rounded rectangle's edge a point lies; negative outside it.
+fn inside_distance(x: f32, y: f32, width: u32, height: u32, radius: f32) -> f32 {
+    let (half_width, half_height) = (width as f32 / 2.0, height as f32 / 2.0);
+    let radius = radius.min(half_width).min(half_height);
+    let reach_x = (x - half_width).abs() - (half_width - radius);
+    let reach_y = (y - half_height).abs() - (half_height - radius);
+    let outside = reach_x.max(0.0).hypot(reach_y.max(0.0)) + reach_x.max(reach_y).min(0.0) - radius;
+    -outside
+}
+
+/// A shadow's opacity at `deviations` standard deviations inside its blurred edge: the logistic
+/// approximation of the normal distribution.
+fn blurred_edge(deviations: f32) -> f32 {
+    1.0 / (1.0 + (1.702 * deviations).exp())
+}
+
+/// The felt's radial gradient, with its glow at the top right and the middle stop at 38%, shaded by
+/// `recess`, and corners of `corner_radius` pixels, transparent outside the curve.
+pub(crate) fn backdrop(
+    colors: [Rgb; 3],
+    width: u32,
+    height: u32,
+    corner_radius: f32,
+    recess: Recess,
+) -> Pixels {
     let radius = width.max(height) as f32 * 1.15;
     let center_x = width as f32 * 0.92;
     let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
@@ -94,12 +180,13 @@ pub(crate) fn backdrop(colors: [Rgb; 3], width: u32, height: u32, corner_radius:
             } else {
                 (colors[1], colors[2], (position - 0.38) / 0.62)
             };
+            let light = 1.0 - recess.shade(x, y, width, height, corner_radius);
             let channel =
-                |start, end| ((1.0 - blend) * f32::from(start) + blend * f32::from(end)) as u8;
+                |start, end| light * ((1.0 - blend) * f32::from(start) + blend * f32::from(end));
             rgba.extend_from_slice(&[
-                channel(start.0, end.0),
-                channel(start.1, end.1),
-                channel(start.2, end.2),
+                to_byte(channel(start.0, end.0)),
+                to_byte(channel(start.1, end.1)),
+                to_byte(channel(start.2, end.2)),
                 to_byte(corner_coverage(x, y, width, height, corner_radius) * 255.0),
             ]);
         }
@@ -255,16 +342,34 @@ mod tests {
     fn the_backdrop_rounds_its_corners_only_with_a_radius() {
         let colors = [Rgb(67, 80, 44), Rgb(23, 61, 39), Rgb(11, 30, 21)];
 
-        let rounded = backdrop(colors, 80, 50, 12.0);
+        let rounded = backdrop(colors, 80, 50, 12.0, Recess { depth: 0.0 });
         for (x, y) in [(0, 0), (79, 0), (0, 49), (79, 49)] {
             assert_eq!(alpha_at(&rounded, x, y), 0, "corner ({x}, {y})");
         }
         assert_eq!(alpha_at(&rounded, 40, 0), 255);
         assert_eq!(alpha_at(&rounded, 0, 25), 255);
 
-        let square = backdrop(colors, 80, 50, 0.0);
+        let square = backdrop(colors, 80, 50, 0.0, Recess { depth: 0.0 });
         let (square_pixels, _) = square.rgba.as_chunks::<4>();
         assert!(square_pixels.iter().all(|[_, _, _, alpha]| *alpha == 255));
+    }
+
+    #[test]
+    fn the_recess_shades_the_top_most_and_leaves_the_middle() {
+        let grey = Rgb(200, 200, 200);
+        let pixels = backdrop([grey; 3], 200, 160, 14.0, Recess { depth: 22.0 });
+        let red_at = |x: u32, y: u32| pixels.rgba[(y as usize * 200 + x as usize) * 4];
+
+        assert_eq!(red_at(100, 80), 200);
+        assert!(
+            red_at(100, 3) < red_at(3, 80),
+            "the top darker than the left"
+        );
+        assert!(
+            red_at(3, 80) < red_at(196, 80),
+            "the left darker than the right"
+        );
+        assert!(red_at(196, 80) < 200, "every edge shaded");
     }
 
     #[test]

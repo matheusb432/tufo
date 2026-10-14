@@ -10,7 +10,7 @@ import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, CollectionCard, CollectionKind, LibraryView, LoopBadge, Navigation, Page,
-    PlayerView, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
+    PlayerView, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow, WindowFrame,
 } from "state.slint";
 import {
     Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem as MenuAction, MenuSurface, ScrollThumb, Slider,
@@ -237,7 +237,7 @@ export component WindowButtonsSpace inherits HorizontalLayout {
     }
 
     Rectangle {
-        width: Theme.window-buttons-width;
+        width: WindowFrame.title-controls-width;
     }
 }
 

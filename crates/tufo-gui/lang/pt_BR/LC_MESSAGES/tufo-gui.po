@@ -253,7 +253,7 @@ msgstr "Coleções"
 msgid "Colors drawn from the collection"
 msgstr "Cores da coleção"
 
-#: ui/sidebar.slint
+#: ui/output.slint
 msgid "Connect Discord for more outputs"
 msgstr "Conectar ao Discord para ver mais saídas"
 
@@ -771,7 +771,7 @@ msgstr "Ou solte uma nesta janela"
 msgid "Or follow a folder"
 msgstr "Ou acompanhe uma pasta"
 
-#: ui/sidebar.slint
+#: ui/output.slint
 msgid "Output: {0}"
 msgstr "Saída: {0}"
 
@@ -831,7 +831,7 @@ msgstr "Lugares"
 msgid "Play"
 msgstr "Reproduzir"
 
-#: ui/sidebar.slint
+#: ui/output.slint
 msgid "Play into"
 msgstr "Tocar em"
 
@@ -863,7 +863,7 @@ msgstr "Ratos"
 msgid "Reading the audio files…"
 msgstr "Lendo os arquivos de áudio…"
 
-#: ui/sidebar.slint
+#: ui/output.slint
 msgid "Refresh the voice channels"
 msgstr "Atualizar canais de voz"
 
@@ -1101,7 +1101,7 @@ msgstr "Este canal de voz não está mais disponível. Atualize os canais."
 msgid "The Discord bot is still connecting. Try again shortly."
 msgstr "O bot do Discord ainda está conectando. Tente novamente em instantes."
 
-#: ui/sidebar.slint
+#: ui/output.slint
 msgid "The Discord connection is disabled — enable it in Settings"
 msgstr "A conexão com o Discord está desativada — ative-a nas Configurações"
 
@@ -1297,7 +1297,7 @@ msgstr "Personalizado"
 msgid "tufo-server is not connected."
 msgstr "Sem conexão com o tufo-server."
 
-#: ui/sidebar.slint
+#: ui/output.slint
 msgid "{0} in {1}"
 msgstr "{0} em {1}"
 

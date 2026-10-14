@@ -353,19 +353,15 @@ fn bind_art(window: &ui::AppWindow) {
     art.on_painting(background_art(window, Shade::None));
     art.on_backdrop({
         let window = window.as_weak();
-        move |width, height, corner_radius, light, canopy, shade, _revision| {
+        move |width, height, corner_radius, recess_depth, light, canopy, shade, _revision| {
             let scale = window
                 .upgrade()
                 .map_or(1.0, |window| window.window().scale_factor());
-            let corner_radius = if corner_radius > 0.0 {
-                physical_pixels(corner_radius, scale)
-            } else {
-                0
-            };
             backgrounds::backdrop::image(
                 physical_pixels(width, scale),
                 physical_pixels(height, scale),
-                corner_radius,
+                physical_pixels_or_none(corner_radius, scale),
+                physical_pixels_or_none(recess_depth, scale),
                 [light, canopy, shade],
             )
         }
@@ -398,6 +394,15 @@ fn background_art(
             physical_pixels(height, scale),
             physical_pixels(radius, scale),
         )
+    }
+}
+
+/// A logical length in whole physical pixels at the window's `scale`, or zero for no length.
+fn physical_pixels_or_none(length: f32, scale: f32) -> u32 {
+    if length > 0.0 {
+        physical_pixels(length, scale)
+    } else {
+        0
     }
 }
 

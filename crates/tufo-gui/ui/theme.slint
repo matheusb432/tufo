@@ -1,5 +1,5 @@
-// A rainforest in late afternoon: everything rests in green shade, and only what plays catches the
-// low sun.
+// A tray of dark wood on a tabletop in late afternoon: pages lie on green felt set into it, and only
+// what plays catches the low sun.
 
 import "../fonts/AlegreyaSans-Regular.ttf";
 import "../fonts/AlegreyaSans-Medium.ttf";
@@ -16,32 +16,33 @@ export global Theme {
     // The logo's mint, for what is selected or switched on.
     out property <color> accent: #95d5b2;
     out property <color> text: #f5eedc;
-    out property <color> text-secondary: #c3ccb8;
-    out property <color> text-faint: #8fa392;
+    out property <color> text-secondary: #cbc3ad;
+    out property <color> text-faint: #9a9482;
     out property <color> text-disabled: rgba(245, 238, 220, 0.38);
     out property <color> error: #f2a39b;
     out property <color> warning: #f4b860;
     out property <color> offline: #ef8a80;
 
-    // The backdrop's still: light from beyond the top-right corner fading into shade.
+    // The felt's still: light from beyond the top-right corner fading into shade.
     out property <color> still-light: #43502c;
     out property <color> still-canopy: #173d27;
     out property <color> still-shade: #0b1e15;
-    out property <color> sidebar-top: rgba(9, 27, 19, 0.82);
-    out property <color> sidebar-bottom: rgba(8, 24, 17, 0.92);
-    out property <brush> sidebar: @linear-gradient(180deg, Theme.sidebar-top 0%, Theme.sidebar-bottom 100%);
-    // The sidebar over the page, where the page mustn't show through.
-    out property <color> sidebar-overlaid: #09190f;
-    out property <color> sidebar-edge: rgba(245, 238, 220, 0.05);
+    // The tray's rim, under the sidebar and the player.
+    out property <color> wood: #231b15;
+    out property <color> wood-hover: rgba(255, 226, 180, 0.07);
+    out property <color> wood-field: rgba(255, 226, 180, 0.07);
+    // Catches the light where the rim's edge drops to the felt, and shades it where it rises.
+    out property <color> felt-lip: rgba(255, 222, 170, 0.16);
+    out property <color> felt-rim-shade: rgba(0, 0, 0, 0.35);
     // Tiles and rows float over the backdrop.
     out property <color> panel: rgba(17, 42, 30, 0.86);
     out property <color> panel-hover: rgba(22, 52, 37, 0.9);
     out property <color> panel-edge: rgba(245, 238, 220, 0.05);
-    out property <color> dock: rgba(12, 33, 23, 0.95);
-    // Menus, popovers, dialogs, and toasts.
-    out property <color> raised: #10281d;
-    out property <color> raised-edge: rgba(245, 238, 220, 0.08);
-    out property <color> field: rgba(245, 238, 220, 0.06);
+    // Menus, popovers, dialogs, and toasts: a lighter cut of the rim's wood.
+    out property <color> raised: #35291f;
+    out property <color> raised-edge: rgba(255, 222, 170, 0.12);
+    // Fields are set into dark felt.
+    out property <color> field: #132a1e;
     out property <color> button: rgba(245, 238, 220, 0.09);
     out property <color> hover: rgba(245, 238, 220, 0.07);
     out property <color> selected: rgba(149, 213, 178, 0.13);
@@ -57,8 +58,10 @@ export global Theme {
     out property <color> badge-hover: rgba(7, 21, 14, 0.88);
     out property <color> current-row: rgba(244, 184, 96, 0.12);
     // Outlines the window, which has no frame or shadow from the desktop.
-    out property <color> window-edge: rgba(245, 238, 220, 0.12);
-    out property <color> window-close-hover: #c4473d;
+    out property <color> window-edge: rgba(255, 222, 170, 0.1);
+    out property <color> window-controls: rgba(245, 238, 220, 0.06);
+    out property <color> window-close-hover: rgba(242, 163, 155, 0.2);
+    out property <color> window-close-hover-icon: #ffd2cc;
 
     // The background gallery hangs its paintings on a wall, ringing the chosen one in sunlight.
     out property <color> gallery-wall: #0e2419;
@@ -74,6 +77,11 @@ export global Theme {
     out property <length> radius-small: 8px;
     // The frameless window's corners, where the desktop shows through them.
     out property <length> radius-window: 12px;
+    // The felt sits this far inside the rim's top and right edges, and the player's ledge.
+    out property <length> felt-margin: 8px;
+    out property <length> radius-felt: 14px;
+    // How far the rim's shadow reaches across the felt.
+    out property <length> felt-recess-depth: 22px;
     out property <length> sidebar-width: 232px;
     out property <length> rail-width: 64px;
     // The narrowest page the expanded sidebar sits beside rather than over.
@@ -94,8 +102,13 @@ export global Theme {
     out property <length> sidebar-icon-padding: (Theme.rail-width - Theme.bar-icon-size) / 2 - Theme.sidebar-row-padding;
     out property <length> sidebar-icon-spacing: 10px;
     out property <length> sidebar-label-padding: Theme.sidebar-icon-padding + Theme.bar-icon-size + Theme.sidebar-icon-spacing;
-    // Three bar buttons, 2 px apart.
-    out property <length> window-buttons-width: 112px;
+    // The window's three buttons share one capsule.
+    out property <length> window-button-width: 32px;
+    out property <length> window-button-height: 26px;
+    out property <length> window-buttons-padding: 2px;
+    out property <length> window-buttons-width: 3 * Theme.window-button-width + 2 * Theme.window-buttons-padding;
+    out property <length> window-buttons-height: Theme.window-button-height + 2 * Theme.window-buttons-padding;
+    out property <length> window-button-icon-size: 15px;
 
     // Alegreya Sans sets small for its size, so the scale runs larger than a geometric face's.
     out property <string> font: "Alegreya Sans";

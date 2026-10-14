@@ -1,17 +1,23 @@
-// The sidebar: the logo, search, the pages, every collection, the output, and the connection.
-// It collapses to a rail of icons.
+// The sidebar, on the tray's rim: the logo, search, the pages, every collection, and the
+// connection. It collapses to a rail of icons.
 
 import { HomeTour } from "tours/home.slint";
-import { PlaybackTour } from "tours/playback.slint";
 import { GuidedTours } from "tours/state.slint";
 import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
-    Actions, BrowserState, BrowserView, CollectionKind, CurrentOutput, LibraryView, NavItem, Navigation, OutputRow,
-    OutputRowKind, Page, PlayerView, Session, VoiceBadge, WindowFrame,
+    Actions, BrowserState, BrowserView, CollectionKind, LibraryView, NavItem, Navigation, Page, PlayerView, Session,
+    WindowFrame,
 } from "state.slint";
-import { Equalizer, Icon, IconButton, Logo, MenuSurface, TextLink, TooltipBubble } from "widgets.slint";
+import { Equalizer, Icon, IconButton, Logo } from "widgets.slint";
 import { WindowDragArea } from "frame.slint";
+
+// Marks the open page's row with a sunlit bar along its left edge.
+component SunEdge inherits Rectangle {
+    width: 3px;
+    border-radius: 1.5px;
+    background: Theme.lit;
+}
 
 component NavRow inherits Rectangle {
     in property <image> icon;
@@ -26,10 +32,15 @@ component NavRow inherits Rectangle {
     callback add();
     height: 36px;
     border-radius: Theme.radius-row;
-    background: root.active ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    background: touch.has-hover && !root.active ? Theme.wood-hover : transparent;
     animate background { duration: Motion.hover; }
     accessible-role: button;
     accessible-label: root.text;
+    if root.active: SunEdge {
+        x: 0;
+        y: 5px;
+        height: root.height - 10px;
+    }
     accessible-action-default => { root.clicked(); }
     touch := TouchArea {
         mouse-cursor: MouseCursor.pointer;
@@ -47,7 +58,7 @@ component NavRow inherits Rectangle {
             width: Theme.bar-icon-size;
             height: Theme.bar-icon-size;
             source: root.icon;
-            tint: root.active || root.running ? Theme.accent : Theme.text-secondary;
+            tint: root.active ? Theme.lit : root.running ? Theme.accent : Theme.text-secondary;
         }
 
         Text {
@@ -56,7 +67,7 @@ component NavRow inherits Rectangle {
             horizontal-stretch: 1;
             font-size: Theme.body;
             font-weight: 700;
-            color: root.active ? Theme.text : Theme.text-secondary;
+            color: root.active ? Theme.lit : Theme.text;
         }
 
         if root.running: Rectangle {
@@ -104,10 +115,15 @@ component CollectionLink inherits Rectangle {
     callback clicked();
     height: 30px;
     border-radius: Theme.radius-row;
-    background: root.active ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
+    background: touch.has-hover && !root.active ? Theme.wood-hover : transparent;
     animate background { duration: Motion.hover; }
     accessible-role: button;
     accessible-label: root.item.title;
+    if root.active: SunEdge {
+        x: 0;
+        y: 5px;
+        height: root.height - 10px;
+    }
     accessible-action-default => { root.clicked(); }
     touch := TouchArea {
         mouse-cursor: MouseCursor.pointer;
@@ -126,237 +142,11 @@ component CollectionLink inherits Rectangle {
             horizontal-stretch: 1;
             overflow: elide;
             font-size: Theme.body-small;
-            color: root.item.missing ? Theme.text-faint : root.active || touch.has-hover ? Theme.text : Theme.text-secondary;
+            color: root.item.missing ? Theme.text-faint : root.active ? Theme.lit : touch.has-hover ? Theme.text : Theme.text-secondary;
         }
 
         if root.item.playing: Equalizer {
             y: (parent.height - self.height) / 2;
-        }
-    }
-}
-
-component OutputItem inherits Rectangle {
-    in property <OutputRow> output;
-    callback picked();
-    property <bool> guild: root.output.kind == OutputRowKind.guild;
-    height: root.guild ? 32px : 38px;
-    border-radius: Theme.radius-small;
-    background: root.guild ? transparent : root.output.selected ? Theme.selected : touch.has-hover ? Theme.hover : transparent;
-    animate background { duration: Motion.hover; }
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 10px;
-        if root.guild: Rectangle {
-            y: (parent.height - self.height) / 2;
-            width: 20px;
-            height: 20px;
-            border-radius: 10px;
-            background: Theme.field;
-            Text {
-                text: root.output.initial;
-                font-size: Theme.micro;
-                font-weight: 700;
-                color: Theme.text-secondary;
-            }
-        }
-        if !root.guild: Icon {
-            y: (parent.height - self.height) / 2;
-            width: 18px;
-            height: 18px;
-            source: root.output.kind == OutputRowKind.local ? @image-url("icons/monitor.svg") : @image-url("icons/volume-2.svg");
-            tint: root.output.selected ? Theme.accent : Theme.text-faint;
-        }
-        Text {
-            text: root.output.label;
-            vertical-alignment: center;
-            horizontal-stretch: 1;
-            overflow: elide;
-            font-size: root.guild ? Theme.caption : Theme.body-small;
-            font-weight: root.guild ? 700 : 500;
-            color: root.guild ? Theme.text-faint : Theme.text;
-        }
-
-        if root.output.selected: Icon {
-            y: (parent.height - self.height) / 2;
-            width: 18px;
-            height: 18px;
-            source: @image-url("icons/check.svg");
-            tint: Theme.accent;
-        }
-    }
-
-    touch := TouchArea {
-        enabled: !root.guild;
-        mouse-cursor: root.guild ? MouseCursor.default : MouseCursor.pointer;
-        clicked => {
-            Actions.select-output(root.output.index);
-            root.picked();
-        }
-    }
-}
-
-// Where the audio goes: this computer, or a Discord voice channel.
-component OutputPicker inherits MenuSurface {
-    callback picked();
-    callback open-settings();
-    width: 272px;
-    HorizontalLayout {
-        padding-left: 10px;
-        height: 38px;
-        Text {
-            text: @tr("Play into");
-            vertical-alignment: center;
-            horizontal-stretch: 1;
-            font-size: Theme.body-small;
-            font-weight: 800;
-            color: Theme.text-secondary;
-        }
-
-        IconButton {
-            y: (parent.height - self.height) / 2;
-            size: 32px;
-            icon-size: 18px;
-            icon: @image-url("icons/refresh-cw.svg");
-            tooltip: @tr("Refresh the voice channels");
-            enabled: Session.connected && Session.discord-configured;
-            clicked => {
-                Actions.refresh-outputs();
-            }
-        }
-    }
-
-    for row in Session.outputs: OutputItem {
-        output: row;
-        picked => {
-            root.picked();
-        }
-    }
-    if Session.discord-disabled: HorizontalLayout {
-        padding: 10px;
-        TextLink {
-            text: @tr("The Discord connection is disabled — enable it in Settings");
-            font-size: Theme.caption;
-            clicked => {
-                root.open-settings();
-            }
-        }
-    }
-    if !Session.discord-configured: HorizontalLayout {
-        padding: 10px;
-        TextLink {
-            text: @tr("Connect Discord for more outputs");
-            font-size: Theme.caption;
-            clicked => {
-                root.open-settings();
-            }
-        }
-    }
-    if Session.voice-status != "": Text {
-        text: Session.voice-status;
-        font-size: Theme.caption;
-        color: Theme.text-faint;
-        wrap: word-wrap;
-    }
-}
-
-// The output the audio goes to now, which opens the picker.
-component OutputButton inherits Rectangle {
-    TourTarget {
-        anchor: PlaybackTour.output;
-        available: root.tooltip-enabled;
-        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
-    }
-    in property <bool> compact;
-    in property <bool> tooltip-enabled: true;
-    callback clicked();
-    property <CurrentOutput> output: Session.current-output;
-    property <bool> channel: root.output.kind == OutputRowKind.channel;
-    property <string> title: root.output.guild-name != "" ? @tr("{0} in {1}", root.output.label, root.output.guild-name) : root.output.label;
-    property <bool> tooltip-dismissed;
-    height: root.compact ? Theme.bar-button-size : 46px;
-    border-radius: Theme.radius-row;
-    background: touch.has-hover ? Theme.hover : Theme.field;
-    animate background { duration: Motion.hover; }
-    accessible-role: button;
-    accessible-label: @tr("Output: {0}", root.title);
-    accessible-action-default => { root.clicked(); }
-    touch := TouchArea {
-        mouse-cursor: MouseCursor.pointer;
-        pointer-event(event) => {
-            if event.kind == PointerEventKind.down {
-                root.tooltip-dismissed = true;
-            }
-        }
-        changed has-hover => {
-            if !self.has-hover {
-                root.tooltip-dismissed = false;
-            }
-        }
-        clicked => {
-            root.clicked();
-        }
-    }
-
-    if root.compact: Icon {
-        width: 20px;
-        height: 20px;
-        source: root.channel ? @image-url("icons/volume-2.svg") : @image-url("icons/monitor.svg");
-        tint: Theme.accent;
-    }
-    if !root.compact: HorizontalLayout {
-        padding-left: Theme.sidebar-icon-padding;
-        padding-right: 10px;
-        spacing: Theme.sidebar-icon-spacing;
-        Icon {
-            y: (parent.height - self.height) / 2;
-            width: Theme.bar-icon-size;
-            height: Theme.bar-icon-size;
-            source: root.channel ? @image-url("icons/volume-2.svg") : @image-url("icons/monitor.svg");
-            tint: Theme.accent;
-        }
-
-        VerticalLayout {
-            alignment: center;
-            horizontal-stretch: 1;
-            Text {
-                text: root.output.label;
-                overflow: elide;
-                font-size: Theme.body-small;
-                font-weight: 700;
-                color: Theme.text;
-            }
-
-            if root.output.guild-name != "": Text {
-                text: root.output.guild-name;
-                overflow: elide;
-                font-size: Theme.micro;
-                color: Theme.text-faint;
-            }
-        }
-
-        Icon {
-            y: (parent.height - self.height) / 2;
-            width: 16px;
-            height: 16px;
-            source: @image-url("icons/chevron-down.svg");
-            tint: Theme.text-faint;
-        }
-    }
-    if Session.voice-badge != VoiceBadge.none: Rectangle {
-        x: root.compact ? parent.width - 13px : Theme.sidebar-icon-padding + Theme.bar-icon-size - 6px;
-        y: root.compact ? 6px : 10px;
-        width: 9px;
-        height: 9px;
-        border-radius: 4.5px;
-        border-width: 2px;
-        border-color: Theme.raised;
-        background: Session.voice-badge == VoiceBadge.joining ? Theme.warning : Theme.error;
-    }
-    if root.compact && root.title != "" && root.tooltip-enabled && !root.tooltip-dismissed: Tooltip {
-        TooltipBubble {
-            text: root.title;
-            detail: root.channel ? Session.voice-status : "";
         }
     }
 }
@@ -381,7 +171,6 @@ component FullSidebar inherits SidebarForm {
     callback collapse();
     callback open-search();
     callback open-settings();
-    callback open-outputs();
     callback add(CollectionKind);
     property <Page> page: Navigation.page;
     property <bool> playlists-expanded: true;
@@ -412,7 +201,7 @@ component FullSidebar inherits SidebarForm {
             search := Rectangle {
                 height: 34px;
                 border-radius: Theme.radius-row;
-                background: search-touch.has-hover ? Theme.hover : Theme.field;
+                background: search-touch.has-hover ? Theme.wood-hover.with-alpha(0.12) : Theme.wood-field;
                 accessible-role: button;
                 accessible-label: @tr("Search everything");
                 accessible-action-default => { root.open-search(); }
@@ -559,13 +348,6 @@ component FullSidebar inherits SidebarForm {
             padding-top: 6px;
             padding-bottom: 6px;
             spacing: 4px;
-            OutputButton {
-                tooltip-enabled: root.shown;
-                clicked => {
-                    root.open-outputs();
-                }
-            }
-
             HorizontalLayout {
                 padding-left: Theme.sidebar-icon-padding - (Theme.bar-button-size - Theme.bar-icon-size) / 2;
                 spacing: Theme.sidebar-icon-spacing - (Theme.bar-button-size - Theme.bar-icon-size) / 2;
@@ -611,8 +393,13 @@ component RailButton inherits IconButton {
     size: Theme.bar-button-size;
     icon-size: Theme.bar-icon-size;
     border-radius: Theme.radius-row;
-    background: root.active ? Theme.selected : root.has-hover ? Theme.hover : transparent;
-    tint: root.active || root.running ? Theme.accent : Theme.text-secondary;
+    background: root.has-hover && !root.active ? Theme.wood-hover : transparent;
+    tint: root.active ? Theme.lit : root.running ? Theme.accent : Theme.text-secondary;
+    if root.active: SunEdge {
+        x: 0;
+        y: 5px;
+        height: root.height - 10px;
+    }
     if root.running: Rectangle {
         x: parent.width - self.width - 2px;
         y: 2px;
@@ -620,7 +407,7 @@ component RailButton inherits IconButton {
         height: 10px;
         border-radius: 5px;
         border-width: 2px;
-        border-color: Theme.sidebar;
+        border-color: Theme.wood;
         background: Theme.lit;
     }
 }
@@ -635,7 +422,6 @@ component Rail inherits SidebarForm {
     callback expand();
     callback open-search();
     callback open-settings();
-    callback open-outputs();
     property <Page> page: Navigation.page;
     width: Theme.rail-width;
     VerticalLayout {
@@ -687,18 +473,6 @@ component Rail inherits SidebarForm {
         spacing: 4px;
         HorizontalLayout {
             alignment: center;
-            OutputButton {
-                compact: true;
-                width: Theme.bar-button-size;
-                tooltip-enabled: root.shown;
-                clicked => {
-                    root.open-outputs();
-                }
-            }
-        }
-
-        HorizontalLayout {
-            alignment: center;
             IconButton {
                 size: Theme.bar-button-size;
                 icon-size: Theme.bar-icon-size;
@@ -737,35 +511,11 @@ export component Sidebar inherits Rectangle {
         duration: Motion.sidebar-slide;
         easing: Motion.sidebar-slide-easing;
     }
-    // A rectangle rounds at most half its height, and the software renderer rounds only solid
-    // colors: solid caps of the gradient's end colors meet the window's rounded corners.
-    property <length> cap-height: 2 * WindowFrame.corner-radius;
-    background: root.overlaid ? Theme.sidebar-overlaid : transparent;
+    // Over the page, the rim's wood is solid, so the page doesn't show through.
+    background: root.overlaid ? Theme.wood : transparent;
     border-top-left-radius: WindowFrame.corner-radius;
     border-bottom-left-radius: WindowFrame.corner-radius;
     clip: true;
-
-    if !root.overlaid: Rectangle {
-        Rectangle {
-            y: 0;
-            height: root.cap-height;
-            background: Theme.sidebar-top;
-            border-top-left-radius: WindowFrame.corner-radius;
-        }
-
-        Rectangle {
-            y: root.cap-height;
-            height: parent.height - 2 * root.cap-height;
-            background: Theme.sidebar;
-        }
-
-        Rectangle {
-            y: parent.height - root.cap-height;
-            height: root.cap-height;
-            background: Theme.sidebar-bottom;
-            border-bottom-left-radius: WindowFrame.corner-radius;
-        }
-    }
 
     WindowDragArea {
         y: 0;
@@ -798,9 +548,6 @@ export component Sidebar inherits Rectangle {
         open-settings => {
             root.open-settings();
         }
-        open-outputs => {
-            outputs.show();
-        }
         add(kind) => {
             root.add(kind);
         }
@@ -822,29 +569,6 @@ export component Sidebar inherits Rectangle {
         open-settings => {
             root.open-settings();
         }
-        open-outputs => {
-            outputs.show();
-        }
     }
 
-    Rectangle {
-        x: root.width - 1px;
-        width: 1px;
-        background: Theme.sidebar-edge;
-    }
-
-    outputs := PopupWindow {
-        x: root.expanded ? 10px : Theme.rail-width + 8px;
-        y: root.height - picker.preferred-height - (root.expanded ? 92px : 8px);
-        width: picker.width;
-        picker := OutputPicker {
-            picked => {
-                outputs.close();
-            }
-            open-settings => {
-                outputs.close();
-                root.open-settings();
-            }
-        }
-    }
 }
