@@ -9,6 +9,7 @@ use crate::{
     playback::{
         AudioFilePath, OutputTarget,
         browser::BrowserPlayback,
+        local_output::LocalOutputState,
         music_layers::{MusicLayerState, MusicLayers},
         queue::{QueueEntry, QueueModes},
     },
@@ -39,6 +40,7 @@ pub struct SoundCue {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PlayerState {
     pub output: OutputTarget,
+    pub local_output: LocalOutputState,
     pub voice: VoiceConnectionState,
     pub music: Option<MusicState>,
     /// The songs added to the queue, in the order they play.
@@ -68,6 +70,7 @@ impl Default for PlayerState {
     fn default() -> Self {
         Self {
             output: OutputTarget::Local,
+            local_output: LocalOutputState::Released,
             voice: VoiceConnectionState::NotConfigured,
             music: None,
             queued_entry_ids: Vec::new(),

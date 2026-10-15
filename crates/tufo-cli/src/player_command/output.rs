@@ -11,6 +11,8 @@ use tufo_models::{
 pub(crate) enum OutputCommand {
     /// Read the current local or Discord output target.
     Get,
+    /// Retry a failed local output. Observe progress with `tufo player watch`.
+    Recover,
     /// Select the local device or one Discord voice channel.
     #[command(after_long_help = r#"Examples:
   tufo output select '{"kind":"local"}'
@@ -76,6 +78,10 @@ fn parse_snowflake(text: &str, field: &str) -> Result<NonZeroU64, String> {
 pub(crate) async fn run_output(command: OutputCommand, json: bool) -> anyhow::Result<bool> {
     let client = crate::api::connect().await?;
     match command {
+        OutputCommand::Recover => {
+            client.recover_local_output().await?;
+            crate::api::ack("recover", "output", "local", json).await?;
+        }
         OutputCommand::Get => {
             let state = crate::api::player_state(&client).await?;
             crate::api::emit(&crate::record::output(state.output), json).await?;

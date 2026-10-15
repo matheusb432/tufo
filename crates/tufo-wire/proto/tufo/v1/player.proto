@@ -57,6 +57,9 @@ service PlayerService {
   // Routes all audio to the local device or one Discord voice channel, carrying the music at its
   // position and the looping sounds over. Selecting the active output does nothing.
   rpc SelectOutput(SelectOutputRequest) returns (SelectOutputResponse);
+  // Starts one local output recovery attempt. Concurrent retries and a ready output are no-ops.
+  // WatchPlayer reports completion or failure. FAILED_PRECONDITION unless Local is selected.
+  rpc RecoverLocalOutput(RecoverLocalOutputRequest) returns (RecoverLocalOutputResponse);
   // Fades out the music and every sound, then closes the audio device and leaves any voice
   // channel until something plays again. Tufo calls it when it quits and leaves the server running.
   rpc StandBy(StandByRequest) returns (StandByResponse);
@@ -101,6 +104,47 @@ message PlayerState {
   // Multiplies every effect's individual volume, independently of music volume and mute.
   float effects_volume = 13;
   BrowserPlayback browser = 14;
+  LocalOutputHealth local_output = 15;
+}
+
+message LocalOutputHealth {
+  oneof state {
+    LocalOutputReleased released = 1;
+    LocalOutputIdentity ready = 2;
+    LocalOutputRecovering recovering = 3;
+    LocalOutputFailure failed = 4;
+  }
+}
+
+message LocalOutputReleased {}
+
+message LocalOutputIdentity {
+  string backend = 1;
+  optional string device = 2;
+  optional uint32 sample_rate = 3;
+}
+
+message LocalOutputRecovering {
+  optional LocalOutputFailure previous_failure = 1;
+}
+
+message LocalOutputFailure {
+  LocalOutputFailureReason reason = 1;
+  optional LocalOutputIdentity identity = 2;
+  // Diagnostic context for the CLI. GUIs translate reason and never display this field.
+  string detail = 3;
+}
+
+enum LocalOutputFailureReason {
+  LOCAL_OUTPUT_FAILURE_REASON_UNSPECIFIED = 0;
+  LOCAL_OUTPUT_FAILURE_REASON_NO_DEVICE = 1;
+  LOCAL_OUTPUT_FAILURE_REASON_TARGET_MISSING = 2;
+  LOCAL_OUTPUT_FAILURE_REASON_DEVICE_UNAVAILABLE = 3;
+  LOCAL_OUTPUT_FAILURE_REASON_STREAM_INVALIDATED = 4;
+  LOCAL_OUTPUT_FAILURE_REASON_DEVICE_CHANGED = 5;
+  LOCAL_OUTPUT_FAILURE_REASON_CALLBACK_STOPPED = 6;
+  LOCAL_OUTPUT_FAILURE_REASON_OPEN_FAILED = 7;
+  LOCAL_OUTPUT_FAILURE_REASON_OPEN_TIMED_OUT = 8;
 }
 
 // The browser's part in playback.
@@ -323,6 +367,10 @@ message SelectOutputRequest {
 }
 
 message SelectOutputResponse {}
+
+message RecoverLocalOutputRequest {}
+
+message RecoverLocalOutputResponse {}
 
 message StandByRequest {}
 

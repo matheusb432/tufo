@@ -246,7 +246,9 @@ fn report(diagnostics: &PlayerDiagnostics) -> anyhow::Result<()> {
         "the local output reported stream errors"
     );
     let Some(pacing) = diagnostics.voice_pacing else {
-        println!("Local output: now check pw-top's ERR column for Tufo's node, then listen back.");
+        println!(
+            "Local output: check pw-top's ERR column and the captured waveform for dropouts, tempo, and pitch changes."
+        );
         return Ok(());
     };
     println!(
@@ -265,7 +267,7 @@ fn report(diagnostics: &PlayerDiagnostics) -> anyhow::Result<()> {
              worst under {LATE_TICK_MAX:?}"
         );
     }
-    println!("Voice pacing passed; now confirm by listening that nothing sped up or slowed down.");
+    println!("Voice pacing passed; check the received waveform for tempo and pitch changes.");
     Ok(())
 }
 

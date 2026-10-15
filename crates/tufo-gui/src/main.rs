@@ -559,6 +559,7 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_toggle_shuffle, | | controller.toggle_shuffle());
     on!(controller => on_cycle_repeat, | | controller.cycle_repeat());
     on!(controller => on_select_output, |index| controller.select_output(index));
+    on!(controller => on_recover_local_output, | | controller.recover_local_output());
     on!(controller => on_refresh_outputs, | | controller.refresh_outputs());
     on!(controller => on_set_crossfade, |crossfade_ms| controller.set_crossfade(crossfade_ms));
     on!(controller => on_set_keep_playing_after_quit, |keep_playing| {

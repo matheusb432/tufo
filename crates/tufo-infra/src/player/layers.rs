@@ -182,7 +182,7 @@ async fn restore_layer(
     })?;
     output
         .mixer
-        .set_music_layer_volume(slot, volume.into_inner());
+        .restore_music_layer_volume(slot, volume.into_inner());
     let deck = output.mixer.music_layer(slot).ok_or_else(|| {
         PlayAudioError::OutputUnavailable(anyhow::anyhow!("the layer deck is absent"))
     })?;

@@ -314,6 +314,9 @@ export global LibraryView {
 }
 
 export global PlayerView {
+    in property <string> local-output-message;
+    in property <bool> local-output-recovering;
+    out property <length> output-notice-height: self.local-output-message != "" ? 112px : 0px;
     in property <bool> has-music;
     in property <bool> has-playback;
     in property <string> entry-id;
@@ -488,6 +491,7 @@ export global SongLoopImportView {
 }
 
 export global Actions {
+    callback recover-local-output();
     callback open-page(Page, string);
     callback filter-changed(string);
     callback song-search-changed(string);

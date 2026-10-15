@@ -1,5 +1,7 @@
 //! Protobuf mappings for the player.
 
+mod local_output;
+
 use std::{path::PathBuf, time::Duration};
 
 use tonic::Status;
@@ -141,6 +143,7 @@ pub fn watch_player_response(state: &PlayerState) -> pb::WatchPlayerResponse {
     pb::WatchPlayerResponse {
         state: Some(pb::PlayerState {
             output: Some(output_message(state.output)),
+            local_output: Some(local_output::message(&state.local_output)),
             voice: Some(voice_message(&state.voice)),
             music: state.music.as_ref().map(music_message),
             queued_collection_entry_ids: state
@@ -281,6 +284,7 @@ pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, In
     let state = response.state.ok_or(InvalidMessage { field: "state" })?;
     let invalid = |field| InvalidMessage { field };
     Ok(PlayerState {
+        local_output: local_output::state(state.local_output.ok_or(invalid("local_output"))?)?,
         output: state
             .output
             .ok_or("is required")
@@ -615,6 +619,7 @@ mod tests {
     fn player_states_survive_the_round_trip() {
         let id = uuid::Uuid::from_u128(5);
         let mut state = PlayerState {
+            local_output: tufo_models::playback::local_output::LocalOutputState::Released,
             output: OutputTarget::DiscordVoice(VoiceChannelTarget {
                 guild_id: GuildId::new(NonZeroU64::new(959_535_519_157_612_664).unwrap()),
                 channel_id: VoiceChannelId::new(NonZeroU64::new(42).unwrap()),

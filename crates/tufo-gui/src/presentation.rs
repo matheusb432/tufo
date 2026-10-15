@@ -25,6 +25,7 @@ use tufo_models::{
     path::ImageFilePath,
     playback::{
         OutputTarget,
+        local_output::{LocalOutputFailureReason, LocalOutputState},
         player_state::{ActiveSound, MusicState, PlayerState, VoiceConnectionState},
         queue::{QueueModes, RepeatMode},
     },
@@ -955,6 +956,8 @@ pub(crate) fn clock(duration: Duration) -> String {
     reason = "it mirrors the window's player properties one to one"
 )]
 pub(crate) struct PlayerBarView {
+    pub(crate) local_output_message: String,
+    pub(crate) local_output_recovering: bool,
     pub(crate) has_music: bool,
     pub(crate) has_playback: bool,
     pub(crate) entry_id: Option<CollectionEntryId>,
@@ -1003,6 +1006,11 @@ pub(crate) fn player_bar(
 ) -> PlayerBarView {
     let music = player.music.as_ref();
     let (elapsed, duration) = music.map_or((Duration::ZERO, None), |music| {
+        let now = if local_output_interrupted(player) {
+            music.position.sampled_at
+        } else {
+            now
+        };
         (music_position(music, player.modes, now), music.duration)
     });
     let progress = duration
@@ -1034,6 +1042,8 @@ pub(crate) fn player_bar(
     let playing_collection =
         displayed_music.and_then(|music| find_collection(snapshot, music.collection_id));
     PlayerBarView {
+        local_output_message: local_output_message(player),
+        local_output_recovering: matches!(player.local_output, LocalOutputState::Recovering { .. }),
         has_music: music.is_some(),
         has_playback: displayed_music.is_some(),
         entry_id: music.map(|music| music.entry.entry_id),
@@ -1100,11 +1110,51 @@ pub(crate) fn next_repeat_mode(repeat: RepeatMode, songs_queued: bool) -> Repeat
 /// How far a sound shows through its pass: a paused sound's start moves only once it resumes, so
 /// its progress shows as none meanwhile.
 fn displayed_sound_progress(player: &PlayerState, sound: &ActiveSound, now: SystemTime) -> f32 {
-    if player.sounds_paused {
+    if player.sounds_paused || local_output_interrupted(player) {
         0.0
     } else {
         sound_progress(sound, now)
     }
+}
+
+fn local_output_interrupted(player: &PlayerState) -> bool {
+    player.output == OutputTarget::Local
+        && matches!(
+            player.local_output,
+            LocalOutputState::Failed(_) | LocalOutputState::Recovering { .. }
+        )
+}
+
+fn local_output_message(player: &PlayerState) -> String {
+    if player.output != OutputTarget::Local {
+        return String::new();
+    }
+    let message = match &player.local_output {
+        LocalOutputState::Released | LocalOutputState::Ready(_) => return String::new(),
+        LocalOutputState::Recovering { .. } => {
+            tr("Reconnecting local audio… Your playback settings are kept.")
+        }
+        LocalOutputState::Failed(failure) => match failure.reason {
+            LocalOutputFailureReason::NoDevice | LocalOutputFailureReason::DeviceUnavailable => {
+                tr("No audio device is available. Connect one, then retry.")
+            }
+            LocalOutputFailureReason::TargetMissing => {
+                tr("The selected audio device is unavailable. Reconnect it, then retry.")
+            }
+            LocalOutputFailureReason::StreamInvalidated
+            | LocalOutputFailureReason::DeviceChanged
+            | LocalOutputFailureReason::CallbackStopped => {
+                tr("Local audio stopped. Check your audio device, then retry.")
+            }
+            LocalOutputFailureReason::OpenFailed => {
+                tr("Local audio could not start. Check your audio device, then retry.")
+            }
+            LocalOutputFailureReason::OpenTimedOut => {
+                tr("The audio device did not respond. Check it, then retry.")
+            }
+        },
+    };
+    message.to_owned()
 }
 
 /// How far `sound` is through its current pass at `now`. A sound that stops looping finishes the

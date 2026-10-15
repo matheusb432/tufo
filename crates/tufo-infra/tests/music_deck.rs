@@ -11,12 +11,11 @@ use kira::{
     sound::static_sound::{StaticSoundData, StaticSoundSettings},
 };
 use tufo_infra::audio::{
-    Mixer,
+    Mixer, MixerVolumes,
     buffered_track::{AudioFile, BufferedTrack, DecodeOptions, TrackHandle},
     limiter::LIMITER_CEILING,
     music_deck::{DeckState, DeckTrack},
 };
-use tufo_models::library::Volume;
 
 mod support;
 
@@ -34,7 +33,7 @@ struct Fixture {
 
 impl Fixture {
     fn new() -> anyhow::Result<Self> {
-        let (mixer, renderer_receiver) = Mixer::open_pulled(SAMPLE_RATE, Volume::default())?;
+        let (mixer, renderer_receiver) = Mixer::open_pulled(SAMPLE_RATE, MixerVolumes::default())?;
         Ok(Self {
             mixer,
             renderer: renderer_receiver.recv()?,

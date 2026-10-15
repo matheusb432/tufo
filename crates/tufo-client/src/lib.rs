@@ -608,6 +608,13 @@ impl TufoClient {
         Ok(())
     }
 
+    /// Starts recovery; observe its current result through `watch_player`.
+    pub async fn recover_local_output(&self) -> Result<(), ClientError> {
+        let request = with_timeout(pb::RecoverLocalOutputRequest {}, QUICK_REQUEST_TIMEOUT);
+        self.player.clone().recover_local_output(request).await?;
+        Ok(())
+    }
+
     /// Fades out all audio, then closes the audio device and leaves any voice channel until
     /// something plays again.
     pub async fn stand_by(&self) -> Result<(), ClientError> {

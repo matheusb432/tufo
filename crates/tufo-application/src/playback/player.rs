@@ -22,6 +22,7 @@ use super::{
     control_sounds::SoundsCommand,
     open_browser::OpenBrowserError,
     play_queue::PlayQueueError,
+    recover_local_output::RecoverLocalOutputError,
     select_output::SelectOutputError,
 };
 use crate::error::ErrorMeta;
@@ -90,6 +91,12 @@ pub trait Player: Send + Sync {
         &self,
         target: OutputTarget,
     ) -> impl Future<Output = Result<(), SelectOutputError>> + Send;
+
+    /// Starts one local reopen attempt and publishes its progress. Concurrent retries share
+    /// the attempt; a ready local output is left playing.
+    fn recover_local_output(
+        &self,
+    ) -> impl Future<Output = Result<(), RecoverLocalOutputError>> + Send;
 
     /// Fades out the music and every sound and closes the browser, then closes the output,
     /// leaving any voice channel, until something plays again.

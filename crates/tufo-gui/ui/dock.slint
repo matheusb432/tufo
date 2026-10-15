@@ -544,6 +544,33 @@ component MiniPlayerButton inherits IconButton {
     }
 }
 
+component LocalOutputNotice inherits Rectangle {
+    height: Session.mini-player ? 103px : max(64px, notice.preferred-height);
+    background: Theme.field;
+    border-radius: 8px;
+    accessible-role: text;
+    accessible-label: PlayerView.local-output-message;
+    notice := HorizontalLayout {
+        padding: 10px;
+        spacing: 12px;
+        Text {
+            text: PlayerView.local-output-message;
+            color: PlayerView.local-output-recovering ? Theme.text-secondary : Theme.error;
+            font-size: Theme.body-small;
+            wrap: word-wrap;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+        }
+        retry := Button {
+            accessible-description: @tr("Retry local audio (Ctrl+Shift+R)");
+            y: (parent.height - self.height) / 2;
+            text: PlayerView.local-output-recovering ? @tr("Retrying…") : @tr("Retry audio");
+            enabled: !PlayerView.local-output-recovering && Session.connected;
+            clicked => { if self.enabled { Actions.recover-local-output(); } }
+        }
+    }
+}
+
 export component Dock inherits Rectangle {
     // Lays the controls out in one row, rather than in two.
     in property <bool> wide: true;
@@ -559,6 +586,7 @@ export component Dock inherits Rectangle {
         padding-left: 14px;
         padding-right: root.wide ? 18px : 10px;
         spacing: 8px;
+        if PlayerView.local-output-message != "": LocalOutputNotice { }
         if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): PlayingSounds { }
         if PlayerView.sounds.length > 0 && (root.wide || !root.collapsed): Rectangle {
             height: 1px;
@@ -840,6 +868,7 @@ export component MiniPlayer inherits Rectangle {
         padding-top: 14px;
         padding-bottom: 14px;
         spacing: 9px;
+        if PlayerView.local-output-message != "": LocalOutputNotice { }
         HorizontalLayout {
             height: 40px;
             spacing: 2px;

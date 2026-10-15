@@ -54,9 +54,9 @@ export component AppWindow inherits Window {
     preferred-width: 1000px;
     preferred-height: 700px;
     min-width: Session.mini-player ? Theme.mini-player-width-min : Theme.window-width-min;
-    min-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-height-min;
+    min-height: Session.mini-player ? Theme.mini-player-height-min + PlayerView.output-notice-height : Theme.window-height-min;
     max-width: Session.mini-player ? Theme.mini-player-width-max : Theme.window-size-unbounded;
-    max-height: Session.mini-player ? Theme.mini-player-height-min : Theme.window-size-unbounded;
+    max-height: Session.mini-player ? Theme.mini-player-height-min + PlayerView.output-notice-height : Theme.window-size-unbounded;
     always-on-top: Session.mini-player && Session.mini-player-pinned && Session.always-on-top-supported;
     background: WindowFrame.corners-rounded ? transparent : Theme.wood;
     default-font-family: Theme.font;
@@ -321,6 +321,10 @@ export component AppWindow inherits Window {
             }
             if event.modifiers.control && event.modifiers.shift && !event.modifiers.alt && (event.text == "m" || event.text == "M") {
                 WindowFrame.switch-form();
+                return accept;
+            }
+            if event.modifiers.control && event.modifiers.shift && !event.modifiers.alt && (event.text == "r" || event.text == "R") && Session.connected && PlayerView.local-output-message != "" && !PlayerView.local-output-recovering {
+                Actions.recover-local-output();
                 return accept;
             }
             if event.text == Key.Escape {

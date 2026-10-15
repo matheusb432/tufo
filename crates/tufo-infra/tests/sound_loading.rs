@@ -1,11 +1,11 @@
 use kira::Frame;
 use tufo_infra::audio::{
-    Mixer,
+    Mixer, MixerVolumes,
     effect_sound::{EffectSource, effect_sound},
     packed_frame::PackedFrame,
     sound_cache::{LoadedSound, SoundLoadOptions, load_sound},
 };
-use tufo_models::library::{SoundSettings, Volume};
+use tufo_models::library::SoundSettings;
 
 mod support;
 
@@ -85,7 +85,7 @@ fn a_cached_loop_keeps_its_pitch_and_seam_at_another_output_rate() -> anyhow::Re
         anyhow::bail!("the loop fits in the byte budget");
     };
     std::fs::remove_file(&path)?;
-    let (mut mixer, renderer) = Mixer::open_pulled(SAMPLE_RATE, Volume::default())?;
+    let (mut mixer, renderer) = Mixer::open_pulled(SAMPLE_RATE, MixerVolumes::default())?;
     let mut renderer = renderer.recv()?;
     let looping = SoundSettings {
         looping: true,

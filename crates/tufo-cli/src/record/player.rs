@@ -6,6 +6,9 @@ use tufo_models::{
         OutputTarget,
         browser::{BrowserPlayback, BrowserStatus, BrowserStopReason},
         diagnostics::{PlayerDiagnostics, VoicePacing},
+        local_output::{
+            LocalOutputFailure, LocalOutputFailureReason, LocalOutputIdentity, LocalOutputState,
+        },
         music_layers::{MusicLayerState, MusicLayers},
         player_state::{ActiveSound, MusicState, PlayerState, VoiceConnectionState},
         queue::{QueueEntry, RepeatMode},
@@ -18,6 +21,7 @@ pub(crate) fn player(value: &PlayerState) -> Value {
     let mut fields = music_fields(value);
     fields.extend([
         ("output".to_owned(), output(value.output)),
+        ("local_output".to_owned(), local_output(&value.local_output)),
         ("voice".to_owned(), voice(&value.voice)),
         (
             "queued_entry_ids".to_owned(),
@@ -28,6 +32,39 @@ pub(crate) fn player(value: &PlayerState) -> Value {
         ("browser".to_owned(), browser(value.browser)),
     ]);
     fields.into()
+}
+
+pub(crate) fn local_output(value: &LocalOutputState) -> Value {
+    match value {
+        LocalOutputState::Released => json!({"status": "released"}),
+        LocalOutputState::Ready(identity) => {
+            json!({"status": "ready", "identity": local_identity(identity)})
+        }
+        LocalOutputState::Recovering { previous_failure } => {
+            json!({"status": "recovering", "previous_failure": previous_failure.as_ref().map(local_failure)})
+        }
+        LocalOutputState::Failed(failure) => {
+            json!({"status": "failed", "failure": local_failure(failure)})
+        }
+    }
+}
+
+fn local_identity(value: &LocalOutputIdentity) -> Value {
+    json!({"backend": value.backend, "device": value.device, "sample_rate": value.sample_rate})
+}
+
+fn local_failure(value: &LocalOutputFailure) -> Value {
+    let reason = match value.reason {
+        LocalOutputFailureReason::NoDevice => "no_device",
+        LocalOutputFailureReason::TargetMissing => "target_missing",
+        LocalOutputFailureReason::DeviceUnavailable => "device_unavailable",
+        LocalOutputFailureReason::StreamInvalidated => "stream_invalidated",
+        LocalOutputFailureReason::DeviceChanged => "device_changed",
+        LocalOutputFailureReason::CallbackStopped => "callback_stopped",
+        LocalOutputFailureReason::OpenFailed => "open_failed",
+        LocalOutputFailureReason::OpenTimedOut => "open_timed_out",
+    };
+    json!({"reason": reason, "identity": value.identity.as_ref().map(local_identity), "detail": value.detail})
 }
 
 pub(crate) fn browser(value: BrowserPlayback) -> Value {

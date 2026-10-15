@@ -10,7 +10,7 @@ use slint::{
 use tokio::{runtime::Handle, sync::watch};
 use tufo_client::desktop::files;
 
-use crate::ui::{Actions, AppWindow, Session, Theme, WindowFrame};
+use crate::ui::{Actions, AppWindow, PlayerView, Session, Theme, WindowFrame};
 
 const WINDOW_STATE_FILE_NAME: &str = "window.toml";
 /// Lets a drag that resizes the window settle before its size is written.
@@ -155,6 +155,8 @@ struct WindowSizeLimits {
 impl WindowSizeLimits {
     fn from_window(window: &AppWindow) -> Self {
         let theme = window.global::<Theme>();
+        let mini_height = theme.get_mini_player_height_min()
+            + window.global::<PlayerView>().get_output_notice_height();
         Self {
             full_minimum: WindowSize {
                 width: theme.get_window_width_min(),
@@ -162,11 +164,11 @@ impl WindowSizeLimits {
             },
             mini_player_minimum: WindowSize {
                 width: theme.get_mini_player_width_min(),
-                height: theme.get_mini_player_height_min(),
+                height: mini_height,
             },
             mini_player_maximum: WindowSize {
                 width: theme.get_mini_player_width_max(),
-                height: theme.get_mini_player_height_min(),
+                height: mini_height,
             },
         }
     }
@@ -277,18 +279,23 @@ pub(crate) fn install(window: &AppWindow, runtime: &Handle, file: Option<WindowS
             window.global::<Session>().set_mini_player(mini_player);
             apply_size_limits(&window);
             set_size(&window, size);
+            resize_for_local_output(&window);
         }
     });
     frame.on_resized({
         let window = window.as_weak();
         move |width, height| {
+            let Some(window) = window.upgrade() else {
+                return;
+            };
+            let limits = WindowSizeLimits::from_window(&window);
             let mut refused = None;
             layout_sender.send_if_modified(|state| {
                 let before = *state;
                 refused = state.record_size(WindowSize { width, height }, limits);
                 *state != before
             });
-            if let (Some(size), Some(window)) = (refused, window.upgrade()) {
+            if let Some(size) = refused {
                 set_size(&window, size);
             }
         }
@@ -296,6 +303,26 @@ pub(crate) fn install(window: &AppWindow, runtime: &Handle, file: Option<WindowS
     if let Some(file) = file {
         runtime.spawn(save_changes(file, layout_receiver));
     }
+}
+
+pub(crate) fn resize_for_local_output(window: &AppWindow) {
+    if !window.global::<Session>().get_mini_player() {
+        return;
+    }
+    let limits = WindowSizeLimits::from_window(window);
+    apply_size_limits(window);
+    let width = window
+        .window()
+        .size()
+        .to_logical(window.window().scale_factor())
+        .width;
+    set_size(
+        window,
+        WindowSize {
+            width,
+            height: limits.mini_player_minimum.height,
+        },
+    );
 }
 
 /// Slint 1.18 recreates a hidden Wayland window with default size hints while retaining its

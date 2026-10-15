@@ -903,3 +903,36 @@ fn generated_titles_localize_before_filtering_and_natural_ordering() {
     );
     assert_eq!(crate::search::search(&library, "rain")[0].title, "Rain");
 }
+
+#[test]
+fn local_output_failure_is_persistent_safe_copy_and_freezes_displayed_position() {
+    use tufo_models::playback::local_output::{
+        LocalOutputFailure, LocalOutputFailureReason, LocalOutputState,
+    };
+    let mut player = playing(1, false);
+    let sampled_at = player.music.as_ref().unwrap().position.sampled_at;
+    let failure = LocalOutputFailure {
+        reason: LocalOutputFailureReason::TargetMissing,
+        identity: None,
+        detail: "private backend diagnostic".to_owned(),
+    };
+    player.local_output = LocalOutputState::Failed(failure.clone());
+    let snapshot = LibrarySnapshot::default();
+    let before = player_bar(&snapshot, &player, sampled_at);
+    let later = player_bar(&snapshot, &player, sampled_at + Duration::from_secs(10));
+    assert_eq!(before.elapsed, later.elapsed);
+    assert!(later.local_output_message.contains("Reconnect"));
+    assert!(!later.local_output_message.contains("private"));
+    assert!(!later.local_output_recovering);
+    player.local_output = LocalOutputState::Recovering {
+        previous_failure: Some(failure),
+    };
+    let recovering = player_bar(&snapshot, &player, sampled_at);
+    assert!(recovering.local_output_recovering);
+    assert_ne!(recovering.local_output_message, "");
+    player.local_output = LocalOutputState::Released;
+    assert_eq!(
+        player_bar(&snapshot, &player, sampled_at).local_output_message,
+        ""
+    );
+}

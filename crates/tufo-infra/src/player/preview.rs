@@ -7,7 +7,7 @@ use std::{
 
 use tokio::sync::oneshot;
 use tufo_application::playback::player::{PlayAudioError, PreviewId, PreviewSession, SongPreview};
-use tufo_models::{library::Volume, playback::OutputTarget};
+use tufo_models::playback::OutputTarget;
 use tufo_wire::song_loops::{PreviewMode, PreviewStarted};
 
 use super::{
@@ -16,7 +16,7 @@ use super::{
     outputs::{AudioOutputs, OpenedOutput},
 };
 use crate::audio::{
-    Mixer,
+    Mixer, MixerVolumes,
     buffered_track::{AudioFile, BufferedTrack, DecodeOptions},
     decibels,
     music_deck::DeckTrack,
@@ -73,7 +73,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     ) -> Result<PreviewSession, PlayAudioError> {
         let mut output = self
             .outputs
-            .open(OutputTarget::Local, Volume::default())
+            .open(OutputTarget::Local, MixerVolumes::default())
             .await
             .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?;
         let playback = prepare_playback(preview, output.mixer.sample_rate()).await?;

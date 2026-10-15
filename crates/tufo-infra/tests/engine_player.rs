@@ -33,7 +33,7 @@ use tufo_application::{
     },
 };
 use tufo_infra::{
-    audio::Mixer,
+    audio::{Mixer, MixerVolumes},
     browser::{BrowserLauncher, BrowserProcess, LaunchBrowserError, LaunchedBrowser},
     database::open_database,
     discord::VoiceAvailability,
@@ -54,6 +54,7 @@ use tufo_models::{
         AudioFilePath, OutputTarget,
         browser::{BrowserStatus, BrowserStopReason},
         diagnostics::VoicePacing,
+        local_output::{LocalOutputFailureReason, LocalOutputState},
         player_state::{
             ActiveSound, CrossfadeDuration, PlayerState, SoundCue, VoiceConnectionState,
         },
@@ -90,9 +91,20 @@ struct OutputControls {
     fail_voice_opens: AtomicBool,
     voice_disabled: AtomicBool,
     closes: AtomicUsize,
+    local_opens: AtomicUsize,
+    local_open_gate: Mutex<Option<oneshot::Receiver<Result<(), SelectOutputError>>>>,
 }
 
 impl OutputControls {
+    fn hold_local_open(&self) -> oneshot::Sender<Result<(), SelectOutputError>> {
+        let (sender, receiver) = oneshot::channel();
+        *self
+            .local_open_gate
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = Some(receiver);
+        sender
+    }
+
     fn drop_voice_connection(&self) -> anyhow::Result<()> {
         let sender = self
             .voice_lost
@@ -115,13 +127,13 @@ impl TestOutputs {
     fn open_pulled(
         &self,
         target: OutputTarget,
-        effects_volume: Volume,
+        volumes: MixerVolumes,
     ) -> anyhow::Result<OpenedOutput> {
         let sample_rate = match target {
             OutputTarget::Local => LOCAL_SAMPLE_RATE,
             OutputTarget::DiscordVoice(_) => SAMPLE_RATE,
         };
-        let (mixer, renderer_receiver) = Mixer::open_pulled(sample_rate, effects_volume)?;
+        let (mixer, renderer_receiver) = Mixer::open_pulled(sample_rate, volumes)?;
         self.renderers
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -152,19 +164,36 @@ impl AudioOutputs for TestOutputs {
         }
     }
 
-    fn open(
+    async fn open(
         &self,
         target: OutputTarget,
-        effects_volume: Volume,
-    ) -> impl Future<Output = Result<OpenedOutput, SelectOutputError>> + Send {
+        volumes: MixerVolumes,
+    ) -> Result<OpenedOutput, SelectOutputError> {
+        if target == OutputTarget::Local {
+            self.controls.local_opens.fetch_add(1, Ordering::Relaxed);
+            let gate = self
+                .controls
+                .local_open_gate
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner)
+                .take();
+            if let Some(gate) = gate {
+                gate.await
+                    .map_err(|error| SelectOutputError::LocalDevice {
+                        reason: LocalOutputFailureReason::OpenFailed,
+                        identity: None,
+                        source: error.into(),
+                    })??;
+            }
+        }
         let refused = matches!(target, OutputTarget::DiscordVoice(_))
             && self.controls.fail_voice_opens.load(Ordering::Relaxed);
         let opened = if refused {
             Err(anyhow::anyhow!("the test refused the connection"))
         } else {
-            self.open_pulled(target, effects_volume)
+            self.open_pulled(target, volumes)
         };
-        std::future::ready(opened.map_err(SelectOutputError::VoiceConnection))
+        opened.map_err(SelectOutputError::VoiceConnection)
     }
 
     fn close(&self, output: OpenedOutput) -> impl Future<Output = ()> + Send {
@@ -500,6 +529,92 @@ async fn recorded_level(rig: &Rig, output: usize) -> anyhow::Result<f32> {
     let captures = rig.sound_card.captures();
     let capture = &captures[output];
     Ok(capture[capture.len() - 100..].iter().sum::<f32>() / 100.0)
+}
+
+#[tokio::test]
+async fn local_recovery_publishes_failures_and_deduplicates_retries_without_blocking_controls()
+-> anyhow::Result<()> {
+    let mut rig = Rig::start()?;
+    let cue = sound(rig.file("retry.wav", &constant(0.5, 4_800))?, false);
+    let first = rig.controls.hold_local_open();
+    rig.player.recover_local_output().await?;
+    first
+        .send(Err(SelectOutputError::LocalDevice {
+            reason: LocalOutputFailureReason::TargetMissing,
+            identity: None,
+            source: anyhow::anyhow!("the test sink is absent"),
+        }))
+        .unwrap();
+    let failed = rig
+        .wait_for(|state| matches!(state.local_output, LocalOutputState::Failed(_)))
+        .await?;
+    assert_eq!(
+        rig.player.watch_player().borrow().local_output,
+        failed.local_output
+    );
+    let LocalOutputState::Failed(failure) = failed.local_output else {
+        anyhow::bail!("the output did not fail");
+    };
+    assert_eq!(failure.reason, LocalOutputFailureReason::TargetMissing);
+
+    let retry = rig.controls.hold_local_open();
+    let (first, second, third) = tokio::join!(
+        rig.player.recover_local_output(),
+        rig.player.recover_local_output(),
+        rig.player.recover_local_output(),
+    );
+    first?;
+    second?;
+    third?;
+    assert_eq!(
+        rig.state().local_output,
+        LocalOutputState::Recovering {
+            previous_failure: Some(failure)
+        }
+    );
+    tokio::time::timeout(
+        WAIT_TIMEOUT,
+        rig.player
+            .control_sounds(SoundsCommand::SetVolume(Volume::try_new(0.0)?)),
+    )
+    .await?;
+    retry.send(Ok(())).unwrap();
+    let ready = rig
+        .wait_for(|state| matches!(state.local_output, LocalOutputState::Ready(_)))
+        .await?;
+    assert_eq!(rig.controls.local_opens.load(Ordering::Relaxed), 2);
+    assert_eq!(ready.effects_volume, Volume::try_new(0.0)?);
+    rig.player.play_sound(cue).await?;
+    rig.wait_for_recorded_frames(0, 10_000).await?;
+    let peak = rig.sound_card.captures()[0]
+        .iter()
+        .copied()
+        .map(f32::abs)
+        .fold(0.0, f32::max);
+    assert_eq!(
+        peak, 0.0,
+        "muting during recovery leaked audio on the new mixer"
+    );
+    rig.player.recover_local_output().await?;
+    assert_eq!(rig.controls.local_opens.load(Ordering::Relaxed), 2);
+    Ok(())
+}
+
+#[tokio::test]
+async fn standby_cancels_a_pending_local_recovery_and_closes_its_late_mixer() -> anyhow::Result<()>
+{
+    let mut rig = Rig::start()?;
+    let opening = rig.controls.hold_local_open();
+    rig.player.recover_local_output().await?;
+    tokio::time::timeout(WAIT_TIMEOUT, rig.player.stand_by()).await?;
+    opening.send(Ok(())).unwrap();
+    rig.wait_for_closes(1).await?;
+    assert_eq!(rig.state().local_output, LocalOutputState::Released);
+    rig.player.recover_local_output().await?;
+    rig.wait_for(|state| matches!(state.local_output, LocalOutputState::Ready(_)))
+        .await?;
+    assert_eq!(rig.controls.local_opens.load(Ordering::Relaxed), 2);
+    Ok(())
 }
 
 #[tokio::test]

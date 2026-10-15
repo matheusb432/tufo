@@ -2551,3 +2551,39 @@ msgstr ""
 #: ui/dialogs.slint
 msgid "Sidebar"
 msgstr ""
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "Reconnecting local audio… Your playback settings are kept."
+msgstr ""
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "No audio device is available. Connect one, then retry."
+msgstr ""
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "The selected audio device is unavailable. Reconnect it, then retry."
+msgstr ""
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "Local audio stopped. Check your audio device, then retry."
+msgstr ""
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "Local audio could not start. Check your audio device, then retry."
+msgstr ""
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "The audio device did not respond. Check it, then retry."
+msgstr ""
+
+#: crates/tufo-gui/ui/dock.slint
+msgid "Retrying…"
+msgstr ""
+
+#: crates/tufo-gui/ui/dock.slint
+msgid "Retry audio"
+msgstr ""
+
+#: crates/tufo-gui/ui/dock.slint
+msgid "Retry local audio (Ctrl+Shift+R)"
+msgstr ""

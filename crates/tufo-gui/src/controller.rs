@@ -1296,6 +1296,10 @@ impl Controller {
         }
     }
 
+    pub(crate) fn recover_local_output(&self) {
+        self.run(|client| async move { client.recover_local_output().await });
+    }
+
     pub(crate) fn refresh_outputs(&self) {
         if let Some(client) = self.client() {
             self.runtime.spawn(self.clone().load_voice_channels(client));

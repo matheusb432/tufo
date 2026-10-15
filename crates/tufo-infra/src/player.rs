@@ -9,6 +9,7 @@
 
 mod browser;
 mod layers;
+mod local_output;
 mod music;
 pub mod outputs;
 mod preview;
@@ -45,6 +46,7 @@ use tufo_application::playback::{
     open_browser::OpenBrowserError,
     play_queue::PlayQueueError,
     player::{PlayAudioError, Player, PreviewId, PreviewSession, SongLoops, SongPreview},
+    recover_local_output::RecoverLocalOutputError,
     select_output::SelectOutputError,
 };
 use tufo_models::{
@@ -53,6 +55,7 @@ use tufo_models::{
         AudioFilePath, OutputTarget,
         browser::BrowserStatus,
         diagnostics::PlayerDiagnostics,
+        local_output::LocalOutputState,
         music_layers::MusicLayers,
         player_state::{
             CrossfadeDuration, MusicState, PlayerState, PositionSample, SoundCue,
@@ -67,7 +70,7 @@ use tufo_models::{
 
 use crate::{
     audio::{
-        LocalStreamErrors,
+        LocalStreamErrors, MixerVolumes,
         browser_input::BrowserAudioCounters,
         buffered_track::{BufferedTrack, DecodeOptions},
         effect_sound::{EffectSource, effect_sound},
@@ -185,6 +188,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let engine = Engine {
             target: OutputTarget::Local,
             output: None,
+            local_output: LocalOutputState::Released,
             output_generation: 0,
             voice: idle_voice(outputs.voice_availability(), None),
             music: None,
@@ -282,12 +286,35 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 "the Discord voice connection is down"
             )));
         }
-        let opened = self
+        if matches!(
+            engine.local_output,
+            LocalOutputState::Failed(_) | LocalOutputState::Recovering { .. }
+        ) {
+            return Err(PlayAudioError::OutputUnavailable(anyhow::anyhow!(
+                "recover the local output before starting playback"
+            )));
+        }
+        engine.local_output = LocalOutputState::Recovering {
+            previous_failure: None,
+        };
+        self.publish(engine);
+        let opened = match self
             .outputs
-            .open(OutputTarget::Local, engine.effects_volume)
+            .open(
+                OutputTarget::Local,
+                MixerVolumes::with_effects(engine.effects_volume),
+            )
             .await
-            .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?;
+        {
+            Ok(opened) => opened,
+            Err(error) => {
+                engine.record_local_open_failure(&error);
+                self.publish(engine);
+                return Err(PlayAudioError::OutputUnavailable(error.into()));
+            }
+        };
         self.install_output(engine, opened).await;
+        self.publish(engine);
         Ok(())
     }
 
@@ -301,9 +328,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         if let Some(voice_lost) = opened.take_voice_lost() {
             self.watch_voice_loss(voice_lost, engine.output_generation);
         }
-        opened
-            .mixer
-            .set_music_volume(volume_gain(engine.volume, engine.muted));
+        opened.mixer.restore_volumes(
+            volume_gain(engine.volume, engine.muted),
+            engine.effects_volume.into_inner(),
+        );
+        engine.local_output = match engine.target {
+            OutputTarget::Local => LocalOutputState::Ready(opened.mixer.local_identity()),
+            OutputTarget::DiscordVoice(_) => LocalOutputState::Released,
+        };
         if let Err(error) = opened
             .mixer
             .music()
@@ -325,32 +357,9 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     /// Closes the output, keeping the music's position and the looping sounds to play again on
     /// the next one.
     async fn suspend_output(&self, engine: &mut Engine) {
-        let Some(output) = engine.take_output() else {
-            return;
-        };
-        if let Some(host) = engine.browser.host() {
-            host.detach();
+        if let Some(output) = engine.detach_output() {
+            self.outputs.close(output).await;
         }
-        engine.output_generation += 1;
-        engine.music_generation += 1;
-        let mut retired_underruns = 0;
-        if let Some(music) = &mut engine.music {
-            music.current.start_offset = music.current.position();
-            retired_underruns += music.current.underrun_frames();
-            music.current.handle = None;
-            if let Some(armed) = music.armed.take() {
-                retired_underruns += armed.underrun_frames();
-            }
-            music.changing = false;
-            music.arm_requested = false;
-        }
-        engine.retired_underrun_frames += retired_underruns;
-        engine.suspend_layers();
-        engine.sounds.retain(|_, sound| sound.cue.settings.looping);
-        for sound in engine.sounds.values_mut() {
-            sound.playback = None;
-        }
-        self.outputs.close(output).await;
     }
 
     async fn restore_music(&self, engine: &mut Engine, sample_rate: u32) {
@@ -753,7 +762,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 
     async fn tick(self: &Arc<Self>) {
         let mut engine = self.engine.lock().await;
-        let mut changed = engine.reap_finished_sounds();
+        let mut changed = self.poll_local_output(&mut engine);
+        changed |= engine.reap_finished_sounds();
         engine.sound_cache.evict_idle(Instant::now());
         changed |= engine.reap_finished_layers();
         if let Some(deck) = engine.deck() {
@@ -874,6 +884,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         engine.output_generation += 1;
         if let Some(output) = engine.take_output() {
             self.outputs.close(output).await;
+            engine.local_output = LocalOutputState::Released;
         }
         if let OutputTarget::DiscordVoice(_) = engine.target {
             engine.target = OutputTarget::Local;
@@ -922,7 +933,10 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             self.publish(&engine);
             match self
                 .outputs
-                .open(engine.target, engine.effects_volume)
+                .open(
+                    engine.target,
+                    MixerVolumes::with_effects(engine.effects_volume),
+                )
                 .await
             {
                 Ok(opened) => {
@@ -950,6 +964,10 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 }
 
 impl<O: AudioOutputs> Player for EnginePlayer<O> {
+    async fn recover_local_output(&self) -> Result<(), RecoverLocalOutputError> {
+        self.start_local_recovery().await
+    }
+
     async fn add_music_layer(&self, cue: MusicLayerCue) -> Result<(), AddMusicLayerError> {
         self.add_layer(cue).await
     }
@@ -1174,6 +1192,11 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         }
         // Ends reconnection attempts to the previous voice channel.
         engine.output_generation += 1;
+        if let LocalOutputState::Recovering { previous_failure } = &engine.local_output {
+            engine.local_output = previous_failure
+                .clone()
+                .map_or(LocalOutputState::Released, LocalOutputState::Failed);
+        }
         let previous_voice = engine.voice.clone();
         if let OutputTarget::DiscordVoice(_) = target {
             engine.voice = VoiceConnectionState::Connecting;
@@ -1187,7 +1210,11 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         }
         let needs_output = matches!(target, OutputTarget::DiscordVoice(_)) || engine.has_audio();
         let opened = if needs_output {
-            match self.outputs.open(target, engine.effects_volume).await {
+            match self
+                .outputs
+                .open(target, MixerVolumes::with_effects(engine.effects_volume))
+                .await
+            {
                 Ok(opened) => Some(opened),
                 Err(error) => {
                     self.recover_from_failed_switch(
@@ -1205,6 +1232,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         };
         self.suspend_output(&mut engine).await;
         engine.target = target;
+        engine.local_output = LocalOutputState::Released;
         engine.voice = match target {
             OutputTarget::Local => idle_voice(voice_availability, None),
             OutputTarget::DiscordVoice(_) => VoiceConnectionState::Connected,
@@ -1229,6 +1257,11 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         self.discard_preview(&mut engine).await;
         // Ends reconnection attempts, which would otherwise rejoin a voice channel meanwhile.
         engine.output_generation += 1;
+        if let LocalOutputState::Recovering { previous_failure } = &engine.local_output {
+            engine.local_output = previous_failure
+                .clone()
+                .map_or(LocalOutputState::Released, LocalOutputState::Failed);
+        }
         engine.stop_music();
         engine.stop_layers();
         let fade = engine.sound_stop_fade(STOP_FADE);
@@ -1295,6 +1328,9 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         previous_voice: VoiceConnectionState,
         error: &SelectOutputError,
     ) {
+        if matches!(error, SelectOutputError::LocalDevice { .. }) {
+            engine.record_local_open_failure(error);
+        }
         if !previous_closed {
             engine.voice = previous_voice;
             self.publish(engine);
@@ -1305,12 +1341,15 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         if engine.has_audio() {
             match self
                 .outputs
-                .open(OutputTarget::Local, engine.effects_volume)
+                .open(
+                    OutputTarget::Local,
+                    MixerVolumes::with_effects(engine.effects_volume),
+                )
                 .await
             {
                 Ok(opened) => self.install_output(engine, opened).await,
                 Err(error) => {
-                    tracing::warn!(error = error_chain(&error), "the local output cannot open");
+                    engine.record_local_open_failure(&error);
                 }
             }
         }
@@ -1321,6 +1360,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 /// Everything the engine plays and where, behind the engine lock.
 struct Engine {
     target: OutputTarget,
+    local_output: LocalOutputState,
     /// Absent until audio first plays locally, and while a voice connection is down.
     output: Option<OpenedOutput>,
     /// Advances whenever the output changes, so stale reconnection attempts end.
@@ -1601,6 +1641,7 @@ impl Engine {
         let sampled_at = SystemTime::now();
         PlayerState {
             output: self.target,
+            local_output: self.local_output.clone(),
             voice: self.voice.clone(),
             music: self.music.as_ref().map(|music| MusicState {
                 collection_id: music.queue.current_collection_id(),

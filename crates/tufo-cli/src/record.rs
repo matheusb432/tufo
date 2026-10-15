@@ -15,7 +15,7 @@ mod song_loops;
 
 pub(crate) use imports::{import_report, kenku_status};
 pub(crate) use player::{
-    browser, diagnostics, music_layers, music_state, output, player, player_settings,
+    browser, diagnostics, local_output, music_layers, music_state, output, player, player_settings,
     queued_entry_ids, sounds, voice, voice_channel,
 };
 pub(crate) use song_loops::{loop_region, saved_loop, waveform};

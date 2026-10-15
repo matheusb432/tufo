@@ -92,7 +92,12 @@ async fn inspect() -> Report {
     };
     report.endpoint = Some(endpoint.path().display().to_string());
     match server::inspect(&endpoint).await {
-        Ok(Some(snapshot)) => report.record_server(snapshot),
+        Ok(Some(snapshot)) => {
+            if snapshot.serving {
+                report.checks.push(local_output_check(&endpoint).await);
+            }
+            report.record_server(snapshot);
+        }
         Ok(None) => {
             report.checks.push(Check::new(
                 "Server",
@@ -108,6 +113,37 @@ async fn inspect() -> Report {
         }
     }
     report
+}
+
+async fn local_output_check(endpoint: &LocalEndpoint) -> Check {
+    use tufo_models::playback::local_output::LocalOutputState;
+    let result = tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let client = tufo_client::TufoClient::connect_lazy(endpoint)?;
+        crate::api::player_state(&client).await
+    })
+    .await;
+    let Ok(Ok(state)) = result else {
+        return Check::new(
+            "Local audio",
+            CheckStatus::Warning,
+            "Current output health is unavailable",
+            None,
+        );
+    };
+    let (status, action) = match state.local_output {
+        LocalOutputState::Failed(_) => (
+            CheckStatus::Fail,
+            Some("Check the audio device, then run `tufo output recover`."),
+        ),
+        LocalOutputState::Recovering { .. } => (CheckStatus::Warning, None),
+        LocalOutputState::Ready(_) | LocalOutputState::Released => (CheckStatus::Pass, None),
+    };
+    Check::new(
+        "Local audio",
+        status,
+        crate::record::local_output(&state.local_output).to_string(),
+        action,
+    )
 }
 
 fn token_unknown() -> Check {

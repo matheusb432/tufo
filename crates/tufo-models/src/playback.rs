@@ -8,6 +8,7 @@ use crate::discord::VoiceChannelTarget;
 
 pub mod browser;
 pub mod diagnostics;
+pub mod local_output;
 pub mod music_layers;
 pub mod player_settings;
 pub mod player_state;

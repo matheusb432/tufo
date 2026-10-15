@@ -418,6 +418,13 @@ pub(crate) fn player(
     let _ = window.upgrade_in_event_loop(move |window| {
         player_progress(&window, &bar);
         let view = window.global::<PlayerView>();
+        let notice_changed =
+            view.get_local_output_message().is_empty() != bar.local_output_message.is_empty();
+        view.set_local_output_message(bar.local_output_message.into());
+        view.set_local_output_recovering(bar.local_output_recovering);
+        if notice_changed {
+            crate::window_state::resize_for_local_output(&window);
+        }
         view.set_has_music(bar.has_music);
         view.set_has_playback(bar.has_playback);
         view.set_entry_id(

@@ -15,6 +15,7 @@ pub mod play_sound;
 pub mod player;
 mod playlist_song;
 pub mod preview_song_loop;
+pub mod recover_local_output;
 pub mod remove_from_queue;
 pub mod resume_saved_loops;
 mod saved_loops;

@@ -2551,3 +2551,39 @@ msgstr "Clique com o botão direito em um painel de sons para fixá-lo aqui."
 #: ui/dialogs.slint
 msgid "Sidebar"
 msgstr "Barra lateral"
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "Reconnecting local audio… Your playback settings are kept."
+msgstr "Reconectando o áudio local… Suas configurações de reprodução serão mantidas."
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "No audio device is available. Connect one, then retry."
+msgstr "Nenhum dispositivo de áudio disponível. Conecte um e tente novamente."
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "The selected audio device is unavailable. Reconnect it, then retry."
+msgstr "O dispositivo de áudio selecionado está indisponível. Reconecte-o e tente novamente."
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "Local audio stopped. Check your audio device, then retry."
+msgstr "O áudio local parou. Verifique o dispositivo de áudio e tente novamente."
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "Local audio could not start. Check your audio device, then retry."
+msgstr "Não foi possível iniciar o áudio local. Verifique o dispositivo e tente novamente."
+
+#: crates/tufo-gui/src/presentation.rs
+msgid "The audio device did not respond. Check it, then retry."
+msgstr "O dispositivo de áudio não respondeu. Verifique-o e tente novamente."
+
+#: crates/tufo-gui/ui/dock.slint
+msgid "Retrying…"
+msgstr "Tentando…"
+
+#: crates/tufo-gui/ui/dock.slint
+msgid "Retry audio"
+msgstr "Tentar novamente"
+
+#: crates/tufo-gui/ui/dock.slint
+msgid "Retry local audio (Ctrl+Shift+R)"
+msgstr "Tentar o áudio local novamente (Ctrl+Shift+R)"

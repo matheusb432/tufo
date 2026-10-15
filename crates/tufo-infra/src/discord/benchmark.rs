@@ -21,10 +21,9 @@ use songbird::{
     },
     tracks::Track,
 };
-use tufo_models::library::Volume;
 
 use super::{DISCORD_SAMPLE_RATE, PacingTotals, voice_input};
-use crate::audio::Mixer;
+use crate::audio::{Mixer, MixerVolumes};
 
 const RUNS: usize = 5;
 const PACKETS: u32 = 200;
@@ -76,7 +75,8 @@ struct Fixture {
 
 impl Fixture {
     fn new(runtime: &tokio::runtime::Runtime) -> anyhow::Result<Self> {
-        let (mut mixer, renderer) = Mixer::open_pulled(DISCORD_SAMPLE_RATE, Volume::default())?;
+        let (mut mixer, renderer) =
+            Mixer::open_pulled(DISCORD_SAMPLE_RATE, MixerVolumes::default())?;
         for frequency in [440.0, 660.0, 880.0] {
             mixer.play_static_sound(tone(frequency))?;
         }
@@ -286,10 +286,10 @@ fn voice_packets_preserve_samples_and_apply_controls_on_the_next_tick() -> anyho
     use songbird::input::{Input, core::audio::SampleBuffer};
 
     let sound = tone(440.0);
-    let (mut mixer, renderer) = Mixer::open_pulled(DISCORD_SAMPLE_RATE, Volume::default())?;
+    let (mut mixer, renderer) = Mixer::open_pulled(DISCORD_SAMPLE_RATE, MixerVolumes::default())?;
     mixer.play_static_sound(sound.clone())?;
     let (mut reference, renderer_reference) =
-        Mixer::open_pulled(DISCORD_SAMPLE_RATE, Volume::default())?;
+        Mixer::open_pulled(DISCORD_SAMPLE_RATE, MixerVolumes::default())?;
     reference.play_static_sound(sound)?;
     let mut renderer_reference = renderer_reference.recv_timeout(Duration::from_secs(1))?;
     let totals = Arc::new(PacingTotals::default());

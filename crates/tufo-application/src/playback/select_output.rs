@@ -1,4 +1,7 @@
-use tufo_models::playback::OutputTarget;
+use tufo_models::playback::{
+    OutputTarget,
+    local_output::{LocalOutputFailure, LocalOutputFailureReason, LocalOutputIdentity},
+};
 
 use super::player::Player;
 use crate::error::ErrorMeta;
@@ -19,10 +22,31 @@ pub enum SelectOutputError {
     VoiceConnection(#[source] anyhow::Error),
     #[error("the local audio device cannot play")]
     #[meta(class = Unavailable, reason = Self::LOCAL_DEVICE)]
-    LocalDevice(#[source] anyhow::Error),
+    LocalDevice {
+        reason: LocalOutputFailureReason,
+        identity: Option<LocalOutputIdentity>,
+        #[source]
+        source: anyhow::Error,
+    },
 }
 
 impl SelectOutputError {
+    #[must_use]
+    pub fn local_failure(&self) -> Option<LocalOutputFailure> {
+        match self {
+            Self::LocalDevice {
+                reason,
+                identity,
+                source,
+            } => Some(LocalOutputFailure {
+                reason: *reason,
+                identity: identity.clone(),
+                detail: format!("{source:#}"),
+            }),
+            _ => None,
+        }
+    }
+
     pub const DISCORD_NOT_CONFIGURED: &'static str =
         "playback.select_output.discord_not_configured";
     pub const DISCORD_DISABLED: &'static str = "playback.select_output.discord_disabled";

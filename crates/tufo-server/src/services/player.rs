@@ -280,6 +280,16 @@ impl<O: AudioOutputs> PlayerService for PlayerGrpcService<O> {
         Ok(Response::new(pb::SelectOutputResponse {}))
     }
 
+    async fn recover_local_output(
+        &self,
+        _request: Request<pb::RecoverLocalOutputRequest>,
+    ) -> Result<Response<pb::RecoverLocalOutputResponse>, Status> {
+        tufo_application::playback::recover_local_output::execute(self.state.player.as_ref())
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::RecoverLocalOutputResponse {}))
+    }
+
     async fn stand_by(
         &self,
         _request: Request<pb::StandByRequest>,

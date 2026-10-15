@@ -12,7 +12,7 @@ use std::{
 use kira::backend::Renderer;
 use tufo_application::{library::Library, playback::select_output::SelectOutputError};
 use tufo_infra::{
-    audio::Mixer,
+    audio::{Mixer, MixerVolumes},
     database::open_database,
     discord::{SongbirdDiscordClient, VoiceAvailability},
     library_files::DiskLibraryFiles,
@@ -22,10 +22,7 @@ use tufo_infra::{
     },
 };
 use tufo_local_transport::{LocalEndpoint, LocalListener};
-use tufo_models::{
-    library::Volume,
-    playback::{OutputTarget, diagnostics::VoicePacing},
-};
+use tufo_models::playback::{OutputTarget, diagnostics::VoicePacing};
 
 use super::support::TEST_TIMEOUT;
 
@@ -102,15 +99,15 @@ struct PulledOutputs {
 }
 
 impl PulledOutputs {
-    fn open_local(&self, effects_volume: Volume) -> Result<OpenedOutput, SelectOutputError> {
-        let (mixer, receiver) = Mixer::open_pulled(SAMPLE_RATE, effects_volume)
-            .map_err(|error| SelectOutputError::LocalDevice(error.into()))?;
+    fn open_local(&self, volumes: MixerVolumes) -> Result<OpenedOutput, SelectOutputError> {
+        let (mixer, receiver) = Mixer::open_pulled(SAMPLE_RATE, volumes)
+            .map_err(|error| local_output_error(error.into()))?;
         let renderer = receiver
             .recv_timeout(Duration::from_secs(1))
-            .map_err(|error| SelectOutputError::LocalDevice(error.into()))?;
+            .map_err(|error| local_output_error(error.into()))?;
         self.renderers
             .try_send(renderer)
-            .map_err(|error| SelectOutputError::LocalDevice(anyhow::anyhow!(error.to_string())))?;
+            .map_err(|error| local_output_error(anyhow::anyhow!(error.to_string())))?;
         Ok(OpenedOutput::new(mixer, None))
     }
 }
@@ -123,10 +120,10 @@ impl AudioOutputs for PulledOutputs {
     fn open(
         &self,
         target: OutputTarget,
-        effects_volume: Volume,
+        volumes: MixerVolumes,
     ) -> impl std::future::Future<Output = Result<OpenedOutput, SelectOutputError>> {
         let output = match target {
-            OutputTarget::Local => self.open_local(effects_volume),
+            OutputTarget::Local => self.open_local(volumes),
             OutputTarget::DiscordVoice(_) => Err(SelectOutputError::DiscordNotConfigured),
         };
         std::future::ready(output)
@@ -190,4 +187,12 @@ fn render_audio(receiver: &mpsc::Receiver<Renderer>, stop: &AtomicBool) -> anyho
         thread::sleep(RENDER_PERIOD);
     }
     Ok(())
+}
+
+fn local_output_error(source: anyhow::Error) -> SelectOutputError {
+    SelectOutputError::LocalDevice {
+        reason: tufo_models::playback::local_output::LocalOutputFailureReason::OpenFailed,
+        identity: None,
+        source,
+    }
 }
