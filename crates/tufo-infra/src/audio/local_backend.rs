@@ -37,6 +37,7 @@ pub(super) struct LocalBackend {
     callbacks: Arc<AtomicU64>,
     callbacks_seen: u64,
     callback_at: Instant,
+    polled_at: Option<Instant>,
     identity: LocalOutputIdentity,
     pending_failure: Option<(LocalOutputFailureReason, String, u64)>,
     totals: LocalStreamErrors,
@@ -58,6 +59,7 @@ impl Backend for LocalBackend {
                 callbacks: Arc::default(),
                 callbacks_seen: 0,
                 callback_at: Instant::now(),
+                polled_at: None,
                 identity,
                 pending_failure: None,
                 totals: LocalStreamErrors::default(),
@@ -133,7 +135,7 @@ impl LocalBackend {
                 && !self
                     .pending_failure
                     .as_ref()
-                    .is_some_and(|(reason, _, _)| invalidates_stream(*reason))
+                    .is_some_and(|(reason, _, _)| reason.invalidates_stream())
             {
                 self.pending_failure = Some((reason, error.to_string(), callbacks_at_error));
             }
@@ -143,8 +145,17 @@ impl LocalBackend {
 
     pub(super) fn failure(&mut self, now: Instant) -> Option<LocalOutputFailure> {
         self.poll();
+        // A poller that was suspended itself, as across sleep on Windows, where `Instant` keeps
+        // counting, can't tell whether callbacks stopped meanwhile.
+        if self
+            .polled_at
+            .replace(now)
+            .is_some_and(|polled_at| now.duration_since(polled_at) >= CALLBACK_TIMEOUT)
+        {
+            self.callback_at = now;
+        }
         if let Some((reason, detail, _)) = &self.pending_failure
-            && invalidates_stream(*reason)
+            && reason.invalidates_stream()
         {
             return Some(LocalOutputFailure {
                 reason: *reason,
@@ -180,13 +191,6 @@ impl LocalBackend {
     }
 }
 
-fn invalidates_stream(reason: LocalOutputFailureReason) -> bool {
-    matches!(
-        reason,
-        LocalOutputFailureReason::DeviceUnavailable | LocalOutputFailureReason::StreamInvalidated
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -200,6 +204,7 @@ mod tests {
             callbacks: Arc::default(),
             callbacks_seen: 0,
             callback_at: Instant::now(),
+            polled_at: None,
             identity: LocalOutputIdentity {
                 backend: "test".to_owned(),
                 device: Some("sink".to_owned()),
@@ -221,6 +226,19 @@ mod tests {
         assert_eq!(failure.reason, LocalOutputFailureReason::CallbackStopped);
         assert_eq!(failure.identity, Some(backend.identity.clone()));
         assert_eq!(backend.poll().reported, 0);
+    }
+
+    #[test]
+    fn a_poller_suspended_past_the_callback_timeout_waits_another_timeout_before_reporting() {
+        let mut backend = backend();
+        let now = backend.callback_at;
+        backend.callbacks.store(1, Ordering::Relaxed);
+        assert!(backend.failure(now).is_none());
+        assert!(backend.failure(now + CALLBACK_TIMEOUT * 30).is_none());
+        let resumed = now + CALLBACK_TIMEOUT * 30;
+        assert!(backend.failure(resumed + CALLBACK_TIMEOUT / 2).is_none());
+        let failure = backend.failure(resumed + CALLBACK_TIMEOUT).unwrap();
+        assert_eq!(failure.reason, LocalOutputFailureReason::CallbackStopped);
     }
 
     #[test]
@@ -258,9 +276,13 @@ mod tests {
             .unwrap();
         backend.discarded.store(3, Ordering::Relaxed);
         assert!(backend.failure(now).is_none());
+        assert!(backend.failure(now + CALLBACK_TIMEOUT / 2).is_none());
         let failure = backend.failure(now + CALLBACK_TIMEOUT).unwrap();
         assert_eq!(failure.reason, LocalOutputFailureReason::DeviceChanged);
-        assert_eq!(backend.failure(now + CALLBACK_TIMEOUT * 2), Some(failure));
+        assert_eq!(
+            backend.failure(now + CALLBACK_TIMEOUT * 3 / 2),
+            Some(failure)
+        );
         assert_eq!(backend.poll().reported, 1);
         assert_eq!(backend.poll().discarded, 3);
     }
@@ -285,7 +307,7 @@ mod tests {
                 .unwrap();
             backend.callbacks.store(3, Ordering::Relaxed);
             let failure = backend.failure(backend.callback_at).unwrap();
-            assert!(invalidates_stream(failure.reason));
+            assert!(failure.reason.invalidates_stream());
             assert_eq!(
                 failure.detail,
                 cpal::Error::with_message(reason, "invalidated").to_string()

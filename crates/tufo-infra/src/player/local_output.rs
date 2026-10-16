@@ -1,4 +1,8 @@
-use std::{sync::Arc, time::Instant};
+use std::{
+    collections::VecDeque,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use tufo_application::playback::{
     recover_local_output::RecoverLocalOutputError, select_output::SelectOutputError,
@@ -11,28 +15,79 @@ use tufo_models::playback::{
 use super::{AudioOutputs, Engine, EnginePlayer, OpenedOutput};
 use crate::audio::MixerVolumes;
 
+/// How many times the engine reopens an invalidated local output on its own within
+/// [`LOCAL_REOPENS_WINDOW`]; past that, the output waits for the user's recovery.
+const LOCAL_REOPENS_MAX: usize = 3;
+const LOCAL_REOPENS_WINDOW: Duration = Duration::from_mins(1);
+
+/// When the engine recently reopened the local output on its own.
+#[derive(Debug, Default)]
+pub(super) struct LocalReopens(VecDeque<Instant>);
+
+impl LocalReopens {
+    /// Records a reopen at `now`, unless the recent ones reached the cap.
+    fn admit(&mut self, now: Instant) -> bool {
+        while self
+            .0
+            .front()
+            .is_some_and(|at| now.duration_since(*at) >= LOCAL_REOPENS_WINDOW)
+        {
+            self.0.pop_front();
+        }
+        if self.0.len() >= LOCAL_REOPENS_MAX {
+            return false;
+        }
+        self.0.push_back(now);
+        true
+    }
+}
+
 impl<O: AudioOutputs> EnginePlayer<O> {
+    /// Retires a failed local output. An invalidated one reopens on the current default device,
+    /// which is how a default-device change arrives on Windows.
     pub(super) fn poll_local_output(&self, engine: &mut Engine) -> bool {
         if engine.target != OutputTarget::Local {
             return false;
         }
+        let now = Instant::now();
         let failure = engine
             .output
             .as_mut()
-            .and_then(|output| output.mixer.local_failure(Instant::now()));
+            .and_then(|output| output.mixer.local_failure(now));
         let Some(failure) = failure else {
             return false;
         };
         tracing::error!(?failure, "local audio output failed");
         let retired = engine.detach_output();
         engine.release_at = None;
-        engine.local_output = LocalOutputState::Failed(failure);
-        if let (Some(output), Some(player)) = (retired, self.this.upgrade()) {
-            tokio::spawn(async move {
-                player.outputs.close(output).await;
-            });
+        let reopen = failure.reason.invalidates_stream() && engine.local_reopens.admit(now);
+        engine.local_output = if reopen {
+            tracing::info!("reopening the local audio output");
+            LocalOutputState::Recovering {
+                previous_failure: Some(failure),
+            }
+        } else {
+            LocalOutputState::Failed(failure)
+        };
+        let reopen_generation = reopen.then_some(engine.output_generation);
+        if let Some(player) = self.this.upgrade() {
+            tokio::spawn(player.replace_failed_local(retired, reopen_generation));
         }
         true
+    }
+
+    /// Closes the failed output before any replacement opens, so the two never share a device.
+    async fn replace_failed_local(
+        self: Arc<Self>,
+        retired: Option<OpenedOutput>,
+        reopen_generation: Option<u64>,
+    ) {
+        if let Some(output) = retired {
+            self.outputs.close(output).await;
+        }
+        if let Some(generation) = reopen_generation {
+            self.reopen_local(generation).await;
+        }
     }
 
     pub(super) async fn start_local_recovery(&self) -> Result<(), RecoverLocalOutputError> {
@@ -123,5 +178,22 @@ impl Engine {
         }
         tracing::error!(?failure, "opening the local audio output failed");
         self.local_output = LocalOutputState::Failed(failure);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reopens_stop_at_the_cap_until_the_window_passes() {
+        let mut reopens = LocalReopens::default();
+        let start = Instant::now();
+        for attempt in 0..LOCAL_REOPENS_MAX {
+            assert!(reopens.admit(start + Duration::from_secs(attempt as u64)));
+        }
+        assert!(!reopens.admit(start + LOCAL_REOPENS_WINDOW / 2));
+        assert!(reopens.admit(start + LOCAL_REOPENS_WINDOW));
+        assert!(!reopens.admit(start + LOCAL_REOPENS_WINDOW));
     }
 }

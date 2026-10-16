@@ -30,6 +30,7 @@ use std::{
 use browser::BrowserSession;
 pub use browser::BrowserTimings;
 use layers::MusicLayer;
+use local_output::LocalReopens;
 use music::{
     Music, MusicTrack, OpenedTrack, TrackSource, open_track, play_audio_error, probe_track,
     start_position,
@@ -189,6 +190,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             target: OutputTarget::Local,
             output: None,
             local_output: LocalOutputState::Released,
+            local_reopens: LocalReopens::default(),
             output_generation: 0,
             voice: idle_voice(outputs.voice_availability(), None),
             music: None,
@@ -1361,6 +1363,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 struct Engine {
     target: OutputTarget,
     local_output: LocalOutputState,
+    local_reopens: LocalReopens,
     /// Absent until audio first plays locally, and while a voice connection is down.
     output: Option<OpenedOutput>,
     /// Advances whenever the output changes, so stale reconnection attempts end.

@@ -37,3 +37,11 @@ pub enum LocalOutputFailureReason {
     OpenFailed,
     OpenTimedOut,
 }
+
+impl LocalOutputFailureReason {
+    /// The stream plays nowhere until a new one replaces it, even if its callbacks continue.
+    #[must_use]
+    pub fn invalidates_stream(self) -> bool {
+        matches!(self, Self::DeviceUnavailable | Self::StreamInvalidated)
+    }
+}

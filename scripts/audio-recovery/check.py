@@ -327,8 +327,19 @@ def verify_default_routing(session):
     session.stop(watcher)
     states = [json.loads(line) for line in log.read_text().splitlines()]
     assert states and all(state["local_output"]["status"] == "ready" for state in states)
-    (session.artifacts / "results.json").write_text(json.dumps({"before": before, "after": after}, indent=2))
     print("Default device changed with captured audio on the new sink and no false failure", flush=True)
+
+    watcher = session.start("watch-removal", session.binaries / "tufo", "--json", "player", "watch")
+    log = session.artifacts / f"{session.sequence:02}-watch-removal.log"
+    session.run("pw-cli", "destroy", "next-default")
+    time.sleep(2.5)
+    assert session.health("ready")["sounds"], "the looping effect did not survive losing its sink"
+    removed = session.capture("default-removed", target="tufo-test-sink")
+    session.stop(watcher)
+    statuses = [json.loads(line)["local_output"]["status"] for line in log.read_text().splitlines()]
+    assert "failed" not in statuses, statuses
+    (session.artifacts / "results.json").write_text(json.dumps({"before": before, "after": after, "removed": removed, "removal_statuses": statuses}, indent=2))
+    print(f"Removing the default sink moved playback to the next one without waiting for the user: {statuses}", flush=True)
 
 
 def main():
