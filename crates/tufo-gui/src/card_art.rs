@@ -79,40 +79,19 @@ pub(crate) fn card(base: &Base<'_>, shade: Shade, width: u32, height: u32, radiu
     }
 }
 
-/// The rim's shadow on the felt set into it, as an inset shadow would cast it: heaviest along the
-/// top, lighter along the left, with a dark hairline at the edge.
+/// The rim's shadow on the felt set into it, as one inset shadow would cast it from above: heaviest
+/// along the top, with a dark hairline at the edge.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Recess {
-    /// The top shadow's blur in pixels; the other shadows scale with it. Zero casts no shadow.
+    /// The shadow's blur in pixels. Zero casts no shadow.
     pub(crate) depth: f32,
 }
 
-/// One of the rim's shadows, with its offset into the felt and its blur as fractions of the
-/// recess's depth.
-struct InsetShadow {
-    offset_x: f32,
-    offset_y: f32,
-    blur: f32,
-    opacity: f32,
-}
-
-const RECESS_SHADOWS: [InsetShadow; 2] = [
-    InsetShadow {
-        offset_x: 0.0,
-        offset_y: 5.0 / 22.0,
-        blur: 1.0,
-        opacity: 0.62,
-    },
-    InsetShadow {
-        offset_x: 4.0 / 22.0,
-        offset_y: 0.0,
-        blur: 14.0 / 22.0,
-        opacity: 0.3,
-    },
-];
-const RECESS_HAIRLINE_WIDTH: f32 = 1.0 / 22.0;
-const RECESS_HAIRLINE_OPACITY: f32 = 0.5;
-/// Past this many depths from the edge, every shadow has faded out.
+/// The shadow's drop into the felt, as a fraction of the recess's depth.
+const RECESS_SHADOW_OFFSET_Y: f32 = 0.25;
+const RECESS_SHADOW_OPACITY: f32 = 0.4;
+const RECESS_HAIRLINE_OPACITY: f32 = 0.35;
+/// Past this many depths from the edge, the shadow has faded out.
 const RECESS_REACH: f32 = 2.0;
 
 impl Recess {
@@ -126,20 +105,16 @@ impl Recess {
         if inside > RECESS_REACH * self.depth {
             return 0.0;
         }
-        let hairline_width = (RECESS_HAIRLINE_WIDTH * self.depth).max(1.0);
-        let hairline = RECESS_HAIRLINE_OPACITY * (1.0 - inside / hairline_width).clamp(0.0, 1.0);
-        let light = RECESS_SHADOWS.iter().fold(1.0 - hairline, |light, shadow| {
-            let distance = inside_distance(
-                center_x - shadow.offset_x * self.depth,
-                center_y - shadow.offset_y * self.depth,
-                width,
-                height,
-                corner_radius,
-            );
-            let deviation = shadow.blur * self.depth / 2.0;
-            light * (1.0 - shadow.opacity * blurred_edge(distance / deviation))
-        });
-        1.0 - light
+        let hairline = RECESS_HAIRLINE_OPACITY * (1.0 - inside).clamp(0.0, 1.0);
+        let shadow_distance = inside_distance(
+            center_x,
+            center_y - RECESS_SHADOW_OFFSET_Y * self.depth,
+            width,
+            height,
+            corner_radius,
+        );
+        let shadow = RECESS_SHADOW_OPACITY * blurred_edge(shadow_distance / (self.depth / 2.0));
+        1.0 - (1.0 - hairline) * (1.0 - shadow)
     }
 }
 
@@ -357,19 +332,16 @@ mod tests {
     #[test]
     fn the_recess_shades_the_top_most_and_leaves_the_middle() {
         let grey = Rgb(200, 200, 200);
-        let pixels = backdrop([grey; 3], 200, 160, 14.0, Recess { depth: 22.0 });
+        let pixels = backdrop([grey; 3], 200, 160, 14.0, Recess { depth: 14.0 });
         let red_at = |x: u32, y: u32| pixels.rgba[(y as usize * 200 + x as usize) * 4];
 
         assert_eq!(red_at(100, 80), 200);
         assert!(
             red_at(100, 3) < red_at(3, 80),
-            "the top darker than the left"
+            "the top darker than the sides"
         );
-        assert!(
-            red_at(3, 80) < red_at(196, 80),
-            "the left darker than the right"
-        );
-        assert!(red_at(196, 80) < 200, "every edge shaded");
+        assert_eq!(red_at(3, 80), red_at(196, 80), "both sides alike");
+        assert!(red_at(100, 159) < 200, "every edge shaded");
     }
 
     #[test]
