@@ -1,5 +1,6 @@
-// The sidebar, on the tray's rim: the logo, search, the pages you keep in it with the collections
-// pinned under them, and the connection. It collapses to a rail of icons and pinned paintings.
+// The sidebar, on the tray's rim: the logo, which opens Home, search, the pages you keep in it with
+// the collections pinned under them, and the connection while it's down. It collapses to a rail of
+// icons and pinned paintings.
 
 import { HomeTour } from "tours/home.slint";
 import { GuidedTours } from "tours/state.slint";
@@ -64,7 +65,7 @@ component NavRow inherits Rectangle {
 
     HorizontalLayout {
         padding-left: Theme.sidebar-icon-padding;
-        padding-right: 4px;
+        padding-right: 2px;
         spacing: Theme.sidebar-icon-spacing;
         Icon {
             y: (parent.height - self.height) / 2;
@@ -78,6 +79,7 @@ component NavRow inherits Rectangle {
             text: root.text;
             vertical-alignment: center;
             horizontal-stretch: 1;
+            overflow: elide;
             font-size: Theme.body;
             font-weight: 700;
             color: root.active ? Theme.lit : Theme.text;
@@ -97,7 +99,7 @@ component NavRow inherits Rectangle {
 
         if root.can-add: IconButton {
             y: (parent.height - self.height) / 2;
-            size: 28px;
+            size: 24px;
             icon-size: 16px;
             icon: @image-url("icons/plus.svg");
             tint: Theme.text-faint;
@@ -139,7 +141,7 @@ component CollectionLink inherits Rectangle {
     HorizontalLayout {
         // The painting centers on the pages' icons, so the titles line up with theirs.
         padding-left: Theme.sidebar-icon-padding - (Theme.pin-thumbnail-size - Theme.bar-icon-size) / 2;
-        padding-right: 10px;
+        padding-right: 8px;
         spacing: Theme.sidebar-icon-spacing - (Theme.pin-thumbnail-size - Theme.bar-icon-size) / 2;
         Image {
             y: (parent.height - self.height) / 2;
@@ -181,6 +183,37 @@ component PinHint inherits HorizontalLayout {
     }
 }
 
+// The logo, which opens Home. It grows under the pointer and gives a little when pressed, about its
+// center; each size keeps that center on a whole pixel.
+component HomeLogo inherits Rectangle {
+    callback clicked();
+    property <length> logo-size: touch.pressed ? 34px : touch.has-hover ? 36px : 32px;
+    animate logo-size {
+        duration: Motion.logo-grow;
+        easing: ease-out;
+    }
+    width: 40px;
+    height: 40px;
+    accessible-role: button;
+    accessible-label: @tr("Home");
+    accessible-description: PlayerView.something-plays ? @tr("Awake while something plays") : @tr("Asleep while nothing plays");
+    accessible-action-default => { root.clicked(); }
+    Logo {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        width: root.logo-size;
+        height: root.logo-size;
+        asleep: !PlayerView.something-plays;
+    }
+
+    touch := TouchArea {
+        mouse-cursor: MouseCursor.pointer;
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
 component SidebarForm inherits Rectangle {
     in property <bool> shown;
     opacity: root.shown ? 1 : 0;
@@ -200,7 +233,6 @@ component FullSidebar inherits SidebarForm {
     callback open-page(Page, string);
     callback collapse();
     callback open-search();
-    callback open-settings();
     callback add(CollectionKind);
     property <Page> page: Navigation.page;
     property <SidebarHiddenPages> hidden: Navigation.hidden-pages;
@@ -228,7 +260,7 @@ component FullSidebar inherits SidebarForm {
     VerticalLayout {
         HorizontalLayout {
             height: Theme.title-row-height;
-            padding-right: 8px;
+            padding-right: Theme.sidebar-row-padding;
             alignment: end;
             IconButton {
                 y: (parent.height - self.height) / 2;
@@ -263,7 +295,7 @@ component FullSidebar inherits SidebarForm {
 
                 HorizontalLayout {
                     padding-left: Theme.sidebar-icon-padding;
-                    padding-right: 12px;
+                    padding-right: 10px;
                     spacing: Theme.sidebar-icon-spacing;
                     Icon {
                         y: (parent.height - self.height) / 2;
@@ -277,6 +309,7 @@ component FullSidebar inherits SidebarForm {
                         text: @tr("Search");
                         vertical-alignment: center;
                         horizontal-stretch: 1;
+                        overflow: elide;
                         font-size: Theme.body-small;
                         color: Theme.text-faint;
                     }
@@ -410,46 +443,30 @@ component FullSidebar inherits SidebarForm {
                 }
             }
         }
-        VerticalLayout {
-            padding-left: Theme.sidebar-row-padding;
+        if !Session.connected: HorizontalLayout {
+            padding-left: Theme.sidebar-row-padding + Theme.sidebar-icon-padding;
             padding-right: Theme.sidebar-row-padding;
             padding-top: 6px;
-            padding-bottom: 6px;
-            spacing: 4px;
-            HorizontalLayout {
-                padding-left: Theme.sidebar-icon-padding - (Theme.bar-button-size - Theme.bar-icon-size) / 2;
-                spacing: Theme.sidebar-icon-spacing - (Theme.bar-button-size - Theme.bar-icon-size) / 2;
-                IconButton {
-                    size: Theme.bar-button-size;
-                    icon-size: Theme.bar-icon-size;
-                    icon: @image-url("icons/settings.svg");
-                    tooltip: @tr("Settings");
-                    tooltip-enabled: root.shown;
-                    clicked => {
-                        root.open-settings();
-                    }
+            padding-bottom: 12px;
+            spacing: Theme.sidebar-icon-spacing;
+            // The dot stands in the icons' column, so the words line up with the pages' names.
+            Rectangle {
+                width: Theme.bar-icon-size;
+                Rectangle {
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 4px;
+                    background: Theme.warning;
                 }
+            }
 
-                HorizontalLayout {
-                    horizontal-stretch: 1;
-                    spacing: 8px;
-                    if !Session.connected: Text {
-                        text: Session.connection-text;
-                        vertical-alignment: center;
-                        horizontal-stretch: 1;
-                        overflow: elide;
-                        font-size: Theme.caption;
-                        color: Theme.text-faint;
-                    }
-
-                    if !Session.connected: Rectangle {
-                        y: (parent.height - self.height) / 2;
-                        width: 8px;
-                        height: 8px;
-                        border-radius: 4px;
-                        background: Theme.warning;
-                    }
-                }
+            Text {
+                text: Session.connection-text;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
+                overflow: elide;
+                font-size: Theme.caption;
+                color: Theme.text-faint;
             }
         }
     }
@@ -579,7 +596,6 @@ component Rail inherits SidebarForm {
     callback open-page(Page, string);
     callback expand();
     callback open-search();
-    callback open-settings();
     property <Page> page: Navigation.page;
     property <SidebarHiddenPages> hidden: Navigation.hidden-pages;
     width: Theme.rail-width;
@@ -715,21 +731,10 @@ component Rail inherits SidebarForm {
             }
         }
 
-        HorizontalLayout {
-            alignment: center;
-            IconButton {
-                size: Theme.bar-button-size;
-                icon-size: Theme.bar-icon-size;
-                icon: @image-url("icons/settings.svg");
-                tooltip: @tr("Settings");
-                tooltip-enabled: root.shown;
-                clicked => {
-                    root.open-settings();
-                }
-            }
-        }
-
+        // The connection, while it's down; the expanded sidebar says why.
         if !Session.connected: HorizontalLayout {
+            padding-top: 6px;
+            padding-bottom: 4px;
             alignment: center;
             Rectangle {
                 width: 8px;
@@ -748,7 +753,6 @@ export component Sidebar inherits Rectangle {
     callback page-opened();
     callback toggle();
     callback open-search();
-    callback open-settings();
     callback add(CollectionKind);
     width: root.expanded ? Theme.sidebar-width : Theme.rail-width;
     animate width {
@@ -766,14 +770,13 @@ export component Sidebar inherits Rectangle {
         height: Theme.title-row-height;
     }
 
-    Logo {
+    HomeLogo {
         x: (Theme.rail-width - self.width) / 2;
-        width: 32px;
-        height: 32px;
         y: (Theme.title-row-height - self.height) / 2;
-        asleep: !PlayerView.something-plays;
-        accessible-role: image;
-        accessible-label: PlayerView.something-plays ? @tr("Awake while something plays") : @tr("Asleep while nothing plays");
+        clicked => {
+            Actions.open-page(Page.home, "");
+            root.page-opened();
+        }
     }
 
     FullSidebar {
@@ -788,9 +791,6 @@ export component Sidebar inherits Rectangle {
         }
         open-search => {
             root.open-search();
-        }
-        open-settings => {
-            root.open-settings();
         }
         add(kind) => {
             root.add(kind);
@@ -809,9 +809,6 @@ export component Sidebar inherits Rectangle {
         }
         open-search => {
             root.open-search();
-        }
-        open-settings => {
-            root.open-settings();
         }
     }
 

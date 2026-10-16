@@ -255,7 +255,8 @@ export global Session {
     in property <bool> discord-disabled;
     in property <string> voice-status;
     in property <VoiceBadge> voice-badge;
-    in property <CurrentOutput> current-output;
+    // Local until the server says otherwise, so the output chip never appears without its name.
+    in property <CurrentOutput> current-output: { kind: OutputRowKind.local, label: @tr("This Computer") };
     in-out property <bool> drawer-pinned: true;
     in-out property <bool> player-collapsed;
     // The window shows only the player, as a small widget.

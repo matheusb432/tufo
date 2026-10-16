@@ -83,10 +83,12 @@ export global Theme {
     out property <length> radius-felt: 14px;
     // How far the rim's shadow reaches across the felt.
     out property <length> felt-recess-depth: 14px;
-    out property <length> sidebar-width: 232px;
+    out property <length> sidebar-width: 184px;
     out property <length> rail-width: 64px;
     // The narrowest page the expanded sidebar sits beside rather than over.
     out property <length> page-width-min: 560px;
+    // The narrowest window whose player lays its controls out in one row.
+    out property <length> dock-wide-width-min: 912px;
     out property <length> window-width-min: 440px;
     out property <length> window-height-min: 380px;
     // Slint treats this limit as unbounded.
@@ -99,9 +101,9 @@ export global Theme {
     out property <length> title-row-height: 44px;
     out property <length> bar-button-size: 36px;
     out property <length> bar-icon-size: 20px;
-    out property <length> sidebar-row-padding: 8px;
+    out property <length> sidebar-row-padding: 6px;
     out property <length> sidebar-icon-padding: (Theme.rail-width - Theme.bar-icon-size) / 2 - Theme.sidebar-row-padding;
-    out property <length> sidebar-icon-spacing: 10px;
+    out property <length> sidebar-icon-spacing: 8px;
     out property <length> sidebar-label-padding: Theme.sidebar-icon-padding + Theme.bar-icon-size + Theme.sidebar-icon-spacing;
     // A pinned collection's painting, in the sidebar and on the rail.
     out property <length> pin-thumbnail-size: 26px;
@@ -114,6 +116,8 @@ export global Theme {
     out property <length> window-buttons-width: 3 * Theme.window-button-width + 2 * Theme.window-buttons-padding;
     out property <length> window-buttons-height: Theme.window-button-height + 2 * Theme.window-buttons-padding;
     out property <length> window-button-icon-size: 15px;
+    // The output chip and the settings button beside the window's capsule.
+    out property <length> title-control-height: Theme.window-buttons-height + 2px;
     out property <length> output-chip-width-max: 240px;
 
     // Alegreya Sans sets small for its size, so the scale runs larger than a geometric face's.
@@ -139,6 +143,7 @@ export global Motion {
     out property <duration> sidebar-fade-in-delay: 100ms;
     out property <duration> hover: 150ms;
     out property <duration> logo-blink: 350ms;
+    out property <duration> logo-grow: 160ms;
     // A `Presence`: an overlay, or the window's form, arriving and leaving.
     out property <duration> tour-travel: 240ms;
     out property <duration> presence-enter: 180ms;

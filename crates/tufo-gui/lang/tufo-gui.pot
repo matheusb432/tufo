@@ -923,8 +923,12 @@ msgstr ""
 msgid "See all {0}"
 msgstr ""
 
-#: ui/dialogs.slint ui/sidebar.slint
+#: ui/dialogs.slint
 msgid "Settings"
+msgstr ""
+
+#: ui/app.slint
+msgid "Settings (Ctrl+,)"
 msgstr ""
 
 #: src/sound_icons.rs
@@ -1129,7 +1133,7 @@ msgstr ""
 msgid "There are no playable files in this collection."
 msgstr ""
 
-#: src/presentation.rs
+#: ui/state.slint src/presentation.rs
 msgid "This Computer"
 msgstr ""
 

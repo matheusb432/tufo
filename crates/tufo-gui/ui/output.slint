@@ -146,7 +146,7 @@ export component OutputChip inherits Rectangle {
     property <bool> channel: root.output.kind == OutputRowKind.channel;
     property <string> title: root.output.guild-name != "" ? @tr("{0} in {1}", root.output.label, root.output.guild-name) : root.output.label;
     property <bool> tooltip-dismissed;
-    height: Theme.window-buttons-height + 2px;
+    height: Theme.title-control-height;
     width: min(layout.preferred-width, Theme.output-chip-width-max);
     border-radius: self.height / 2;
     background: touch.has-hover ? Theme.hover : Theme.window-controls;

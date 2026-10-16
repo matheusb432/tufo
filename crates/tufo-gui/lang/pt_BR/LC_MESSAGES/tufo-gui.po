@@ -923,9 +923,13 @@ msgstr "Buscar em tudo (Ctrl+Shift+F)"
 msgid "See all {0}"
 msgstr "Ver tudo ({0})"
 
-#: ui/dialogs.slint ui/sidebar.slint
+#: ui/dialogs.slint
 msgid "Settings"
 msgstr "Configurações"
+
+#: ui/app.slint
+msgid "Settings (Ctrl+,)"
+msgstr "Configurações (Ctrl+,)"
 
 #: src/sound_icons.rs
 msgid "Shield"
@@ -1129,7 +1133,7 @@ msgstr "O servidor está indisponível. O Tufo vai reconectar em instantes."
 msgid "There are no playable files in this collection."
 msgstr "Não há arquivos que possam ser reproduzidos nesta coleção."
 
-#: src/presentation.rs
+#: ui/state.slint src/presentation.rs
 msgid "This Computer"
 msgstr "Este computador"
 
