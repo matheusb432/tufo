@@ -29,6 +29,11 @@ const EXIT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Starts browser hosts.
 pub trait BrowserLauncher: Send + Sync + 'static {
+    /// Whether this installation has a host to launch.
+    fn is_available(&self) -> bool {
+        true
+    }
+
     fn launch(&self) -> Result<LaunchedBrowser, LaunchBrowserError>;
 }
 
@@ -37,6 +42,10 @@ pub trait BrowserLauncher: Send + Sync + 'static {
 pub struct UnavailableBrowser;
 
 impl BrowserLauncher for UnavailableBrowser {
+    fn is_available(&self) -> bool {
+        false
+    }
+
     fn launch(&self) -> Result<LaunchedBrowser, LaunchBrowserError> {
         Err(LaunchBrowserError::Unavailable)
     }

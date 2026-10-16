@@ -162,6 +162,8 @@ async fn layer_rpcs_reject_invalid_and_unknown_songs_and_ignore_stopped_layers()
 #[tokio::test]
 async fn watching_starts_idle_on_local_output_and_ends_when_the_server_drains() -> anyhow::Result<()>
 {
+    use tufo_models::playback::browser::{BrowserPlayback, BrowserStatus, BrowserStopReason};
+
     let server = TestServer::start().await?;
     let mut states = server.client()?.watch_player().await?;
 
@@ -170,7 +172,14 @@ async fn watching_starts_idle_on_local_output_and_ends_when_the_server_drains() 
     let after_drain = tokio::time::timeout(TEST_TIMEOUT, states.next()).await?;
     stop.await??;
 
-    assert_eq!(first, Some(PlayerState::default()));
+    let idle_without_a_browser = PlayerState {
+        browser: BrowserPlayback {
+            status: BrowserStatus::Stopped(BrowserStopReason::Unavailable),
+            ..BrowserPlayback::default()
+        },
+        ..PlayerState::default()
+    };
+    assert_eq!(first, Some(idle_without_a_browser));
     assert!(after_drain.is_none_or(|state| state.is_err()));
     Ok(())
 }
@@ -372,14 +381,15 @@ async fn queue_rpcs_reject_invalid_unknown_and_missing_songs() -> anyhow::Result
 }
 
 #[tokio::test]
-async fn opening_a_missing_browser_is_unavailable_and_closing_succeeds() -> anyhow::Result<()> {
+async fn a_missing_browser_stays_unavailable_and_closing_succeeds() -> anyhow::Result<()> {
     use tufo_models::playback::browser::{BrowserStatus, BrowserStopReason};
 
     let server = TestServer::start().await?;
     let client = server.client()?;
 
-    let opened = client.open_browser().await;
     let mut states = client.watch_player().await?;
+    let initial = states.next().await.transpose()?.unwrap();
+    let opened = client.open_browser().await;
     let stopped = states.next().await.transpose()?.unwrap();
     let closed = client.close_browser().await;
     let after_close = states.next().await.transpose()?.unwrap();
@@ -393,13 +403,12 @@ async fn opening_a_missing_browser_is_unavailable_and_closing_succeeds() -> anyh
     let adjusted = states.next().await.transpose()?.unwrap();
     server.stop().await?;
 
+    let unavailable = BrowserStatus::Stopped(BrowserStopReason::Unavailable);
+    assert_eq!(initial.browser.status, unavailable);
     assert_eq!(status_code(opened), Some(Code::Unavailable));
-    assert_eq!(
-        stopped.browser.status,
-        BrowserStatus::Stopped(BrowserStopReason::Unavailable)
-    );
+    assert_eq!(stopped.browser.status, unavailable);
     assert!(closed.is_ok());
-    assert_eq!(after_close.browser.status, BrowserStatus::Closed);
+    assert_eq!(after_close.browser.status, unavailable);
     assert_eq!(adjusted.browser.volume, Volume::try_new(0.4)?);
     assert!(adjusted.browser.muted);
     Ok(())

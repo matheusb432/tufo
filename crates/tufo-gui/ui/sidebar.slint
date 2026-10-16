@@ -325,7 +325,7 @@ component FullSidebar inherits SidebarForm {
                     }
                 }
 
-                if !root.hidden.browser: NavRow {
+                if !root.hidden.browser && BrowserView.available: NavRow {
                     icon: @image-url("icons/globe.svg");
                     text: @tr("Browser");
                     active: root.page == Page.browser;
@@ -643,7 +643,7 @@ component Rail inherits SidebarForm {
                         }
                     }
                 }
-                if !root.hidden.browser: HorizontalLayout {
+                if !root.hidden.browser && BrowserView.available: HorizontalLayout {
                     alignment: center;
                     RailButton {
                         icon: @image-url("icons/globe.svg");

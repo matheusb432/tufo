@@ -9,7 +9,7 @@ import { TourButton } from "tours/button.slint";
 import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
-    Actions, Art, BackgroundLabel, Backgrounds, CollectionBackground, CollectionKind, LibraryView,
+    Actions, Art, BackgroundLabel, Backgrounds, BrowserView, CollectionBackground, CollectionKind, LibraryView,
     KenkuImportView, Navigation, PlaylistChoice, Session, SidebarPage, SoundIcons,
 } from "state.slint";
 import {
@@ -911,12 +911,14 @@ export component SettingsDialog inherits DialogFrame {
             }
         }
 
-        SettingsDivider { }
-        SwitchSetting {
-            title: @tr("Browser");
-            checked: !Navigation.hidden-pages.browser;
-            toggled(checked) => {
-                Actions.set-sidebar-page-hidden(SidebarPage.browser, !checked);
+        if BrowserView.available: VerticalLayout {
+            SettingsDivider { }
+            SwitchSetting {
+                title: @tr("Browser");
+                checked: !Navigation.hidden-pages.browser;
+                toggled(checked) => {
+                    Actions.set-sidebar-page-hidden(SidebarPage.browser, !checked);
+                }
             }
         }
 

@@ -212,7 +212,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             release_at: None,
             preview: None,
             last_preview_id: 0,
-            browser: BrowserSession::default(),
+            browser: BrowserSession::new(browser_launcher.is_available()),
         };
         let state = watch::Sender::new(engine.snapshot());
         let (browser_notices, browser_notice_receiver) = tokio::sync::mpsc::unbounded_channel();

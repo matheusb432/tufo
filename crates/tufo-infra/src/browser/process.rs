@@ -62,8 +62,12 @@ impl ProcessBrowserLauncher {
     }
 }
 
-/// The host beside this executable, following a link to it as the GUI and CLI do.
+/// The host beside this executable, following a link to it as the GUI and CLI do. Only Linux
+/// runs the browser; elsewhere the host executable is a stub that reports so.
 fn installed_host() -> Option<PathBuf> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
     let name = format!("{HOST_EXECUTABLE_NAME}{}", std::env::consts::EXE_SUFFIX);
     let executable = std::env::current_exe().ok()?;
     let executable = std::fs::canonicalize(&executable).unwrap_or(executable);
@@ -71,6 +75,10 @@ fn installed_host() -> Option<PathBuf> {
 }
 
 impl BrowserLauncher for ProcessBrowserLauncher {
+    fn is_available(&self) -> bool {
+        self.executable.is_some()
+    }
+
     fn launch(&self) -> Result<LaunchedBrowser, LaunchBrowserError> {
         let executable = self
             .executable

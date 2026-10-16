@@ -59,6 +59,19 @@ pub(super) struct BrowserSession {
 }
 
 impl BrowserSession {
+    /// A session for an installation without a browser reports it unavailable from the start.
+    pub(super) fn new(available: bool) -> Self {
+        let status = if available {
+            BrowserStatus::Closed
+        } else {
+            BrowserStatus::Stopped(BrowserStopReason::Unavailable)
+        };
+        Self {
+            status,
+            ..Self::default()
+        }
+    }
+
     pub(super) fn playback(&self) -> BrowserPlayback {
         BrowserPlayback {
             status: self.status,
@@ -85,7 +98,10 @@ impl BrowserSession {
         if let Some(host) = self.host.take() {
             self.exiting.push(host.close());
         }
-        self.status = status;
+        // Closing a browser this installation lacks leaves it unavailable.
+        if self.status != BrowserStatus::Stopped(BrowserStopReason::Unavailable) {
+            self.status = status;
+        }
         self.audible = false;
         self.view_attached = false;
         self.started_at = None;

@@ -223,7 +223,10 @@ export struct BrowserTabView {
 }
 
 export global BrowserView {
-    in property <BrowserState> state;
+    // Until the server reports, assume a browser wherever one is built.
+    in property <BrowserState> state: Platform.os == OperatingSystemType.linux ? BrowserState.closed : BrowserState.unavailable;
+    // An installation without a browser hides it from the sidebar and Settings.
+    out property <bool> available: self.state != BrowserState.unavailable;
     in property <[BrowserTabView]> tabs;
     // The selected tab's id, or -1.
     in property <int> selected-tab: -1;
