@@ -69,6 +69,8 @@ export component SearchPalette inherits Rectangle {
         if self.open {
             results.content-y = 0px;
             query.focus();
+            // The last search stays for another look, and typing replaces it.
+            query.select-all();
         }
     }
 
@@ -154,7 +156,8 @@ export component SearchPalette inherits Rectangle {
                             Actions.palette-query-changed(text);
                         }
                     }
-                    TourButton { y: (parent.height - self.height) / 2; guide: SearchTour.guide; label: @tr("Search everything"); available: root.open; }
+                    // Centered on the field, below its label.
+                    TourButton { y: parent.height - (Theme.field-height + self.height) / 2; guide: SearchTour.guide; label: @tr("Search everything"); available: root.open; }
                 }
 
                 if Search.palette-query != "" && Search.results.length == 0: Text {

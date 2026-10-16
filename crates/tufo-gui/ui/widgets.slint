@@ -282,6 +282,9 @@ export component TextField inherits VerticalLayout {
     property <string> saved-secret-mask: "●●●●●●●●●●●●";
     forward-focus: input;
     spacing: 6px;
+    public function select-all() {
+        input.select-all();
+    }
     if root.label != "": Text {
         text: root.label;
         font-size: Theme.caption;
@@ -289,7 +292,7 @@ export component TextField inherits VerticalLayout {
         color: input.has-focus ? Theme.accent : Theme.text-secondary;
     }
     Rectangle {
-        height: 44px;
+        height: Theme.field-height;
         border-radius: Theme.radius-row;
         background: Theme.field;
         border-width: input.has-focus ? 2px : 1px;
