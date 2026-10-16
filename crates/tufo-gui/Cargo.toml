@@ -19,7 +19,6 @@ fastrand = { workspace = true }
 gettext = "0.4.0"
 image = { workspace = true }
 jiff = { workspace = true }
-nucleo-matcher = { workspace = true }
 rfd = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true, optional = true }
@@ -34,6 +33,7 @@ tufo-application = { workspace = true }
 tufo-client = { workspace = true }
 tufo-local-transport = { workspace = true }
 tufo-models = { workspace = true }
+unicode-normalization = { workspace = true }
 uuid = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]

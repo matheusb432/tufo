@@ -901,7 +901,11 @@ fn generated_titles_localize_before_filtering_and_natural_ordering() {
             .collect::<Vec<_>>(),
         ["Rain", "Track 2", "Track 10"]
     );
-    assert_eq!(crate::search::search(&library, "rain")[0].title, "Rain");
+    let query = crate::search::PaletteQuery::parse("rain").unwrap();
+    assert_eq!(
+        crate::search::SearchIndex::new(&library).search(&query)[0].title,
+        "Rain"
+    );
 }
 
 #[test]

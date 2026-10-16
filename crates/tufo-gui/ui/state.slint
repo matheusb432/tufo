@@ -188,9 +188,10 @@ export struct SoundChip {
     looping: bool,
 }
 
+export enum SearchResultKind { track, sound, playlist, soundboard }
+
 export struct SearchResult {
-    // "Music", "Sounds", or "Collections".
-    section: string,
+    kind: SearchResultKind,
     title: string,
     subtitle: string,
 }

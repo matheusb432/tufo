@@ -7,7 +7,10 @@ use tufo_client::{
     desktop::{SidebarPage, TourVisibility},
     library::{Background, ImportReport, KenkuImportStatus},
 };
-use tufo_models::{kenku_import::KenkuImportState, library::SoundIcon};
+use tufo_models::{
+    kenku_import::KenkuImportState,
+    library::{CollectionKind, SoundIcon},
+};
 
 use crate::{
     backgrounds,
@@ -17,7 +20,7 @@ use crate::{
         self, CardView, CollectionPageView, CurrentOutputView, DrawerView, LibraryPageView,
         NavItemView, OutputRowView, PageKind, PlayerBarView, SongRowView, SongsPageView,
     },
-    search::PaletteResult,
+    search::{PaletteResult, PaletteTarget},
     settings::{DesktopSettings, QuitBehavior},
     sound_icons,
     ui::{
@@ -25,9 +28,9 @@ use crate::{
         BrowserPointer, BrowserState, BrowserTabView, BrowserView, CollectionBackground,
         CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge,
         LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation, OutputRow, OutputRowKind,
-        Page, PlayerView, PlaylistChoice, Search, SearchResult, Session, SidebarHiddenPages,
-        SongFolder, SongLoopImportRow, SongLoopImportRowState, SongLoopImportView, SongRow,
-        SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
+        Page, PlayerView, PlaylistChoice, Search, SearchResult, SearchResultKind, Session,
+        SidebarHiddenPages, SongFolder, SongLoopImportRow, SongLoopImportRowState,
+        SongLoopImportView, SongRow, SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
     },
 };
 
@@ -571,7 +574,18 @@ pub(crate) fn palette(window: &slint::Weak<AppWindow>, results: &[PaletteResult]
     let results = results
         .iter()
         .map(|result| SearchResult {
-            section: result.section.into(),
+            kind: match result.target {
+                PaletteTarget::Track { .. } => SearchResultKind::Track,
+                PaletteTarget::Sound { .. } => SearchResultKind::Sound,
+                PaletteTarget::Collection {
+                    kind: CollectionKind::Playlist,
+                    ..
+                } => SearchResultKind::Playlist,
+                PaletteTarget::Collection {
+                    kind: CollectionKind::Soundboard,
+                    ..
+                } => SearchResultKind::Soundboard,
+            },
             title: result.title.as_str().into(),
             subtitle: result.subtitle.as_str().into(),
         })

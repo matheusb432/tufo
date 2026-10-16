@@ -5,7 +5,7 @@ import { GuidedTours, TourScroll } from "tours/state.slint";
 import { TourButton } from "tours/button.slint";
 import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
-import { Actions, Search, SearchResult } from "state.slint";
+import { Actions, Search, SearchResult, SearchResultKind } from "state.slint";
 import { Icon, Presence, Scrim, TextField } from "widgets.slint";
 
 component ResultRow inherits Rectangle {
@@ -23,7 +23,10 @@ component ResultRow inherits Rectangle {
             y: (parent.height - self.height) / 2;
             width: 20px;
             height: 20px;
-            source: root.result.section == @tr("Sounds") ? @image-url("icons/volume-2.svg") : root.result.section == @tr("Music") ? @image-url("icons/music.svg") : @image-url("icons/folder.svg");
+            source: root.result.kind == SearchResultKind.sound ? @image-url("icons/volume-2.svg")
+                : root.result.kind == SearchResultKind.track ? @image-url("icons/music.svg")
+                : root.result.kind == SearchResultKind.playlist ? @image-url("icons/list-music.svg")
+                : @image-url("icons/layout-grid.svg");
             tint: root.selected ? Theme.accent : Theme.text-secondary;
         }
 

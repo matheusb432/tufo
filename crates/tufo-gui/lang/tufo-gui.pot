@@ -245,10 +245,6 @@ msgstr ""
 msgid "Collapse the player"
 msgstr ""
 
-#: src/search.rs
-msgid "Collections"
-msgstr ""
-
 #: ui/gallery.slint src/presentation.rs
 msgid "Colors drawn from the collection"
 msgstr ""
@@ -675,10 +671,6 @@ msgstr ""
 msgid "Mountain"
 msgstr ""
 
-#: ui/search.slint src/search.rs
-msgid "Music"
-msgstr ""
-
 #: ui/dock.slint
 msgid "Mute"
 msgstr ""
@@ -1001,7 +993,7 @@ msgstr ""
 msgid "Soundboards"
 msgstr ""
 
-#: ui/dock.slint ui/search.slint src/search.rs
+#: ui/dock.slint
 msgid "Sounds"
 msgstr ""
 

@@ -245,10 +245,6 @@ msgstr "Recolher (Ctrl+B)"
 msgid "Collapse the player"
 msgstr "Recolher o player"
 
-#: src/search.rs
-msgid "Collections"
-msgstr "Coleções"
-
 #: ui/gallery.slint src/presentation.rs
 msgid "Colors drawn from the collection"
 msgstr "Cores da coleção"
@@ -675,10 +671,6 @@ msgstr "Mais"
 msgid "Mountain"
 msgstr "Montanha"
 
-#: ui/search.slint src/search.rs
-msgid "Music"
-msgstr "Músicas"
-
 #: ui/dock.slint
 msgid "Mute"
 msgstr "Silenciar"
@@ -1001,7 +993,7 @@ msgstr "Painel de sons"
 msgid "Soundboards"
 msgstr "Painéis de sons"
 
-#: ui/dock.slint ui/search.slint src/search.rs
+#: ui/dock.slint
 msgid "Sounds"
 msgstr "Sons"
 

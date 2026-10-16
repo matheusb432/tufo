@@ -42,7 +42,7 @@ use crate::{
     media_controls::MediaState,
     presentation::{self, Navigation, PageKind, PageQueries},
     render,
-    search::{self, PaletteResult, PaletteTarget},
+    search::{PaletteQuery, PaletteResult, PaletteTarget, SearchIndex},
     server_process,
     settings::{DesktopSettings, QuitBehavior, SettingsFile},
     tray::{TrayMusic, TrayPlayback, TraySounds},
@@ -84,6 +84,8 @@ struct Shared {
     song_search: String,
     /// The song the Add to playlist dialog adds.
     adding_song: Option<AudioFileId>,
+    /// The palette's index of `snapshot`, built by the first search after the library changes.
+    search_index: Option<SearchIndex>,
     palette_results: Vec<PaletteResult>,
     /// The newest volume each slider asked for, not yet sent.
     pending_volumes: Vec<(VolumeTarget, Volume)>,
@@ -284,7 +286,10 @@ impl Controller {
             match result {
                 Ok(mut snapshot) => {
                     presentation::localize_snapshot(&mut snapshot);
-                    self.lock().snapshot = Arc::new(snapshot);
+                    let mut shared = self.lock();
+                    shared.snapshot = Arc::new(snapshot);
+                    shared.search_index = None;
+                    drop(shared);
                     render::retry_missing_backgrounds(&self.window);
                     self.render_library();
                     // The player names the playing collection and shows its background.
@@ -392,11 +397,11 @@ impl Controller {
     }
 
     fn refresh_palette(&self) {
-        let query = self.window.upgrade().map(|window| {
-            window
-                .global::<crate::ui::Search>()
-                .get_palette_query()
-                .to_string()
+        let query = self.window.upgrade().and_then(|window| {
+            let search = window.global::<crate::ui::Search>();
+            search
+                .get_palette_open()
+                .then(|| search.get_palette_query().to_string())
         });
         if let Some(query) = query {
             self.search_palette(&query);
@@ -432,7 +437,14 @@ impl Controller {
     }
 
     pub(crate) fn search_palette(&self, query: &str) {
-        let results = search::search(&self.lock().snapshot, query);
+        let results = PaletteQuery::parse(query).map_or_else(Vec::new, |query| {
+            let mut shared = self.lock();
+            let shared = &mut *shared;
+            shared
+                .search_index
+                .get_or_insert_with(|| SearchIndex::new(&shared.snapshot))
+                .search(&query)
+        });
         render::palette(&self.window, &results);
         self.lock().palette_results = results;
     }
