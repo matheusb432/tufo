@@ -97,15 +97,18 @@ component NavRow inherits Rectangle {
             }
         }
 
-        if root.can-add: IconButton {
-            y: (parent.height - self.height) / 2;
-            size: 24px;
-            icon-size: 16px;
-            icon: @image-url("icons/plus.svg");
-            tint: Theme.text-faint;
-            tooltip: root.add-label;
-            clicked => {
-                root.add();
+        // The button's hover circle overhangs its slot, leaving the name room for "Painéis de sons".
+        if root.can-add: Rectangle {
+            width: 16px;
+            IconButton {
+                size: 20px;
+                icon-size: 16px;
+                icon: @image-url("icons/plus.svg");
+                tint: Theme.text-faint;
+                tooltip: root.add-label;
+                clicked => {
+                    root.add();
+                }
             }
         }
     }
