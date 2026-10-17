@@ -62,10 +62,10 @@ fn place(workspace_root: &Path, release_dir: &Path) -> Result<PathBuf> {
     anyhow::bail!("installing supports Linux, macOS, and Windows")
 }
 
-/// Closes the session's Tufo and its server, then installs the release build over them.
+/// Closes the session's GUI and its server, then installs the release build over them.
 pub(crate) fn update(workspace_root: &Path, release_dir: &Path) -> Result<()> {
     install(workspace_root, release_dir)?;
-    println!("open Tufo again to use the new build");
+    println!("open the app again to use the new build");
     Ok(())
 }
 

@@ -1,4 +1,4 @@
-//! Concrete audio, Discord, and data providers for Tufo.
+//! Concrete audio, Discord, and data providers.
 
 pub mod audio;
 pub mod browser;

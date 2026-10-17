@@ -1,4 +1,4 @@
-"""Renders the preset backgrounds Tufo embeds from full-resolution originals.
+"""Renders the preset backgrounds the GUI embeds from full-resolution originals.
 
 Each original becomes two lossy WebPs in sRGB, stripped of metadata: a large rendition for the
 open collection's page and a small one for cards and the background gallery.

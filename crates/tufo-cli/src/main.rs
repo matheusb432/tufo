@@ -1,4 +1,4 @@
-//! Tufo's command-line process root; all server requests go through tufo-client.
+//! Command-line process root; all server requests go through tufo-client.
 
 mod api;
 mod command;

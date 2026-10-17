@@ -17,5 +17,4 @@ Download one installer and its matching `.sha256` file:
 
 [Installation, update, removal, checksums, and platform limits](https://github.com/matheusb432/tufo/blob/0.2.0/release/INSTALL.md)
 are documented for this tag. The Windows installer and macOS package are unsigned;
-the macOS app bundle has an ad hoc signature and is not notarized. The package
-smoke tests do not establish audible local or Discord playback.
+the macOS app bundle has an ad hoc signature and is not notarized.

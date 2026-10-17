@@ -1,4 +1,4 @@
-//! Authors Tufo's migration catalogue from the registered Toasty models.
+//! Authors the migration catalogue from the registered Toasty models.
 //!
 //! `tufo-server` applies the catalogue at startup; this tool only writes it.
 

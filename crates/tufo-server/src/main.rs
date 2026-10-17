@@ -92,7 +92,7 @@ fn limit_malloc_arenas() {
 }
 
 /// After freeing a large block, glibc serves blocks of that size from heaps it rarely shrinks, so
-/// decoded sounds and decode buffers freed while idle stayed resident. Mapping each large block
+/// decoded sounds and decode buffers freed while idle stay resident. Mapping each large block
 /// separately returns it to the system when freed.
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 fn map_large_allocations_separately() {
@@ -103,8 +103,7 @@ fn map_large_allocations_separately() {
     }
 }
 
-/// Opens the log in Tufo's state directory, or its local data directory where the platform has
-/// no state directory, rotating a log that grew too large.
+/// Opens the log in [`tufo_server::log_directory`], rotating a log that grew too large.
 fn open_log_file() -> Option<(File, PathBuf)> {
     let folder = tufo_server::log_directory()?;
     std::fs::create_dir_all(&folder).ok()?;

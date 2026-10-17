@@ -1,4 +1,4 @@
-//! A local stream owned by Tufo: recovery must retain its selected host and target.
+//! A local stream this crate owns: recovery must retain its selected host and target.
 
 use std::{
     sync::{

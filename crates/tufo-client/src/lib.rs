@@ -1,4 +1,4 @@
-//! Typed client for the local Tufo server, speaking gRPC over its user-private local endpoint.
+//! Typed client for the local server, speaking gRPC over its user-private local endpoint.
 //!
 //! Callers exchange domain values only; Prost messages and the transport stay inside this crate.
 

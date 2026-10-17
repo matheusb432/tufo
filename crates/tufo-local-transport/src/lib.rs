@@ -1,8 +1,8 @@
-//! User-private IPC between the Tufo GUI and `tufo-server` or the browser host, and from a later
+//! User-private IPC between the GUI and `tufo-server` or the browser host, and from a later
 //! GUI launch to the running GUI: Unix sockets in a private directory, or named pipes only the
 //! current user can open on Windows.
 //!
-//! Adapted from pwf's `pwf-local-transport`, which shares this repository's author.
+//! Adapted from pwf's `pwf-local-transport`.
 
 #[cfg(unix)]
 mod unix;

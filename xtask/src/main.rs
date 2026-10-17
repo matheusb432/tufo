@@ -15,7 +15,7 @@ mod windows_installer;
 #[derive(Parser)]
 #[command(
     version,
-    about = "Tufo repository automation",
+    about = "Repository automation",
     styles = clap_cargo::style::CLAP_STYLING
 )]
 struct Cli {
@@ -40,7 +40,7 @@ enum Command {
     },
     /// Install the release build for the current user, with a launcher desktop search finds.
     Install,
-    /// Close the session's Tufo and its server, then install the release build over them.
+    /// Close the session's GUI and its server, then install the release build over them.
     Update,
     /// Remove what `install` placed, keeping the library, settings, and credentials.
     Uninstall,

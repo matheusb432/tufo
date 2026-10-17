@@ -51,7 +51,7 @@ async fn the_server_binary_answers_health_checks_on_its_local_endpoint() -> anyh
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
-    // Keeps the server away from the developer's Discord credentials and Tufo data.
+    // Keeps the server away from the developer's Discord credentials and app data.
     #[cfg(unix)]
     for variable in ["XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"] {
         command.env(variable, directory.path().join(variable));

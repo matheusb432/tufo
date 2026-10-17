@@ -299,7 +299,7 @@ fn import_paths(
         .flat_map(|planned| planned.files.iter().map(|file| file.path.clone()))
         .collect::<HashSet<_>>();
     // New followed roots also expose their subfolders. Existing collections (including hidden
-    // ones) are left alone; only genuinely new folders need their files prepared here.
+    // ones) are left alone; only new folders need their files prepared here.
     for root in roots {
         for folder in &root.scan.folders {
             if !claimed.contains(&(root.kind, &folder.path)) {

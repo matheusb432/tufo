@@ -1,6 +1,6 @@
-# softbuffer for Tufo
+# softbuffer
 
-This is `softbuffer` 0.4.8 from crates.io. Tufo patches its Wayland backend to
+This is `softbuffer` 0.4.8 from crates.io, with its Wayland backend patched to
 share buffers as `Argb8888` rather than `Xrgb8888`, so the alpha that Slint's
 software renderer writes reaches the compositor and the frameless window's
 rounded corners show the desktop behind them. Every other backend is unchanged;

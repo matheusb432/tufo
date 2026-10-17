@@ -2,7 +2,7 @@
 //! library while their sources keep them.
 //!
 //! A manual collection is deleted outright. A linked collection keeps a hidden row, so the next
-//! scan doesn't recreate it while Tufo keeps following its folder; dropping the folder again
+//! scan doesn't recreate it while its folder stays followed; dropping the folder again
 //! shows it once more.
 
 use jiff::Timestamp;

@@ -1,4 +1,4 @@
-//! Absolute paths on the server's filesystem that Tufo stores and sends as text.
+//! Absolute paths on the server's filesystem, stored and sent as text.
 //!
 //! Protobuf strings and SQLite text are UTF-8, so every stored path must be too. Scans skip
 //! entries whose names aren't UTF-8 instead of storing a lossy copy that points nowhere.
@@ -13,7 +13,7 @@ pub(crate) fn is_absolute_utf8(path: &Path) -> bool {
     path.is_absolute() && path.to_str().is_some()
 }
 
-/// An absolute, UTF-8 path to a folder: one dropped into Tufo, or one a collection follows.
+/// An absolute, UTF-8 path to a folder: a dropped one, or one a collection follows.
 #[nutype(
     validate(predicate = is_absolute_utf8),
     derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, AsRef)

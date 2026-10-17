@@ -1,4 +1,4 @@
-//! Tufo's desktop GUI: a Slint window that drives the local tufo-server.
+//! The desktop GUI: a Slint window that drives the local tufo-server.
 
 // Release builds on Windows open no console window behind the app; the server keeps its own log.
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
@@ -314,7 +314,7 @@ impl WindowRequests {
         }
     }
 
-    /// Shows the window whenever Tufo is launched again, until the runtime shuts down.
+    /// Shows the window at every later launch, until the runtime shuts down.
     async fn follow_activations(self, mut activations: ActivationListener) {
         loop {
             if let Err(error) = activations.next_activation().await {

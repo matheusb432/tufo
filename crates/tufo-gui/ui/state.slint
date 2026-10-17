@@ -5,10 +5,10 @@ import { TourVisibility } from "tours/state.slint";
 
 export enum Page { home, songs, playlists, playlist, soundboards, soundboard, browser }
 
-// A sidebar row the user can hide. Search and Settings always show.
+// A hideable sidebar row. Search and Settings always show.
 export enum SidebarPage { home, songs, browser, playlists, soundboards }
 
-// The sidebar rows the user hid. A hidden row's page still opens from elsewhere and stays open
+// The hidden sidebar rows. A hidden row's page still opens from elsewhere and stays open
 // when its row hides. Hiding Playlists or Soundboards hides their pinned collections too.
 export struct SidebarHiddenPages {
     home: bool,
@@ -273,7 +273,6 @@ export global Session {
     in property <bool> drop-hover;
     in property <string> drop-label;
     in property <int> crossfade-ms: 2000;
-    // Quitting Tufo leaves tufo-server running, and Tufo never starts it.
     in property <bool> keep-playing-after-quit;
     in property <bool> start-at-login;
 }
@@ -387,7 +386,7 @@ export global Art {
     // Rises whenever the worker delivers a picture, or pictures that failed may decode now.
     in property <int> pictures-revision;
     // A collection's background with rounded corners, at the given size: its preset or image,
-    // otherwise the gradient derived from its id, or Tufo's own gradient for an empty id. The last
+    // otherwise the gradient derived from its id, or the default gradient for an empty id. The last
     // arguments are the corners' radius and `pictures-revision`, which the host ignores; passing
     // it draws the picture again when it rises.
     pure callback painting(string, CollectionBackground, length, length, length, int) -> image;

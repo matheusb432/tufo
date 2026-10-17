@@ -1,7 +1,5 @@
-# Tufo assets
+# Assets
 
-Tufo tracks its bundled paintings and ambience as ordinary Git files. A clone includes
-the media bytes; Git LFS and separate repositories are unnecessary.
 The GUI embeds `backgrounds/small/`; the server embeds `effects/`.
 The `large/` renditions are retained for artwork maintenance.
 
@@ -13,8 +11,6 @@ The `large/` renditions are retained for artwork maintenance.
 | [backgrounds/render.py](backgrounds/render.py) | Rendition generator |
 | [effects/CREDITS.md](effects/CREDITS.md) | Recording authors, source links, edits, and licenses |
 
-The initial snapshot comes from asset revision `429b193208b84e7e7abeec452a460bc78011a92f`.
-Its 40 WebP renditions and eight Ogg files preserve the original LFS object SHA-256 values.
 The effects originate from Blanket's pinned revision recorded in their credits.
 
 ## Updating assets

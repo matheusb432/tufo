@@ -311,7 +311,6 @@ pub(crate) fn close_tab(id: TabId) {
     }
 }
 
-/// Runs `action` on a tab's browser.
 pub(crate) fn with_browser(id: TabId, action: impl FnOnce(&Browser)) -> Result<(), TabNotFound> {
     let browser = with_tabs(|tabs| tabs.tab(id).map(|tab| tab.browser.clone()))
         .flatten()

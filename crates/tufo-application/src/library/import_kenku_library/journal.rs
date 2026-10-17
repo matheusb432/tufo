@@ -100,7 +100,7 @@ impl From<StoredKind> for CollectionKind {
 pub(super) struct ImportedCollection {
     pub(super) source_id: String,
     pub(super) kind: StoredKind,
-    /// None means the user chose to keep their existing collection.
+    /// `None` keeps the existing collection.
     pub(super) destination: Option<String>,
 }
 

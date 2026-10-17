@@ -104,8 +104,8 @@ songbird = { version = "0.6.0", default-features = false, features = ["driver", 
 symphonia = { version = "0.6.1", default-features = false, features = ["aac", "flac", "id3v2", "isomp4", "mp3", "ogg", "pcm", "vorbis", "wav"] }
 # Decodes Opus files, which symphonia demuxes but can't decode, with the libopus songbird encodes with.
 opus2 = "0.4.0"
-# songbird decodes its inputs with symphonia 0.5 and registers only the codecs enabled on it. Tufo
-# feeds songbird raw f32 PCM, which needs the PCM codec.
+# songbird decodes its inputs with symphonia 0.5 and registers only the codecs enabled on it; the
+# raw f32 PCM it receives needs the PCM codec.
 symphonia-for-songbird = { package = "symphonia", version = "0.5.5", default-features = false, features = ["pcm"] }
 twilight-gateway = "0.17.1"
 twilight-http = "0.17.1"
@@ -118,7 +118,7 @@ cef = { version = "=154.5.0", default-features = false }
 cef-dll-sys = { version = "=154.5.0", default-features = false }
 
 # GUI.
-# The software renderer draws Tufo's window in about 30 MB of RSS. GPU renderers load the graphics
+# The software renderer draws the window in about 30 MB of RSS. GPU renderers load the graphics
 # driver, which cost about 190 MB with NVIDIA's.
 slint = { version = "1.18.1", default-features = false, features = ["accessibility", "backend-winit", "compat-1-2", "renderer-software", "std", "unstable-winit-030"] }
 slint-build = "1.18.1"

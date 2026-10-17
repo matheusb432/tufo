@@ -5,8 +5,8 @@ package tufo.v1;
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 
-// The playlists and soundboards, the songs, and the audio files they point at. Tufo never
-// copies, moves, or writes audio files.
+// The playlists and soundboards, the songs, and the audio files they point at. Audio files are
+// never copied, moved, or written.
 service LibraryService {
   // Streams the whole library, then the whole library again after each change. A slow reader
   // skips to the latest snapshot. The stream ends when the server shuts down.
@@ -24,7 +24,7 @@ service LibraryService {
   // Changes the fields present in the request and leaves the others.
   rpc UpdateCollection(UpdateCollectionRequest) returns (UpdateCollectionResponse);
   // Deletes a collection; its songs stay in the library. A deleted linked collection stays
-  // deleted until its folder is imported again, while Tufo keeps following the folder.
+  // deleted until its folder is imported again, while the folder stays followed.
   rpc DeleteCollection(DeleteCollectionRequest) returns (DeleteCollectionResponse);
   // Changes the fields present in the request and leaves the others.
   rpc UpdateCollectionEntry(UpdateCollectionEntryRequest) returns (UpdateCollectionEntryResponse);
@@ -95,9 +95,9 @@ message Song {
   // The file's absolute path.
   string path = 4;
   google.protobuf.Duration duration = 5;
-  // When the file was added to Tufo.
+  // When the file was added.
   google.protobuf.Timestamp added_at = 6;
-  // Whether Tufo last looked for the file and didn't find it.
+  // Whether the last look for the file found nothing.
   bool missing = 7;
   // A followed folder wins over the file's own path.
   oneof source {
@@ -129,7 +129,7 @@ message SavedSongLoop {
 // The file was added to a playlist by its own path.
 message FileSongSource {}
 
-// A folder Tufo follows.
+// A followed folder.
 message LibraryFolder {
   // A canonical UUID.
   string id = 1;
@@ -167,7 +167,7 @@ message Background {
     GradientBackground gradient = 1;
     // An absolute path to an image file.
     string image_path = 2;
-    // A painting that ships with Tufo.
+    // A bundled painting.
     BackgroundPreset preset = 3;
   }
 }
@@ -213,7 +213,7 @@ enum EntryOrderKey {
   ENTRY_ORDER_KEY_UNSPECIFIED = 0;
   ENTRY_ORDER_KEY_TITLE = 1;
   ENTRY_ORDER_KEY_DURATION = 2;
-  // When the file was added to Tufo.
+  // When the file was added.
   ENTRY_ORDER_KEY_DATE_ADDED = 3;
   // As arranged by hand through ArrangeCollectionEntries.
   ENTRY_ORDER_KEY_CUSTOM = 4;
@@ -225,7 +225,7 @@ message ManualSource {}
 // The audio files one folder holds directly.
 message LinkedSource {
   string folder_path = 1;
-  // Whether Tufo last looked for the folder and didn't find it.
+  // Whether the last look for the folder found nothing.
   bool missing = 2;
 }
 
@@ -238,9 +238,9 @@ message CollectionEntry {
   // The file's absolute path.
   string path = 4;
   google.protobuf.Duration duration = 5;
-  // When the file was added to Tufo.
+  // When the file was added.
   google.protobuf.Timestamp added_at = 6;
-  // Whether Tufo last looked for the file and didn't find it.
+  // Whether the last look for the file found nothing.
   bool missing = 7;
   SoundSettings sound = 8;
   SoundIcon icon = 9;
@@ -359,7 +359,7 @@ message ImportPathsResponse {
 message ImportReport {
   uint32 collections_created = 1;
   uint32 files_added = 2;
-  // Audio files Tufo couldn't read, left out.
+  // Unreadable audio files, left out.
   repeated string unreadable_paths = 3;
   // Dropped paths that are neither folders nor audio files.
   repeated string ignored_paths = 4;
@@ -587,7 +587,7 @@ message KenkuImportConflict {
 message KenkuImportReport {
   uint32 collections_imported = 1;
   uint32 files_imported = 2;
-  // Collections the user chose to keep.
+  // Existing collections left as they were.
   repeated string skipped_collection_titles = 3;
   // Audio files that couldn't be found or read.
   repeated string unreadable_paths = 4;

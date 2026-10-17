@@ -1,12 +1,10 @@
-//! The pictures behind collections: the preset paintings Tufo ships and the image files
+//! The pictures behind collections: the shipped preset paintings and the image files
 //! collections point at.
 //!
 //! A worker thread decodes pictures and draws them at the size and corner radius each place
 //! shows them, so the window never waits on a picture. Until a picture is ready, the window shows
 //! the same picture drawn at another size, or the collection's gradient, and then draws again when
-//! the worker delivers. Pictures decode at most [`PICTURE_SIDE_MAX`] pixels on a side, the size of
-//! the presets' small renditions. Every cache drops its least recently used entries past its byte
-//! budget.
+//! the worker delivers. Every cache drops its least recently used entries past its byte budget.
 
 use std::{
     cell::{Cell, RefCell},
@@ -42,7 +40,7 @@ const MEBIBYTE: usize = 1024 * 1024;
 const CARD_PICTURES_BYTES_MAX: usize = 16 * MEBIBYTE;
 const CARD_ART_BYTES_MIN: usize = 24 * MEBIBYTE;
 const CARD_ART_BYTES_MAX: usize = 256 * MEBIBYTE;
-/// Tufo's own gradient, for a card without a collection yet.
+/// For a card without a collection yet.
 const DEFAULT_GRADIENT: (Rgb, Rgb) = (Rgb(45, 106, 79), Rgb(1, 50, 32));
 
 /// A picture a background decodes from.
@@ -193,7 +191,7 @@ fn map_large_buffers_separately() {
 }
 
 /// A background at `width` × `height` physical pixels with corners of `radius` pixels: its
-/// picture, or the gradient of the collection `id`, or Tufo's own gradient without one.
+/// picture, or the gradient of the collection `id`, or the default gradient without one.
 pub(crate) fn card(
     id: Option<CollectionId>,
     background: &Background,

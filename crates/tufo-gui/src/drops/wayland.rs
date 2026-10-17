@@ -1,6 +1,6 @@
 //! File drops on a native Wayland window, which winit 0.30 doesn't report.
 //!
-//! Tufo adds its own `wl_data_device` to winit's Wayland connection, on its own event queue.
+//! This module adds its own `wl_data_device` to winit's Wayland connection, on its own event queue.
 //! winit keeps reading the socket, which fills that queue as well, and [`WaylandDrops::dispatch`]
 //! empties it on the UI thread whenever winit's loop is about to wait: nothing here reads the
 //! socket or blocks. Only a dropped file list arrives separately, over a pipe that a short-lived
@@ -44,7 +44,7 @@ const URI_LIST_MIME_TYPE: &str = "text/uri-list";
 const DATA_DEVICE_MANAGER_VERSION_MAX: u32 = 3;
 /// How long a drop's source gets to send its file list.
 const FILE_LIST_TIMEOUT: Duration = Duration::from_secs(5);
-/// The largest file list Tufo reads, far past any real drop.
+/// Far past any real drop.
 const FILE_LIST_BYTES_MAX: usize = 1024 * 1024;
 
 type Deliver = fn(DropEvent);
@@ -408,7 +408,7 @@ impl Dispatch<WlDataDevice, ()> for Drops {
             wl_data_device::Event::Enter { serial, id, .. } => state.enter(serial, id),
             wl_data_device::Event::Leave => state.leave(),
             wl_data_device::Event::Drop => state.drop_offer(),
-            // Tufo doesn't read the clipboard, so its offers go at once.
+            // The clipboard is never read, so its offers go at once.
             wl_data_device::Event::Selection { id: Some(offer) } => offer.destroy(),
             _ => {}
         }

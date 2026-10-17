@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Drops a folder from a GTK window onto Tufo's Playlists page in a headless GNOME Shell, with Tufo
+# Drops a folder from a GTK window onto the Playlists page in a headless GNOME Shell, with the GUI
 # on native Wayland, and checks that the folder became a playlist. Run it through
-# `just wayland-drop-check`, which builds Tufo and gives this script its own D-Bus session.
+# `just wayland-drop-check`, which builds the GUI and gives this script its own D-Bus session.
 # It writes its steps and verdict to the report file it's given; TUFO_DROP_CHECK_KEEP=1 keeps the
 # run folder with every process's log.
 set -euo pipefail
@@ -15,7 +15,7 @@ cleanup() {
     for process in "$source" "$gui"; do
         if [[ -n "$process" ]]; then kill "$process" 2>/dev/null || true; fi
     done
-    # The GUI started a server that outlives it, as it does for people.
+    # The GUI started a server that outlives it.
     TUFO_RUNTIME_DIR="$run/runtime" "$target/tufo" server kill >/dev/null 2>&1 || true
     if [[ -n "$shell" ]]; then kill "$shell" 2>/dev/null || true; fi
     wait 2>/dev/null || true
@@ -31,7 +31,7 @@ mkdir -m 700 "$run/xdg" "$run/runtime" "$run/home"
 export XDG_RUNTIME_DIR="$run/xdg" GSETTINGS_BACKEND=memory GSK_RENDERER=cairo
 unset DISPLAY WAYLAND_DISPLAY XDG_SESSION_ID XDG_SESSION_TYPE XDG_SEAT
 # Its own home keeps the desktop's extensions out, and its settings keep a pressed window from
-# rising over Tufo's, so the drag starts on the source and ends on Tufo.
+# rising over the GUI's, so the drag starts on the source and ends on the GUI.
 mkdir -p "$run/home/.config/glib-2.0/settings"
 printf '[org/gnome/desktop/wm/preferences]\nraise-on-click=false\n' \
     >"$run/home/.config/glib-2.0/settings/keyfile"
@@ -46,20 +46,20 @@ export WAYLAND_DISPLAY=tufo-drop
 mkdir -p "$run/music/tavern"
 ffmpeg -loglevel error -f lavfi -i "sine=frequency=440:duration=2" "$run/music/tavern/theme.wav"
 
-step "opening Tufo, then the drag source"
+step "opening the GUI, then the drag source"
 TUFO_RUNTIME_DIR="$run/runtime" TUFO_DATABASE_PATH="$run/tufo.sqlite3" \
     XDG_CONFIG_HOME="$run/config" XDG_STATE_HOME="$run/state" SLINT_MCP_PORT=$mcp_port \
     RUST_LOG="${RUST_LOG:-info,tufo_gui=debug}" "$target/tufo-gui" >"$run/gui.log" 2>&1 & gui=$!
 timeout 60 bash -c "until [[ -S $run/runtime/tufo.sock ]] && curl -s -o /dev/null -X POST -d '{}' http://127.0.0.1:$mcp_port/mcp; do sleep 0.3; done"
 sleep 1
-# Mutter keeps focus on Tufo's window and stacks the later, maximized drag source beneath it, so
-# the source shows around Tufo's edges.
+# Mutter keeps focus on the GUI's window and stacks the later, maximized drag source beneath it, so
+# the source shows around the GUI's edges.
 python3 "$here/drag_source.py" "$run/music/tavern" >"$run/source.log" 2>&1 & source=$!
 sleep 2
 
 step "dragging the folder onto the Playlists page"
 python3 "$here/window.py" $mcp_port open-playlists
-# From the drag source, right of Tufo's window, to the middle of Tufo's window.
+# From the drag source, right of the GUI's window, to the middle of the GUI's window.
 python3 "$here/pointer.py" "$run/source.log" 1380 450 700 450
 sleep 3
 

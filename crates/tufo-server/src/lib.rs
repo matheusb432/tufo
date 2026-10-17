@@ -1,4 +1,4 @@
-//! Local gRPC process root for Tufo, served over a user-private Unix socket.
+//! Local gRPC process root, served over a user-private local endpoint.
 
 pub mod data;
 mod server;
@@ -36,7 +36,7 @@ const SHUTDOWN_GRACE_PERIOD: Duration = Duration::from_secs(5);
 const DISCORD_CREDENTIALS_FILE_NAME: &str = "discord.toml";
 
 /// Runs the resident server until it is asked to stop. Discord output needs credentials from
-/// `discord_credentials`, or from `discord.toml` in Tufo's config directory when that file exists:
+/// `discord_credentials`, or from `discord.toml` in the config directory when that file exists:
 /// `$XDG_CONFIG_HOME/tufo` on Linux, `%APPDATA%\tufo\config` on Windows, and
 /// `~/Library/Application Support/tufo` on macOS.
 pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
@@ -149,7 +149,7 @@ fn start_discord(path: &Path) -> anyhow::Result<SongbirdDiscordClient> {
     Ok(SongbirdDiscordClient::start(credentials))
 }
 
-/// Tufo's log folder: the state directory, or the local data directory where the platform has
+/// The log folder: the state directory, or the local data directory where the platform has
 /// none.
 #[must_use]
 pub fn log_directory() -> Option<PathBuf> {

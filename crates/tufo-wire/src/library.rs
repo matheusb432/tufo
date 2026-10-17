@@ -115,9 +115,9 @@ pub struct EntryView {
     pub builtin_title: Option<BuiltinTitle>,
     pub path: AudioFilePath,
     pub duration: Duration,
-    /// When the file was added to Tufo.
+    /// When the file was added.
     pub added_at: Timestamp,
-    /// Whether Tufo last looked for the file and didn't find it.
+    /// Whether the last look for the file found nothing.
     pub missing: bool,
     pub sound: SoundSettings,
     pub icon: SoundIcon,
@@ -132,9 +132,9 @@ pub struct SongView {
     pub builtin_title: Option<BuiltinTitle>,
     pub path: AudioFilePath,
     pub duration: Duration,
-    /// When the file was added to Tufo.
+    /// When the file was added.
     pub added_at: Timestamp,
-    /// Whether Tufo last looked for the file and didn't find it.
+    /// Whether the last look for the file found nothing.
     pub missing: bool,
     pub source: SongSource,
     pub saved_loop: Option<SavedSongLoop>,
@@ -149,7 +149,7 @@ pub enum SongSource {
     File,
 }
 
-/// A folder Tufo follows.
+/// A followed folder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct LibraryFolderView {
     pub id: LibraryFolderId,
@@ -214,7 +214,7 @@ impl EntryArrangement {
 pub struct ImportReport {
     pub collections_created: usize,
     pub files_added: usize,
-    /// Audio files Tufo couldn't read, left out.
+    /// Unreadable audio files, left out.
     pub unreadable_files: Vec<AudioFilePath>,
     /// Dropped paths that are neither folders nor audio files.
     pub ignored_paths: Vec<LocalPath>,

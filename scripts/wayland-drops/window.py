@@ -1,4 +1,4 @@
-"""Drives Tufo's window through the Slint MCP server compiled into a debug build.
+"""Drives the GUI's window through the Slint MCP server compiled into a debug build.
 
     python3 window.py <mcp port> open-playlists
 """

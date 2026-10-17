@@ -1,4 +1,4 @@
-//! Adding audio files to a manual collection, reading each file Tufo doesn't know yet.
+//! Adding audio files to a manual collection, reading each file not yet stored.
 
 use jiff::Timestamp;
 use toasty::Db;
@@ -61,7 +61,7 @@ pub(super) struct AddedFiles {
     pub(super) unreadable: Vec<AudioFilePath>,
 }
 
-/// Lists each file in the collection, creating the files Tufo doesn't know. Files the
+/// Lists each file in the collection, creating the files not yet stored. Files the
 /// collection already lists are skipped. Files added to a playlist become song sources. The
 /// caller holds the write gate.
 pub(super) async fn add_files<F: LibraryFiles>(
@@ -153,7 +153,7 @@ pub(super) async fn read_files(files: &impl LibraryFiles, paths: Vec<AudioFilePa
     read
 }
 
-/// Splits paths into the ids of files Tufo knows at that path and the paths it doesn't.
+/// Splits paths into the ids of files stored at that path and the paths with none.
 async fn partition_known(
     database: &mut Db,
     audio_files: Vec<AudioFilePath>,

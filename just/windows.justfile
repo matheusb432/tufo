@@ -13,7 +13,7 @@ windows-lint:
         CL=/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH \
         mise exec -- cargo xwin clippy --locked --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings
 
-# Build Tufo on the winvm-rs Windows VM and run its portable tests there
+# Build the workspace on the winvm-rs Windows VM and run its portable tests there.
 [group('quality')]
 windows-check:
     #!/usr/bin/env bash

@@ -1,4 +1,4 @@
-//! Tufo domain models and Toasty model declarations.
+//! Domain models and Toasty model declarations.
 
 pub mod browser;
 pub mod discord;

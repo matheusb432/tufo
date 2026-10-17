@@ -3,8 +3,6 @@
 //! Prepare a cloned path list with [`resolve_paths`] before the RPC, and send the original
 //! request unchanged so the server's ignored paths retain their submitted spelling.
 //! Correlation then compares path components without disk access.
-//!
-//! Matching identities can already exist or come from another import of the same source.
 //! The filesystem can change between path preparation and server classification.
 
 use std::{

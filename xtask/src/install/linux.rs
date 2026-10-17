@@ -98,7 +98,7 @@ pub(super) fn install(workspace_root: &Path, release_dir: &Path) -> Result<PathB
     Ok(homes.binary("tufo"))
 }
 
-/// Stops the session's Tufo GUI and server; isolated instances keep running.
+/// Stops the session's GUI and server; isolated instances keep running.
 pub(super) fn stop_session() -> Result<()> {
     session::stop()
 }

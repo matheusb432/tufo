@@ -85,7 +85,7 @@ pub(super) fn uninstall() -> Result<()> {
     Ok(())
 }
 
-/// Force-stops every running Tufo GUI, server, and browser of this user, GUI first so it can't
+/// Force-stops every running GUI, server, and browser of this user, GUI first so it can't
 /// start the server again. Windows exposes no cheap way to read another process's environment, so
 /// isolated instances stop too.
 pub(super) fn stop_session() -> Result<()> {

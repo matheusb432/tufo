@@ -5,7 +5,7 @@ use std::{
     process::{Command, Stdio},
 };
 
-/// One of Tufo's executables that another one launches.
+/// An executable that another one launches.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Executable {
     Server,

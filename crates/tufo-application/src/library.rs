@@ -1,4 +1,4 @@
-//! The library: audio files Tufo points at, kept in step with the folders that hold them.
+//! The library: the audio files it points at, kept in step with the folders that hold them.
 //!
 //! A file stays while a collection lists it or a source keeps it. Song sources are the followed
 //! music folders and the files added to a playlist by their own path, so deleting a playlist

@@ -1,6 +1,6 @@
 # Background credits
 
-These preset collection backgrounds are public-domain paintings from the sources below. Each is trimmed of scan borders and rendered from the source's full-resolution original as two WebPs: `small/` is embedded by Tufo for cards and the background gallery; `large/` is retained for artwork maintenance.
+These preset collection backgrounds are public-domain paintings from the sources below. Each is trimmed of scan borders and rendered from the source's full-resolution original as two WebPs: `small/` is embedded by the GUI for cards and the background gallery; `large/` is retained for artwork maintenance.
 
 | Key | Title | Artist | Year | Source | License |
 | --- | --- | --- | --- | --- | --- |

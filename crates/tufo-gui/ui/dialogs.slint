@@ -118,7 +118,7 @@ component BackgroundPreview inherits VerticalLayout {
         scroll: TourScroll.dialog;
         bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
     }
-    // The collection whose gradient the card shows; empty shows Tufo's own.
+    // The collection whose gradient the card shows; empty shows the default.
     in property <string> collection-id;
     in property <string> title;
     in property <CollectionBackground> background;

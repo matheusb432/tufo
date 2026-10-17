@@ -1,4 +1,4 @@
-//! Web pages whose audio Tufo mixes, in a browser that runs only while someone uses it.
+//! Web pages whose audio is mixed in, in a browser that runs only while someone uses it.
 
 use std::{fmt, num::NonZeroU32};
 

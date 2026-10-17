@@ -15,7 +15,6 @@ use crate::{
     },
 };
 
-/// The longest crossfade Tufo accepts.
 pub const CROSSFADE_DURATION_MAX: Duration = Duration::from_secs(10);
 
 /// How long one track fades into the next, at most [`CROSSFADE_DURATION_MAX`]. Zero plays tracks
@@ -94,13 +93,13 @@ pub enum VoiceConnectionState {
     NotConfigured,
     /// The bot is configured, but its Discord connection is disabled, so it can't join a channel.
     Disabled,
-    /// No voice channel is joined. `reason` explains a connection Tufo gave up on.
+    /// No voice channel is joined. `reason` explains a connection given up on.
     Disconnected { reason: Option<String> },
     /// Joining the output's voice channel.
     Connecting,
     /// Streaming into the output's voice channel.
     Connected,
-    /// The voice connection dropped, and Tufo is joining again.
+    /// The voice connection dropped and is rejoining.
     Reconnecting { attempt: u32 },
 }
 

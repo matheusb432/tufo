@@ -27,7 +27,6 @@ use crate::audio::browser_input::{BrowserAudioCounters, BrowserInputHandle};
 /// How often the supervisor checks whether the host exited.
 const EXIT_POLL_INTERVAL: Duration = Duration::from_millis(100);
 
-/// Starts browser hosts.
 pub trait BrowserLauncher: Send + Sync + 'static {
     /// Whether this installation has a host to launch.
     fn is_available(&self) -> bool {

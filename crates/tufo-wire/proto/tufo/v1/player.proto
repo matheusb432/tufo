@@ -61,7 +61,7 @@ service PlayerService {
   // WatchPlayer reports completion or failure. FAILED_PRECONDITION unless Local is selected.
   rpc RecoverLocalOutput(RecoverLocalOutputRequest) returns (RecoverLocalOutputResponse);
   // Fades out the music and every sound, then closes the audio device and leaves any voice
-  // channel until something plays again. Tufo calls it when it quits and leaves the server running.
+  // channel until something plays again. The GUI calls it when quitting leaves the server running.
   rpc StandBy(StandByRequest) returns (StandByResponse);
   // Playback health totals since the server started.
   rpc GetPlayerDiagnostics(GetPlayerDiagnosticsRequest) returns (GetPlayerDiagnosticsResponse);

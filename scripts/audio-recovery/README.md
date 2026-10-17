@@ -1,6 +1,6 @@
 # Local audio recovery checks
 
-These Linux checks start private PipeWire and WirePlumber processes, create null sinks, and generate sine-wave WAV fixtures in temporary directories. They never use hardware devices or the user's Tufo profile. Each check stops its own processes and keeps its disposable profile path, logs, captures, and results for inspection.
+These Linux checks start private PipeWire and WirePlumber processes, create null sinks, and generate sine-wave WAV fixtures in temporary directories. They never use hardware devices or your real profile. Each check stops its own processes and keeps its disposable profile path, logs, captures, and results for inspection.
 
 Prerequisites are PipeWire tools, WirePlumber 0.4 with its `main.conf` and `policy.conf`, Python 3, and `dbus-run-session`. GUI and browser checks also need Xvfb; the GUI check uses xdotool and Slint MCP, and the browser check uses the mise-managed grpcurl and a repository-built browser host.
 

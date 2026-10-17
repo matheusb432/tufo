@@ -1,4 +1,4 @@
-//! Default titles for what Tufo finds on disk.
+//! Default titles for what scans find on disk.
 
 use std::path::Path;
 

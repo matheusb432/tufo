@@ -1,4 +1,4 @@
-//! Finds and stops the Tufo GUI and server of this user's session. Isolated instances keep
+//! Finds and stops the GUI and server of this user's session. Isolated instances keep
 //! running: checks and `just stress` set `TUFO_RUNTIME_DIR`, and the session's never do.
 
 use std::{

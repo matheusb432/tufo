@@ -1,4 +1,4 @@
-# Modified for Tufo in 2026: upgraded to Rust 2024 and the workspace lint policy.
+# Modified in 2026: upgraded to Rust 2024 and the workspace lint policy.
 [package]
 name = "field"
 description = "Statically verified struct field names as strings."

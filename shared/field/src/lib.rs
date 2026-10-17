@@ -4,8 +4,8 @@
 // This file may not be copied, modified, or distributed except according to
 // those terms.
 //
-// Modified for Tufo in 2026: upgraded to Rust 2024 and the workspace lint
-// policy, and removed a broad lint suppression from the macro expansion.
+// Modified in 2026: upgraded to Rust 2024 and the workspace lint policy, and
+// removed a broad lint suppression from the macro expansion.
 
 //! Statically verified `struct` field names as strings.
 //!

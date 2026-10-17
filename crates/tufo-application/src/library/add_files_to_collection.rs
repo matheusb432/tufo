@@ -11,7 +11,7 @@ pub enum AddFilesToCollectionError {
     #[error("the collection does not exist")]
     #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
-    /// Tufo never copies files, so a linked collection only changes with its folder.
+    /// Files are never copied, so a linked collection only changes with its folder.
     #[error("the collection mirrors a folder; add the files to that folder instead")]
     #[meta(class = FailedPrecondition, reason = Self::LINKED)]
     Linked { folder: FolderPath },

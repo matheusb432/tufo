@@ -4,8 +4,8 @@
 
 Moves the pointer to the start until the drag source logs it there, since Mutter drops input
 until its virtual device is ready. GTK asks to be activated when its window opens and winit
-doesn't, so the maximized source covers Tufo; Alt+Tab brings Tufo forward until the source no
-longer sees the pointer at the end. Then it presses the left button, glides to the end, releases
+doesn't, so the maximized source covers the GUI; Alt+Tab brings the GUI forward until the source
+no longer sees the pointer at the end. Then it presses the left button, glides to the end, releases
 it, and waits for the source to log the drag's end. Coordinates are logical pixels on the only
 monitor; the drag source is maximized, so its coordinates match the monitor's below its title
 bar.

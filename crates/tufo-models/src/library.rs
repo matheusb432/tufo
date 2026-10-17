@@ -1,6 +1,6 @@
-//! Audio files Tufo points at, and the playlists and soundboards that collect them.
+//! Audio files the library points at, and the playlists and soundboards that collect them.
 //!
-//! Tufo never copies, moves, or writes audio files. An [`AudioFile`] row remembers where a file
+//! Audio files are never copied, moved, or written. An [`AudioFile`] row remembers where a file
 //! was and enough about it to find it again after it moves: its [`FileStamp`] and its
 //! [`AudioFingerprint`].
 
@@ -18,7 +18,7 @@ use crate::{
 pub mod default_effects;
 pub mod song_loop;
 
-/// A Tufo-generated title, translated by the GUI until the user renames it.
+/// A generated title, translated by the GUI until someone renames it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, toasty::Embed)]
 pub enum BuiltinTitle {
     Effects,
@@ -38,7 +38,7 @@ uuid_identifier!(
     AudioFileId
 );
 uuid_identifier!(
-    /// A folder dropped into Tufo, which Tufo watches recursively.
+    /// A dropped folder, watched recursively.
     LibraryFolderId
 );
 uuid_identifier!(
@@ -67,7 +67,6 @@ pub enum CollectionKind {
 )]
 pub struct Volume(f32);
 
-/// The longest fade Tufo accepts.
 pub const FADE_DURATION_MAX: Duration = Duration::from_mins(1);
 
 /// How long a sound takes to fade in or out, at most [`FADE_DURATION_MAX`].
@@ -116,7 +115,7 @@ impl Title {
         Ok(Self(trimmed_copy.unwrap_or(text)))
     }
 
-    /// A title made from a name Tufo found on disk: trimmed, cut to the limit, and "Untitled"
+    /// A title made from a name found on disk: trimmed, cut to the limit, and "Untitled"
     /// when nothing is left.
     #[must_use]
     pub fn from_name_lossy(name: &str) -> Self {
@@ -214,7 +213,7 @@ pub const FILE_IDENTITY_LENGTH_MAX: usize = 100;
 )]
 pub struct FileIdentity(String);
 
-/// The filesystem facts that reveal whether a file changed since Tufo last read it.
+/// The filesystem facts that reveal whether a file changed since it was last read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileStamp {
     pub identity: FileIdentity,
@@ -243,8 +242,8 @@ pub struct AudioFingerprint(String);
 )]
 pub struct FileSha256(String);
 
-/// Rounds `duration` down to whole milliseconds, saturating at about 49 days, which is how Tufo
-/// stores durations.
+/// Rounds `duration` down to whole milliseconds, saturating at about 49 days, which is how
+/// durations are stored.
 #[must_use]
 pub fn milliseconds_saturating(duration: Duration) -> u32 {
     u32::try_from(duration.as_millis()).unwrap_or(u32::MAX)
@@ -256,7 +255,7 @@ pub enum EntryOrderKey {
     #[default]
     Title,
     Duration,
-    /// When the file was added to Tufo.
+    /// When the file was added.
     DateAdded,
     /// As arranged by hand.
     Custom,
@@ -269,7 +268,7 @@ pub struct EntryOrder {
     pub descending: bool,
 }
 
-/// One audio file Tufo knows, at the path where Tufo last saw it.
+/// One known audio file, at the path where it was last seen.
 #[derive(Debug, toasty::Model)]
 pub struct AudioFile {
     #[key]
@@ -286,9 +285,9 @@ pub struct AudioFile {
     pub duration_ms: u32,
     pub title: Title,
     pub builtin_title: Option<BuiltinTitle>,
-    /// When Tufo last looked for the file and didn't find it.
+    /// When the last look for the file found nothing.
     pub missing_since: Option<Timestamp>,
-    /// When the file was added to Tufo; the "date added" order.
+    /// When the file was added; the "date added" order.
     pub created_at: Timestamp,
     /// Added to a playlist by its own path, so it stays among the songs, wherever it moves,
     /// until removed from them.
@@ -313,7 +312,7 @@ impl AudioFile {
     }
 }
 
-/// A folder dropped on a grid. Tufo watches it recursively, and each folder under it that holds
+/// A folder dropped on a grid. It's watched recursively, and each folder under it that holds
 /// audio becomes a linked collection of the same kind.
 #[derive(Debug, toasty::Model)]
 pub struct LibraryFolder {
@@ -326,7 +325,7 @@ pub struct LibraryFolder {
     pub created_at: Timestamp,
 }
 
-/// A public-domain painting that ships with Tufo as a collection background. The GUI holds the
+/// A bundled public-domain painting used as a collection background. The GUI holds the
 /// images; the library stores only which one a collection shows.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, toasty::Embed)]
 pub enum BackgroundPreset {
@@ -539,7 +538,7 @@ pub struct Collection {
     /// The linked folder, present exactly when `library_folder_id` is.
     pub folder_path: Option<FolderPath>,
     pub folder_identity: Option<FileIdentity>,
-    /// When Tufo last looked for the linked folder and didn't find it.
+    /// When the last look for the linked folder found nothing.
     pub folder_missing_since: Option<Timestamp>,
     /// When you deleted this linked collection. The row stays so rescans don't recreate it.
     pub hidden_at: Option<Timestamp>,

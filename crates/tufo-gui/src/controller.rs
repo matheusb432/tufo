@@ -1384,9 +1384,6 @@ impl Controller {
         }
     }
 
-    /// Saves the desktop settings, then the crossfade when it changed, and a new bot token
-    /// followed by a server restart so the bot logs in with it; the connection loop starts the
-    /// server again.
     pub(crate) fn set_crossfade(&self, crossfade_ms: i32) {
         let crossfade = CrossfadeDuration::try_new(Duration::from_millis(
             u64::try_from(crossfade_ms).unwrap_or(0),
@@ -1505,7 +1502,7 @@ impl Controller {
             });
     }
 
-    /// Quits Tufo, leaving the server running and, unless the audio should keep playing,
+    /// Quits, leaving the server running and, unless the audio should keep playing,
     /// standing it by first.
     pub(crate) fn quit(&self) {
         let stand_by_client = self.start_quitting();
@@ -1528,7 +1525,7 @@ impl Controller {
         }
     }
 
-    /// The client to stand the server by with, the first time Tufo quits.
+    /// The client to stand the server by with, on the first quit.
     fn start_quitting(&self) -> Option<TufoClient> {
         let mut shared = self.lock();
         if std::mem::replace(&mut shared.quitting, true)

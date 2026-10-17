@@ -9,7 +9,7 @@ use tufo_models::{
 };
 use tufo_wire::song_loops::SongWaveform;
 
-/// Reads the folders and audio files the library points at. Tufo never writes through it.
+/// Reads the folders and audio files the library points at. Nothing writes through it.
 pub trait LibraryFiles: Send + Sync {
     /// Resolves symlinks and `..` in a dropped path and says what it is.
     fn classify_path(

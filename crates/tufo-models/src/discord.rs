@@ -1,4 +1,4 @@
-//! Discord identities Tufo addresses when streaming into voice channels.
+//! Discord identities addressed when streaming into voice channels.
 
 use std::num::NonZeroU64;
 

@@ -1,7 +1,7 @@
 //! Importing folders and files dropped on the playlists or soundboards grid.
 //!
-//! A dropped folder becomes a library folder that Tufo follows. Dropping a folder inside one it
-//! already follows re-follows the collections under it that were deleted. Dropping a folder
+//! A dropped folder becomes a followed library folder. Dropping a folder inside a followed one
+//! re-follows the collections under it that were deleted. Dropping a folder
 //! that holds library folders of the same kind absorbs them, keeping their collections.
 //! Loose audio files become one manual collection, titled after the first file's folder; dropped
 //! as music, they also become song sources.

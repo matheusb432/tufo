@@ -1,6 +1,6 @@
 # Install Tufo
 
-Download the installer and its matching `.sha256` file from the same Tufo release.
+Download the installer and its matching `.sha256` file from the same release.
 Keep the `tufo` CLI, `tufo-server`, and `tufo-gui` together. The GUI starts its sibling
 server over a user-private Unix socket or Windows named pipe; it needs no web server.
 Tufo points at your music files and never copies them into the package.
@@ -70,13 +70,9 @@ sudo rm -r /Applications/Tufo.app
 sudo pkgutil --forget dev.tufo.Tufo
 ```
 
-## Data and current limits
+## Data
 
 Updates and removal leave your library, desktop settings, and Discord credentials
-in your user profile. The CLI's `tufo doctor` reports gRPC health, version match,
-and Discord configuration. Tufo currently plays local audio or sends it to one
-Discord voice channel through a bot you configure; it is a native Slint GUI over
-a local Tonic server. The installer checks run without speakers or Discord
-credentials, so they establish launch and service behavior, not actual playback
-or voice quality. See [Discord setup](../wiki/discord.md) and
+in your user profile. `tufo doctor` reports gRPC health, version match, and Discord
+configuration. See [Discord setup](../wiki/discord.md) and
 [troubleshooting](../wiki/troubleshooting.md).

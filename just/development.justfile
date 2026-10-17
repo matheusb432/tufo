@@ -22,7 +22,7 @@ server *args:
 gui-bench *args:
     cargo run --quiet --release -p tufo-gui --features benchmark -- benchmark {{ args }}
 
-# Drop a folder onto Tufo on native Wayland in a headless GNOME Shell, and check it became a playlist.
+# Drop a folder onto the GUI on native Wayland in a headless GNOME Shell, and check it became a playlist.
 [group('run')]
 wayland-drop-check:
     #!/usr/bin/env bash

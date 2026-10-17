@@ -1,4 +1,4 @@
-//! Renders Tufo's icon sources in `crates/tufo-gui/icons` into the Windows icons the executable
+//! Renders the icon sources in `crates/tufo-gui/icons` into the Windows icons the executable
 //! embeds: `tufo.ico` for Explorer, the Start menu, and the taskbar, and `tufo-tray.ico` for the
 //! notification area. The Linux install renders its fixed-size PNGs, and the macOS install its app
 //! bundle's `.icns`, from the same sources.

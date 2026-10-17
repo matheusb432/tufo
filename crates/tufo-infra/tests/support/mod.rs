@@ -44,7 +44,6 @@ pub fn write_wav(path: &Path, sample_rate: u32, samples: &[f32]) -> anyhow::Resu
     Ok(())
 }
 
-/// `frames` samples of `value`.
 pub fn constant(value: f32, frames: usize) -> Vec<f32> {
     vec![value; frames]
 }

@@ -18,7 +18,7 @@ const LOG_RESTART_BYTES: u64 = 10 * 1024 * 1024;
 /// The server's own environment the host must not inherit.
 const WITHHELD_ENVIRONMENT: [&str; 2] = ["TUFO_DISCORD_CREDENTIALS", "PIPEWIRE_CONFIG_NAME"];
 
-/// Starts the `tufo-browser` executable installed beside this one, with a Tufo-owned profile.
+/// Starts the `tufo-browser` executable installed beside this one, with its own profile.
 #[derive(Debug, Clone)]
 pub struct ProcessBrowserLauncher {
     executable: Option<PathBuf>,

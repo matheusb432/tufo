@@ -117,7 +117,7 @@ impl SongbirdDiscordClient {
 
     /// Joins `target` self-deafened and streams whatever the renderer from `renderer_receiver`
     /// produces. The session's [`VoiceSession::take_lost_signal`] reports when the connection
-    /// drops without Tufo leaving.
+    /// drops without the bot leaving.
     pub async fn join(
         &self,
         target: VoiceChannelTarget,
@@ -305,13 +305,13 @@ pub struct VoiceSession {
     guild_id: GuildId,
     track: TrackHandle,
     reporter: tokio::task::JoinHandle<()>,
-    /// Set before Tufo leaves, so its own disconnect isn't reported as lost.
+    /// Set before leaving, so its own disconnect isn't reported as lost.
     leaving: Arc<AtomicBool>,
     lost: Option<oneshot::Receiver<String>>,
 }
 
 impl VoiceSession {
-    /// Resolves with a reason when the connection drops without Tufo leaving. Available once.
+    /// Resolves with a reason when the connection drops without the bot leaving. Available once.
     pub fn take_lost_signal(&mut self) -> Option<oneshot::Receiver<String>> {
         self.lost.take()
     }
@@ -334,7 +334,7 @@ impl Drop for VoiceSession {
     }
 }
 
-/// Reports the first disconnect of a call Tufo didn't leave.
+/// Reports the first disconnect of a call the bot didn't leave.
 struct DisconnectWatcher {
     leaving: Arc<AtomicBool>,
     lost_sender: Mutex<Option<oneshot::Sender<String>>>,

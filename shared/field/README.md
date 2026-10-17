@@ -1,11 +1,11 @@
-<!-- Modified for Tufo in 2026: replaced registry installation guidance with workspace usage. -->
+<!-- Modified in 2026: replaced registry installation guidance with workspace usage. -->
 
 # field
 
 Statically verified `struct` field names as strings.
 
-Tufo vendors this dependency under `shared/field`. Workspace crates can use it
-through the root dependency declaration:
+Vendored under `shared/field`. Workspace crates use it through the root
+dependency declaration:
 
 ```toml
 [dependencies]

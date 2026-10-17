@@ -1,5 +1,5 @@
 @echo off
-rem Installs the machine-wide tools Tufo's Windows build needs: the MSVC Build Tools with the
+rem Installs the machine-wide tools the Windows build needs: the MSVC Build Tools with the
 rem Windows SDK, and a pinned CMake for the bundled Opus build. Run elevated through
 rem `winvm-rs script --elevated`; rerunning skips installed tools.
 setlocal

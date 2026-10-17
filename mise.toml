@@ -25,5 +25,5 @@ zig = "0.16.0"
 "apt:nsis" = "latest"
 
 [tasks.bootstrap]
-description = "Set up Tufo development tools"
+description = "Set up the development tools"
 run = "just setup"

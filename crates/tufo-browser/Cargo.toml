@@ -29,8 +29,7 @@ tufo-local-transport = { workspace = true }
 tufo-models = { workspace = true }
 tufo-wire = { workspace = true }
 
-# Chromium runs only on Linux and Windows for now; elsewhere the executable reports it is
-# unsupported.
+# Chromium runs only on Linux and Windows; elsewhere the executable reports it is unsupported.
 [target.'cfg(target_os = "linux")'.dependencies]
 cef = { workspace = true }
 # Named directly so the build script receives the CEF directory it unpacked.

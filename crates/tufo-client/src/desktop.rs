@@ -84,7 +84,7 @@ impl TourVisibility {
     }
 }
 
-/// A sidebar row the user can hide. Search and Settings always show.
+/// A sidebar row that can be hidden. Search and Settings always show.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SidebarPage {

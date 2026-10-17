@@ -135,7 +135,7 @@ impl Tray {
     }
 }
 
-/// Writes the icon into an `icons` folder in Tufo's private runtime directory, which the panel,
+/// Writes the icon into an `icons` folder in the private runtime directory, which the panel,
 /// running as the same user, can read.
 fn publish_icon() -> anyhow::Result<String> {
     let endpoint = LocalEndpoint::gui_from_environment()?;

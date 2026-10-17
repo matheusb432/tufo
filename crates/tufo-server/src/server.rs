@@ -34,7 +34,7 @@ const APPLICATION_SERVICE_NAMES: [&str; 4] = [
     VoiceChannelServiceServer::<VoiceChannelGrpcService>::NAME,
 ];
 
-/// Serves every Tufo service on `listener` until `shutdown` resolves or a client asks it to stop.
+/// Serves every service on `listener` until `shutdown` resolves or a client asks it to stop.
 /// Draining ends playback streams at once and gives other requests at most `shutdown_grace_period`.
 pub async fn serve<O: AudioOutputs>(
     listener: LocalListener,

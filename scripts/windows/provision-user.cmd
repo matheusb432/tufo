@@ -1,5 +1,5 @@
 @echo off
-rem Installs the per-user tools Tufo's Windows build needs: Rust through rustup, buf, which
+rem Installs the per-user tools the Windows build needs: Rust through rustup, buf, which
 rem tufo-wire's build script runs, and Ninja, which builds CEF's C++ wrapper for the browser. Run
 rem as the standard user through `winvm-rs script`; rerunning skips installed tools.
 setlocal

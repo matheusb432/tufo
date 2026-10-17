@@ -36,7 +36,7 @@ const READ_ACCESS_RIGHTS: u32 = FILE_READ_DATA | GENERIC_READ | GENERIC_ALL;
 /// A SID buffer of `SECURITY_MAX_SID_SIZE` bytes, aligned for the SID's 32-bit sub-authorities.
 const SID_BUFFER_WORDS: usize = SECURITY_MAX_SID_SIZE as usize / size_of::<u32>();
 
-/// Creates a new file. It inherits the folder's permissions; Tufo's config folder in the user's
+/// Creates a new file. It inherits the folder's permissions; the config folder in the user's
 /// profile grants access only to the user, SYSTEM, and Administrators, which
 /// [`ensure_owner_only`] then confirms.
 pub(super) fn create_owner_only(path: &Path) -> io::Result<std::fs::File> {

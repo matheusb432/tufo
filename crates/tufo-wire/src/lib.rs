@@ -1,4 +1,4 @@
-//! Protobuf contracts shared by the Tufo process roots, the process-neutral operation contracts
+//! Protobuf contracts shared by the process roots, the process-neutral operation contracts
 //! they carry, and the explicit mappings between the two.
 
 pub mod browser;

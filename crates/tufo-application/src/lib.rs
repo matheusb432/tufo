@@ -1,4 +1,4 @@
-//! Tufo application operations and capability boundaries.
+//! Application operations and capability boundaries.
 
 extern crate self as tufo_application;
 
