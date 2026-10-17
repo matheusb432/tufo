@@ -160,6 +160,34 @@ async fn opus_files_are_found_and_timed_without_their_encoder_delay() {
 }
 
 #[tokio::test]
+async fn an_mp3_behind_cover_art_larger_than_the_probe_depth_is_found_and_timed() {
+    const FRAMES_IN_3_S: usize = 125;
+    /// Symphonia searches 1 MiB past a tag it can't read.
+    const COVER_BYTES_PAST_PROBE_DEPTH: usize = 2 * 1024 * 1024;
+    let library = tempfile::tempdir().unwrap();
+    let bare = library.path().join("bare.mp3");
+    let covered = library.path().join("covered.mp3");
+    fs::write(&bare, silent_mp3_bytes(FRAMES_IN_3_S, None).unwrap()).unwrap();
+    fs::write(
+        &covered,
+        silent_mp3_bytes(FRAMES_IN_3_S, Some(COVER_BYTES_PAST_PROBE_DEPTH)).unwrap(),
+    )
+    .unwrap();
+
+    let bare = DiskLibraryFiles
+        .inspect_audio(audio(&bare).unwrap())
+        .await
+        .unwrap();
+    let covered = DiskLibraryFiles
+        .inspect_audio(audio(&covered).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(covered.fingerprint, bare.fingerprint);
+    assert_eq!(covered.duration, Duration::from_secs(3));
+}
+
+#[tokio::test]
 async fn a_file_whose_codec_has_no_decoder_is_unsupported() {
     let library = tempfile::tempdir().unwrap();
     let adpcm = library.path().join("adpcm.wav");
@@ -205,6 +233,35 @@ fn ima_adpcm_wav_bytes() -> Vec<u8> {
     bytes.extend_from_slice(b"WAVE");
     bytes.extend_from_slice(&chunks);
     bytes
+}
+
+/// Silent mono MPEG-1 Layer III frames of 24 ms at 48 kHz, optionally behind an ID3v2.3 tag
+/// holding a cover picture of `cover_bytes`.
+fn silent_mp3_bytes(frame_count: usize, cover_bytes: Option<usize>) -> anyhow::Result<Vec<u8>> {
+    // 128 kb/s at 48 kHz makes every frame 384 bytes, with no padding.
+    const FRAME_HEADER: [u8; 4] = [0xFF, 0xFB, 0x94, 0xC0];
+    const FRAME_BYTES: usize = 384;
+    let mut bytes = Vec::new();
+    if let Some(cover_bytes) = cover_bytes {
+        let mut picture = b"\0image/png\0\x03\0".to_vec();
+        // Never 0xFF, so no stray frame sync hides inside the picture.
+        picture.extend((0..=250).cycle().take(cover_bytes));
+        let mut frame = b"APIC".to_vec();
+        frame.extend_from_slice(&u32::try_from(picture.len())?.to_be_bytes());
+        frame.extend_from_slice(&[0, 0]);
+        frame.extend_from_slice(&picture);
+        let tag_size = u32::try_from(frame.len())?;
+        bytes.extend_from_slice(b"ID3\x03\0\0");
+        for shift in [21, 14, 7, 0] {
+            bytes.push(u8::try_from((tag_size >> shift) & 0x7F)?);
+        }
+        bytes.extend_from_slice(&frame);
+    }
+    for _ in 0..frame_count {
+        bytes.extend_from_slice(&FRAME_HEADER);
+        bytes.resize(bytes.len() + FRAME_BYTES - FRAME_HEADER.len(), 0);
+    }
+    Ok(bytes)
 }
 
 fn chunk_length(length: usize) -> [u8; 4] {
