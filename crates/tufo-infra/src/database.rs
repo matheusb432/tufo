@@ -103,9 +103,10 @@ pub async fn open_temporary_database() -> anyhow::Result<(tempfile::TempDir, Db)
 #[cfg(test)]
 mod tests {
     use jiff::Timestamp;
+    use toasty::stmt::Uuid;
     use tufo_models::{
         library::{
-            AudioFile, AudioFingerprint, Collection, CollectionEntry, CollectionKind,
+            AudioFile, AudioFingerprint, Collection, CollectionEntry, CollectionId, CollectionKind,
             EntryOrderKey, FadeDuration, FileIdentity, LibraryFolder, SoundIcon, Title, Volume,
         },
         path::FolderPath,
@@ -561,10 +562,46 @@ mod tests {
 
         let half_linked =
             toasty::sql::statement("UPDATE collections SET folder_path = 'boss' WHERE id = ?1")
-                .bind(collection.id.into_uuid())
+                .bind(collection.id.into_uuid().as_bytes().to_vec())
                 .exec(&mut database)
                 .await;
 
         assert!(half_linked.is_err());
+    }
+
+    #[tokio::test]
+    async fn ids_round_trip_as_sixteen_byte_uuid_blobs() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(DATABASE_FILE_NAME);
+        let mut database = open_database(&path).await.unwrap();
+        let created = insert_manual_playlist(&mut database).await;
+        drop(database);
+        let stored = rusqlite::Connection::open(&path).unwrap();
+        let stored_ids = stored
+            .prepare("SELECT id FROM collections")
+            .unwrap()
+            .query_map([], |row| row.get::<_, Vec<u8>>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(stored_ids, [created.id.into_uuid().as_bytes().to_vec()]);
+        let written_outside = Uuid::parse_str("0192f3a4-5b6c-7d8e-9f01-23456789abcd").unwrap();
+        stored
+            .execute(
+                "UPDATE collections SET id = ?1",
+                [written_outside.as_bytes().as_slice()],
+            )
+            .unwrap();
+        drop(stored);
+
+        let mut reopened = open_database(&path).await.unwrap();
+        let loaded = Collection::filter_by_id(CollectionId::from_uuid(written_outside))
+            .first()
+            .exec(&mut reopened)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(loaded.id.into_uuid(), written_outside);
     }
 }

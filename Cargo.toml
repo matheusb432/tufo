@@ -15,7 +15,7 @@ members = [
     "shared/field",
     "xtask",
 ]
-exclude = ["shared/error-meta", "shared/softbuffer", "shared/toasty-driver-sqlite"]
+exclude = ["shared/error-meta", "shared/softbuffer"]
 
 [workspace.package]
 edition = "2024"
@@ -171,4 +171,3 @@ opt-level = 3
 [patch.crates-io]
 # Keeps the alpha of Wayland buffers, which the frameless window's rounded corners need.
 softbuffer = { path = "shared/softbuffer" }
-toasty-driver-sqlite = { path = "shared/toasty-driver-sqlite" }

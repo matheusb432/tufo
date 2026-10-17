@@ -11,7 +11,6 @@ Tufo's own code is [MIT licensed](LICENSE). Bundled material retains its own ter
 | Lucide sound icons | [ISC license and attribution](crates/tufo-gui/icons/sounds/LICENSE) |
 | field 0.1.0 | [MIT](shared/field/LICENSE-MIT) or [Apache-2.0](shared/field/LICENSE-APACHE); [vendoring provenance](shared/field/VENDORING.md) |
 | error-meta 0.1.0 | [MIT](shared/error-meta/LICENSE); [pinned source and update procedure](shared/error-meta/README.md) |
-| Toasty SQLite driver 0.10.0 | [MIT](shared/toasty-driver-sqlite/LICENSE); [local patch](shared/toasty-driver-sqlite/README.md) |
 | softbuffer 0.4.8 | [MIT](shared/softbuffer/LICENSE-MIT) or [Apache-2.0](shared/softbuffer/LICENSE-APACHE); [local patch](shared/softbuffer/README.md) |
 
 Other Rust dependencies are resolved by `Cargo.lock`; their package metadata and

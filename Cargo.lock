@@ -10140,6 +10140,8 @@ dependencies = [
 [[package]]
 name = "toasty-driver-sqlite"
 version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8dc7c7bdc6db7b857528680ef3be77f3a156cd187e600e2cab1e8a425d55edf4"
 dependencies = [
  "async-trait",
  "rusqlite",
