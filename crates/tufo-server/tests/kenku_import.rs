@@ -13,7 +13,7 @@ use tufo_infra::kenku::{
 };
 use tufo_models::{
     kenku_import::{KenkuImportId, KenkuImportState},
-    library::{BackgroundPreset, CollectionKind, Volume},
+    library::{BackgroundPreset, CollectionKind, EntryOrderKey, Volume},
     path::FolderPath,
     playback::queue::RepeatMode,
 };
@@ -42,12 +42,13 @@ fn persisted(root: &serde_json::Value) -> String {
     serde_json::Value::Object(encoded).to_string()
 }
 
-/// A one-folder playlist, and a soundboard with a missing file and a web address.
+/// A one-folder playlist arranged against its file order, and a soundboard with a missing file
+/// and a web address.
 fn write_kenku_folder(kenku: &Path, music: &Path) -> anyhow::Result<()> {
     let player = persisted(&json!({
         "playlists": {
             "playlists": {
-                "byId": {"p": {"id": "p", "title": "Combat Music", "background": "war", "tracks": ["a", "b"]}},
+                "byId": {"p": {"id": "p", "title": "Combat Music", "background": "war", "tracks": ["b", "a"]}},
                 "allIds": ["p"]
             },
             "tracks": {
@@ -146,7 +147,13 @@ async fn a_kenku_library_imports_its_folders_sounds_settings_and_token() {
         playlist.background,
         Background::Preset(BackgroundPreset::Battle)
     );
-    assert_eq!(playlist.entries.len(), 2);
+    assert_eq!(playlist.order.key, EntryOrderKey::Custom);
+    let arranged = playlist
+        .entries
+        .iter()
+        .map(|entry| entry.path.as_ref().file_name().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    assert_eq!(arranged, ["b.wav", "a.wav"]);
     assert!(playlist.pinned);
 
     let soundboard = &library.collections[1];

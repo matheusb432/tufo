@@ -2074,8 +2074,8 @@ msgid "Use Songs for other playlists"
 msgstr "Use Músicas para outras playlists"
 
 #: ui/tours/kenku.slint
-msgid "Web addresses, bookmarks, hand-arranged order, and Kenku FM's remote and streaming settings are left out. The report lists unavailable files and skipped web addresses."
-msgstr "Endereços web, favoritos, ordenação manual e configurações remotas e de transmissão do Kenku FM ficam de fora. O relatório lista arquivos indisponíveis e endereços web ignorados."
+msgid "Web addresses, bookmarks, and Kenku FM's remote and streaming settings are left out; playlists and soundboards keep Kenku FM's order. The report lists unavailable files and skipped web addresses."
+msgstr "Endereços web, favoritos e configurações remotas e de transmissão do Kenku FM ficam de fora; playlists e painéis de sons mantêm a ordem do Kenku FM. O relatório lista arquivos indisponíveis e endereços web ignorados."
 
 #: ui/tours/kenku.slint
 msgid "What stays outside Tufo"

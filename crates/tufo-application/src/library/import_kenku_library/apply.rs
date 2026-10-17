@@ -333,6 +333,11 @@ async fn apply_collections(
             .copied();
         let collection =
             destination(executor, planned, prior, &write.existing, &write.roots, now).await?;
+        Collection::update_by_id(collection.id)
+            .order_key(EntryOrderKey::Custom)
+            .order_descending(false)
+            .exec(executor)
+            .await?;
         add_entries(
             executor,
             &collection,
