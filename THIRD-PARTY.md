@@ -17,5 +17,5 @@ Other Rust dependencies are resolved by `Cargo.lock`; their package metadata and
 source distributions contain their licenses. Preserve these notices when redistributing
 the source, binaries, or bundled assets.
 
-The README and release notes display Slint's attribution badge from
+The README displays Slint's attribution badge from
 [Slint 1.18.1](https://github.com/slint-ui/slint/blob/v1.18.1/logo/MadeWithSlint-logo-whitebg.png).
