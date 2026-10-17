@@ -18,8 +18,9 @@ use tufo_client::{
     ClientError, Code, LocalEndpoint, TufoClient,
     desktop::{DesktopSettingsUpdate, SidebarPage, SidebarPagesPatch, TourVisibility},
     library::{
-        AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CreateCollection,
-        ImportPaths, ImportReport, LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
+        AddFilesToCollection, AddSongsToPlaylist, ArrangeCollectionEntries, Background,
+        CollectionSource, CreateCollection, EntryArrangement, ImportPaths, ImportReport,
+        LibrarySnapshot, UpdateCollection, UpdateCollectionEntry,
     },
     player::UpdatePlayerSettings,
 };
@@ -332,23 +333,34 @@ impl Controller {
     // Rendering.
 
     pub(crate) fn render_library(&self) {
-        let (view, navigation) = {
-            let shared = self.lock();
-            let queries = PageQueries {
-                filter: &shared.filter,
-                song_search: &shared.song_search,
-                adding_song: shared.adding_song,
-            };
-            let view = presentation::library_page(
-                &shared.snapshot,
-                &shared.player,
-                shared.navigation,
-                queries,
-                SystemTime::now(),
-            );
-            (view, shared.navigation)
-        };
+        let (view, navigation) = self.library_view();
         render::library(&self.window, view, navigation);
+    }
+
+    /// Shows the library before the window draws again, from a window callback.
+    fn render_library_now(&self) {
+        let Some(window) = self.window.upgrade() else {
+            return self.render_library();
+        };
+        let (view, navigation) = self.library_view();
+        render::library_now(&window, view, navigation);
+    }
+
+    fn library_view(&self) -> (presentation::LibraryPageView, presentation::Navigation) {
+        let shared = self.lock();
+        let queries = PageQueries {
+            filter: &shared.filter,
+            song_search: &shared.song_search,
+            adding_song: shared.adding_song,
+        };
+        let view = presentation::library_page(
+            &shared.snapshot,
+            &shared.player,
+            shared.navigation,
+            queries,
+            SystemTime::now(),
+        );
+        (view, shared.navigation)
     }
 
     pub(crate) fn render_player(&self) {
@@ -591,14 +603,9 @@ impl Controller {
         }
     }
 
-    pub(crate) fn set_order(&self, key: i32, descending: bool) {
+    pub(crate) fn set_order(&self, key: EntryOrderKey, descending: bool) {
         let Some(id) = self.lock().navigation.collection_id else {
             return;
-        };
-        let key = match key {
-            1 => EntryOrderKey::Duration,
-            2 => EntryOrderKey::DateAdded,
-            _ => EntryOrderKey::Title,
         };
         self.update_collection(
             id,
@@ -950,6 +957,65 @@ impl Controller {
                 ..UpdateCollectionEntry::default()
             },
         );
+    }
+
+    /// Shows the entry at its new place at once; a refused arrangement restores the order the
+    /// server last sent.
+    pub(crate) fn arrange_entry(&self, id: &str, place: i32) {
+        let (Some(entry_id), Ok(place)) = (entry_id_of(id), usize::try_from(place)) else {
+            return;
+        };
+        let Some(client) = self.connected_client() else {
+            return;
+        };
+        let (request, previous, arranged) = {
+            let mut shared = self.lock();
+            let Some(collection_id) = shared.navigation.collection_id else {
+                return;
+            };
+            if !shared.filter.is_empty() {
+                return;
+            }
+            let previous = Arc::clone(&shared.snapshot);
+            let snapshot = Arc::make_mut(&mut shared.snapshot);
+            let Some(collection) = snapshot
+                .collections
+                .iter_mut()
+                .find(|collection| collection.id == collection_id)
+            else {
+                return;
+            };
+            if !presentation::arrange(collection, entry_id, place) {
+                return;
+            }
+            let Ok(entry_ids) = EntryArrangement::try_new(
+                collection.entries.iter().map(|entry| entry.id).collect(),
+            ) else {
+                return;
+            };
+            let request = ArrangeCollectionEntries {
+                collection_id,
+                entry_ids,
+            };
+            (request, previous, Arc::clone(&shared.snapshot))
+        };
+        self.render_library_now();
+        let controller = self.clone();
+        self.runtime.spawn(async move {
+            if let Err(error) = client.arrange_collection_entries(&request).await {
+                controller.undo_arrangement(&arranged, previous);
+                controller.render_library();
+                controller.toast_error(presentation::error_text(&error));
+            }
+        });
+    }
+
+    /// Restores the library as the server last sent it, unless a newer snapshot already arrived.
+    fn undo_arrangement(&self, arranged: &Arc<LibrarySnapshot>, previous: Arc<LibrarySnapshot>) {
+        let mut shared = self.lock();
+        if Arc::ptr_eq(&shared.snapshot, arranged) {
+            shared.snapshot = previous;
+        }
     }
 
     pub(crate) fn delete_entry(&self, id: &str) {

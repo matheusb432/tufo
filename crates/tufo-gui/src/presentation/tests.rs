@@ -940,3 +940,49 @@ fn local_output_failure_is_persistent_safe_copy_and_freezes_displayed_position()
         ""
     );
 }
+
+#[test]
+fn an_arranged_entry_lands_on_its_place_and_the_collection_turns_custom() {
+    let mut playlist = collection(
+        1,
+        CollectionKind::Playlist,
+        "Session",
+        vec![
+            entry(2, "Ambush", 60),
+            entry(3, "Chase", 60),
+            entry(4, "Dragon", 60),
+            entry(5, "Tavern", 60),
+        ],
+    );
+    let titles = |collection: &CollectionView| {
+        collection
+            .entries
+            .iter()
+            .map(|entry| entry.title.as_str().to_owned())
+            .collect::<Vec<_>>()
+    };
+
+    let unmoved = arrange(&mut playlist, CollectionEntryId::from_uuid(uuid(3)), 1);
+    assert!(!unmoved);
+    assert_eq!(playlist.order, EntryOrder::default());
+
+    assert!(arrange(
+        &mut playlist,
+        CollectionEntryId::from_uuid(uuid(2)),
+        2
+    ));
+    assert_eq!(titles(&playlist), ["Chase", "Dragon", "Ambush", "Tavern"]);
+    assert_eq!(playlist.order.key, EntryOrderKey::Custom);
+
+    assert!(arrange(
+        &mut playlist,
+        CollectionEntryId::from_uuid(uuid(2)),
+        99
+    ));
+    assert!(arrange(
+        &mut playlist,
+        CollectionEntryId::from_uuid(uuid(5)),
+        0
+    ));
+    assert_eq!(titles(&playlist), ["Tavern", "Chase", "Dragon", "Ambush"]);
+}

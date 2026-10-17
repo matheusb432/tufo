@@ -691,6 +691,10 @@ msgstr ""
 msgid "Newest first"
 msgstr ""
 
+#: ui/pages.slint
+msgid "Custom order"
+msgstr ""
+
 #: ui/dock.slint
 msgid "Next"
 msgstr ""

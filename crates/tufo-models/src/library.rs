@@ -258,6 +258,8 @@ pub enum EntryOrderKey {
     Duration,
     /// When the file was added to Tufo.
     DateAdded,
+    /// As arranged by hand.
+    Custom,
 }
 
 /// How a collection orders its entries. Ties fall back to the title, then the entry's id.
@@ -568,6 +570,8 @@ pub struct CollectionEntry {
     #[index]
     pub audio_file_id: AudioFileId,
     pub added_at: Timestamp,
+    /// The entry's place in the custom order; entries at the same place fall back to the title.
+    pub position: u32,
     pub looping: bool,
     pub volume: Volume,
     pub fade_in: FadeDuration,

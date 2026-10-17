@@ -664,6 +664,7 @@ async fn add_entries(
         .into_iter()
         .map(|entry| entry.audio_file_id)
         .collect::<HashSet<_>>();
+    let mut positions = store::EntryPositionsAtEnd::default();
     for (id, sound) in files {
         if collection.kind == CollectionKind::Playlist && collection.library_folder_id.is_none() {
             AudioFile::update_by_id(id)
@@ -674,6 +675,7 @@ async fn add_entries(
         if listed.insert(id) {
             store::create_entry(
                 executor,
+                &mut positions,
                 collection.id,
                 id,
                 now,

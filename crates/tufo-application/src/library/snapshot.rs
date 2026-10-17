@@ -76,7 +76,10 @@ async fn load_collections(
         entries_by_collection
             .entry(entry.collection_id)
             .or_default()
-            .push(entry_view(&entry, file, saved_loops.get(&file.id).copied()));
+            .push(PositionedEntry {
+                position: entry.position,
+                view: entry_view(&entry, file, saved_loops.get(&file.id).copied()),
+            });
     }
     let mut views = collections
         .into_iter()
@@ -86,6 +89,7 @@ async fn load_collections(
                 .remove(&collection.id)
                 .unwrap_or_default();
             sort_entries(&mut entries, collection.order());
+            let entries = entries.into_iter().map(|entry| entry.view).collect();
             collection_view(collection, entries)
         })
         .collect::<Vec<_>>();
@@ -207,14 +211,21 @@ fn collection_view(collection: Collection, entries: Vec<EntryView>) -> Collectio
     }
 }
 
+struct PositionedEntry {
+    position: u32,
+    view: EntryView,
+}
+
 /// Orders entries by the collection's key and direction. Ties fall back to the title, then the
 /// entry id, in ascending order, so equal keys never shuffle between snapshots.
-pub(super) fn sort_entries(entries: &mut [EntryView], order: EntryOrder) {
-    entries.sort_by(|left, right| {
+fn sort_entries(entries: &mut [PositionedEntry], order: EntryOrder) {
+    entries.sort_by(|left_entry, right_entry| {
+        let (left, right) = (&left_entry.view, &right_entry.view);
         let by_key = match order.key {
             EntryOrderKey::Title => compare_titles(left.title.as_str(), right.title.as_str()),
             EntryOrderKey::Duration => left.duration.cmp(&right.duration),
             EntryOrderKey::DateAdded => left.added_at.cmp(&right.added_at),
+            EntryOrderKey::Custom => left_entry.position.cmp(&right_entry.position),
         };
         let by_key = if order.descending {
             by_key.reverse()
@@ -240,8 +251,18 @@ mod tests {
 
     use super::*;
 
-    fn entry(seed: u128, title: &str, seconds: u64, added_second: i64) -> EntryView {
-        EntryView {
+    fn entry(seed: u128, title: &str, seconds: u64, added_second: i64) -> PositionedEntry {
+        positioned(seed, title, seconds, added_second, 0)
+    }
+
+    fn positioned(
+        seed: u128,
+        title: &str,
+        seconds: u64,
+        added_second: i64,
+        position: u32,
+    ) -> PositionedEntry {
+        let view = EntryView {
             builtin_title: None,
             id: CollectionEntryId::from_uuid(Uuid::from_u128(seed)),
             audio_file_id: AudioFileId::from_uuid(Uuid::from_u128(seed)),
@@ -253,11 +274,15 @@ mod tests {
             sound: SoundSettings::default(),
             icon: SoundIcon::default(),
             saved_loop: None,
-        }
+        };
+        PositionedEntry { position, view }
     }
 
-    fn titles(entries: &[EntryView]) -> Vec<&str> {
-        entries.iter().map(|entry| entry.title.as_str()).collect()
+    fn titles(entries: &[PositionedEntry]) -> Vec<&str> {
+        entries
+            .iter()
+            .map(|entry| entry.view.title.as_str())
+            .collect()
     }
 
     #[test]
@@ -311,5 +336,25 @@ mod tests {
             },
         );
         assert_eq!(titles(&entries), ["Tavern", "Dragon", "Ambush"]);
+    }
+
+    #[test]
+    fn custom_order_follows_positions_and_equal_positions_fall_back_to_the_title() {
+        let mut entries = vec![
+            positioned(1, "Tavern", 1, 0, 2),
+            positioned(2, "Dragon", 1, 0, 0),
+            positioned(3, "Ambush", 1, 0, 2),
+            positioned(4, "Chase", 1, 0, 1),
+        ];
+
+        sort_entries(
+            &mut entries,
+            EntryOrder {
+                key: EntryOrderKey::Custom,
+                descending: false,
+            },
+        );
+
+        assert_eq!(titles(&entries), ["Dragon", "Chase", "Ambush", "Tavern"]);
     }
 }

@@ -4,10 +4,10 @@ use tokio::sync::{mpsc, watch};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::library::{
-    add_files_to_collection, add_songs_to_playlist, create_collection, delete_collection,
-    delete_collection_entry, delete_library_folder, delete_song, delete_song_loop,
-    export_song_loops, get_song_waveform, import_kenku_library, import_paths, import_song_loops,
-    sync_library, update_collection, update_collection_entry, update_song_loop,
+    add_files_to_collection, add_songs_to_playlist, arrange_collection_entries, create_collection,
+    delete_collection, delete_collection_entry, delete_library_folder, delete_song,
+    delete_song_loop, export_song_loops, get_song_waveform, import_kenku_library, import_paths,
+    import_song_loops, sync_library, update_collection, update_collection_entry, update_song_loop,
 };
 use tufo_infra::{
     kenku::DiskKenkuReader,
@@ -147,6 +147,17 @@ impl<O: AudioOutputs> LibraryService for LibraryGrpcService<O> {
             .await
             .into_grpc()?;
         Ok(Response::new(pb::DeleteCollectionEntryResponse {}))
+    }
+
+    async fn arrange_collection_entries(
+        &self,
+        request: Request<pb::ArrangeCollectionEntriesRequest>,
+    ) -> Result<Response<pb::ArrangeCollectionEntriesResponse>, Status> {
+        let request = proto::library::arrange_collection_entries_request(request.get_ref())?;
+        arrange_collection_entries::execute(request, &self.state.library)
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::ArrangeCollectionEntriesResponse {}))
     }
 
     async fn add_songs_to_playlist(

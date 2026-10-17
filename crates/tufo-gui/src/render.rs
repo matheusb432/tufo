@@ -9,7 +9,7 @@ use tufo_client::{
 };
 use tufo_models::{
     kenku_import::KenkuImportState,
-    library::{CollectionKind, SoundIcon},
+    library::{CollectionKind, EntryOrderKey, SoundIcon},
 };
 
 use crate::{
@@ -27,9 +27,9 @@ use crate::{
         AppWindow, Art, BackgroundGroup, BackgroundLabel, BackgroundPresetTile, Backgrounds,
         BrowserPointer, BrowserState, BrowserTabView, BrowserView, CollectionBackground,
         CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge,
-        LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation, OutputRow, OutputRowKind,
-        Page, PlayerView, PlaylistChoice, Search, SearchResult, SearchResultKind, Session,
-        SidebarHiddenPages, SongFolder, SongLoopImportRow, SongLoopImportRowState,
+        LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation, OrderKey, OutputRow,
+        OutputRowKind, Page, PlayerView, PlaylistChoice, Search, SearchResult, SearchResultKind,
+        Session, SidebarHiddenPages, SongFolder, SongLoopImportRow, SongLoopImportRowState,
         SongLoopImportView, SongRow, SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
     },
 };
@@ -182,6 +182,15 @@ fn song_row(song: SongRowView) -> SongRow {
     }
 }
 
+fn order_key(key: EntryOrderKey) -> OrderKey {
+    match key {
+        EntryOrderKey::Title => OrderKey::Title,
+        EntryOrderKey::Duration => OrderKey::Duration,
+        EntryOrderKey::DateAdded => OrderKey::DateAdded,
+        EntryOrderKey::Custom => OrderKey::Custom,
+    }
+}
+
 fn loop_badge(badge: presentation::LoopBadgeView) -> LoopBadge {
     match badge {
         presentation::LoopBadgeView::None => LoopBadge::None,
@@ -263,67 +272,74 @@ pub(crate) fn library(
     view: LibraryPageView,
     navigation: presentation::Navigation,
 ) {
-    let _ = window.upgrade_in_event_loop(move |window| {
-        let library = window.global::<LibraryView>();
-        library.set_loaded(true);
-        library.set_playlists(model(view.playlists.iter().map(card).collect()));
-        library.set_soundboards(model(view.soundboards.iter().map(card).collect()));
-        show_rows(
-            &library.get_nav_playlists(),
-            view.nav_playlists.iter().map(nav_item).collect(),
-            |items| library.set_nav_playlists(items),
-        );
-        show_rows(
-            &library.get_nav_soundboards(),
-            view.nav_soundboards.iter().map(nav_item).collect(),
-            |items| library.set_nav_soundboards(items),
-        );
-        library.set_playlist_count(i32::try_from(view.playlist_count).unwrap_or(i32::MAX));
-        library.set_soundboard_count(i32::try_from(view.soundboard_count).unwrap_or(i32::MAX));
-        show_rows(
-            &library.get_playlist_choices(),
-            view.playlist_choices
-                .into_iter()
-                .map(|choice| PlaylistChoice {
-                    id: choice.id.to_string().into(),
-                    title: choice.title.into(),
-                    count_label: choice.count_label.into(),
-                    holds_song: choice.holds_song,
-                })
-                .collect(),
-            |choices| library.set_playlist_choices(choices),
-        );
-        if let Some(songs) = view.songs {
-            songs_page(&library, songs);
-        }
-        let page = match navigation.page {
-            PageKind::Home => Page::Home,
-            PageKind::Songs => Page::Songs,
-            PageKind::Playlists => Page::Playlists,
-            PageKind::Playlist => Page::Playlist,
-            PageKind::Soundboards => Page::Soundboards,
-            PageKind::Soundboard => Page::Soundboard,
-            PageKind::Browser => Page::Browser,
-        };
-        let pages = window.global::<Navigation>();
-        pages.set_collection_id(
-            navigation
-                .collection_id
-                .map(|id| id.to_string())
-                .unwrap_or_default()
-                .into(),
-        );
-        // A collection that disappeared sends its page back to the grid.
-        let page = match (page, &view.collection) {
-            (Page::Playlist, None) => Page::Playlists,
-            (Page::Soundboard, None) => Page::Soundboards,
-            (page, _) => page,
-        };
-        pages.set_page(page);
-        if let Some(collection) = view.collection {
-            collection_page(&library, collection);
-        }
-    });
+    let _ = window.upgrade_in_event_loop(move |window| library_now(&window, view, navigation));
+}
+
+/// Shows the library before the window draws again; only the UI thread can call it.
+pub(crate) fn library_now(
+    window: &AppWindow,
+    view: LibraryPageView,
+    navigation: presentation::Navigation,
+) {
+    let library = window.global::<LibraryView>();
+    library.set_loaded(true);
+    library.set_playlists(model(view.playlists.iter().map(card).collect()));
+    library.set_soundboards(model(view.soundboards.iter().map(card).collect()));
+    show_rows(
+        &library.get_nav_playlists(),
+        view.nav_playlists.iter().map(nav_item).collect(),
+        |items| library.set_nav_playlists(items),
+    );
+    show_rows(
+        &library.get_nav_soundboards(),
+        view.nav_soundboards.iter().map(nav_item).collect(),
+        |items| library.set_nav_soundboards(items),
+    );
+    library.set_playlist_count(i32::try_from(view.playlist_count).unwrap_or(i32::MAX));
+    library.set_soundboard_count(i32::try_from(view.soundboard_count).unwrap_or(i32::MAX));
+    show_rows(
+        &library.get_playlist_choices(),
+        view.playlist_choices
+            .into_iter()
+            .map(|choice| PlaylistChoice {
+                id: choice.id.to_string().into(),
+                title: choice.title.into(),
+                count_label: choice.count_label.into(),
+                holds_song: choice.holds_song,
+            })
+            .collect(),
+        |choices| library.set_playlist_choices(choices),
+    );
+    if let Some(songs) = view.songs {
+        songs_page(&library, songs);
+    }
+    let page = match navigation.page {
+        PageKind::Home => Page::Home,
+        PageKind::Songs => Page::Songs,
+        PageKind::Playlists => Page::Playlists,
+        PageKind::Playlist => Page::Playlist,
+        PageKind::Soundboards => Page::Soundboards,
+        PageKind::Soundboard => Page::Soundboard,
+        PageKind::Browser => Page::Browser,
+    };
+    let pages = window.global::<Navigation>();
+    pages.set_collection_id(
+        navigation
+            .collection_id
+            .map(|id| id.to_string())
+            .unwrap_or_default()
+            .into(),
+    );
+    // A collection that disappeared sends its page back to the grid.
+    let page = match (page, &view.collection) {
+        (Page::Playlist, None) => Page::Playlists,
+        (Page::Soundboard, None) => Page::Soundboards,
+        (page, _) => page,
+    };
+    pages.set_page(page);
+    if let Some(collection) = view.collection {
+        collection_page(&library, collection);
+    }
 }
 
 fn songs_page(library: &LibraryView<'_>, songs: SongsPageView) {
@@ -358,9 +374,11 @@ fn collection_page(library: &LibraryView<'_>, collection: CollectionPageView) {
     library.set_collection_folder(collection.linked_folder.unwrap_or_default().into());
     library.set_collection_missing(collection.missing);
     library.set_collection_pinned(collection.pinned);
-    library.set_order_key(collection.order_key);
+    library.set_order_key(order_key(collection.order_key));
     library.set_order_descending(collection.order_descending);
-    library.set_tracks(model(
+    // Updating rows in place keeps a lifted row's drag alive through playback changes.
+    show_rows(
+        &library.get_tracks(),
         collection
             .tracks
             .into_iter()
@@ -381,7 +399,8 @@ fn collection_page(library: &LibraryView<'_>, collection: CollectionPageView) {
                 loop_badge: loop_badge(track.loop_badge),
             })
             .collect(),
-    ));
+        |tracks| library.set_tracks(tracks),
+    );
     let tiles = collection
         .sounds
         .into_iter()

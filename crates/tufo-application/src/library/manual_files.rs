@@ -93,6 +93,7 @@ pub(super) async fn add_files<F: LibraryFiles>(
         .map(|entry| entry.audio_file_id)
         .collect::<Vec<_>>();
     let mut file_ids = known;
+    let mut positions = store::EntryPositionsAtEnd::default();
     for file in &new_files {
         file_ids.push(
             store::create_audio_file(&mut transaction, file, now, None)
@@ -110,6 +111,7 @@ pub(super) async fn add_files<F: LibraryFiles>(
         if !listed.contains(&audio_file_id) {
             store::create_entry(
                 &mut transaction,
+                &mut positions,
                 collection.id,
                 audio_file_id,
                 now,

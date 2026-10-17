@@ -94,6 +94,8 @@ export struct LoopFieldTexts {
 
 export enum LoopBadge { none, saved, needs-review }
 
+export enum OrderKey { title, duration, date-added, custom }
+
 export struct TrackRow {
     id: string,
     // The audio file's id, which Add to playlist adds.
@@ -302,7 +304,7 @@ export global LibraryView {
     in property <string> collection-folder;
     in property <bool> collection-missing;
     in property <bool> collection-pinned;
-    in property <int> order-key;
+    in property <OrderKey> order-key;
     in property <bool> order-descending;
     in property <[TrackRow]> tracks;
     in property <[SoundTile]> sounds;
@@ -513,7 +515,7 @@ export global Actions {
     callback delete-collection(string);
     // Lists the collection in the sidebar, or stops listing it.
     callback set-collection-pinned(string, bool);
-    callback set-order(int, bool);
+    callback set-order(OrderKey, bool);
     callback add-files(string);
 
     callback play-collection(string);
@@ -526,6 +528,8 @@ export global Actions {
     callback set-music-layer-looping(string, bool);
     callback rename-entry(string, string);
     callback delete-entry(string);
+    // Moves an entry to a place in its collection's custom order.
+    callback arrange-entry(string, int);
 
     // The song the Add to playlist dialog adds, for the host to list the playlists, or empty
     // once the dialog closes.

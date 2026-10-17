@@ -68,7 +68,7 @@ use tufo_client::{
     library::Background,
 };
 use tufo_local_transport::{ActivationListener, GuiInstance, LocalEndpoint};
-use tufo_models::library::{CollectionId, CollectionKind};
+use tufo_models::library::{CollectionId, CollectionKind, EntryOrderKey};
 
 /// The GUI only waits on RPCs, so two workers are plenty.
 const RUNTIME_WORKER_THREADS: usize = 2;
@@ -466,6 +466,15 @@ fn pane_modifiers(modifiers: &ui::BrowserModifiers) -> KeyModifiers {
     }
 }
 
+fn order_key(key: ui::OrderKey) -> EntryOrderKey {
+    match key {
+        ui::OrderKey::Title => EntryOrderKey::Title,
+        ui::OrderKey::Duration => EntryOrderKey::Duration,
+        ui::OrderKey::DateAdded => EntryOrderKey::DateAdded,
+        ui::OrderKey::Custom => EntryOrderKey::Custom,
+    }
+}
+
 fn page(page: ui::Page) -> PageKind {
     match page {
         ui::Page::Home => PageKind::Home,
@@ -529,7 +538,9 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     });
     on!(controller => on_delete_collection, |id| controller.delete_collection(&id));
     on!(controller => on_set_collection_pinned, |id, pinned| controller.set_collection_pinned(&id, pinned));
-    on!(controller => on_set_order, |key, descending| controller.set_order(key, descending));
+    on!(controller => on_set_order, |key, descending| {
+        controller.set_order(order_key(key), descending);
+    });
     on!(controller => on_add_files, |id| controller.add_files(&id));
     on!(controller => on_play_collection, |id| controller.play_collection(&id));
     on!(controller => on_play_track, |id| controller.play_track(&id));
@@ -541,6 +552,7 @@ fn bind(window: &ui::AppWindow, controller: &Controller) {
     on!(controller => on_set_music_layer_looping, |id, looping| controller.set_music_layer_looping(&id, looping));
     on!(controller => on_rename_entry, |id, title| controller.rename_entry(&id, &title));
     on!(controller => on_delete_entry, |id| controller.delete_entry(&id));
+    on!(controller => on_arrange_entry, |id, place| controller.arrange_entry(&id, place));
     on!(controller => on_toggle_sound, |id| controller.toggle_sound(&id));
     on!(controller => on_set_sound_looping, |id, looping| controller.set_sound_looping(&id, looping));
     on!(controller => on_set_sound_volume, |id, volume| controller.set_sound_volume(&id, volume));

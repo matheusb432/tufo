@@ -5,17 +5,22 @@ mod support;
 use support::{TEST_TIMEOUT, TestServer, write_wav};
 use tufo_application::library::{
     add_files_to_collection::AddFilesToCollectionError,
-    add_songs_to_playlist::AddSongsToPlaylistError, delete_collection::DeleteCollectionError,
-    delete_song::DeleteSongError,
+    add_songs_to_playlist::AddSongsToPlaylistError,
+    arrange_collection_entries::ArrangeCollectionEntriesError,
+    delete_collection::DeleteCollectionError, delete_song::DeleteSongError,
 };
-use tufo_client::{ClientError, Code, error};
+use tufo_client::{ClientError, Code, LibrarySnapshots, error};
 use tufo_models::{
-    library::{AudioFileId, CollectionId, CollectionKind, SoundIcon, Title},
+    library::{
+        AudioFileId, CollectionEntryId, CollectionId, CollectionKind, EntryOrderKey, SoundIcon,
+        Title,
+    },
     path::LocalPath,
 };
 use tufo_wire::library::{
-    AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CreateCollection,
-    ImportPaths, SongSource, UpdateCollectionEntry,
+    AddFilesToCollection, AddSongsToPlaylist, ArrangeCollectionEntries, Background,
+    CollectionSource, CollectionView, CreateCollection, EntryArrangement, ImportPaths,
+    LibrarySnapshot, SongSource, UpdateCollectionEntry,
 };
 
 #[tokio::test]
@@ -198,4 +203,119 @@ async fn a_sound_keeps_the_icon_chosen_for_it() {
     assert_eq!(updated_rain.icon, SoundIcon::CloudRain);
     assert_eq!(updated_rain.sound, rain.sound);
     server.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn a_collection_keeps_its_custom_order_and_new_sounds_join_its_end() {
+    let server = TestServer::start().await.unwrap();
+    let client = server.client().unwrap();
+    let sounds = tempfile::tempdir().unwrap();
+    for name in ["ambush", "chase", "dragon", "tavern"] {
+        write_wav(&sounds.path().join(format!("sfx/{name}.wav")), 440.0).unwrap();
+    }
+    client
+        .import_paths(&ImportPaths {
+            kind: CollectionKind::Soundboard,
+            paths: vec![LocalPath::try_new(sounds.path().join("sfx")).unwrap()],
+        })
+        .await
+        .unwrap();
+    let mut snapshots = client.watch_library().await.unwrap();
+    let imported = snapshots.next().await.unwrap().unwrap();
+    let collection_id = imported.collections[0].id;
+    let entry_id = |title: &str| entry_id_by_title(&imported.collections[0], title).unwrap();
+    let arrange = |titles: &[&str]| ArrangeCollectionEntries {
+        collection_id,
+        entry_ids: EntryArrangement::try_new(titles.iter().map(|title| entry_id(title)).collect())
+            .unwrap(),
+    };
+
+    client
+        .arrange_collection_entries(&arrange(&["dragon", "tavern", "ambush", "chase"]))
+        .await
+        .unwrap();
+    let arranged = next_snapshot_where(&mut snapshots, |snapshot| {
+        snapshot.collections[0].order.key == EntryOrderKey::Custom
+    })
+    .await
+    .unwrap();
+    write_wav(&sounds.path().join("sfx/bandits.wav"), 440.0).unwrap();
+    client.rescan_library().await.unwrap();
+    next_snapshot_where(&mut snapshots, |snapshot| {
+        snapshot.collections[0].entries.len() == 5
+    })
+    .await
+    .unwrap();
+    client
+        .arrange_collection_entries(&arrange(&["chase"]))
+        .await
+        .unwrap();
+    let rearranged = next_snapshot_where(&mut snapshots, |snapshot| {
+        snapshot.collections[0].entries[0].title.as_str() == "chase"
+    })
+    .await
+    .unwrap();
+    let unknown_entry = client
+        .arrange_collection_entries(&ArrangeCollectionEntries {
+            collection_id,
+            entry_ids: EntryArrangement::try_new(vec![CollectionEntryId::from_uuid(
+                uuid::Uuid::from_u128(1),
+            )])
+            .unwrap(),
+        })
+        .await;
+    let unknown_collection = client
+        .arrange_collection_entries(&ArrangeCollectionEntries {
+            collection_id: CollectionId::from_uuid(uuid::Uuid::from_u128(1)),
+            entry_ids: EntryArrangement::default(),
+        })
+        .await;
+
+    assert_eq!(
+        titles(&arranged.collections[0]),
+        ["dragon", "tavern", "ambush", "chase"]
+    );
+    assert_eq!(
+        titles(&rearranged.collections[0]),
+        ["chase", "dragon", "tavern", "ambush", "bandits"]
+    );
+    assert!(matches!(unknown_entry, Err(ClientError::Status(status))
+        if status.code() == Code::NotFound
+        && error::reason(&status).as_deref() == Some(ArrangeCollectionEntriesError::ENTRY_NOT_FOUND)));
+    assert!(
+        matches!(unknown_collection, Err(ClientError::Status(status))
+        if status.code() == Code::NotFound
+        && error::reason(&status).as_deref() == Some(ArrangeCollectionEntriesError::NOT_FOUND))
+    );
+    server.stop().await.unwrap();
+}
+
+fn entry_id_by_title(collection: &CollectionView, title: &str) -> Option<CollectionEntryId> {
+    collection
+        .entries
+        .iter()
+        .find(|entry| entry.title.as_str() == title)
+        .map(|entry| entry.id)
+}
+
+fn titles(collection: &CollectionView) -> Vec<&str> {
+    collection
+        .entries
+        .iter()
+        .map(|entry| entry.title.as_str())
+        .collect()
+}
+
+async fn next_snapshot_where(
+    snapshots: &mut LibrarySnapshots,
+    wanted: impl Fn(&LibrarySnapshot) -> bool,
+) -> anyhow::Result<LibrarySnapshot> {
+    loop {
+        let snapshot = tokio::time::timeout(TEST_TIMEOUT, snapshots.next())
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("the library stream ended"))??;
+        if wanted(&snapshot) {
+            return Ok(snapshot);
+        }
+    }
 }

@@ -212,6 +212,7 @@ mod tests {
             collection_id: collection.id,
             audio_file_id: file.id,
             added_at: seeded_at,
+            position: 0,
             looping: true,
             volume: Volume::default(),
             fade_in: FadeDuration::default(),
@@ -234,8 +235,9 @@ mod tests {
              ALTER TABLE collections DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN song_source;
+             ALTER TABLE collection_entries DROP COLUMN position;
              DELETE FROM __toasty_migrations
-             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql');",
+             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql', '0013_custom_entry_order.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -264,6 +266,7 @@ mod tests {
             collection_id: collection.id,
             audio_file_id: audio_file.id,
             added_at: Timestamp::now(),
+            position: 0,
             looping: false,
             volume: Volume::default(),
             fade_in: FadeDuration::default(),
@@ -297,7 +300,8 @@ mod tests {
              ALTER TABLE player_settings DROP COLUMN browser_muted;
              ALTER TABLE audio_files DROP COLUMN song_source;
              ALTER TABLE collections DROP COLUMN pinned;
-             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql');",
+             ALTER TABLE collection_entries DROP COLUMN position;
+             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql', '0013_custom_entry_order.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -382,7 +386,9 @@ mod tests {
         legacy
             .execute_batch(
                 "ALTER TABLE collections DROP COLUMN pinned;
-             DELETE FROM __toasty_migrations WHERE name = '0012_pinned_collections.sql';",
+             ALTER TABLE collection_entries DROP COLUMN position;
+             DELETE FROM __toasty_migrations
+             WHERE name IN ('0012_pinned_collections.sql', '0013_custom_entry_order.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -413,6 +419,7 @@ mod tests {
             collection_id: collection.id,
             audio_file_id: audio_file.id,
             added_at: Timestamp::now(),
+            position: 0,
             looping: false,
             volume: Volume::default(),
             fade_in: FadeDuration::default(),
@@ -433,6 +440,118 @@ mod tests {
         let audio_files = AudioFile::all().exec(&mut database).await.unwrap();
         assert!(entries.is_empty());
         assert_eq!(audio_files.len(), 1);
+    }
+
+    async fn insert_ordered_playlist(
+        database: &mut Db,
+        order_key: EntryOrderKey,
+        order_descending: bool,
+        files: &[AudioFile],
+    ) -> Collection {
+        let collection = insert_manual_playlist(database).await;
+        Collection::update_by_id(collection.id)
+            .order_key(order_key)
+            .order_descending(order_descending)
+            .exec(database)
+            .await
+            .unwrap();
+        for file in files {
+            insert_entry(database, &collection, file).await;
+        }
+        collection
+    }
+
+    async fn positions_by_file(
+        database: &mut Db,
+        collection: &Collection,
+        files: &[AudioFile],
+    ) -> Vec<u32> {
+        let entries = CollectionEntry::filter_by_collection_id(collection.id)
+            .exec(database)
+            .await
+            .unwrap();
+        let position_of = |file: &AudioFile| {
+            entries
+                .iter()
+                .find(|entry| entry.audio_file_id == file.id)
+                .map(|entry| entry.position)
+        };
+        files
+            .iter()
+            .map(|file| position_of(file).unwrap())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn the_custom_order_starts_as_each_collections_current_order() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join(DATABASE_FILE_NAME);
+        let mut database = open_database(&path).await.unwrap();
+        let first_added_at = Timestamp::from_second(1_790_000_000).unwrap();
+        let mut files = Vec::new();
+        for (added_second, (file_name, duration_ms)) in (0..).zip([
+            ("ambush.ogg", 180_000),
+            ("tavern.ogg", 60_000),
+            ("chase.ogg", 120_000),
+        ]) {
+            let file = insert_audio_file(&mut database, file_name).await;
+            AudioFile::update_by_id(file.id)
+                .duration_ms(duration_ms)
+                .created_at(
+                    first_added_at
+                        .checked_add(jiff::SignedDuration::from_secs(added_second))
+                        .unwrap(),
+                )
+                .exec(&mut database)
+                .await
+                .unwrap();
+            files.push(file);
+        }
+        let longest_first =
+            insert_ordered_playlist(&mut database, EntryOrderKey::Duration, true, &files).await;
+        let oldest_first =
+            insert_ordered_playlist(&mut database, EntryOrderKey::DateAdded, false, &files).await;
+        let by_title =
+            insert_ordered_playlist(&mut database, EntryOrderKey::Title, false, &files).await;
+        drop(database);
+        let legacy = rusqlite::Connection::open(&path).unwrap();
+        legacy
+            .execute_batch(
+                "ALTER TABLE collection_entries DROP COLUMN position;
+             DELETE FROM __toasty_migrations WHERE name = '0013_custom_entry_order.sql';",
+            )
+            .unwrap();
+        drop(legacy);
+
+        let mut migrated = open_database(&path).await.unwrap();
+        assert_eq!(
+            positions_by_file(&mut migrated, &longest_first, &files).await,
+            [0, 2, 1]
+        );
+        assert_eq!(
+            positions_by_file(&mut migrated, &oldest_first, &files).await,
+            [0, 1, 2]
+        );
+        assert_eq!(
+            positions_by_file(&mut migrated, &by_title, &files).await,
+            [0, 0, 0]
+        );
+        drop(migrated);
+        let migrated = rusqlite::Connection::open(&path).unwrap();
+        let collection_indexes = migrated
+            .prepare("SELECT name FROM sqlite_schema WHERE type = 'index' AND tbl_name = 'collections' AND sql IS NOT NULL ORDER BY name")
+            .unwrap()
+            .query_map([], |row| row.get::<_, String>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(
+            collection_indexes,
+            [
+                "index_collections_by_library_folder_id",
+                "index_collections_by_linked_folder"
+            ]
+        );
     }
 
     #[tokio::test]

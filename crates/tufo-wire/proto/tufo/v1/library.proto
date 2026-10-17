@@ -31,6 +31,10 @@ service LibraryService {
   // Deletes an entry from a manual collection. Linked collections refuse with
   // FAILED_PRECONDITION, since their folder decides their entries.
   rpc DeleteCollectionEntry(DeleteCollectionEntryRequest) returns (DeleteCollectionEntryResponse);
+  // Saves a collection's custom order and switches the collection to it. The listed entries
+  // come first, in the listed order; entries left out follow in their previous custom order.
+  // NOT_FOUND names an unknown collection or an entry it doesn't list.
+  rpc ArrangeCollectionEntries(ArrangeCollectionEntriesRequest) returns (ArrangeCollectionEntriesResponse);
   // Adds songs to a hand-picked playlist, skipping the songs it already lists. NOT_FOUND names
   // an unknown playlist or song; linked playlists refuse with FAILED_PRECONDITION.
   rpc AddSongsToPlaylist(AddSongsToPlaylistRequest) returns (AddSongsToPlaylistResponse);
@@ -211,6 +215,8 @@ enum EntryOrderKey {
   ENTRY_ORDER_KEY_DURATION = 2;
   // When the file was added to Tufo.
   ENTRY_ORDER_KEY_DATE_ADDED = 3;
+  // As arranged by hand through ArrangeCollectionEntries.
+  ENTRY_ORDER_KEY_CUSTOM = 4;
 }
 
 // Entries added by hand.
@@ -414,6 +420,14 @@ message DeleteCollectionEntryRequest {
 }
 
 message DeleteCollectionEntryResponse {}
+
+message ArrangeCollectionEntriesRequest {
+  string collection_id = 1;
+  // Canonical UUIDs of the collection's entries, each at most once.
+  repeated string collection_entry_ids = 2;
+}
+
+message ArrangeCollectionEntriesResponse {}
 
 message AddSongsToPlaylistRequest {
   string playlist_id = 1;

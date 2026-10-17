@@ -23,9 +23,9 @@ use tufo_models::{
 pub use tufo_wire::{error, library, player, server, song_loops};
 use tufo_wire::{
     library::{
-        AddFilesToCollection, AddSongsToPlaylist, CreateCollection, ImportKenkuLibrary,
-        ImportPaths, ImportReport, KenkuImportStatus, LibrarySnapshot, UpdateCollection,
-        UpdateCollectionEntry,
+        AddFilesToCollection, AddSongsToPlaylist, ArrangeCollectionEntries, CreateCollection,
+        ImportKenkuLibrary, ImportPaths, ImportReport, KenkuImportStatus, LibrarySnapshot,
+        UpdateCollection, UpdateCollectionEntry,
     },
     pb::{
         self, library_service_client::LibraryServiceClient,
@@ -271,6 +271,21 @@ impl TufoClient {
         self.library
             .clone()
             .delete_collection_entry(request)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn arrange_collection_entries(
+        &self,
+        request: &ArrangeCollectionEntries,
+    ) -> Result<(), ClientError> {
+        let request = with_timeout(
+            proto::library::arrange_collection_entries_message(request),
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.library
+            .clone()
+            .arrange_collection_entries(request)
             .await?;
         Ok(())
     }

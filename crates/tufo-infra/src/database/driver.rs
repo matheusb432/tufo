@@ -62,7 +62,13 @@ impl ConfiguredSqlite {
     }
 
     async fn configure_connection(&self, connection: &mut dyn Connection) -> Result<()> {
-        self.execute_pragma(connection, "PRAGMA foreign_keys = ON", RawSqlRet::Infer)
+        let foreign_keys = match self.role {
+            DatabaseConnectionRole::Runtime => "PRAGMA foreign_keys = ON",
+            // Rebuilding a table would cascade into its children's rows; each migration checks
+            // foreign keys before it commits instead.
+            DatabaseConnectionRole::Migration => "PRAGMA foreign_keys = OFF",
+        };
+        self.execute_pragma(connection, foreign_keys, RawSqlRet::Infer)
             .await?;
         self.execute_pragma(connection, "PRAGMA busy_timeout = 5000", RawSqlRet::Infer)
             .await?;

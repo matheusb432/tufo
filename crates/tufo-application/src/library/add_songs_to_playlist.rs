@@ -66,6 +66,7 @@ pub async fn execute<F: LibraryFiles>(
         .collect::<HashSet<_>>();
     let now = Timestamp::now();
     let mut songs_added = 0;
+    let mut positions = store::EntryPositionsAtEnd::default();
     for audio_file_id in request.audio_file_ids {
         AudioFile::filter_by_id(audio_file_id)
             .first()
@@ -76,6 +77,7 @@ pub async fn execute<F: LibraryFiles>(
         if listed.insert(audio_file_id) {
             store::create_entry(
                 &mut transaction,
+                &mut positions,
                 playlist.id,
                 audio_file_id,
                 now,

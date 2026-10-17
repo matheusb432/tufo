@@ -147,6 +147,7 @@ pub(super) async fn apply_changes(
             .exec(&mut transaction)
             .await?;
     }
+    let mut positions = EntryPositionsAtEnd::default();
     for (collection, file) in &changes.entries_added {
         let collection_id = match collection {
             CollectionRef::Existing(id) => *id,
@@ -158,6 +159,7 @@ pub(super) async fn apply_changes(
         };
         create_entry(
             &mut transaction,
+            &mut positions,
             collection_id,
             audio_file_id,
             now,
@@ -374,8 +376,34 @@ pub(super) async fn create_manual_collection(
     .await?)
 }
 
+/// The places after each collection's last entry, where new entries join its custom order.
+#[derive(Default)]
+pub(super) struct EntryPositionsAtEnd(HashMap<CollectionId, u32>);
+
+impl EntryPositionsAtEnd {
+    async fn take_next(
+        &mut self,
+        executor: &mut dyn Executor,
+        collection_id: CollectionId,
+    ) -> Result<u32, LibraryStorageError> {
+        let next = match self.0.get(&collection_id) {
+            Some(next) => *next,
+            None => CollectionEntry::filter_by_collection_id(collection_id)
+                .exec(executor)
+                .await?
+                .iter()
+                .map(|entry| entry.position.saturating_add(1))
+                .max()
+                .unwrap_or(0),
+        };
+        self.0.insert(collection_id, next.saturating_add(1));
+        Ok(next)
+    }
+}
+
 pub(super) async fn create_entry(
     executor: &mut dyn Executor,
+    positions: &mut EntryPositionsAtEnd,
     collection_id: CollectionId,
     audio_file_id: AudioFileId,
     now: Timestamp,
@@ -388,10 +416,12 @@ pub(super) async fn create_entry(
         fade_in,
         fade_out,
     } = sound;
+    let position = positions.take_next(executor, collection_id).await?;
     Ok(toasty::create!(CollectionEntry {
         collection_id,
         audio_file_id,
         added_at: now,
+        position,
         looping,
         volume,
         fade_in,

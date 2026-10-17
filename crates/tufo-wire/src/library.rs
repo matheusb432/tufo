@@ -1,6 +1,6 @@
 //! The process-neutral contracts for reading and changing the library.
 
-use std::time::Duration;
+use std::{collections::HashSet, time::Duration};
 
 use jiff::Timestamp;
 use tufo_models::{
@@ -177,6 +177,36 @@ pub struct AddSongsToPlaylist {
     pub playlist_id: CollectionId,
     /// At least one.
     pub audio_file_ids: Vec<AudioFileId>,
+}
+
+/// A collection's custom order, from its first entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrangeCollectionEntries {
+    pub collection_id: CollectionId,
+    pub entry_ids: EntryArrangement,
+}
+
+/// Entry ids in order, each at most once.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EntryArrangement(Vec<CollectionEntryId>);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[error("the entry {0} is listed more than once")]
+pub struct DuplicateEntryError(pub CollectionEntryId);
+
+impl EntryArrangement {
+    pub fn try_new(entry_ids: Vec<CollectionEntryId>) -> Result<Self, DuplicateEntryError> {
+        let mut seen = HashSet::with_capacity(entry_ids.len());
+        if let Some(duplicate) = entry_ids.iter().find(|id| !seen.insert(**id)) {
+            return Err(DuplicateEntryError(*duplicate));
+        }
+        Ok(Self(entry_ids))
+    }
+
+    #[must_use]
+    pub fn as_slice(&self) -> &[CollectionEntryId] {
+        &self.0
+    }
 }
 
 /// What an import or addition changed.

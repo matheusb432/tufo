@@ -76,8 +76,17 @@ pub async fn execute<F: LibraryFiles>(
         Some(BuiltinTitle::Effects),
     )
     .await?;
+    let mut positions = store::EntryPositionsAtEnd::default();
     for (effect, new_file) in &readable_effects {
-        add_effect(&mut transaction, soundboard.id, *effect, new_file, now).await?;
+        add_effect(
+            &mut transaction,
+            &mut positions,
+            soundboard.id,
+            *effect,
+            new_file,
+            now,
+        )
+        .await?;
     }
     record_seed(&mut transaction, now).await?;
     transaction.commit().await?;
@@ -87,6 +96,7 @@ pub async fn execute<F: LibraryFiles>(
 
 async fn add_effect(
     executor: &mut dyn Executor,
+    positions: &mut store::EntryPositionsAtEnd,
     soundboard_id: CollectionId,
     effect: DefaultEffect,
     file: &NewFile,
@@ -110,6 +120,7 @@ async fn add_effect(
     };
     store::create_entry(
         executor,
+        positions,
         soundboard_id,
         audio_file_id,
         now,

@@ -21,11 +21,12 @@ use super::{
 };
 use crate::{
     library::{
-        AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
-        CreateCollection, EntryOrderPatch, EntryView, ImportKenkuLibrary, ImportPaths,
-        ImportReport, KenkuCollectionChoice, KenkuImportConflict, KenkuImportReport,
-        KenkuImportStatus, LibraryFolderView, LibrarySnapshot, SongSource, SongView,
-        SoundSettingsPatch, UpdateCollection, UpdateCollectionEntry,
+        AddFilesToCollection, AddSongsToPlaylist, ArrangeCollectionEntries, Background,
+        CollectionSource, CollectionView, CreateCollection, EntryArrangement, EntryOrderPatch,
+        EntryView, ImportKenkuLibrary, ImportPaths, ImportReport, KenkuCollectionChoice,
+        KenkuImportConflict, KenkuImportReport, KenkuImportStatus, LibraryFolderView,
+        LibrarySnapshot, SongSource, SongView, SoundSettingsPatch, UpdateCollection,
+        UpdateCollectionEntry,
     },
     pb,
 };
@@ -176,6 +177,25 @@ pub fn delete_collection_entry_request(
     request: &pb::DeleteCollectionEntryRequest,
 ) -> Result<CollectionEntryId, Status> {
     collection_entry_id(&request.collection_entry_id)
+}
+
+pub fn arrange_collection_entries_request(
+    request: &pb::ArrangeCollectionEntriesRequest,
+) -> Result<ArrangeCollectionEntries, Status> {
+    let entry_ids = request
+        .collection_entry_ids
+        .iter()
+        .map(|id| {
+            parse_uuid(id)
+                .map(CollectionEntryId::from_uuid)
+                .ok_or_else(|| invalid("collection_entry_ids", "must be canonical UUIDs"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(ArrangeCollectionEntries {
+        collection_id: collection_id(&request.collection_id)?,
+        entry_ids: EntryArrangement::try_new(entry_ids)
+            .map_err(|error| invalid("collection_entry_ids", error))?,
+    })
 }
 
 pub fn add_songs_to_playlist_request(
@@ -463,6 +483,21 @@ pub fn update_collection_entry_message(
 pub fn delete_collection_entry_message(id: CollectionEntryId) -> pb::DeleteCollectionEntryRequest {
     pb::DeleteCollectionEntryRequest {
         collection_entry_id: id.to_string(),
+    }
+}
+
+#[must_use]
+pub fn arrange_collection_entries_message(
+    request: &ArrangeCollectionEntries,
+) -> pb::ArrangeCollectionEntriesRequest {
+    pb::ArrangeCollectionEntriesRequest {
+        collection_id: request.collection_id.to_string(),
+        collection_entry_ids: request
+            .entry_ids
+            .as_slice()
+            .iter()
+            .map(ToString::to_string)
+            .collect(),
     }
 }
 
@@ -915,8 +950,9 @@ fn entry_order_key(key: i32) -> Result<EntryOrderKey, &'static str> {
         Ok(pb::EntryOrderKey::Title) => Ok(EntryOrderKey::Title),
         Ok(pb::EntryOrderKey::Duration) => Ok(EntryOrderKey::Duration),
         Ok(pb::EntryOrderKey::DateAdded) => Ok(EntryOrderKey::DateAdded),
+        Ok(pb::EntryOrderKey::Custom) => Ok(EntryOrderKey::Custom),
         Ok(pb::EntryOrderKey::Unspecified) | Err(_) => {
-            Err("key must be title, duration, or date added")
+            Err("key must be title, duration, date added, or custom")
         }
     }
 }
@@ -933,6 +969,7 @@ fn entry_order_key_message(key: EntryOrderKey) -> pb::EntryOrderKey {
         EntryOrderKey::Title => pb::EntryOrderKey::Title,
         EntryOrderKey::Duration => pb::EntryOrderKey::Duration,
         EntryOrderKey::DateAdded => pb::EntryOrderKey::DateAdded,
+        EntryOrderKey::Custom => pb::EntryOrderKey::Custom,
     }
 }
 
@@ -1290,6 +1327,24 @@ mod tests {
     }
 
     #[test]
+    fn arrangements_survive_the_round_trip() {
+        let request = ArrangeCollectionEntries {
+            collection_id: CollectionId::from_uuid(uuid::Uuid::from_u128(1)),
+            entry_ids: EntryArrangement::try_new(vec![
+                CollectionEntryId::from_uuid(uuid::Uuid::from_u128(3)),
+                CollectionEntryId::from_uuid(uuid::Uuid::from_u128(2)),
+            ])
+            .unwrap(),
+        };
+
+        assert_eq!(
+            arrange_collection_entries_request(&arrange_collection_entries_message(&request))
+                .unwrap(),
+            request
+        );
+    }
+
+    #[test]
     fn absent_update_fields_leave_their_properties_alone() {
         let id = CollectionId::from_uuid(uuid::Uuid::from_u128(9));
         for update in [
@@ -1532,10 +1587,16 @@ mod tests {
         let not_a_song = delete_song_request(&pb::DeleteSongRequest {
             audio_file_id: "tavern.mp3".to_owned(),
         });
+        let entry_twice =
+            arrange_collection_entries_request(&pb::ArrangeCollectionEntriesRequest {
+                collection_id: uuid::Uuid::from_u128(1).to_string(),
+                collection_entry_ids: vec![uuid::Uuid::from_u128(2).to_string(); 2],
+            });
 
         assert_eq!(not_a_uuid.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(no_songs.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(not_a_song.unwrap_err().code(), Code::InvalidArgument);
+        assert_eq!(entry_twice.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(no_background.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(unknown_preset.unwrap_err().code(), Code::InvalidArgument);
         assert_eq!(no_kind.unwrap_err().code(), Code::InvalidArgument);

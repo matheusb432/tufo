@@ -3,6 +3,7 @@
 //! Everything here is plain data, so it's computed off the UI thread and tested without a window.
 
 use std::{
+    cmp::Ordering,
     collections::{BTreeMap, HashMap, HashSet},
     path::PathBuf,
     time::{Duration, SystemTime},
@@ -20,7 +21,7 @@ use tufo_models::{
     discord::{VoiceChannel, VoiceChannelTarget},
     library::{
         AudioFileId, BackgroundPreset, BuiltinTitle, CollectionEntryId, CollectionId,
-        CollectionKind, EntryOrderKey, LibraryFolderId, SoundIcon, Title,
+        CollectionKind, EntryOrder, EntryOrderKey, LibraryFolderId, SoundIcon, Title,
     },
     path::ImageFilePath,
     playback::{
@@ -238,8 +239,7 @@ pub(crate) struct CollectionPageView {
     pub(crate) linked_folder: Option<String>,
     pub(crate) missing: bool,
     pub(crate) pinned: bool,
-    /// 0 title, 1 duration, 2 date added.
-    pub(crate) order_key: i32,
+    pub(crate) order_key: EntryOrderKey,
     pub(crate) order_descending: bool,
     pub(crate) tracks: Vec<TrackRowView>,
     pub(crate) sounds: Vec<SoundTileView>,
@@ -526,6 +526,33 @@ fn song_search_results(
         .collect()
 }
 
+/// Moves an entry to `place` in the order the page shows and switches the collection to that
+/// custom order. Returns whether the order changed.
+pub(crate) fn arrange(
+    collection: &mut CollectionView,
+    entry_id: CollectionEntryId,
+    place: usize,
+) -> bool {
+    let Some(from) = collection
+        .entries
+        .iter()
+        .position(|entry| entry.id == entry_id)
+    else {
+        return false;
+    };
+    let place = place.min(collection.entries.len() - 1);
+    if place == from {
+        return false;
+    }
+    let entry = collection.entries.remove(from);
+    collection.entries.insert(place, entry);
+    collection.order = EntryOrder {
+        key: EntryOrderKey::Custom,
+        descending: false,
+    };
+    true
+}
+
 pub(crate) fn find_collection(
     snapshot: &LibrarySnapshot,
     id: CollectionId,
@@ -667,11 +694,7 @@ fn collection_page(
         linked_folder,
         missing,
         pinned: collection.pinned,
-        order_key: match collection.order.key {
-            EntryOrderKey::Title => 0,
-            EntryOrderKey::Duration => 1,
-            EntryOrderKey::DateAdded => 2,
-        },
+        order_key: collection.order.key,
         order_descending: collection.order.descending,
         tracks,
         sounds,
@@ -1356,6 +1379,8 @@ pub(crate) fn localize_snapshot(snapshot: &mut LibrarySnapshot) {
                 EntryOrderKey::Title => compare_titles(left.title.as_str(), right.title.as_str()),
                 EntryOrderKey::Duration => left.duration.cmp(&right.duration),
                 EntryOrderKey::DateAdded => left.added_at.cmp(&right.added_at),
+                // The server sends the custom order, which a stable sort keeps.
+                EntryOrderKey::Custom => return Ordering::Equal,
             };
             let by_key = if collection.order.descending {
                 by_key.reverse()
@@ -1434,6 +1459,7 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
             LibraryStorageError,
             add_files_to_collection::AddFilesToCollectionError,
             add_songs_to_playlist::AddSongsToPlaylistError,
+            arrange_collection_entries::ArrangeCollectionEntriesError,
             delete_collection::DeleteCollectionError,
             delete_collection_entry::DeleteCollectionEntryError,
             delete_library_folder::DeleteLibraryFolderError,
@@ -1460,6 +1486,7 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
             | AddSongsToPlaylistError::PLAYLIST_NOT_FOUND
             | DeleteCollectionError::NOT_FOUND
             | UpdateCollectionError::NOT_FOUND
+            | ArrangeCollectionEntriesError::NOT_FOUND
             | PlayCollectionError::NOT_FOUND,
         ) => tr("That collection no longer exists."),
         (Code::NotFound, AddSongsToPlaylistError::SONG_NOT_FOUND | DeleteSongError::NOT_FOUND) => {
@@ -1475,6 +1502,7 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
             Code::NotFound,
             DeleteCollectionEntryError::NOT_FOUND
             | UpdateCollectionEntryError::NOT_FOUND
+            | ArrangeCollectionEntriesError::ENTRY_NOT_FOUND
             | PlayEntrySoundError::NOT_FOUND,
         ) => tr("That track or sound no longer exists."),
         (

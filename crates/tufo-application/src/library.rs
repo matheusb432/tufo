@@ -6,6 +6,7 @@
 
 pub mod add_files_to_collection;
 pub mod add_songs_to_playlist;
+pub mod arrange_collection_entries;
 pub mod create_collection;
 pub mod delete_collection;
 pub mod delete_collection_entry;

@@ -6,8 +6,8 @@ use serde_json::{Value, json};
 use tufo_client::{
     import_resources,
     library::{
-        AddFilesToCollection, AddSongsToPlaylist, Background, CreateCollection, EntryOrderPatch,
-        UpdateCollection,
+        AddFilesToCollection, AddSongsToPlaylist, ArrangeCollectionEntries, Background,
+        CreateCollection, EntryArrangement, EntryOrderPatch, UpdateCollection,
     },
 };
 use tufo_models::{
@@ -18,7 +18,10 @@ use tufo_models::{
 use super::{collection_by_id, matches_query, parse_collection_kind, parse_paths, resource_ids};
 use crate::{
     api,
-    input::{NullableField, deserialize_present, parse_audio_file_id, parse_collection_id},
+    input::{
+        NullableField, deserialize_present, parse_audio_file_id, parse_collection_id,
+        parse_entry_id,
+    },
     library_values::parse_background_preset,
     record,
 };
@@ -67,7 +70,8 @@ haunted, mountain, night, sky, skulls, storm, tavern, town, underworld, volcano,
   tufo collection update COLLECTION_ID '{"background":null}'
   tufo collection update COLLECTION_ID '{"pinned":false}'
 
-Order keys: title, duration, date_added. Omitted order properties are preserved.
+Order keys: title, duration, date_added, custom. Omitted order properties are preserved.
+collection arrange saves the custom order.
 background accepts the same objects as collection add; null restores the gradient.
 pinned lists the collection in the GUI's sidebar; new collections start pinned.
 Other fields cannot be null. Unknown fields, including nested fields, are rejected.
@@ -106,6 +110,20 @@ audio_file_ids must contain at least one lowercase hyphenated UUID."#
         id: CollectionId,
         #[arg(value_name = "JSON_PAYLOAD")]
         payload: AddSongsPayload,
+    },
+    /// Save a custom entry order and switch the collection to it.
+    #[command(
+        after_long_help = r#"Example (use IDs from entry list --collection COLLECTION_ID):
+  tufo collection arrange COLLECTION_ID '{"entry_ids":["01a0cf81-04dd-7d42-9a53-2904e3318bc7"]}'
+
+The listed entries come first, in the listed order; entries left out follow in their
+previous custom order. Each entry ID may appear once."#
+    )]
+    Arrange {
+        #[arg(value_name = "COLLECTION_ID", value_parser = parse_collection_id)]
+        id: CollectionId,
+        #[arg(value_name = "JSON_PAYLOAD")]
+        payload: ArrangePayload,
     },
 }
 
@@ -187,6 +205,14 @@ pub(crate) async fn run_collection(command: CollectionCommand, json: bool) -> an
                 json,
             )
             .await?;
+        }
+        CollectionCommand::Arrange { id, payload } => {
+            let request = ArrangeCollectionEntries {
+                collection_id: id,
+                entry_ids: payload.0,
+            };
+            client.arrange_collection_entries(&request).await?;
+            api::ack("arrange", "collection", id, json).await?;
         }
     }
     Ok(true)
@@ -302,7 +328,8 @@ impl TryFrom<OrderJson> for EntryOrderPatch {
                 "title" => Ok(EntryOrderKey::Title),
                 "duration" => Ok(EntryOrderKey::Duration),
                 "date_added" => Ok(EntryOrderKey::DateAdded),
-                _ => Err("order.key must be title, duration, or date_added".to_owned()),
+                "custom" => Ok(EntryOrderKey::Custom),
+                _ => Err("order.key must be title, duration, date_added, or custom".to_owned()),
             })
             .transpose()?;
         Ok(Self {
@@ -353,6 +380,31 @@ impl FromStr for AddSongsPayload {
             .map(|id| parse_audio_file_id(id))
             .collect::<Result<Vec<_>, _>>()
             .map(Self)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ArrangePayload(EntryArrangement);
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ArrangeJson {
+    entry_ids: Vec<String>,
+}
+
+impl FromStr for ArrangePayload {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let input: ArrangeJson = crate::input::parse_json(text)?;
+        let entry_ids = input
+            .entry_ids
+            .iter()
+            .map(|id| parse_entry_id(id))
+            .collect::<Result<Vec<_>, _>>()?;
+        EntryArrangement::try_new(entry_ids)
+            .map(Self)
+            .map_err(|error| error.to_string())
     }
 }
 
@@ -419,5 +471,16 @@ mod tests {
         }
         assert!(r#"{"audio_file_ids":[]}"#.parse::<AddSongsPayload>().is_err());
         assert!(r#"{"audio_file_ids":["invalid"]}"#.parse::<AddSongsPayload>().is_err());
+    }
+
+    #[test]
+    fn arrangements_list_each_entry_once() -> Result<(), String> {
+        const ENTRY_ID: &str = "01a0cf81-04dd-7d42-9a53-2904e3318bc7";
+        let empty: ArrangePayload = r#"{"entry_ids":[]}"#.parse()?;
+        assert_eq!(empty.0, EntryArrangement::default());
+        let duplicated = format!(r#"{{"entry_ids":["{ENTRY_ID}","{ENTRY_ID}"]}}"#);
+        assert!(duplicated.parse::<ArrangePayload>().is_err());
+        assert!(r#"{"entry_ids":["invalid"]}"#.parse::<ArrangePayload>().is_err());
+        Ok(())
     }
 }

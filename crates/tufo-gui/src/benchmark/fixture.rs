@@ -1,7 +1,7 @@
 use slint::{ComponentHandle as _, ModelRc, VecModel};
 use tufo_client::library::Background;
 use tufo_models::library::{
-    AudioFileId, BackgroundPreset, CollectionEntryId, CollectionId, SoundIcon,
+    AudioFileId, BackgroundPreset, CollectionEntryId, CollectionId, EntryOrderKey, SoundIcon,
 };
 
 use crate::{
@@ -73,7 +73,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
             linked_folder: None,
             missing: false,
             pinned: true,
-            order_key: 0,
+            order_key: EntryOrderKey::Title,
             order_descending: false,
             tracks: (0..13)
                 .map(|index| TrackRowView {

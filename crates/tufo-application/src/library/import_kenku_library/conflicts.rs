@@ -141,6 +141,7 @@ fn target_version(
                 entry.fade_in.into_inner().as_millis(),
                 entry.fade_out.into_inner().as_millis(),
                 entry.icon.index(),
+                entry.position,
             ])
         })
         .collect::<Vec<_>>();
@@ -158,6 +159,7 @@ fn target_version(
             tufo_models::library::EntryOrderKey::Title => 0,
             tufo_models::library::EntryOrderKey::Duration => 1,
             tufo_models::library::EntryOrderKey::DateAdded => 2,
+            tufo_models::library::EntryOrderKey::Custom => 3,
         },
         collection.library_folder_id.map(|id| id.to_string()),
         collection

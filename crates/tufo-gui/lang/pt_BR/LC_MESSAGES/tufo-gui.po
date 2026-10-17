@@ -691,6 +691,10 @@ msgstr "Nome Z→A"
 msgid "Newest first"
 msgstr "Mais recentes"
 
+#: ui/pages.slint
+msgid "Custom order"
+msgstr "Ordem personalizada"
+
 #: ui/dock.slint
 msgid "Next"
 msgstr "Próxima"

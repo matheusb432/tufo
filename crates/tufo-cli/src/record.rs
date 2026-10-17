@@ -126,6 +126,7 @@ fn order_key(value: EntryOrderKey) -> &'static str {
         EntryOrderKey::Title => "title",
         EntryOrderKey::Duration => "duration",
         EntryOrderKey::DateAdded => "date_added",
+        EntryOrderKey::Custom => "custom",
     }
 }
 

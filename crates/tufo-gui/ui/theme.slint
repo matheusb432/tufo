@@ -100,6 +100,10 @@ export global Theme {
     // the window.
     out property <length> title-row-height: 44px;
     out property <length> bar-button-size: 36px;
+    // How far a pressed row or tile moves before it lifts to be arranged.
+    out property <length> arrange-threshold: 6px;
+    // Where a lifted row or tile scrolls its page, at each end of the page.
+    out property <length> arrange-scroll-edge: 56px;
     out property <length> bar-icon-size: 20px;
     out property <length> sidebar-row-padding: 6px;
     out property <length> sidebar-icon-padding: (Theme.rail-width - Theme.bar-icon-size) / 2 - Theme.sidebar-row-padding;
@@ -143,6 +147,7 @@ export global Motion {
     out property <duration> sidebar-fade-in: 120ms;
     out property <duration> sidebar-fade-in-delay: 100ms;
     out property <duration> hover: 150ms;
+    out property <duration> arrange-slide: 100ms;
     out property <duration> logo-blink: 350ms;
     out property <duration> logo-grow: 160ms;
     // A `Presence`: an overlay, or the window's form, arriving and leaving.
