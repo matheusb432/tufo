@@ -1,4 +1,4 @@
-# Install the Windows build tools into the selected winvm-rs state. See wiki/development.md.
+# Install the Windows build tools into the selected winvm-rs state.
 [group('quality')]
 windows-provision:
     "${WINVM_RS:-winvm-rs}" script --elevated --timeout 5400 scripts/windows/provision-machine.cmd

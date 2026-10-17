@@ -21,6 +21,10 @@ const APP_ID: &str = "dev.tufo.Tufo";
 const APP_ICON_SVG: &str = "tufo.svg";
 /// The hicolor sizes the small-size art covers.
 const FIXED_ICON_SIDES_PX: [u32; 4] = [16, 22, 24, 32];
+/// Where the system-wide package installs what a user install puts under `~/.local`.
+const PACKAGE_BINARIES: &str = "/usr/bin";
+const PACKAGE_DATA: &str = "/usr/share";
+pub(crate) const PACKAGE_BROWSER: &str = "/usr/lib/tufo/browser";
 
 /// Where an install goes: `$XDG_BIN_HOME` or `~/.local/bin`, and `$XDG_DATA_HOME` or
 /// `~/.local/share`.
@@ -113,23 +117,56 @@ pub(super) fn uninstall() -> Result<()> {
     refresh_icon_theme(&homes.data)
 }
 
+/// Stages the system-wide package's tree under `root`, laid out like a user install under `/usr`.
+pub(crate) fn stage_package(workspace_root: &Path, release_dir: &Path, root: &Path) -> Result<()> {
+    let homes = Homes {
+        binaries: under(root, PACKAGE_BINARIES),
+        data: under(root, PACKAGE_DATA),
+    };
+    let browser = browser::find_source(workspace_root, release_dir)?
+        .context("the package needs the browser host; run `just build`")?;
+    place_binaries(&homes, release_dir)?;
+    write_launcher(
+        &homes,
+        &workspace_root.join(ICONS_DIR),
+        &Path::new(PACKAGE_BINARIES).join("tufo-gui"),
+    )?;
+    browser::stage(
+        &browser,
+        &under(root, PACKAGE_BROWSER),
+        &homes.binaries,
+        Path::new(PACKAGE_BROWSER),
+    )
+}
+
+fn under(root: &Path, absolute: &str) -> PathBuf {
+    root.join(absolute.trim_start_matches('/'))
+}
+
 fn install_into(homes: &Homes, release_dir: &Path, icons: &Path) -> Result<()> {
+    place_binaries(homes, release_dir)?;
+    write_launcher(homes, icons, &homes.binary("tufo-gui"))?;
+    refresh_icon_theme(&homes.data)
+}
+
+fn place_binaries(homes: &Homes, release_dir: &Path) -> Result<()> {
     fs::create_dir_all(&homes.binaries)
         .with_context(|| format!("create {}", homes.binaries.display()))?;
     for name in BINARY_NAMES {
         replace_file(&release_dir.join(name), &homes.binary(name))?;
     }
-    let desktop_entry = homes.desktop_entry();
-    write_creating_directories(
-        &desktop_entry,
-        desktop_entry_text(&homes.binary("tufo-gui")).as_bytes(),
-    )?;
+    Ok(())
+}
+
+/// Writes the desktop entry, which starts `gui` where it is installed, and the icons.
+fn write_launcher(homes: &Homes, icons: &Path, gui: &Path) -> Result<()> {
+    write_creating_directories(&homes.desktop_entry(), desktop_entry_text(gui).as_bytes())?;
     write_creating_directories(&homes.icon(), &read(&icons.join(APP_ICON_SVG))?)?;
     let small_icon = read(&icons.join(SMALL_ICON_SVG))?;
     for side in FIXED_ICON_SIDES_PX {
         write_creating_directories(&homes.fixed_icon(side), &app_icon::png(&small_icon, side)?)?;
     }
-    refresh_icon_theme(&homes.data)
+    Ok(())
 }
 
 fn read(path: &Path) -> Result<Vec<u8>> {

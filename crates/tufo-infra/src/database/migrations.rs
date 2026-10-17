@@ -368,3 +368,19 @@ fn migration_not_safe(error: impl Into<anyhow::Error>) -> anyhow::Error {
         "refusing to apply migrations; {MIGRATION_REPAIR_REMEDY}"
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MIGRATIONS;
+
+    #[test]
+    fn embedded_migrations_have_lf_line_endings() {
+        for migration in MIGRATIONS.migrations() {
+            assert!(
+                !migration.sql().contains('\r'),
+                "{} has CRLF line endings, which hide its statement breakpoints",
+                migration.name()
+            );
+        }
+    }
+}

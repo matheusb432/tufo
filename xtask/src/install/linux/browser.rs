@@ -71,14 +71,31 @@ pub(super) fn install(source: &BrowserSource, folder: &Path, binaries: &Path) ->
             .with_context(|| format!("write {}", stamp.display()))?;
     }
     super::super::replace_file(&source.host, &folder.join(HOST_NAME))?;
+    link_host(binaries, &folder.join(HOST_NAME))
+}
+
+/// Places the host and the runtime in `folder`, and a link in `binaries` to where the host lands
+/// once `folder` is installed as `installed_folder`.
+pub(super) fn stage(
+    source: &BrowserSource,
+    folder: &Path,
+    binaries: &Path,
+    installed_folder: &Path,
+) -> Result<()> {
+    fs::create_dir_all(folder).with_context(|| format!("create {}", folder.display()))?;
+    copy_runtime(&source.runtime, folder)?;
+    super::super::replace_file(&source.host, &folder.join(HOST_NAME))?;
+    link_host(binaries, &installed_folder.join(HOST_NAME))
+}
+
+fn link_host(binaries: &Path, host: &Path) -> Result<()> {
     let link = binaries.join(HOST_NAME);
     match fs::remove_file(&link) {
         Ok(()) => {}
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
         Err(error) => return Err(error).with_context(|| format!("remove {}", link.display())),
     }
-    std::os::unix::fs::symlink(folder.join(HOST_NAME), &link)
-        .with_context(|| format!("link {}", link.display()))
+    std::os::unix::fs::symlink(host, &link).with_context(|| format!("link {}", link.display()))
 }
 
 fn copy_runtime(runtime: &Path, folder: &Path) -> Result<()> {
@@ -234,6 +251,29 @@ mod tests {
         assert_eq!(
             fs::read_to_string(folder.join("resources.pak")).unwrap(),
             "newer"
+        );
+    }
+
+    #[test]
+    fn staging_links_the_host_where_the_package_installs_it() {
+        let root = tempfile::tempdir().unwrap();
+        let (folder, binaries) = (root.path().join("lib"), root.path().join("bin"));
+        fs::create_dir_all(&binaries).unwrap();
+
+        stage(
+            &source(root.path()),
+            &folder,
+            &binaries,
+            Path::new("/usr/lib/tufo/browser"),
+        )
+        .unwrap();
+
+        assert!(folder.join(LIBCEF_NAME).is_file());
+        assert!(!folder.join(RUNTIME_STAMP_NAME).exists());
+        assert_eq!(fs::read_to_string(folder.join(HOST_NAME)).unwrap(), "host");
+        assert_eq!(
+            fs::read_link(binaries.join(HOST_NAME)).unwrap(),
+            Path::new("/usr/lib/tufo/browser").join(HOST_NAME)
         );
     }
 

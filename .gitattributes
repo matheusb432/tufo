@@ -1,2 +1,4 @@
 # cmd.exe misreads labels in files with bare LF line endings.
 *.cmd text eol=crlf
+# Toasty splits migrations on LF-delimited breakpoints, and the server embeds them as checked out.
+*.sql text eol=lf

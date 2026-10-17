@@ -63,7 +63,7 @@ smoke bin_directory:
     export TUFO_RUNTIME_DIR="$state/runtime" TUFO_DATABASE_PATH="$state/tufo.sqlite3"
     export XDG_CONFIG_HOME="$state/config" XDG_DATA_HOME="$state/data" XDG_STATE_HOME="$state/state"
     unset TUFO_DISCORD_CREDENTIALS
-    trap '"$tufo" server kill >/dev/null 2>&1 || true; rm -rf "$state"' EXIT
+    trap 'status=$?; [ "$status" -eq 0 ] || cat "$state/state/tufo/tufo-server.log" 2>/dev/null || true; "$tufo" server kill >/dev/null 2>&1 || true; rm -rf "$state"' EXIT
     "$tufo" --version
     "$tufo" server start
     "$tufo" doctor

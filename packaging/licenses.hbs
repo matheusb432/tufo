@@ -1,0 +1,27 @@
+Dependency licenses
+
+Generated from Cargo.lock for the Linux, Windows, and macOS release targets.
+Slint's royalty-free terms are in SLINT-LICENSE.md, and Chromium's credits are in the browser's
+CREDITS.html. THIRD-PARTY.md lists the bundled paintings, recordings, fonts, and icons.
+The registry source archives below hold each dependency's unmodified source, including those
+under the Mozilla Public License. The tagged source at https://github.com/matheusb432/tufo holds
+the workspace crates and the vendored patches THIRD-PARTY.md describes.
+
+{{#each licenses}}
+===============================================================================
+{{name}} ({{id}})
+{{#each used_by}}
+{{crate.name}} {{crate.version}}
+{{#if crate.source}}
+Source archive: https://crates.io/api/v1/crates/{{crate.name}}/{{crate.version}}/download
+{{else}}
+Source: https://github.com/matheusb432/tufo
+{{/if}}
+{{#if crate.repository}}
+Repository: {{{crate.repository}}}
+{{/if}}
+{{/each}}
+
+{{{text}}}
+
+{{/each}}

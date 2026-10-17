@@ -13,8 +13,7 @@ clap = { workspace = true }
 clap-cargo = { workspace = true }
 directories = { workspace = true }
 resvg = { workspace = true }
-
-[dev-dependencies]
+sha2 = { workspace = true }
 tempfile = { workspace = true }
 
 [lints]

@@ -14,6 +14,9 @@ jobs:
   install:
     runs-on: windows-2025
     timeout-minutes: 120
+    # rust-cache keeps only Cargo's own output, so CEF's download lives outside target.
+    env:
+      CEF_PATH: ${{ github.workspace }}/../cef
     defaults:
       run:
         shell: bash
@@ -33,11 +36,18 @@ jobs:
         with:
           workspaces: tools/tufo
           cache-on-failure: true
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CEF_PATH }}
+          key: cef-${{ github.job }}-${{ runner.os }}-${{ hashFiles('tools/tufo/Cargo.toml') }}
       - name: Build and install Tufo
         id: install
         run: just install
       - name: Smoke-test the installed executables
         run: just smoke "$LOCALAPPDATA/Programs/Tufo"
+      - name: Show the server log
+        if: ${{ failure() }}
+        run: cat "$LOCALAPPDATA/tufo/data/tufo-server.log" || true
       - name: Collect the installed executables
         run: mkdir -p .artifacts/windows && cp "$LOCALAPPDATA"/Programs/Tufo/*.exe .artifacts/windows/
       - name: Upload the installed executables
@@ -55,7 +65,7 @@ jobs:
         run: just uninstall
       - name: Test the workspace
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: just test
+        run: just test --no-fail-fast
       - name: Lint Windows-specific code
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: cargo clippy --locked --workspace --all-targets -- -D warnings

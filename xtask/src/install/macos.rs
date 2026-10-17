@@ -65,13 +65,6 @@ impl Places {
         self.executables().join(binary_name)
     }
 
-    fn icon(&self) -> PathBuf {
-        self.bundle()
-            .join("Contents")
-            .join("Resources")
-            .join(format!("{ICON_NAME}.icns"))
-    }
-
     fn command_link(&self) -> PathBuf {
         self.command_links.join("tufo")
     }
@@ -143,19 +136,46 @@ fn install_into(places: &Places, release_dir: &Path, icons: &Path, version: &str
     if places.bundle().exists() {
         ensure_is_tufo_bundle(places)?;
     }
-    let executables = places.executables();
+    write_bundle(&places.bundle(), release_dir, icons, version)?;
+    link_command(&places.executable("tufo"), &places.command_link())
+}
+
+/// Writes a signed `bundle` with the licenses of everything it ships in `Contents/Resources`.
+pub(crate) fn stage_bundle(
+    workspace_root: &Path,
+    release_dir: &Path,
+    bundle: &Path,
+    version: &str,
+) -> Result<()> {
+    write_bundle(
+        bundle,
+        release_dir,
+        &workspace_root.join(ICONS_DIR),
+        version,
+    )?;
+    crate::release::stage_notices(workspace_root, &bundle.join("Contents/Resources/licenses"))?;
+    sign(bundle)
+}
+
+fn write_bundle(bundle: &Path, release_dir: &Path, icons: &Path, version: &str) -> Result<()> {
+    let executables = bundle.join("Contents/MacOS");
     fs::create_dir_all(&executables)
         .with_context(|| format!("create {}", executables.display()))?;
     for name in BINARY_NAMES {
-        replace_file(&release_dir.join(name), &places.executable(name))?;
+        replace_file(&release_dir.join(name), &executables.join(name))?;
     }
-    write_creating_directories(&places.info_plist(), info_plist(version).as_bytes())?;
+    write_creating_directories(
+        &bundle.join("Contents/Info.plist"),
+        info_plist(version).as_bytes(),
+    )?;
     let bundle_icon = app_icon::icns(
         &read(&icons.join(APP_ICON_SVG))?,
         &read(&icons.join(SMALL_ICON_SVG))?,
     )?;
-    write_creating_directories(&places.icon(), &bundle_icon)?;
-    link_command(&places.executable("tufo"), &places.command_link())
+    write_creating_directories(
+        &bundle.join(format!("Contents/Resources/{ICON_NAME}.icns")),
+        &bundle_icon,
+    )
 }
 
 /// Refuses to change a `Tufo.app` that another app's bundle occupies.
@@ -343,7 +363,15 @@ mod tests {
         let info = fs::read_to_string(places.info_plist()).unwrap();
         assert!(info.contains("<key>CFBundleExecutable</key>\n  <string>tufo-gui</string>\n"));
         assert!(info.contains("<key>CFBundleShortVersionString</key>\n  <string>1.2.3</string>\n"));
-        assert!(fs::read(places.icon()).unwrap().starts_with(b"icns"));
+        assert!(
+            fs::read(
+                places
+                    .bundle()
+                    .join(format!("Contents/Resources/{ICON_NAME}.icns"))
+            )
+            .unwrap()
+            .starts_with(b"icns")
+        );
         assert_eq!(
             fs::read_link(places.command_link()).unwrap(),
             places.executable("tufo")

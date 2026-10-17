@@ -1,0 +1,8 @@
+# Ubuntu 23.10 and later restrict unprivileged user namespaces, which Chromium's sandbox needs.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile tufo-browser /usr/lib/tufo/browser/tufo-browser flags=(unconfined) {
+  userns,
+  include if exists <local/tufo-browser>
+}

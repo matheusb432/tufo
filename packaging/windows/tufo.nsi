@@ -1,6 +1,6 @@
 ; Installs for the current user, without administrator rights, where `just install` does.
-; `just windows-installer` defines VERSION, VERSION_NUMERIC, BINARIES_DIR, BROWSER_DIR, and
-; OUTFILE.
+; `just windows-installer` defines VERSION, VERSION_NUMERIC, BINARIES_DIR, BROWSER_DIR,
+; LICENSES_DIR, and OUTFILE.
 
 Unicode true
 ManifestDPIAware true
@@ -84,6 +84,9 @@ Section
   ; and ALL RESTRICTED APPLICATION PACKAGES.
   nsExec::Exec 'icacls "$INSTDIR\browser" /grant *S-1-15-2-1:(OI)(CI)(RX) *S-1-15-2-2:(OI)(CI)(RX) /T /Q'
   Pop $0
+  RMDir /r "$INSTDIR\licenses"
+  SetOutPath "$INSTDIR\licenses"
+  File /r "${LICENSES_DIR}${SOURCE_SEPARATOR}*"
   SetOutPath "$INSTDIR"
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
@@ -112,6 +115,7 @@ Section "Uninstall"
   Delete "$INSTDIR\tufo.exe"
   Delete "$INSTDIR\uninstall.exe"
   RMDir /r "$INSTDIR\browser"
+  RMDir /r "$INSTDIR\licenses"
   ; Only an empty folder goes; anything else in it isn't the installer's.
   RMDir "$INSTDIR"
 

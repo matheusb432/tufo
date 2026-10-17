@@ -6,18 +6,18 @@ use std::{fs, io, path::Path, process::Command};
 use anyhow::{Context as _, Result, bail, ensure};
 use cargo_metadata::{Metadata, semver::Version};
 
-use crate::{install::BINARY_NAMES, windows_browser};
+use crate::{install::BINARY_NAMES, release, windows_browser};
 
 const TARGET: &str = "x86_64-pc-windows-msvc";
 const PACKAGES: [&str; 3] = ["tufo-gui", "tufo-server", "tufo-cli"];
 const BROWSER_PACKAGE: &str = "tufo-browser";
 const INSTALLER_VERSION_PACKAGE: &str = "tufo-gui";
 const INSTALLER_SCRIPT: &str = "packaging/windows/tufo.nsi";
+const LICENSES_FOLDER_NAME: &str = "licenses";
 const CMAKE_TOOLCHAIN: &str = "packaging/windows/cross-toolchain.cmake";
 const OPUS_CMAKE_FILES: [&str; 2] = [CMAKE_TOOLCHAIN, "packaging/windows/opus-clang-cl.cmake"];
 /// A copy of the files and C flags that configured the cross-built Opus.
 const OPUS_CMAKE_STAMP: &str = "xwin-opus-cmake.stamp";
-const OUTPUT_DIR: &str = "dist";
 /// `libopus_sys` links libm whenever its build script runs on Unix, whatever the target.
 const LIBM_STUB_DIR: &str = "xwin-link-stubs";
 const EMPTY_ARCHIVE: &[u8] = b"!<arch>\n";
@@ -53,10 +53,27 @@ pub(crate) fn build(workspace_root: &Path, metadata: &Metadata) -> Result<()> {
         .context("the cross-build left no browser host library")?;
     let browser = binaries.join(windows_browser::FOLDER_NAME);
     windows_browser::place(&browser_source, &browser)?;
-    let output_dir = workspace_root.join(OUTPUT_DIR);
+    let licenses = binaries.join(LICENSES_FOLDER_NAME);
+    match fs::remove_dir_all(&licenses) {
+        Ok(()) => {}
+        Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error).with_context(|| format!("remove {}", licenses.display())),
+    }
+    release::stage_notices(workspace_root, &licenses)?;
+    let output_dir = workspace_root.join(release::OUTPUT_DIR);
     fs::create_dir_all(&output_dir).with_context(|| format!("create {}", output_dir.display()))?;
     let installer = output_dir.join(format!("tufo-{version}-windows-x86_64-setup.exe"));
-    pack(workspace_root, &binaries, &browser, version, &installer)?;
+    pack(
+        workspace_root,
+        &InstallerInputs {
+            binaries: &binaries,
+            browser: &browser,
+            licenses: &licenses,
+        },
+        version,
+        &installer,
+    )?;
+    release::write_checksum(&installer)?;
     println!("built the installer {}", installer.display());
     Ok(())
 }
@@ -142,10 +159,16 @@ fn cross_cflags() -> Result<String> {
     Ok(format!("/clang:-ffile-prefix-map={home}=/usr/src/tufo"))
 }
 
+/// The folders the installer packs.
+struct InstallerInputs<'a> {
+    binaries: &'a Path,
+    browser: &'a Path,
+    licenses: &'a Path,
+}
+
 fn pack(
     workspace_root: &Path,
-    binaries: &Path,
-    browser: &Path,
+    inputs: &InstallerInputs<'_>,
     version: &Version,
     installer: &Path,
 ) -> Result<()> {
@@ -154,8 +177,9 @@ fn pack(
         .args(["-V2", "-WX", "-INPUTCHARSET", "UTF8"])
         .arg(format!("-DVERSION={version}"))
         .arg(format!("-DVERSION_NUMERIC={}", numeric_version(version)?))
-        .arg(format!("-DBINARIES_DIR={}", binaries.display()))
-        .arg(format!("-DBROWSER_DIR={}", browser.display()))
+        .arg(format!("-DBINARIES_DIR={}", inputs.binaries.display()))
+        .arg(format!("-DBROWSER_DIR={}", inputs.browser.display()))
+        .arg(format!("-DLICENSES_DIR={}", inputs.licenses.display()))
         .arg(format!("-DOUTFILE={}", installer.display()))
         .arg(workspace_root.join(INSTALLER_SCRIPT));
     run(&mut command, "makensis")

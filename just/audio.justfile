@@ -3,7 +3,7 @@
 discord-bench mode="":
     TUFO_DISCORD_BENCH_MODE="$1" cargo test --release -p tufo-infra --lib discord::benchmark::run -- --ignored --exact --nocapture
 
-# Load the audio path under CPU pressure; not a routine check, see wiki/development.md.
+# Load the audio path under CPU pressure; not a routine check.
 [group('performance')]
 stress voice="" minutes="10" music="" sounds="":
     #!/usr/bin/env bash

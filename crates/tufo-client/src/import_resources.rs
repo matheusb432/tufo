@@ -363,7 +363,8 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(unix)]
+    // APFS rejects file names that aren't UTF-8.
+    #[cfg(all(unix, not(target_os = "macos")))]
     #[tokio::test]
     async fn resolution_keeps_aliases_with_non_utf8_targets() -> Result<()> {
         use std::{

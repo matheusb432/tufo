@@ -11,9 +11,9 @@ use std::{
 use anyhow::{Context as _, Result, ensure};
 
 #[cfg(target_os = "linux")]
-mod linux;
+pub(crate) mod linux;
 #[cfg(target_os = "macos")]
-mod macos;
+pub(crate) mod macos;
 #[cfg(windows)]
 mod windows;
 
@@ -69,13 +69,23 @@ pub(crate) fn update(workspace_root: &Path, release_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+/// Closes the session's GUI and server first, since Windows can't remove a running executable.
 pub(crate) fn uninstall() -> Result<()> {
     #[cfg(target_os = "linux")]
-    return linux::uninstall();
+    return {
+        linux::stop_session()?;
+        linux::uninstall()
+    };
     #[cfg(target_os = "macos")]
-    return macos::uninstall();
+    return {
+        macos::stop_session()?;
+        macos::uninstall()
+    };
     #[cfg(windows)]
-    return windows::uninstall();
+    return {
+        windows::stop_session()?;
+        windows::uninstall()
+    };
     #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
     anyhow::bail!("installing supports Linux, macOS, and Windows")
 }

@@ -143,7 +143,9 @@ mod tests {
         seen.insert(TourId::Home);
         file.save(&seen)?;
         assert!(file.load()?.contains(TourId::Home));
-        let unavailable = SeenFile(settings.join("guided-tours.seen"));
+        let blocked = folder.path().join("blocked.seen");
+        std::fs::create_dir(&blocked)?;
+        let unavailable = SeenFile(blocked);
         assert!(unavailable.load().is_err());
         assert!(unavailable.save(&seen).is_err());
         assert_eq!(std::fs::read_to_string(settings)?, "language = \"pt-BR\"\n");

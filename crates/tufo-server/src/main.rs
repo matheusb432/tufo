@@ -19,12 +19,12 @@ const RUNTIME_WORKER_THREADS: usize = 2;
 const LOG_ROTATE_BYTES: u64 = 10 * 1024 * 1024;
 const LOG_FILE_NAME: &str = "tufo-server.log";
 
-/// Tufo's local server: the audio engine, the Discord bot, and the RPCs the GUI drives.
+/// The local server: the audio engine, the Discord bot, and the RPCs the GUI drives.
 #[derive(Parser)]
 #[command(version, about)]
 struct Arguments {
     /// TOML file holding the Discord `bot_token`, readable only by you. Defaults to `discord.toml`
-    /// in Tufo's config directory when that file exists.
+    /// in the config directory when that file exists.
     #[arg(long, value_name = "PATH", env = "TUFO_DISCORD_CREDENTIALS")]
     discord_credentials: Option<PathBuf>,
     #[command(subcommand)]
@@ -80,7 +80,12 @@ async fn run() -> anyhow::Result<()> {
     }
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     map_large_allocations_separately();
-    tufo_server::run(arguments.discord_credentials).await
+    let result = tufo_server::run(arguments.discord_credentials).await;
+    // Clients start the server without a terminal, so its last error would otherwise go unseen.
+    if let Err(error) = &result {
+        tracing::error!(error = format!("{error:#}"), "tufo-server stopped");
+    }
+    result
 }
 
 /// Each thread that allocates gets an arena of its own until the cap, so threads that come and go,

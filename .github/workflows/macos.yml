@@ -44,6 +44,9 @@ jobs:
         run: just install
       - name: Smoke-test the installed executables
         run: just smoke "$HOME/Applications/Tufo.app/Contents/MacOS"
+      - name: Show the server log
+        if: ${{ failure() }}
+        run: cat "$HOME/Library/Application Support/tufo/tufo-server.log" || true
       - name: Check the bundle's signature
         run: codesign --verify --deep --strict "$HOME/Applications/Tufo.app"
       - name: Pack the bundle
@@ -63,7 +66,7 @@ jobs:
         run: just uninstall
       - name: Test the workspace
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: just test
+        run: just test --no-fail-fast
       - name: Lint macOS-specific code
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: cargo clippy --locked --workspace --all-targets -- -D warnings

@@ -1,0 +1,215 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Tag or commit to package
+        required: true
+        default: main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.ref }}
+  cancel-in-progress: false
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    # rust-cache keeps only Cargo's own output, so CEF's download lives outside target.
+    env:
+      CEF_PATH: ${{ github.workspace }}/../cef
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.8
+          install_args: rust just buf cargo-binstall cargo:cargo-about
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CEF_PATH }}
+          key: cef-${{ github.job }}-${{ hashFiles('Cargo.toml') }}
+      - name: Install the native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config cmake clang dpkg-dev libasound2-dev libpipewire-0.3-dev libfontconfig-dev libdbus-1-dev
+      - name: Package
+        run: just package-linux
+      - name: Install on a clean Ubuntu 24.04 and check every library resolves
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" ubuntu:24.04 bash -euo pipefail -c '
+            apt-get update -qq
+            apt-get install -y -qq /dist/tufo-*-linux-x86_64.deb >/dev/null
+            tufo --version
+            tufo-browser --version
+            missing=$(find /usr/bin/tufo /usr/bin/tufo-gui /usr/bin/tufo-server /usr/lib/tufo -type f -exec sh -c "head -c4 \"\$1\" | grep -q ELF && ldd \"\$1\"" _ {} \; | grep "not found" | sort -u || true)
+            if [ -n "$missing" ]; then echo "$missing" >&2; exit 1; fi
+          '
+      - name: Install, check, and remove the package on the runner
+        run: |
+          sudo apt-get install -y ./dist/tufo-*-linux-x86_64.deb
+          test -f /usr/share/doc/tufo/DEPENDENCY-LICENSES.txt
+          just smoke /usr/bin
+          sudo apparmor_parser --preprocess /etc/apparmor.d/tufo-browser >/dev/null
+          sudo apt-get remove -y tufo
+          test ! -e /usr/bin/tufo && test ! -e /usr/lib/tufo
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux
+          path: dist/tufo-*-linux-x86_64.deb*
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-installer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    # rust-cache keeps only Cargo's own output, so CEF's download lives outside target.
+    env:
+      CEF_PATH: ${{ github.workspace }}/../cef
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.8
+          install_args: rust just buf ninja cargo-binstall cargo:cargo-xwin cargo:cargo-about
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - uses: actions/cache@v6
+        with:
+          path: ${{ env.CEF_PATH }}
+          key: cef-${{ github.job }}-${{ hashFiles('Cargo.toml') }}
+      - uses: actions/cache@v6
+        with:
+          path: ~/.cache/cargo-xwin
+          key: cargo-xwin-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+      - name: Install the cross-build dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang llvm nsis cmake
+          # cargo-xwin supplies clang-cl and lld-link and runs LLVM's llvm-lib and llvm-rc.
+          echo /usr/lib/llvm-18/bin >> "$GITHUB_PATH"
+      - name: Cross-build the installer
+        run: just windows-installer
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows
+          path: dist/tufo-*-windows-x86_64-setup.exe*
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-check:
+    needs: windows-installer
+    runs-on: windows-2025
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.8
+          install_args: just
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows
+          path: dist
+      - name: Install, reinstall over the running server, check, and remove
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $setup = (Resolve-Path dist\tufo-*-windows-x86_64-setup.exe).Path
+          $installed = "$env:LOCALAPPDATA\Programs\Tufo"
+          Start-Process -FilePath $setup -ArgumentList '/S' -Wait
+          foreach ($file in 'tufo.exe', 'tufo-gui.exe', 'tufo-server.exe', 'uninstall.exe', 'browser\tufo-browser.exe', 'licenses\DEPENDENCY-LICENSES.txt') {
+            if (-not (Test-Path "$installed\$file")) { throw "the installer left no $file" }
+          }
+          & bash -c "just smoke '$($installed -replace '\\', '/')'"
+          if ($LASTEXITCODE -ne 0) { throw "the smoke check failed" }
+          & "$installed\tufo.exe" server start
+          Start-Process -FilePath $setup -ArgumentList '/S' -Wait
+          & bash -c "just smoke '$($installed -replace '\\', '/')'"
+          if ($LASTEXITCODE -ne 0) { throw "the smoke check failed after reinstalling" }
+          # The uninstaller copies itself away and returns before it finishes.
+          Start-Process -FilePath "$installed\uninstall.exe" -ArgumentList '/S' -Wait
+          $deadline = (Get-Date).AddSeconds(60)
+          while ((Test-Path "$installed\tufo.exe") -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
+          if (Test-Path "$installed\tufo.exe") { throw "uninstalling left tufo.exe" }
+          if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\Tufo') { throw "uninstalling left the uninstall entry" }
+      - name: Show the server log
+        if: ${{ failure() }}
+        run: cat "$LOCALAPPDATA/tufo/data/tufo-server.log" || true
+
+  macos:
+    runs-on: macos-15
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+      - uses: jdx/mise-action@v4
+        with:
+          version: 2026.8.8
+          install_args: rust just buf cargo-binstall cargo:cargo-about
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - name: Package
+        run: just package-macos
+      - name: Install, reinstall, check, and remove the package
+        run: |
+          package=$(ls dist/tufo-*-macos-arm64.pkg)
+          sudo installer -pkg "$package" -target /
+          codesign --verify --deep --strict /Applications/Tufo.app
+          test -f /Applications/Tufo.app/Contents/Resources/licenses/DEPENDENCY-LICENSES.txt
+          /usr/local/bin/tufo --version
+          just smoke /Applications/Tufo.app/Contents/MacOS
+          sudo installer -pkg "$package" -target /
+          just smoke /Applications/Tufo.app/Contents/MacOS
+          sudo rm /usr/local/bin/tufo
+          sudo rm -r /Applications/Tufo.app
+          sudo pkgutil --forget dev.tufo.Tufo
+      - name: Show the server log
+        if: ${{ failure() }}
+        run: cat "$HOME/Library/Application Support/tufo/tufo-server.log" || true
+      - uses: actions/upload-artifact@v7
+        with:
+          name: macos
+          path: dist/tufo-*-macos-arm64.pkg*
+          if-no-files-found: error
+          retention-days: 14
+
+  collect:
+    needs: [linux, windows-check, macos]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Check the checksums
+        working-directory: dist
+        run: |
+          ls -l
+          test "$(ls *.sha256 | wc -l)" -eq 3
+          sha256sum --check *.sha256
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 30

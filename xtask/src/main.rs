@@ -8,6 +8,7 @@ mod app_icon;
 mod architecture;
 mod cef_distribution;
 mod install;
+mod release;
 mod translations;
 mod windows_browser;
 mod windows_installer;
@@ -42,11 +43,17 @@ enum Command {
     Install,
     /// Close the session's GUI and its server, then install the release build over them.
     Update,
-    /// Remove what `install` placed, keeping the library, settings, and credentials.
+    /// Close the session's GUI and server, then remove what `install` placed, keeping the library,
+    /// settings, and credentials.
     Uninstall,
     /// Cross-build the Windows executables and pack them into an unsigned installer in `dist/`.
     #[command(name = "windows-installer")]
     WindowsInstaller,
+    /// Package the release build for this platform in `dist/`, with its checksum.
+    Package {
+        #[arg(value_enum)]
+        platform: release::Platform,
+    },
 }
 
 fn workspace_metadata(workspace_root: &Path) -> Result<Metadata> {
@@ -81,5 +88,10 @@ fn main() -> Result<()> {
         Command::WindowsInstaller => {
             windows_installer::build(workspace_root, &workspace_metadata(workspace_root)?)
         }
+        Command::Package { platform } => release::package(
+            workspace_root,
+            &workspace_metadata(workspace_root)?,
+            platform,
+        ),
     }
 }
