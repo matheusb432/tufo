@@ -8,6 +8,7 @@ discord-bench mode="":
 stress voice="" minutes="10" music="" sounds="":
     #!/usr/bin/env bash
     set -euo pipefail
+    [[ -n "{{ music }}" ]] || { echo "pass a music folder: just stress <voice> <minutes> <music> [sounds]" >&2; exit 1; }
     command -v stress-ng >/dev/null || { echo "stress-ng is missing: sudo apt install stress-ng" >&2; exit 1; }
     command -v pw-cli >/dev/null || { echo "pw-cli is missing; the run plays into a PipeWire sink" >&2; exit 1; }
     command -v systemd-run >/dev/null || { echo "systemd-run is missing; it bounds the load's CPU, memory, and swap" >&2; exit 1; }
@@ -29,7 +30,7 @@ stress voice="" minutes="10" music="" sounds="":
         rm -rf "$run"
     }
     trap cleanup EXIT
-    # A null sink paces the graph in real time like a device, so pw-top still shows Tufo's xruns.
+    # A null sink paces the graph in real time like a device, so pw-top still shows the server's xruns.
     # It outlives pw-cli until cleanup destroys it.
     pw-cli create-node adapter "{ factory.name=support.null-audio-sink node.name=$sink node.description=\"Tufo stress run\" media.class=Audio/Sink object.linger=true audio.position=[FL FR] }" >/dev/null
     export PIPEWIRE_NODE="$sink"

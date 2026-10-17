@@ -30,26 +30,20 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
     };
     let playlists = cards(
         &[
-            "ambient",
-            "boss",
-            "combat",
-            "dungeons",
+            "Ambience",
+            "Boss Fights",
+            "Chase",
+            "Dungeon Crawl",
             "Frostmarch",
             "IronveilCovenant",
-            "moment",
-            "tavern",
+            "Quiet Hours",
+            "Tavern",
         ],
         1,
     );
     let soundboards = cards(
         &[
-            "combat",
-            "Effects",
-            "environment",
-            "monsters",
-            "OLD",
-            "portals",
-            "tunes",
+            "Battle", "Effects", "Weather", "monsters", "Archive", "portals", "Stingers",
         ],
         100,
     );
