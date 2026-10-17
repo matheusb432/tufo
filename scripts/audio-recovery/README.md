@@ -22,4 +22,4 @@ Use `--binaries PATH` to select a build and `--artifacts PATH` to choose the cap
 
 `browser.py` serves a synthetic tone from a local HTTP page, starts the real browser host, and verifies its audio is reattached with the same gain and pitch after recovery.
 
-These recovery checks complement the ten-minute load and captured-waveform check in [Verification](../../docs/agents/verification.md#the-stress-run).
+These recovery checks complement `just stress`, the ten-minute load and captured-waveform check.
