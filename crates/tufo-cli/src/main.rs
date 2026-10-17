@@ -1,5 +1,11 @@
 //! Command-line process root; all server requests go through tufo-client.
 
+macro_rules! releases_url {
+    () => {
+        concat!(env!("CARGO_PKG_REPOSITORY"), "/releases")
+    };
+}
+
 mod api;
 mod command;
 mod data;

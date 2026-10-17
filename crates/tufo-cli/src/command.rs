@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-/// Manage Tufo's library, playback, desktop settings, and resident server.
+/// Manage the library, playback, desktop settings, and resident server.
 #[derive(Parser)]
 #[command(name = "tufo", version, about, styles = clap_cargo::style::CLAP_STYLING)]
 pub(crate) struct Cli {
@@ -65,7 +65,7 @@ pub(crate) enum Command {
         #[command(subcommand)]
         command: crate::player_command::EffectCommand,
     },
-    /// Open or close the browser whose pages play through Tufo.
+    /// Open or close the browser whose pages play alongside music and effects.
     Browser {
         #[command(subcommand)]
         command: crate::player_command::BrowserCommand,

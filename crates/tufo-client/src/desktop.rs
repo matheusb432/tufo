@@ -407,13 +407,13 @@ fn render(settings: DesktopSettings) -> String {
     let hidden_pages = quoted_page_names(settings.sidebar_hidden_pages.iter());
     let hideable_pages = quoted_page_names(SidebarPage::ALL.into_iter());
     format!(
-        "# Tufo's desktop settings. Changing a setting in Tufo rewrites this file.\n\
+        "# Desktop settings. Changing a setting in the app rewrites this file.\n\
          \n\
          language = \"{language}\"\n\
          tours = \"{tours}\"\n\
          \n\
          [quit]\n\
-         # Leave the music and sounds playing after Tufo quits.\n\
+         # Leave the music and sounds playing after quitting.\n\
          keep_playing = {keep_playing}\n\
          \n\
          [sidebar]\n\

@@ -47,7 +47,7 @@ pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
         .context("binding the local gRPC endpoint")?;
     let discord_credentials_path = discord_credentials
         .or_else(default_discord_credentials)
-        .context("resolving Tufo's config directory for the Discord credentials")?;
+        .context("resolving the config directory for the Discord credentials")?;
     let discord = start_discord(&discord_credentials_path)?;
     let database_path = database::database_path()?;
     let database = database::open_database(&database_path)

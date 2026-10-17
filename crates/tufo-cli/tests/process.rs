@@ -202,7 +202,7 @@ async fn a_server_without_status_support_is_reported_as_incompatible_not_unreach
                 && check["status"] == "fail"
                 && check["action"]
                     .as_str()
-                    .is_some_and(|action| action.contains("just update"))
+                    .is_some_and(|action| action.contains("latest version"))
         }));
         assert!(!String::from_utf8_lossy(&output.stdout).contains("permissions"));
         assert!(!String::from_utf8_lossy(&output.stdout).contains("unreachable"));

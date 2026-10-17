@@ -71,7 +71,7 @@ pub enum ClientError {
     #[error("the server ended the preview before it started")]
     PreviewNotStarted,
     #[error(
-        "the running server does not support partial library updates; replace matching Tufo binaries and run `tufo server restart`"
+        "the running server does not support partial library updates; install matching binaries and run `tufo server restart`"
     )]
     LibraryPatchesUnsupported,
 }

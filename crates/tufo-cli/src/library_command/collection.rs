@@ -82,7 +82,7 @@ Nested updates require matching current binaries; after updating them, run tufo 
         #[arg(value_name = "JSON_PAYLOAD")]
         payload: UpdatePayload,
     },
-    /// Remove a collection from Tufo.
+    /// Remove a collection without touching its audio files.
     Delete {
         #[arg(value_name = "COLLECTION_ID", value_parser = parse_collection_id)]
         id: CollectionId,

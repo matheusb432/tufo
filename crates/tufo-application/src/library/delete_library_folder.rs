@@ -12,7 +12,7 @@ use crate::error::ErrorMeta;
 
 #[derive(Debug, thiserror::Error, ErrorMeta)]
 pub enum DeleteLibraryFolderError {
-    #[error("Tufo does not follow that folder")]
+    #[error("that folder is not followed")]
     #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
     #[error(transparent)]

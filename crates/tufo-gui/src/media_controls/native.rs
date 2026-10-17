@@ -27,10 +27,10 @@ pub(super) async fn run(
         let window = requests
             .window
             .upgrade()
-            .ok_or_else(|| anyhow::anyhow!("Tufo's window closed"))?;
+            .ok_or_else(|| anyhow::anyhow!("the window closed"))?;
         let native = window.window().winit_window().await?;
         let RawWindowHandle::Win32(handle) = native.window_handle()?.as_raw() else {
-            anyhow::bail!("Tufo has no Windows window handle");
+            anyhow::bail!("the window has no Windows handle");
         };
         Some(handle.hwnd.get() as *mut std::ffi::c_void)
     };

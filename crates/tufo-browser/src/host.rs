@@ -50,7 +50,7 @@ pub(crate) struct Host {
 #[derive(Parser)]
 #[command(version, about)]
 struct Arguments {
-    /// The Tufo-owned folder for Chromium's profile and the saved tabs.
+    /// The folder for Chromium's profile and the saved tabs.
     #[arg(long, value_name = "PATH")]
     profile: PathBuf,
 }

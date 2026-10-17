@@ -108,7 +108,10 @@ pub(crate) async fn start(endpoint: &LocalEndpoint) -> anyhow::Result<&'static s
             snapshot.serving,
             "tufo-server is running but not healthy; run `tufo doctor`"
         );
-        ensure_matching_version(&snapshot.status.context("cannot read server status; run `just update` from the Tufo checkout to replace the running server")?)?;
+        ensure_matching_version(&snapshot.status.context(concat!(
+            "cannot read server status; get the latest version at ",
+            releases_url!()
+        ))?)?;
         return Ok("Already running and healthy");
     }
     let mut process = StartingServer(Some(
@@ -121,18 +124,18 @@ pub(crate) async fn start(endpoint: &LocalEndpoint) -> anyhow::Result<&'static s
         loop {
             if let Ok(Some(snapshot)) = inspect(endpoint).await
                 && snapshot.serving {
-                ensure_matching_version(&snapshot.status.context("the server cannot report its status; install matching Tufo binaries with `just update`")?)?;
+                ensure_matching_version(&snapshot.status.context(concat!("the server cannot report its status; get the latest version at ", releases_url!()))?)?;
                 // The server must outlive this CLI. Dropping Child does not terminate it.
                 process.0.take();
                 return Ok("Started and healthy");
             }
             if let Some(child) = process.0.as_mut()
                 && let Some(status) = child.try_wait().context("check tufo-server startup")? {
-                anyhow::bail!("tufo-server exited during startup ({status}); inspect tufo-server.log in Tufo's state directory and run `tufo doctor`");
+                anyhow::bail!("tufo-server exited during startup ({status}); inspect tufo-server.log in the server's state directory and run `tufo doctor`");
             }
             tokio::time::sleep(POLL_INTERVAL).await;
         }
-    }).await.context("tufo-server did not become healthy within 15 seconds; inspect tufo-server.log in Tufo's state directory")?
+    }).await.context("tufo-server did not become healthy within 15 seconds; inspect tufo-server.log in the server's state directory")?
 }
 
 fn ensure_matching_version(status: &ServerStatus) -> anyhow::Result<()> {

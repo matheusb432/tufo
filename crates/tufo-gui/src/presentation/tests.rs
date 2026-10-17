@@ -815,12 +815,12 @@ fn kenku_reports_name_what_came_and_what_stayed_behind() {
     assert_eq!(
         kenku_report_text(&full),
         "Imported 12 collections with 206 files from Kenku FM. 1 collection was already in \
-         Tufo. 1 file could not be found or read. Left out 2 web addresses Tufo cannot play. \
-         Discord bot token imported."
+         the library. 1 file could not be found or read. Left out 2 web addresses that cannot \
+         be played. Discord bot token imported."
     );
     assert_eq!(
         kenku_report_text(&repeated),
-        "2 collections were already in Tufo."
+        "2 collections were already in the library."
     );
     assert_eq!(
         kenku_report_text(&KenkuImportReport::default()),
@@ -843,7 +843,7 @@ fn server_diagnostics_never_become_gui_text() {
     );
     assert_eq!(
         error_text(&ClientError::Status(unreadable)),
-        "Tufo could not read the audio file. Check its permissions."
+        "Could not read the audio file. Check its permissions."
     );
     let missing = error::status(
         Code::FailedPrecondition,
@@ -861,7 +861,7 @@ fn server_diagnostics_never_become_gui_text() {
     ] {
         assert_eq!(
             error_text(&ClientError::Status(unknown)),
-            "Tufo could not complete the request. Check the server log."
+            "Could not complete the request. Check the server log."
         );
     }
     assert_eq!(

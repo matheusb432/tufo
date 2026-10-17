@@ -230,7 +230,7 @@ impl Controller {
         };
         let kenku_folder = FolderPath::try_new(folder.path().to_path_buf()).ok();
         if kenku_folder.is_none() {
-            self.toast_error(tr("Tufo can't read that folder's path.").to_owned());
+            self.toast_error(tr("Can't read that folder's path.").to_owned());
         }
         kenku_folder
     }

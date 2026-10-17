@@ -192,7 +192,7 @@ impl Controller {
                 Err(error) => {
                     tracing::warn!(%error, "cannot load desktop settings");
                     self.toast_error(
-                        tr("Tufo could not read config.toml. Fix or remove it and restart Tufo.")
+                        tr("Could not read config.toml. Fix or remove it, then restart the app.")
                             .to_owned(),
                     );
                 }
@@ -219,7 +219,7 @@ impl Controller {
                 render::connection(
                     &self.window,
                     false,
-                    tr("Tufo could not start its server. Check that tufo-server is installed.")
+                    tr("Could not start the server. Check that tufo-server is installed.")
                         .to_owned(),
                 );
             }
@@ -521,7 +521,7 @@ impl Controller {
         let controller = self.clone();
         self.runtime.spawn(async move {
             let folders = rfd::AsyncFileDialog::new()
-                .set_title(tr("Choose folders for Tufo to follow"))
+                .set_title(tr("Choose folders to follow"))
                 .pick_folders()
                 .await
                 .unwrap_or_default();
@@ -1471,7 +1471,7 @@ impl Controller {
             Err(error) => {
                 tracing::warn!(%error, "cannot change starting at login");
                 self.toast_error(
-                    tr("Tufo could not change starting at login. Check your system settings.")
+                    tr("Could not change starting at login. Check your system settings.")
                         .to_owned(),
                 );
             }
@@ -1481,7 +1481,7 @@ impl Controller {
     fn save_desktop_settings(&self, update: DesktopSettingsUpdate) {
         let Some(file) = self.settings_file.clone() else {
             self.toast_error(
-                tr("This system names no config directory for Tufo's settings.").to_owned(),
+                tr("This system names no config directory for the settings.").to_owned(),
             );
             return;
         };
@@ -1495,7 +1495,7 @@ impl Controller {
                 Err(error) => {
                     tracing::warn!(%error, "cannot save desktop settings");
                     controller.toast_error(
-                        tr("Tufo could not save config.toml. Check its contents and permissions.")
+                        tr("Could not save config.toml. Check its contents and permissions.")
                             .to_owned(),
                     );
                 }

@@ -908,7 +908,7 @@ fn background_preset(preset: i32) -> Result<BackgroundPreset, &'static str> {
         Ok(pb::BackgroundPreset::Volcano) => BackgroundPreset::Volcano,
         Ok(pb::BackgroundPreset::Winter) => BackgroundPreset::Winter,
         Ok(pb::BackgroundPreset::Unspecified) | Err(_) => {
-            return Err("preset must be one Tufo ships");
+            return Err("preset must be a bundled one");
         }
     })
 }
@@ -1049,7 +1049,7 @@ macro_rules! sound_icon_mappings {
         fn sound_icon(icon: i32) -> Result<SoundIcon, &'static str> {
             match pb::SoundIcon::try_from(icon) {
                 $(Ok(pb::SoundIcon::$variant) => Ok(SoundIcon::$variant),)+
-                Ok(pb::SoundIcon::Unspecified) | Err(_) => Err("icon must be one Tufo ships"),
+                Ok(pb::SoundIcon::Unspecified) | Err(_) => Err("icon must be a bundled one"),
             }
         }
 

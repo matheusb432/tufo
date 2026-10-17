@@ -15,7 +15,7 @@ use toasty_cli::{Config, ToastyCli};
 #[command(
     name = "tufo-migrator",
     version,
-    about = "Tufo database migration authoring",
+    about = "Database migration authoring",
     arg_required_else_help = true
 )]
 struct Cli {

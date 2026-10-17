@@ -20,7 +20,7 @@ pub enum PlayCollectionError {
     #[error("the playlist does not exist")]
     #[meta(class = NotFound, reason = Self::NOT_FOUND)]
     NotFound,
-    #[error("the playlist has no track Tufo can find on disk")]
+    #[error("the playlist has no track on disk")]
     #[meta(class = FailedPrecondition, reason = Self::NOTHING_PLAYABLE)]
     NothingPlayable,
     #[error("the track to start from is not in the playlist or its file is missing")]

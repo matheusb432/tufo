@@ -202,8 +202,8 @@ msgid "Choose audio files"
 msgstr "Escolha arquivos de áudio"
 
 #: src/controller.rs
-msgid "Choose folders for Tufo to follow"
-msgstr "Escolha pastas para o Tufo acompanhar"
+msgid "Choose folders to follow"
+msgstr "Escolha pastas para acompanhar"
 
 #: src/sound_icons.rs
 msgid "Church"
@@ -598,10 +598,10 @@ msgid "Key"
 msgstr "Chave"
 
 #: src/presentation.rs
-msgid "Left out {n} web address Tufo cannot play."
-msgid_plural "Left out {n} web addresses Tufo cannot play."
-msgstr[0] "{n} endereço da web não foi importado porque o Tufo não pode reproduzi-lo."
-msgstr[1] "{n} endereços da web não foram importados porque o Tufo não pode reproduzi-los."
+msgid "Left out {n} web address that cannot be played."
+msgid_plural "Left out {n} web addresses that cannot be played."
+msgstr[0] "{n} endereço da web não foi importado porque não pode ser reproduzido."
+msgstr[1] "{n} endereços da web não foram importados porque não podem ser reproduzidos."
 
 #: src/sound_icons.rs
 msgid "Lightning"
@@ -1130,8 +1130,8 @@ msgid "The server is busy. Try again shortly."
 msgstr "O servidor está ocupado. Tente novamente em instantes."
 
 #: src/presentation.rs
-msgid "The server is unavailable. Tufo will reconnect shortly."
-msgstr "O servidor está indisponível. O Tufo vai reconectar em instantes."
+msgid "The server is unavailable. Reconnecting shortly."
+msgstr "O servidor está indisponível. Reconectando em instantes."
 
 #: src/presentation.rs
 msgid "There are no playable files in this collection."
@@ -1158,8 +1158,8 @@ msgid "This folder holds no audio yet."
 msgstr "Esta pasta ainda não tem áudio."
 
 #: src/controller.rs
-msgid "This system names no config directory for Tufo's settings."
-msgstr "O sistema não informou uma pasta para as configurações do Tufo."
+msgid "This system names no config directory for the settings."
+msgstr "O sistema não informou uma pasta para as configurações."
 
 #: src/sound_icons.rs
 msgid "Tornado"
@@ -1182,76 +1182,76 @@ msgid "Tufo"
 msgstr "Tufo"
 
 #: ui/gallery.slint
-msgid "Tufo can't open this file"
-msgstr "O Tufo não consegue abrir este arquivo"
+msgid "Can't open this file"
+msgstr "Não foi possível abrir este arquivo"
 
 #: ui/dialogs.slint
-msgid "Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another."
-msgstr "O Tufo não consegue mais abrir esta imagem e está exibindo o degradê. Altere o fundo para escolher outra."
+msgid "This image can't be opened anymore, so the gradient shows instead. Change the background to pick another."
+msgstr "Não é mais possível abrir esta imagem, então o degradê aparece no lugar. Altere o fundo para escolher outra."
 
 #: src/controller.rs
-msgid "Tufo can't read that folder's path."
-msgstr "O Tufo não consegue ler o caminho desta pasta."
+msgid "Can't read that folder's path."
+msgstr "Não foi possível ler o caminho desta pasta."
 
 #: src/presentation.rs
-msgid "Tufo cannot play this audio format."
-msgstr "O Tufo não consegue reproduzir este formato de áudio."
+msgid "This audio format can't be played."
+msgstr "Este formato de áudio não pode ser reproduzido."
 
 #: src/controller.rs
-msgid "Tufo could not change starting at login. Check your system settings."
-msgstr "O Tufo não conseguiu alterar a inicialização ao entrar no sistema. Confira as configurações do sistema."
+msgid "Could not change starting at login. Check your system settings."
+msgstr "Não foi possível alterar a inicialização ao entrar no sistema. Confira as configurações do sistema."
 
 #: src/presentation.rs
-msgid "Tufo could not complete the request. Check the server log."
-msgstr "O Tufo não conseguiu concluir a solicitação. Consulte o log do servidor."
+msgid "Could not complete the request. Check the server log."
+msgstr "Não foi possível concluir a solicitação. Consulte o log do servidor."
 
 #: src/presentation.rs
-msgid "Tufo could not join the voice channel. Check the bot’s permissions and try again."
-msgstr "O Tufo não conseguiu entrar no canal de voz. Confira as permissões do bot e tente novamente."
+msgid "Could not join the voice channel. Check the bot’s permissions and try again."
+msgstr "Não foi possível entrar no canal de voz. Confira as permissões do bot e tente novamente."
 
 #: src/presentation.rs
-msgid "Tufo could not open the audio device. Check your system’s audio settings."
-msgstr "O Tufo não conseguiu abrir o dispositivo de áudio. Confira as configurações de áudio do sistema."
+msgid "Could not open the audio device. Check your system’s audio settings."
+msgstr "Não foi possível abrir o dispositivo de áudio. Confira as configurações de áudio do sistema."
 
 #: src/presentation.rs
-msgid "Tufo could not read Kenku FM’s library. Check the folder permissions."
-msgstr "O Tufo não conseguiu ler a biblioteca do Kenku FM. Confira as permissões da pasta."
+msgid "Could not read Kenku FM’s library. Check the folder permissions."
+msgstr "Não foi possível ler a biblioteca do Kenku FM. Confira as permissões da pasta."
 
 #: src/controller.rs
-msgid "Tufo could not read config.toml. Fix or remove it and restart Tufo."
-msgstr "O Tufo não conseguiu ler config.toml. Corrija ou remova o arquivo e reinicie o Tufo."
+msgid "Could not read config.toml. Fix or remove it, then restart the app."
+msgstr "Não foi possível ler config.toml. Corrija ou remova o arquivo e reinicie o aplicativo."
 
 #: src/presentation.rs
-msgid "Tufo could not read or save the Discord bot token. Check the config folder permissions."
+msgid "Could not read or save the Discord bot token. Check the config folder permissions."
 msgstr "Não foi possível ler ou salvar o token do bot do Discord. Verifique as permissões da pasta de configuração."
 
 #: src/presentation.rs
-msgid "Tufo could not read the audio file. Check its permissions."
-msgstr "O Tufo não conseguiu ler o arquivo de áudio. Confira as permissões dele."
+msgid "Could not read the audio file. Check its permissions."
+msgstr "Não foi possível ler o arquivo de áudio. Confira as permissões dele."
 
 #: src/controller.rs
-msgid "Tufo could not save config.toml. Check its contents and permissions."
-msgstr "O Tufo não conseguiu salvar config.toml. Confira o conteúdo e as permissões do arquivo."
+msgid "Could not save config.toml. Check its contents and permissions."
+msgstr "Não foi possível salvar config.toml. Confira o conteúdo e as permissões do arquivo."
 
 #: src/presentation.rs
-msgid "Tufo could not save or read the library. Check the server log."
-msgstr "O Tufo não conseguiu salvar ou ler a biblioteca. Consulte o log do servidor."
+msgid "Could not save or read the library. Check the server log."
+msgstr "Não foi possível salvar ou ler a biblioteca. Consulte o log do servidor."
 
 #: src/controller.rs
-msgid "Tufo could not start its server. Check that tufo-server is installed."
-msgstr "O Tufo não conseguiu iniciar o servidor. Confira se o tufo-server está instalado."
+msgid "Could not start the server. Check that tufo-server is installed."
+msgstr "Não foi possível iniciar o servidor. Confira se o tufo-server está instalado."
 
 #: src/presentation.rs
-msgid "Tufo does not have permission to complete this request."
-msgstr "O Tufo não tem permissão para concluir esta solicitação."
+msgid "Permission denied for this request."
+msgstr "Permissão negada para esta solicitação."
 
 #: ui/dialogs.slint
-msgid "Tufo keeps its files in sync."
-msgstr "O Tufo mantém os arquivos sincronizados."
+msgid "Its files stay in sync."
+msgstr "Os arquivos ficam sincronizados."
 
 #: src/presentation.rs
-msgid "Tufo received an invalid response. Update the app and server together."
-msgstr "O Tufo recebeu uma resposta inválida. Atualize o aplicativo e o servidor juntos."
+msgid "The server sent an invalid response. Update the app and server together."
+msgstr "O servidor enviou uma resposta inválida. Atualize o aplicativo e o servidor juntos."
 
 #: src/presentation.rs
 msgid "Underworld"
@@ -1312,10 +1312,10 @@ msgstr[0] "{n} coleção"
 msgstr[1] "{n} coleções"
 
 #: src/presentation.rs
-msgid "{n} collection was already in Tufo."
-msgid_plural "{n} collections were already in Tufo."
-msgstr[0] "{n} coleção já estava no Tufo."
-msgstr[1] "{n} coleções já estavam no Tufo."
+msgid "{n} collection was already in the library."
+msgid_plural "{n} collections were already in the library."
+msgstr[0] "{n} coleção já estava na biblioteca."
+msgstr[1] "{n} coleções já estavam na biblioteca."
 
 #: src/presentation.rs src/render.rs
 msgid "{n} file"
@@ -1518,8 +1518,8 @@ msgid "A followed folder holds this song. Stop following the folder to remove it
 msgstr "Uma pasta acompanhada contém esta música. Pare de acompanhar a pasta para removê-la."
 
 #: src/presentation.rs
-msgid "Tufo no longer follows that folder."
-msgstr "O Tufo não acompanha mais essa pasta."
+msgid "That folder is no longer followed."
+msgstr "Essa pasta não é mais acompanhada."
 
 #: src/presentation.rs
 msgid "A Kenku FM import is already in progress."
@@ -1534,8 +1534,8 @@ msgid "Checking folders…"
 msgstr "Verificando pastas…"
 
 #: src/presentation.rs
-msgid "Choose Keep or Overwrite for each collection. Overwrite each Tufo collection only once."
-msgstr "Escolha Manter ou Sobrescrever para cada coleção. Sobrescreva cada coleção do Tufo apenas uma vez."
+msgid "Choose Keep or Overwrite for each collection. Overwrite each existing collection only once."
+msgstr "Escolha Manter ou Sobrescrever para cada coleção. Sobrescreva cada coleção existente apenas uma vez."
 
 #: ui/kenku-import.slint
 msgid "Choose which collections to overwrite."
@@ -1734,8 +1734,8 @@ msgid "Click a track to play it. Right-click Add to queue to schedule it; its li
 msgstr "Clique em uma faixa para reproduzi-la. Use Adicionar à fila no menu do botão direito para agendá-la; o número destacado mostra sua posição na fila. Repetir uma faixa desativa a fila, e uma fila com músicas faz Repetir pular essa opção."
 
 #: ui/tours/kenku.slint
-msgid "Close Kenku FM so Tufo can read its saved library. Import brings collections, local audio references and supported settings; it can adopt the bot token only when Tufo has none."
-msgstr "Feche o Kenku FM para Tufo ler sua biblioteca salva. Importar traz coleções, referências de áudio local e configurações compatíveis; só adota o token de bot quando Tufo não tem um."
+msgid "Close Kenku FM so its saved library can be read. Import brings collections, local audio references and supported settings; it can adopt the bot token only when none is saved."
+msgstr "Feche o Kenku FM para que a biblioteca salva dele possa ser lida. Importar traz coleções, referências de áudio local e configurações compatíveis; só adota o token de bot quando nenhum está salvo."
 
 #: ui/tours/overlay.slint
 msgid "Close guide"
@@ -1830,8 +1830,8 @@ msgid "Finish"
 msgstr "Concluir"
 
 #: ui/tours/songs.slint
-msgid "Follow a music folder or drop it on Songs. Tufo watches its audio and subfolders. A followed folder's menu can stop following it and delete its playlists."
-msgstr "Siga uma pasta de músicas ou solte-a em Músicas. Tufo acompanha seus arquivos de áudio e subpastas. O menu de uma pasta seguida permite parar de segui-la e excluir suas playlists."
+msgid "Follow a music folder or drop it on Songs. Its audio and subfolders are watched. A followed folder's menu can stop following it and delete its playlists."
+msgstr "Siga uma pasta de músicas ou solte-a em Músicas. Seus arquivos de áudio e subpastas são acompanhados. O menu de uma pasta seguida permite parar de segui-la e excluir suas playlists."
 
 #: ui/tours/shelves.slint
 msgid "Follow folders or pick files"
@@ -1958,16 +1958,16 @@ msgid "Playing sounds appear as chips with Loop and Stop. Pause sounds pauses or
 msgstr "Os sons em reprodução aparecem com controles de Repetir e Parar. Pausar sons pausa ou retoma todos eles juntos, independentemente da música."
 
 #: ui/tours/songs.slint
-msgid "Remove from Songs is available for songs added by their own path. Tufo removes library references and never moves or deletes your audio files."
-msgstr "Remover de Músicas está disponível para músicas adicionadas pelo próprio caminho. Tufo remove referências da biblioteca e nunca move nem exclui seus arquivos de áudio."
+msgid "Remove from Songs is available for songs added by their own path. It removes library references and never moves or deletes your audio files."
+msgstr "Remover de Músicas está disponível para músicas adicionadas pelo próprio caminho. Remove referências da biblioteca e nunca move nem exclui seus arquivos de áudio."
 
 #: ui/tours/collection.slint
 msgid "Right-click Add to mix for another music layer. The mix holds three songs including the main track. The player's Mix button offers each layer's volume, loop and stop controls."
 msgstr "Use Adicionar à mixagem no menu de uma faixa para criar outra camada musical. A mixagem comporta três músicas, incluindo a faixa principal. O botão Mix do player oferece volume, repetição e parada de cada camada."
 
 #: ui/tours/settings.slint
-msgid "Run at startup opens Tufo when you log in. Settings save as you change them; a new Discord token has its own Save and restart button."
-msgstr "Iniciar com o sistema abre Tufo ao entrar no sistema. As configurações são salvas quando alteradas; um novo token do Discord tem seu próprio botão Salvar e reiniciar."
+msgid "Run at startup opens the app when you log in. Settings save as you change them; a new Discord token has its own Save and restart button."
+msgstr "Iniciar com o sistema abre o aplicativo ao entrar no sistema. As configurações são salvas quando alteradas; um novo token do Discord tem seu próprio botão Salvar e reiniciar."
 
 #: ui/tours/settings.slint
 msgid "Search from the keyboard"
@@ -2038,8 +2038,8 @@ msgid "Step {0} of {1}"
 msgstr "Etapa {0} de {1}"
 
 #: ui/tours/collection-form.slint
-msgid "The folder picker follows audio and subfolders automatically. Tufo keeps references to your files; it never copies or moves them."
-msgstr "O seletor de pastas acompanha áudio e subpastas automaticamente. Tufo mantém referências aos seus arquivos; nunca os copia nem move."
+msgid "The folder picker follows audio and subfolders automatically. Collections keep references to your files and never copy or move them."
+msgstr "O seletor de pastas acompanha áudio e subpastas automaticamente. As coleções mantêm referências aos seus arquivos e nunca os copiam nem movem."
 
 #: ui/tours/kenku.slint
 msgid "The job continues if you close its dialog. View import reopens progress and results. Retry uses the same saved job when missing files return; Import again starts a fresh import."
@@ -2054,12 +2054,12 @@ msgid "The sidebar opens your pages and the playlists and soundboards pinned und
 msgstr "A barra lateral abre suas páginas e as playlists e painéis de sons fixados nelas. Clique com o botão direito em uma página para ocultá-la, ou em uma coleção para fixá-la ou desafixá-la. Ctrl+B alterna entre a barra lateral e sua versão estreita."
 
 #: ui/tours/collection.slint
-msgid "Tufo keeps this playlist in sync with its folder. The folder and any missing state appear in the large header. Folder-followed playlists do not take individual additions or removals."
-msgstr "Tufo mantém esta playlist sincronizada com sua pasta. A pasta e os avisos de ausência aparecem no cabeçalho grande. Playlists vinculadas a pastas não aceitam adições ou remoções individuais."
+msgid "This playlist stays in sync with its folder. The folder and any missing state appear in the large header. Folder-followed playlists do not take individual additions or removals."
+msgstr "Esta playlist fica sincronizada com sua pasta. A pasta e os avisos de ausência aparecem no cabeçalho grande. Playlists vinculadas a pastas não aceitam adições ou remoções individuais."
 
 #: ui/tours/collection.slint
-msgid "Tufo watches the folder and updates its sounds. Folder-followed soundboards do not take individual additions or removals."
-msgstr "Tufo acompanha a pasta e atualiza seus sons. Painéis de sons vinculados a pastas não aceitam adições ou remoções individuais."
+msgid "The folder is watched and its sounds update with it. Folder-followed soundboards do not take individual additions or removals."
+msgstr "A pasta é acompanhada e seus sons se atualizam com ela. Painéis de sons vinculados a pastas não aceitam adições ou remoções individuais."
 
 #: ui/tours/search.slint
 msgid "Up and Down select a result. Enter plays a track or sound, or opens a collection. Escape closes the palette. This guide only explains those actions."
@@ -2078,8 +2078,8 @@ msgid "Web addresses, bookmarks, and Kenku FM's remote and streaming settings ar
 msgstr "Endereços web, favoritos e configurações remotas e de transmissão do Kenku FM ficam de fora; playlists e painéis de sons mantêm a ordem do Kenku FM. O relatório lista arquivos indisponíveis e endereços web ignorados."
 
 #: ui/tours/kenku.slint
-msgid "What stays outside Tufo"
-msgstr "O que fica fora do Tufo"
+msgid "What isn't imported"
+msgstr "O que não é importado"
 
 #: ui/tours/collection.slint
 msgid "Your hand-picked playlist"
@@ -2090,8 +2090,8 @@ msgid "Your hand-picked soundboard"
 msgstr "Seu painel de sons montado à mão"
 
 #: ui/tours/artwork.slint
-msgid "Your own offers the collection's gradient, its current image, and Choose an image file. You can also drop an image onto this window. Tufo points at that image file."
-msgstr "Personalizado oferece o gradiente da coleção, sua imagem atual e Escolher um arquivo de imagem. Você também pode soltar uma imagem nesta janela. Tufo usa uma referência a esse arquivo."
+msgid "Your own offers the collection's gradient, its current image, and Choose an image file. You can also drop an image onto this window. The collection points at that image file."
+msgstr "Personalizado oferece o gradiente da coleção, sua imagem atual e Escolher um arquivo de imagem. Você também pode soltar uma imagem nesta janela. A coleção usa uma referência a esse arquivo."
 
 #: ui/tours/songs.slint
 msgid "Your song library"
@@ -2421,16 +2421,16 @@ msgid "The browser stopped unexpectedly. Opening it again restores its tabs."
 msgstr "O navegador parou inesperadamente. Abri-lo de novo restaura as abas."
 
 #: src/presentation.rs ui/browser.slint
-msgid "The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder."
-msgstr "O navegador não pôde iniciar. Confira o tufo-browser.log na pasta de logs do Tufo."
+msgid "The browser couldn’t start. Check tufo-browser.log beside the server’s log."
+msgstr "O navegador não pôde iniciar. Confira o tufo-browser.log ao lado do log do servidor."
 
 #: src/presentation.rs ui/browser.slint
-msgid "This installation of Tufo has no browser. It runs on Linux for now."
-msgstr "Esta instalação do Tufo não tem navegador. Por enquanto, ele funciona só no Linux."
+msgid "This installation has no browser. It runs on Linux and Windows."
+msgstr "Esta instalação não tem navegador. Ele funciona no Linux e no Windows."
 
 #: ui/browser.slint
-msgid "Play music and ambience from websites through Tufo, on this computer or in Discord. The browser runs only while it’s open."
-msgstr "Toque música e ambientação de sites pelo Tufo, neste computador ou no Discord. O navegador só funciona enquanto está aberto."
+msgid "Play music and ambience from websites, on this computer or in Discord. The browser runs only while it’s open."
+msgstr "Toque música e ambientação de sites, neste computador ou no Discord. O navegador só funciona enquanto está aberto."
 
 #: ui/browser.slint
 msgid "Try again"
@@ -2473,8 +2473,8 @@ msgid "This page stopped working. Reload it to try again."
 msgstr "Esta página parou de funcionar. Recarregue-a para tentar de novo."
 
 #: src/presentation/browser.rs
-msgid "Tufo couldn’t find that site. Check the address."
-msgstr "O Tufo não encontrou esse site. Confira o endereço."
+msgid "Couldn’t find that site. Check the address."
+msgstr "Esse site não foi encontrado. Confira o endereço."
 
 #: src/presentation/browser.rs
 msgid "The site didn’t respond. Try again later."
@@ -2485,8 +2485,8 @@ msgid "This computer is offline."
 msgstr "Este computador está sem internet."
 
 #: src/presentation/browser.rs
-msgid "The site’s security certificate isn’t valid, so Tufo didn’t open it."
-msgstr "O certificado de segurança do site não é válido, então o Tufo não o abriu."
+msgid "The site’s security certificate isn’t valid, so it wasn’t opened."
+msgstr "O certificado de segurança do site não é válido, então ele não foi aberto."
 
 #: src/presentation/browser.rs
 msgid "The site refused to open here."

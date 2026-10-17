@@ -114,13 +114,11 @@ fn failure_text(failure: PageFailure) -> &'static str {
     match failure {
         PageFailure::Crashed => tr("This page stopped working. Reload it to try again."),
         PageFailure::LoadFailed(error) => match error {
-            PageLoadError::NameNotResolved => {
-                tr("Tufo couldn’t find that site. Check the address.")
-            }
+            PageLoadError::NameNotResolved => tr("Couldn’t find that site. Check the address."),
             PageLoadError::ConnectionFailed => tr("The site didn’t respond. Try again later."),
             PageLoadError::Offline => tr("This computer is offline."),
             PageLoadError::InvalidCertificate => {
-                tr("The site’s security certificate isn’t valid, so Tufo didn’t open it.")
+                tr("The site’s security certificate isn’t valid, so it wasn’t opened.")
             }
             PageLoadError::Blocked => tr("The site refused to open here."),
             PageLoadError::Other => tr("This page couldn’t load."),
@@ -202,10 +200,7 @@ mod tests {
 
         let view = browser_page(open(), &tabs);
 
-        assert_eq!(
-            view.failure,
-            "Tufo couldn’t find that site. Check the address."
-        );
+        assert_eq!(view.failure, "Couldn’t find that site. Check the address.");
     }
 
     #[test]

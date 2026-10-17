@@ -110,6 +110,6 @@ pub enum ScanFolderError {
 pub enum InspectAudioError {
     #[error("the audio file cannot be read")]
     Unreadable(#[source] std::io::Error),
-    #[error("the file holds no audio track Tufo can decode")]
+    #[error("the file holds no audio track that can be decoded")]
     Unsupported(#[source] anyhow::Error),
 }

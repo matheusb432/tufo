@@ -8,7 +8,7 @@ export global KenkuTour {
         {
             anchor: SettingsTour.kenku-launch,
             title: @tr("Before importing Kenku FM"),
-            body: @tr("Close Kenku FM so Tufo can read its saved library. Import brings collections, local audio references and supported settings; it can adopt the bot token only when Tufo has none."),
+            body: @tr("Close Kenku FM so its saved library can be read. Import brings collections, local audio references and supported settings; it can adopt the bot token only when none is saved."),
         },
         {
             anchor: KenkuTour.kenku-conflicts,
@@ -22,7 +22,7 @@ export global KenkuTour {
         },
         {
             anchor: "",
-            title: @tr("What stays outside Tufo"),
+            title: @tr("What isn't imported"),
             body: @tr("Web addresses, bookmarks, and Kenku FM's remote and streaming settings are left out; playlists and soundboards keep Kenku FM's order. The report lists unavailable files and skipped web addresses."),
         },
     ] };

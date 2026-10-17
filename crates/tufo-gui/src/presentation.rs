@@ -1427,7 +1427,7 @@ fn builtin_title(key: BuiltinTitle) -> &'static str {
 /// Server diagnostics never become GUI text, including unknown or old-server errors.
 pub(crate) fn error_text(error: &ClientError) -> String {
     let ClientError::Status(status) = error else {
-        return tr("Tufo received an invalid response. Update the app and server together.")
+        return tr("The server sent an invalid response. Update the app and server together.")
             .to_owned();
     };
     if let Some(reason) = tufo_client::error::reason(status)
@@ -1436,18 +1436,16 @@ pub(crate) fn error_text(error: &ClientError) -> String {
         return text.to_owned();
     }
     match status.code() {
-        Code::Unavailable => tr("The server is unavailable. Tufo will reconnect shortly."),
+        Code::Unavailable => tr("The server is unavailable. Reconnecting shortly."),
         Code::DeadlineExceeded => tr("The request took too long. Try again."),
         Code::Cancelled => tr("The request was cancelled."),
-        Code::PermissionDenied | Code::Unauthenticated => {
-            tr("Tufo does not have permission to complete this request.")
-        }
+        Code::PermissionDenied | Code::Unauthenticated => tr("Permission denied for this request."),
         Code::InvalidArgument | Code::OutOfRange => {
             tr("Some values are invalid. Check them and try again.")
         }
         Code::Unimplemented => tr("Update the app and server together to use this feature."),
         Code::ResourceExhausted => tr("The server is busy. Try again shortly."),
-        _ => tr("Tufo could not complete the request. Check the server log."),
+        _ => tr("Could not complete the request. Check the server log."),
     }
     .to_owned()
 }
@@ -1472,13 +1470,13 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
     };
     Some(match (code, reason) {
         (Code::InvalidArgument, ImportKenkuLibraryError::CHOICES) => tr(
-            "Choose Keep or Overwrite for each collection. Overwrite each Tufo collection only once.",
+            "Choose Keep or Overwrite for each collection. Overwrite each existing collection only once.",
         ),
         (Code::FailedPrecondition, ImportKenkuLibraryError::BUSY) => {
             tr("A Kenku FM import is already in progress.")
         }
         (Code::Internal, LibraryStorageError::REASON) => {
-            tr("Tufo could not save or read the library. Check the server log.")
+            tr("Could not save or read the library. Check the server log.")
         }
         (
             Code::NotFound,
@@ -1496,7 +1494,7 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
             tr("A followed folder holds this song. Stop following the folder to remove it.")
         }
         (Code::NotFound, DeleteLibraryFolderError::NOT_FOUND) => {
-            tr("Tufo no longer follows that folder.")
+            tr("That folder is no longer followed.")
         }
         (
             Code::NotFound,
@@ -1515,7 +1513,7 @@ fn library_reason_text(code: Code, reason: &str) -> Option<&'static str> {
             tr("No Kenku FM library was found in that folder.")
         }
         (Code::FailedPrecondition, ReadKenkuDataError::UNREADABLE) => {
-            tr("Tufo could not read Kenku FM’s library. Check the folder permissions.")
+            tr("Could not read Kenku FM’s library. Check the folder permissions.")
         }
         (Code::FailedPrecondition, ReadKenkuDataError::RUNNING) => {
             tr("Close Kenku FM and try again.")
@@ -1589,10 +1587,10 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
     }
     Some(match (code, reason) {
         (Code::Unavailable, OpenBrowserError::UNAVAILABLE) => {
-            tr("This installation of Tufo has no browser. It runs on Linux for now.")
+            tr("This installation has no browser. It runs on Linux and Windows.")
         }
         (Code::Unavailable, OpenBrowserError::START_FAILED) => {
-            tr("The browser couldn’t start. Check tufo-browser.log in Tufo’s log folder.")
+            tr("The browser couldn’t start. Check tufo-browser.log beside the server’s log.")
         }
         (Code::NotFound, PlayAudioError::NOT_FOUND)
         | (
@@ -1612,10 +1610,10 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             tr("The mix has three songs. Stop a layer before adding another.")
         }
         (Code::FailedPrecondition, PlayAudioError::UNREADABLE) => {
-            tr("Tufo could not read the audio file. Check its permissions.")
+            tr("Could not read the audio file. Check its permissions.")
         }
         (Code::FailedPrecondition, PlayAudioError::UNSUPPORTED) => {
-            tr("Tufo cannot play this audio format.")
+            tr("This audio format can't be played.")
         }
         (Code::Unavailable, PlayAudioError::OUTPUT_UNAVAILABLE) => {
             tr("The audio output is unavailable. Choose another output.")
@@ -1638,10 +1636,10 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
             tr("That voice channel is no longer available. Refresh the channels.")
         }
         (Code::Unavailable, SelectOutputError::VOICE_CONNECTION) => {
-            tr("Tufo could not join the voice channel. Check the bot’s permissions and try again.")
+            tr("Could not join the voice channel. Check the bot’s permissions and try again.")
         }
         (Code::Unavailable, SelectOutputError::LOCAL_DEVICE) => {
-            tr("Tufo could not open the audio device. Check your system’s audio settings.")
+            tr("Could not open the audio device. Check your system’s audio settings.")
         }
         (Code::Unavailable, DiscordClientError::NOT_READY) => {
             tr("The Discord bot is still connecting. Try again shortly.")
@@ -1649,9 +1647,9 @@ fn reason_text(code: Code, reason: &str) -> Option<&'static str> {
         (Code::InvalidArgument, SetDiscordBotTokenError::EMPTY_TOKEN) => {
             tr("Paste a Discord bot token before saving.")
         }
-        (Code::Internal, CredentialsError::REASON) => tr(
-            "Tufo could not read or save the Discord bot token. Check the config folder permissions.",
-        ),
+        (Code::Internal, CredentialsError::REASON) => {
+            tr("Could not read or save the Discord bot token. Check the config folder permissions.")
+        }
         _ => return None,
     })
 }
@@ -1673,8 +1671,8 @@ pub(crate) fn kenku_report_text(report: &KenkuImportReport) -> String {
     }
     if !report.skipped_collections.is_empty() {
         sentences.push(tr_count(
-            "{n} collection was already in Tufo.",
-            "{n} collections were already in Tufo.",
+            "{n} collection was already in the library.",
+            "{n} collections were already in the library.",
             report.skipped_collections.len(),
         ));
     }
@@ -1687,8 +1685,8 @@ pub(crate) fn kenku_report_text(report: &KenkuImportReport) -> String {
     }
     if !report.unsupported_sources.is_empty() {
         sentences.push(tr_count(
-            "Left out {n} web address Tufo cannot play.",
-            "Left out {n} web addresses Tufo cannot play.",
+            "Left out {n} web address that cannot be played.",
+            "Left out {n} web addresses that cannot be played.",
             report.unsupported_sources.len(),
         ));
     }
@@ -1709,7 +1707,7 @@ pub(crate) fn kenku_error_text(reason: &str) -> String {
         _ => library_reason_text(Code::FailedPrecondition, reason)
             .or_else(|| library_reason_text(Code::NotFound, reason))
             .or_else(|| reason_text(Code::Internal, reason))
-            .unwrap_or_else(|| tr("Tufo could not complete the request. Check the server log.")),
+            .unwrap_or_else(|| tr("Could not complete the request. Check the server log.")),
     }
     .to_owned()
 }

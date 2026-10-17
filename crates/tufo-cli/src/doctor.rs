@@ -8,6 +8,8 @@ use crate::{
     server,
 };
 
+const LATEST_VERSION_ACTION: &str = concat!("Get the latest version at ", releases_url!());
+
 #[derive(serde::Serialize)]
 struct Report {
     cli_version: &'static str,
@@ -108,7 +110,7 @@ async fn inspect() -> Report {
             report.checks.push(token_unknown());
         }
         Err(error) => {
-            report.checks.push(Check::new("Server", CheckStatus::Fail, format!("Cannot inspect tufo-server: {error:#}"), Some("Check the runtime directory permissions and tufo-server.log in Tufo's state directory.")));
+            report.checks.push(Check::new("Server", CheckStatus::Fail, format!("Cannot inspect tufo-server: {error:#}"), Some("Check the runtime directory permissions and tufo-server.log in the server's state directory.")));
             report.checks.push(token_unknown());
         }
     }
@@ -167,14 +169,14 @@ fn discord_checks(status: &ServerStatus) -> [Check; 2] {
             "Bot token",
             CheckStatus::Warning,
             "Not configured; local playback is available",
-            Some("Save a bot token in Tufo Settings to enable Discord."),
+            Some("Save a bot token in the GUI's Settings to enable Discord."),
         ),
         DiscordBotTokenStatus::Invalid => Check::new(
             "Bot token",
             CheckStatus::Fail,
             "The saved credentials cannot be read safely or contain an invalid token entry",
             Some(
-                "Check the credentials file's permissions and save a valid token in Tufo Settings.",
+                "Check the credentials file's permissions and save a valid token in the GUI's Settings.",
             ),
         ),
     };
@@ -202,7 +204,7 @@ fn discord_checks(status: &ServerStatus) -> [Check; 2] {
             "Discord",
             CheckStatus::Warning,
             "Connection disabled; the bot is not logged in",
-            Some("Enable the Discord connection in Tufo Settings to use voice output."),
+            Some("Enable the Discord connection in the GUI's Settings to use voice output."),
         ),
     };
     [token, connection]
@@ -235,9 +237,13 @@ impl Report {
             Ok(status) => {
                 self.checks.push(Check::new(
                     "Versions",
-                    if status.version == self.cli_version { CheckStatus::Pass } else { CheckStatus::Fail },
+                    if status.version == self.cli_version {
+                        CheckStatus::Pass
+                    } else {
+                        CheckStatus::Fail
+                    },
                     format!("CLI {} / server {}", self.cli_version, status.version),
-                    (status.version != self.cli_version).then_some("Run `just update` from the Tufo checkout to install matching binaries and restart the server."),
+                    (status.version != self.cli_version).then_some(LATEST_VERSION_ACTION),
                 ));
                 self.checks.extend(discord_checks(&status));
                 self.checks.push(Check::new(
@@ -253,7 +259,7 @@ impl Report {
                         "The running server cannot apply nested partial library updates"
                     },
                     (!status.supports_library_patches)
-                        .then_some("Replace matching Tufo binaries and run `tufo server restart`."),
+                        .then_some("Install matching binaries and run `tufo server restart`."),
                 ));
                 details.supports_library_patches = Some(status.supports_library_patches);
                 details.version = Some(status.version);
@@ -265,7 +271,7 @@ impl Report {
                     "Server API",
                     CheckStatus::Fail,
                     "The running server does not support status diagnostics",
-                    Some("Run `just update` from the Tufo checkout to replace the older installed server."),
+                    Some(LATEST_VERSION_ACTION),
                 ));
                 self.checks.push(token_unknown());
             }

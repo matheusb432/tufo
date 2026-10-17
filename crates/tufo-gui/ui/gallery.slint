@@ -239,7 +239,7 @@ export component BackgroundGallery inherits Rectangle {
                                 columns: root.columns;
                                 width: root.tile-width;
                                 painting-height: root.painting-height;
-                                label: root.image-missing ? { name: root.selected-label.name, credit: @tr("Tufo can't open this file") } : root.selected-label;
+                                label: root.image-missing ? { name: root.selected-label.name, credit: @tr("Can't open this file") } : root.selected-label;
                                 credit-is-error: root.image-missing;
                                 selected: true;
                                 clicked => {

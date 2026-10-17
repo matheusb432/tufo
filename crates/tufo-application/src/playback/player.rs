@@ -166,7 +166,7 @@ pub enum PlayAudioError {
     #[error("the audio file cannot be read")]
     #[meta(class = FailedPrecondition, reason = Self::UNREADABLE)]
     Unreadable(#[source] std::io::Error),
-    #[error("the file holds no audio track Tufo can decode")]
+    #[error("the file holds no audio track that can be decoded")]
     #[meta(class = FailedPrecondition, reason = Self::UNSUPPORTED)]
     Unsupported(#[source] anyhow::Error),
     #[error("the active output cannot play audio")]

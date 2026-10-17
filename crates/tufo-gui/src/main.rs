@@ -109,11 +109,11 @@ fn run_desktop() -> anyhow::Result<()> {
     let activations = match runtime.block_on(claim_gui_instance()) {
         Ok(GuiInstance::First(activations)) => Some(activations),
         Ok(GuiInstance::AlreadyRunning) => {
-            tracing::info!("Tufo is already running and shows its window");
+            tracing::info!("already running; showing its window");
             return Ok(());
         }
         Err(error) => {
-            tracing::warn!(%error, "cannot claim Tufo's window; a later launch opens another");
+            tracing::warn!(%error, "cannot claim the window; a later launch opens another");
             None
         }
     };
@@ -218,9 +218,7 @@ fn select_backend(
 fn show_tray(requests: &WindowRequests) -> Option<Tray> {
     let requests = requests.clone();
     Tray::show(move |command| requests.send(command))
-        .inspect_err(
-            |error| tracing::warn!(%error, "no tray icon, so closing the window quits Tufo"),
-        )
+        .inspect_err(|error| tracing::warn!(%error, "no tray icon, so closing the window quits"))
         .ok()
 }
 
@@ -318,7 +316,7 @@ impl WindowRequests {
     async fn follow_activations(self, mut activations: ActivationListener) {
         loop {
             if let Err(error) = activations.next_activation().await {
-                tracing::warn!(%error, "stopped hearing later launches of Tufo");
+                tracing::warn!(%error, "stopped hearing later launches");
                 return;
             }
             self.send(TrayCommand::ShowWindow);

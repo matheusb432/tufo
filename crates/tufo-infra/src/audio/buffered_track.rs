@@ -38,7 +38,7 @@ pub enum OpenTrackError {
     NotFound,
     #[error("the audio file cannot be read")]
     Unreadable(#[source] io::Error),
-    #[error("the file holds no audio track Tufo can decode")]
+    #[error("the file holds no audio track that can be decoded")]
     Unsupported(#[source] anyhow::Error),
     #[error("the decoder thread cannot start")]
     DecoderThread(#[source] io::Error),

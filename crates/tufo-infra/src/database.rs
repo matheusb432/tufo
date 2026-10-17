@@ -36,7 +36,7 @@ pub fn database_path() -> anyhow::Result<PathBuf> {
         return Ok(path);
     }
     let directories = directories::ProjectDirs::from("", "", "tufo")
-        .context("resolving the platform local data directory for the Tufo database")?;
+        .context("resolving the platform local data directory for the database")?;
     Ok(directories.data_local_dir().join(DATABASE_FILE_NAME))
 }
 

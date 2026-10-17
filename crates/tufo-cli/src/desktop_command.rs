@@ -101,7 +101,7 @@ pub(crate) async fn run(command: DesktopCommand, json: bool) -> anyhow::Result<b
 
 fn settings_file() -> anyhow::Result<SettingsFile> {
     SettingsFile::from_environment()
-        .context("this system names no config directory for Tufo's settings")
+        .context("this system names no config directory for the desktop settings")
 }
 
 fn get() -> anyhow::Result<serde_json::Value> {

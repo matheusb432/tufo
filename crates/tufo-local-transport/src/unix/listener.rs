@@ -27,7 +27,7 @@ pub enum BindUdsError {
     NotSocket { path: PathBuf },
     #[error("the local socket has unsafe ownership or permissions: {}", path.display())]
     UnsafeSocket { path: PathBuf },
-    #[error("another Tufo process owns the local socket: {}", path.display())]
+    #[error("another process owns the local socket: {}", path.display())]
     AlreadyOwned { path: PathBuf },
     #[error("timed out while probing the existing local socket: {}", path.display())]
     ProbeTimedOut { path: PathBuf },

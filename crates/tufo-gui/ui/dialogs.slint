@@ -235,7 +235,7 @@ export component AddCollectionDialog inherits DialogFrame {
         }
 
         Text {
-            text: @tr("Tufo keeps its files in sync.");
+            text: @tr("Its files stay in sync.");
             color: Theme.text-secondary;
             font-size: Theme.body-small;
             horizontal-stretch: 1;
@@ -438,7 +438,7 @@ export component EditCollectionDialog inherits DialogFrame {
     }
 
     if Art.picture-missing(LibraryView.collection-background, Art.pictures-revision): Text {
-        text: @tr("Tufo can't open this image anymore, so the gradient shows instead. Change the background to pick another.");
+        text: @tr("This image can't be opened anymore, so the gradient shows instead. Change the background to pick another.");
         color: Theme.error;
         font-size: Theme.body-small;
         wrap: word-wrap;
