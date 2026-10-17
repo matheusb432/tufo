@@ -27,7 +27,8 @@ jobs:
         with:
           version: 2026.8.8
           working_directory: tools/tufo
-          install_args: rust just buf cargo-binstall cargo:cargo-nextest
+          # Ninja builds CEF's C++ wrapper for the browser host.
+          install_args: rust just buf ninja cargo-binstall cargo:cargo-nextest
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tools/tufo

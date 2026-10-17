@@ -1,5 +1,6 @@
 //! `%LOCALAPPDATA%\Programs\Tufo` for the executables, and a Start menu shortcut, which Windows
-//! search finds. The shortcut shows the icon embedded in `tufo-gui.exe`.
+//! search finds. The shortcut shows the icon embedded in `tufo-gui.exe`. A built browser host goes
+//! to a `browser` folder there with Chromium's runtime.
 
 use std::{
     fs,
@@ -10,6 +11,7 @@ use std::{
 use anyhow::{Context as _, Result, ensure};
 
 use super::{BINARY_NAMES, remove_files, replace_file};
+use crate::windows_browser;
 
 /// Creates or replaces the shortcut named by `TUFO_SHORTCUT`, which opens `TUFO_TARGET`.
 const CREATE_SHORTCUT_SCRIPT: &str = "\
@@ -38,16 +40,29 @@ impl Places {
     fn executable(&self, binary_name: &str) -> PathBuf {
         self.programs.join(format!("{binary_name}.exe"))
     }
+
+    fn browser(&self) -> PathBuf {
+        self.programs.join(windows_browser::FOLDER_NAME)
+    }
 }
 
-pub(super) fn install(release_dir: &Path) -> Result<PathBuf> {
+pub(super) fn install(workspace_root: &Path, release_dir: &Path) -> Result<PathBuf> {
     let places = Places::for_current_user()?;
+    let browser = windows_browser::find_source(workspace_root, release_dir)?;
     fs::create_dir_all(&places.programs)
         .with_context(|| format!("create {}", places.programs.display()))?;
     for name in BINARY_NAMES {
         let file_name = format!("{name}.exe");
         replace_file(&release_dir.join(&file_name), &places.executable(name))
             .context("quit Tufo and stop tufo-server before installing over them")?;
+    }
+    match browser {
+        Some(source) => {
+            windows_browser::place(&source, &places.browser())?;
+            windows_browser::grant_app_container_access(&places.browser())?;
+            println!("installed the browser in {}", places.browser().display());
+        }
+        None => println!("no tufo-browser build; Tufo installs without its browser"),
     }
     create_shortcut(&places.start_menu_shortcut, &places.executable("tufo-gui"))?;
     println!(
@@ -60,21 +75,23 @@ pub(super) fn install(release_dir: &Path) -> Result<PathBuf> {
 
 pub(super) fn uninstall() -> Result<()> {
     let places = Places::for_current_user()?;
+    let browser = places.browser();
     let mut paths = BINARY_NAMES.map(|name| places.executable(name)).to_vec();
     paths.push(places.start_menu_shortcut);
     remove_files(&paths.iter().map(PathBuf::as_path).collect::<Vec<_>>())?;
+    windows_browser::remove(&browser)?;
     // Only an empty directory goes; anything else in it isn't the installer's.
     let _ = fs::remove_dir(&places.programs);
     Ok(())
 }
 
-/// Force-stops every running Tufo GUI and server of this user, GUI first so it can't start the
-/// server again. Windows exposes no cheap way to read another process's environment, so isolated
-/// instances stop too.
+/// Force-stops every running Tufo GUI, server, and browser of this user, GUI first so it can't
+/// start the server again. Windows exposes no cheap way to read another process's environment, so
+/// isolated instances stop too.
 pub(super) fn stop_session() -> Result<()> {
     /// taskkill's exit code when no process matched.
     const NO_MATCHING_PROCESS: i32 = 128;
-    for name in ["tufo-gui", "tufo-server"] {
+    for name in ["tufo-gui", "tufo-server", "tufo-browser"] {
         let status = Command::new("taskkill")
             .args(["/F", "/IM", &format!("{name}.exe")])
             .status()

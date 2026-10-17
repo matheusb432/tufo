@@ -67,15 +67,15 @@ impl InputTranslator {
                 let (button_type, held) = match button {
                     MouseButton::Left => (
                         MouseButtonType::LEFT,
-                        cef_event_flags_t::EVENTFLAG_LEFT_MOUSE_BUTTON.0,
+                        flag_bits(cef_event_flags_t::EVENTFLAG_LEFT_MOUSE_BUTTON),
                     ),
                     MouseButton::Middle => (
                         MouseButtonType::MIDDLE,
-                        cef_event_flags_t::EVENTFLAG_MIDDLE_MOUSE_BUTTON.0,
+                        flag_bits(cef_event_flags_t::EVENTFLAG_MIDDLE_MOUSE_BUTTON),
                     ),
                     MouseButton::Right => (
                         MouseButtonType::RIGHT,
-                        cef_event_flags_t::EVENTFLAG_RIGHT_MOUSE_BUTTON.0,
+                        flag_bits(cef_event_flags_t::EVENTFLAG_RIGHT_MOUSE_BUTTON),
                     ),
                 };
                 if pressed {
@@ -134,7 +134,18 @@ fn modifier_flags(modifiers: KeyModifiers) -> u32 {
     ]
     .into_iter()
     .filter(|(held, _)| *held)
-    .fold(0, |flags, (_, flag)| flags | flag.0)
+    .fold(0, |flags, (_, flag)| flags | flag_bits(flag))
+}
+
+/// The flag as events carry it; C enums are unsigned on Linux and signed on Windows.
+#[cfg(not(windows))]
+fn flag_bits(flag: cef_event_flags_t) -> u32 {
+    flag.0
+}
+
+#[cfg(windows)]
+fn flag_bits(flag: cef_event_flags_t) -> u32 {
+    flag.0.cast_unsigned()
 }
 
 /// A key press is a raw key down followed by the characters it types; a release is a key up.
@@ -142,7 +153,7 @@ fn modifier_flags(modifiers: KeyModifiers) -> u32 {
 fn key_events(key: &KeyInput) -> Vec<KeyEvent> {
     let mut modifiers = modifier_flags(key.modifiers);
     if key.repeat {
-        modifiers |= cef_event_flags_t::EVENTFLAG_IS_REPEAT.0;
+        modifiers |= flag_bits(cef_event_flags_t::EVENTFLAG_IS_REPEAT);
     }
     let key_code = i32::try_from(key.key_code).unwrap_or(0);
     let event = |type_, character| KeyEvent {
@@ -152,6 +163,15 @@ fn key_events(key: &KeyInput) -> Vec<KeyEvent> {
         character,
         unmodified_character: character,
         ..KeyEvent::default()
+    };
+    // Windows reads a typed character from the key code, Linux from the character.
+    let char_event = |character: u16| KeyEvent {
+        windows_key_code: if cfg!(windows) {
+            i32::from(character)
+        } else {
+            key_code
+        },
+        ..event(KeyEventType::CHAR, character)
     };
     if !key.pressed {
         return if key_code == 0 {
@@ -168,14 +188,10 @@ fn key_events(key: &KeyInput) -> Vec<KeyEvent> {
         return events;
     }
     if key.key_code == RETURN_KEY_CODE {
-        events.push(event(KeyEventType::CHAR, CARRIAGE_RETURN));
+        events.push(char_event(CARRIAGE_RETURN));
         return events;
     }
-    events.extend(
-        key.text
-            .encode_utf16()
-            .map(|unit| event(KeyEventType::CHAR, unit)),
-    );
+    events.extend(key.text.encode_utf16().map(char_event));
     events
 }
 
@@ -211,7 +227,14 @@ mod tests {
                 (KeyEventType::CHAR, u16::from(b'a'))
             ]
         );
-        assert!(events.iter().all(|event| event.windows_key_code == 0x41));
+        let typed_key_code = if cfg!(windows) { i32::from(b'a') } else { 0x41 };
+        assert_eq!(
+            events
+                .iter()
+                .map(|event| event.windows_key_code)
+                .collect::<Vec<_>>(),
+            [0x41, typed_key_code]
+        );
     }
 
     #[test]
@@ -272,8 +295,8 @@ mod tests {
         });
         let left = translator.translate(ViewInput::PointerLeft);
 
-        let dragging_flags = cef_event_flags_t::EVENTFLAG_LEFT_MOUSE_BUTTON.0
-            | cef_event_flags_t::EVENTFLAG_SHIFT_DOWN.0;
+        let dragging_flags = flag_bits(cef_event_flags_t::EVENTFLAG_LEFT_MOUSE_BUTTON)
+            | flag_bits(cef_event_flags_t::EVENTFLAG_SHIFT_DOWN);
         assert!(matches!(
             &dragging[..],
             [PageEvent::MouseMove { event, leaves: false }] if event.modifiers == dragging_flags

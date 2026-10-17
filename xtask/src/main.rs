@@ -6,8 +6,10 @@ use clap::{Parser, Subcommand};
 
 mod app_icon;
 mod architecture;
+mod cef_distribution;
 mod install;
 mod translations;
+mod windows_browser;
 mod windows_installer;
 
 #[derive(Parser)]

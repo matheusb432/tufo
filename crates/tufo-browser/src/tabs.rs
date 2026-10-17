@@ -29,6 +29,10 @@ const FRAMES_PER_SECOND: i32 = 30;
 /// How long closing pages may take before the host quits regardless.
 const CLOSE_GRACE: Duration = Duration::from_secs(3);
 const OPAQUE_WHITE: u32 = 0xFFFF_FFFF;
+#[cfg(target_os = "linux")]
+const NO_PARENT_WINDOW: cef::sys::cef_window_handle_t = 0;
+#[cfg(windows)]
+const NO_PARENT_WINDOW: cef::sys::cef_window_handle_t = cef::sys::HWND(std::ptr::null_mut());
 /// Inserts committed text at the caret; CEF drops a commit without a range.
 const CARET_RANGE: Range = Range {
     from: u32::MAX,
@@ -209,7 +213,7 @@ fn open_tab_unselected(address: Option<&PageAddress>) -> Result<TabId, OpenTabEr
     })
     .ok_or(OpenTabError::Closing)??;
     let address_text = address.map_or(BLANK_ADDRESS, PageAddress::as_str);
-    let window = WindowInfo::default().set_as_windowless(0);
+    let window = WindowInfo::default().set_as_windowless(NO_PARENT_WINDOW);
     let settings = BrowserSettings {
         windowless_frame_rate: FRAMES_PER_SECOND,
         background_color: OPAQUE_WHITE,

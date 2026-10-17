@@ -9,6 +9,8 @@ use std::{
 use super::{BrowserLauncher, BrowserProcess, LaunchBrowserError, LaunchedBrowser};
 
 const HOST_EXECUTABLE_NAME: &str = "tufo-browser";
+#[cfg(windows)]
+const WINDOWS_HOST_FOLDER_NAME: &str = "browser";
 const PROFILE_FOLDER_NAME: &str = "browser";
 const LOG_FILE_NAME: &str = "tufo-browser.log";
 /// A log past this size starts over when the host starts.
@@ -62,16 +64,31 @@ impl ProcessBrowserLauncher {
     }
 }
 
-/// The host beside this executable, following a link to it as the GUI and CLI do. Only Linux
-/// runs the browser; elsewhere the host executable is a stub that reports so.
+/// The installed host. Only Linux and Windows run the browser; elsewhere the host executable is
+/// a stub that reports so.
 fn installed_host() -> Option<PathBuf> {
-    if !cfg!(target_os = "linux") {
+    if !cfg!(any(target_os = "linux", windows)) {
         return None;
     }
     let name = format!("{HOST_EXECUTABLE_NAME}{}", std::env::consts::EXE_SUFFIX);
     let executable = std::env::current_exe().ok()?;
-    let executable = std::fs::canonicalize(&executable).unwrap_or(executable);
-    Some(executable.with_file_name(name)).filter(|host| host.is_file())
+    Some(host_folder(&executable)?.join(name)).filter(|host| host.is_file())
+}
+
+/// Beside this executable, following a link to it as the GUI and CLI do.
+#[cfg(unix)]
+fn host_folder(executable: &Path) -> Option<PathBuf> {
+    let executable = std::fs::canonicalize(executable).unwrap_or_else(|_| executable.to_path_buf());
+    executable.parent().map(Path::to_path_buf)
+}
+
+/// A folder beside this executable that also holds Chromium's runtime. Canonical Windows paths
+/// carry the `\\?\` prefix, which the host would hand Chromium.
+#[cfg(windows)]
+fn host_folder(executable: &Path) -> Option<PathBuf> {
+    executable
+        .parent()
+        .map(|folder| folder.join(WINDOWS_HOST_FOLDER_NAME))
 }
 
 impl BrowserLauncher for ProcessBrowserLauncher {
@@ -98,7 +115,7 @@ impl BrowserLauncher for ProcessBrowserLauncher {
         own_process_group(&mut command);
         let mut child = command.spawn().map_err(LaunchBrowserError::Spawn)?;
         let (Some(events), stdin) = (child.stdout.take(), child.stdin.take()) else {
-            let mut process = ChildProcess { child, stdin: None };
+            let mut process = ChildProcess::new(child, None);
             process.kill();
             return Err(LaunchBrowserError::Spawn(std::io::Error::other(
                 "the browser host's pipes did not open",
@@ -107,7 +124,7 @@ impl BrowserLauncher for ProcessBrowserLauncher {
         tracing::info!(pid = child.id(), "started the browser host");
         Ok(LaunchedBrowser {
             events: Box::new(events),
-            process: Box::new(ChildProcess { child, stdin }),
+            process: Box::new(ChildProcess::new(child, stdin)),
         })
     }
 }
@@ -131,6 +148,26 @@ struct ChildProcess {
     child: Child,
     /// Closing it asks the host to exit.
     stdin: Option<ChildStdin>,
+    /// Without one, killing reaches only the host.
+    #[cfg(windows)]
+    job: Option<job::ProcessJob>,
+}
+
+impl ChildProcess {
+    #[cfg(unix)]
+    fn new(child: Child, stdin: Option<ChildStdin>) -> Self {
+        Self { child, stdin }
+    }
+
+    #[cfg(windows)]
+    fn new(child: Child, stdin: Option<ChildStdin>) -> Self {
+        let job = job::ProcessJob::holding(&child)
+            .inspect_err(|error| {
+                tracing::warn!(%error, "cannot hold the browser host's processes in a job");
+            })
+            .ok();
+        Self { child, stdin, job }
+    }
 }
 
 impl BrowserProcess for ChildProcess {
@@ -174,9 +211,90 @@ impl BrowserProcess for ChildProcess {
 
     #[cfg(windows)]
     fn kill(&mut self) {
-        let _ = self.child.kill();
+        match &self.job {
+            Some(job) => job.terminate(),
+            None => {
+                let _ = self.child.kill();
+            }
+        }
         if let Err(error) = self.child.wait() {
             tracing::warn!(%error, "cannot reap the browser host");
+        }
+    }
+}
+
+#[cfg(windows)]
+mod job {
+    use std::{
+        os::windows::io::{AsRawHandle as _, FromRawHandle as _, OwnedHandle},
+        process::Child,
+    };
+
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        JOBOBJECT_BASIC_LIMIT_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JobObjectExtendedLimitInformation, SetInformationJobObject, TerminateJobObject,
+    };
+
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the structure takes 144 bytes"
+    )]
+    const LIMITS_BYTES: u32 = size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
+    const TERMINATED_EXIT_CODE: u32 = 1;
+
+    /// A job holding the host and every process Chromium starts. Terminating it leaves nothing
+    /// behind, and closing its handle, even through the server's crash, ends them all.
+    pub(super) struct ProcessJob(OwnedHandle);
+
+    impl ProcessJob {
+        /// Puts `child` in a new job. The host starts no process of its own until CEF
+        /// initializes, long after the job holds it.
+        pub(super) fn holding(child: &Child) -> std::io::Result<Self> {
+            // SAFETY: creates an unnamed job with default security.
+            let handle = unsafe { CreateJobObjectW(std::ptr::null(), std::ptr::null()) };
+            if handle.is_null() {
+                return Err(std::io::Error::last_os_error());
+            }
+            // SAFETY: CreateJobObjectW returned a fresh handle this process owns.
+            let job = Self(unsafe { OwnedHandle::from_raw_handle(handle) });
+            let limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION {
+                BasicLimitInformation: JOBOBJECT_BASIC_LIMIT_INFORMATION {
+                    LimitFlags: JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+                    ..JOBOBJECT_BASIC_LIMIT_INFORMATION::default()
+                },
+                ..JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default()
+            };
+            // SAFETY: `limits` is the structure this information class takes, alive for the
+            // call.
+            let limited = unsafe {
+                SetInformationJobObject(
+                    job.0.as_raw_handle(),
+                    JobObjectExtendedLimitInformation,
+                    (&raw const limits).cast(),
+                    LIMITS_BYTES,
+                )
+            };
+            if limited == 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            // SAFETY: the job and the child's process handle stay open for the call.
+            if unsafe { AssignProcessToJobObject(job.0.as_raw_handle(), child.as_raw_handle()) }
+                == 0
+            {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(job)
+        }
+
+        pub(super) fn terminate(&self) {
+            // SAFETY: the job's handle stays open for the call.
+            if unsafe { TerminateJobObject(self.0.as_raw_handle(), TERMINATED_EXIT_CODE) } == 0 {
+                tracing::warn!(
+                    error = %std::io::Error::last_os_error(),
+                    "cannot end the browser host's processes"
+                );
+            }
         }
     }
 }

@@ -26,11 +26,17 @@ const SWITCHES: [&str; 4] = [
     "disable-gpu-compositing",
     "disable-component-update",
 ];
+#[cfg(target_os = "linux")]
 const VALUED_SWITCHES: [(&str, &str); 3] = [
     ("ozone-platform", "headless"),
     ("password-store", "basic"),
     ("enable-logging", "stderr"),
 ];
+/// Windows has no display connection to skip and protects cookies without prompting. Logging to
+/// standard error there opens a console for each of Chromium's processes without one, so
+/// Chromium logs to a file instead.
+#[cfg(windows)]
+const VALUED_SWITCHES: [(&str, &str); 0] = [];
 
 pub(crate) fn app(on_context_ready: OnContextReady) -> App {
     HostApp::new(HostProcess::new(on_context_ready))

@@ -3,7 +3,6 @@
 use std::{
     fs::File,
     io::{BufWriter, Write as _},
-    os::fd::{FromRawFd as _, OwnedFd},
     sync::{
         Arc,
         atomic::{AtomicU64, Ordering},
@@ -42,6 +41,21 @@ impl HostEvents {
 /// Chromium or its libraries print reaches the pipe, and starts the writer. Call before any
 /// other thread starts.
 pub(crate) fn start() -> std::io::Result<HostEvents> {
+    let pipe = take_standard_output()?;
+    let (sender, receiver) = sync_channel(EVENTS_QUEUED_MAX);
+    thread::Builder::new()
+        .name("tufo-browser-events".to_owned())
+        .spawn(move || write_events(&receiver, pipe))?;
+    Ok(HostEvents {
+        sender,
+        dropped: Arc::default(),
+    })
+}
+
+#[cfg(unix)]
+fn take_standard_output() -> std::io::Result<File> {
+    use std::os::fd::{FromRawFd as _, OwnedFd};
+
     // SAFETY: F_DUPFD_CLOEXEC duplicates standard output to a new descriptor that child
     // processes don't inherit.
     let duplicate = unsafe { libc::fcntl(libc::STDOUT_FILENO, libc::F_DUPFD_CLOEXEC, 3) };
@@ -54,14 +68,53 @@ pub(crate) fn start() -> std::io::Result<HostEvents> {
     if unsafe { libc::dup2(libc::STDERR_FILENO, libc::STDOUT_FILENO) } < 0 {
         return Err(std::io::Error::last_os_error());
     }
-    let (sender, receiver) = sync_channel(EVENTS_QUEUED_MAX);
-    thread::Builder::new()
-        .name("tufo-browser-events".to_owned())
-        .spawn(move || write_events(&receiver, pipe))?;
-    Ok(HostEvents {
-        sender,
-        dropped: Arc::default(),
-    })
+    Ok(pipe)
+}
+
+#[cfg(windows)]
+fn take_standard_output() -> std::io::Result<File> {
+    use std::os::windows::io::{FromRawHandle as _, OwnedHandle};
+
+    use windows_sys::Win32::{
+        Foundation::{
+            DUPLICATE_CLOSE_SOURCE, DUPLICATE_SAME_ACCESS, DuplicateHandle, FALSE,
+            INVALID_HANDLE_VALUE,
+        },
+        System::{
+            Console::{GetStdHandle, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle},
+            Threading::GetCurrentProcess,
+        },
+    };
+
+    // SAFETY: GetStdHandle only reads this process's standard handles.
+    let output = unsafe { GetStdHandle(STD_OUTPUT_HANDLE) };
+    if output.is_null() || output == INVALID_HANDLE_VALUE {
+        return Err(std::io::Error::other("standard output is not open"));
+    }
+    let mut duplicate = std::ptr::null_mut();
+    // SAFETY: duplicates a handle this process owns into a copy that child processes don't
+    // inherit, closing the inheritable original.
+    let duplicated = unsafe {
+        DuplicateHandle(
+            GetCurrentProcess(),
+            output,
+            GetCurrentProcess(),
+            &raw mut duplicate,
+            0,
+            FALSE,
+            DUPLICATE_CLOSE_SOURCE | DUPLICATE_SAME_ACCESS,
+        )
+    };
+    if duplicated == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    // SAFETY: DuplicateHandle returned a fresh handle this process owns.
+    let pipe = File::from(unsafe { OwnedHandle::from_raw_handle(duplicate) });
+    // SAFETY: SetStdHandle only replaces standard output with standard error.
+    if unsafe { SetStdHandle(STD_OUTPUT_HANDLE, GetStdHandle(STD_ERROR_HANDLE)) } == 0 {
+        return Err(std::io::Error::last_os_error());
+    }
+    Ok(pipe)
 }
 
 /// Writes each event in one system call.

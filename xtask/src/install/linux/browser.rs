@@ -10,6 +10,8 @@ use std::{
 
 use anyhow::{Context as _, Result, ensure};
 
+use crate::cef_distribution;
+
 pub(super) const HOST_NAME: &str = "tufo-browser";
 /// Records which CEF build the folder holds, so updates copy the runtime only when it changes.
 const RUNTIME_STAMP_NAME: &str = ".cef-runtime";
@@ -40,13 +42,12 @@ pub(super) fn find_source(
     if !host.is_file() {
         return Ok(None);
     }
-    let lock = fs::read_to_string(workspace_root.join("Cargo.lock")).context("read Cargo.lock")?;
-    let cef_version = cef_version(&lock).context("Cargo.lock names no cef-dll-sys build")?;
-    let cef_home = std::env::var_os("CEF_PATH")
-        .map_or_else(|| workspace_root.join("target/cef"), PathBuf::from);
-    let runtime = cef_home
-        .join(&cef_version)
-        .join(format!("cef_linux_{}", std::env::consts::ARCH));
+    let cef_version = cef_distribution::pinned_version(workspace_root)?;
+    let runtime = cef_distribution::directory(
+        workspace_root,
+        &cef_version,
+        &format!("cef_linux_{}", std::env::consts::ARCH),
+    );
     ensure!(
         runtime.join(LIBCEF_NAME).is_file(),
         "missing {}; build tufo-browser to download CEF",
@@ -57,21 +58,6 @@ pub(super) fn find_source(
         runtime,
         cef_version,
     }))
-}
-
-/// The CEF build after `+` in cef-dll-sys's version, such as `154.0.34`.
-fn cef_version(lock: &str) -> Option<String> {
-    let mut lines = lock.lines();
-    while let Some(line) = lines.next() {
-        if line == r#"name = "cef-dll-sys""# {
-            let version = lines
-                .next()?
-                .strip_prefix(r#"version = ""#)?
-                .strip_suffix('"')?;
-            return version.split_once('+').map(|(_, cef)| cef.to_owned());
-        }
-    }
-    None
 }
 
 /// Places the host in `folder`, the runtime once per CEF build, and the link in `binaries`.
@@ -262,12 +248,5 @@ mod tests {
 
         assert!(!folder.exists());
         assert!(fs::symlink_metadata(binaries.join(HOST_NAME)).is_err());
-    }
-
-    #[test]
-    fn the_cef_build_comes_from_the_lock_file() {
-        let lock = "[[package]]\nname = \"cef-dll-sys\"\nversion = \"154.5.0+154.0.34\"\n";
-        assert_eq!(cef_version(lock).as_deref(), Some("154.0.34"));
-        assert_eq!(cef_version("[[package]]\nname = \"cef\"\n"), None);
     }
 }

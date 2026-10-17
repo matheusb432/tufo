@@ -1,14 +1,16 @@
-//! Cross-builds the Windows executables and packs them into an unsigned NSIS installer.
+//! Cross-builds the Windows executables and the browser host's library, and packs them with
+//! Chromium's runtime into an unsigned NSIS installer.
 
 use std::{fs, io, path::Path, process::Command};
 
 use anyhow::{Context as _, Result, bail, ensure};
 use cargo_metadata::{Metadata, semver::Version};
 
-use crate::install::BINARY_NAMES;
+use crate::{install::BINARY_NAMES, windows_browser};
 
 const TARGET: &str = "x86_64-pc-windows-msvc";
 const PACKAGES: [&str; 3] = ["tufo-gui", "tufo-server", "tufo-cli"];
+const BROWSER_PACKAGE: &str = "tufo-browser";
 const INSTALLER_VERSION_PACKAGE: &str = "tufo-gui";
 const INSTALLER_SCRIPT: &str = "packaging/windows/tufo.nsi";
 const CMAKE_TOOLCHAIN: &str = "packaging/windows/cross-toolchain.cmake";
@@ -23,6 +25,9 @@ const EMPTY_ARCHIVE: &[u8] = b"!<arch>\n";
 const STATIC_CRT_FLAG: &str = "-C target-feature=+crt-static";
 /// cargo-xwin's download lacks the static runtime's debug files.
 const IGNORE_MISSING_PDB_FLAG: &str = "-C link-arg=/IGNORE:4099";
+/// clang-cl reads extra options from `CL`. cargo-xwin's clang-cl may be older than the MSVC
+/// standard library it downloads, which CEF's C++ wrapper includes.
+const CLANG_CL_OPTIONS: (&str, &str) = ("CL", "/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
 
 pub(crate) fn build(workspace_root: &Path, metadata: &Metadata) -> Result<()> {
     let version = &metadata
@@ -44,10 +49,14 @@ pub(crate) fn build(workspace_root: &Path, metadata: &Metadata) -> Result<()> {
             binary.display()
         );
     }
+    let browser_source = windows_browser::find_source(workspace_root, &binaries)?
+        .context("the cross-build left no browser host library")?;
+    let browser = binaries.join(windows_browser::FOLDER_NAME);
+    windows_browser::place(&browser_source, &browser)?;
     let output_dir = workspace_root.join(OUTPUT_DIR);
     fs::create_dir_all(&output_dir).with_context(|| format!("create {}", output_dir.display()))?;
     let installer = output_dir.join(format!("tufo-{version}-windows-x86_64-setup.exe"));
-    pack(workspace_root, &binaries, version, &installer)?;
+    pack(workspace_root, &binaries, &browser, version, &installer)?;
     println!("built the installer {}", installer.display());
     Ok(())
 }
@@ -97,20 +106,34 @@ fn cross_build(workspace_root: &Path, target_dir: &Path) -> Result<()> {
         std::env::var("HOME").context("the cross-build needs HOME for private-path remapping")?
     );
 
-    let mut command = Command::new("cargo");
-    command
-        .current_dir(workspace_root)
-        .args(["xwin", "build", "--locked", "--release", "--target", TARGET])
-        .args(PACKAGES.into_iter().flat_map(|package| ["-p", package]))
-        // cargo-xwin merges its own flags into these.
-        .env("CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS", rustflags)
-        .env("CFLAGS", cross_cflags()?)
-        // The cmake crate prefers this spelling over cargo-xwin's underscored one, which it wraps.
-        .env(
-            format!("CMAKE_TOOLCHAIN_FILE_{TARGET}"),
-            workspace_root.join(CMAKE_TOOLCHAIN),
-        );
-    run(&mut command, "cargo-xwin")
+    let cross_cargo = |arguments: &[&str]| -> Result<Command> {
+        let mut command = Command::new("cargo");
+        command
+            .current_dir(workspace_root)
+            .arg("xwin")
+            .args(arguments)
+            .args(["--locked", "--release", "--target", TARGET])
+            // cargo-xwin merges its own flags into these.
+            .env("CARGO_TARGET_X86_64_PC_WINDOWS_MSVC_RUSTFLAGS", &rustflags)
+            // Only the cross-built C takes these; build scripts' own C, such as download-cef's
+            // ring, compiles for Linux.
+            .env("TARGET_CFLAGS", cross_cflags()?)
+            .env(CLANG_CL_OPTIONS.0, CLANG_CL_OPTIONS.1)
+            // The cmake crate prefers this spelling over cargo-xwin's underscored one, which it
+            // wraps.
+            .env(
+                format!("CMAKE_TOOLCHAIN_FILE_{TARGET}"),
+                workspace_root.join(CMAKE_TOOLCHAIN),
+            );
+        Ok(command)
+    };
+    let mut executables = cross_cargo(&["build"])?;
+    executables.args(PACKAGES.into_iter().flat_map(|package| ["-p", package]));
+    run(&mut executables, "cargo-xwin")?;
+    // CEF's bootstrap executable loads the host as a DLL.
+    let mut browser = cross_cargo(&["rustc"])?;
+    browser.args(["-p", BROWSER_PACKAGE, "--lib", "--crate-type", "cdylib"]);
+    run(&mut browser, "cargo-xwin")
 }
 
 fn cross_cflags() -> Result<String> {
@@ -119,13 +142,20 @@ fn cross_cflags() -> Result<String> {
     Ok(format!("/clang:-ffile-prefix-map={home}=/usr/src/tufo"))
 }
 
-fn pack(workspace_root: &Path, binaries: &Path, version: &Version, installer: &Path) -> Result<()> {
+fn pack(
+    workspace_root: &Path,
+    binaries: &Path,
+    browser: &Path,
+    version: &Version,
+    installer: &Path,
+) -> Result<()> {
     let mut command = Command::new("makensis");
     command
         .args(["-V2", "-WX", "-INPUTCHARSET", "UTF8"])
         .arg(format!("-DVERSION={version}"))
         .arg(format!("-DVERSION_NUMERIC={}", numeric_version(version)?))
         .arg(format!("-DBINARIES_DIR={}", binaries.display()))
+        .arg(format!("-DBROWSER_DIR={}", browser.display()))
         .arg(format!("-DOUTFILE={}", installer.display()))
         .arg(workspace_root.join(INSTALLER_SCRIPT));
     run(&mut command, "makensis")

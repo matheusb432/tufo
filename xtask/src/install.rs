@@ -55,9 +55,8 @@ fn place(workspace_root: &Path, release_dir: &Path) -> Result<PathBuf> {
     };
     #[cfg(windows)]
     return {
-        let _ = workspace_root;
         windows::stop_session()?;
-        windows::install(release_dir)
+        windows::install(workspace_root, release_dir)
     };
     #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
     anyhow::bail!("installing supports Linux, macOS, and Windows")

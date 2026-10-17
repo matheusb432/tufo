@@ -10799,6 +10799,7 @@ dependencies = [
  "tufo-local-transport",
  "tufo-models",
  "tufo-wire",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

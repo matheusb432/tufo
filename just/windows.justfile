@@ -7,8 +7,10 @@ windows-provision:
 # Lint the Windows code from Linux: clippy for x86-64 Windows through cargo-xwin.
 [group('quality')]
 windows-lint:
-    # Clippy never links, so pointing libopus_sys at a library folder skips building Opus.
+    # Clippy never links, so pointing libopus_sys at a library folder skips building Opus. CL lets
+    # an older clang-cl compile CEF's C++ wrapper against cargo-xwin's MSVC standard library.
     LIBOPUS_LIB_DIR="${CARGO_TARGET_DIR:-target}/windows-lint" CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}/windows-lint" \
+        CL=/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH \
         mise exec -- cargo xwin clippy --locked --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings
 
 # Build Tufo on the winvm-rs Windows VM and run its portable tests there
