@@ -234,7 +234,12 @@ async fn preview(
             }
             started = preview.next_started() => match started {
                 Some(started) => {
-                    if !api::emit_stream(&updated_record(id, &started?)?, json).await? {
+                    let record = updated_record(id, &started?)?;
+                    let emitted = tokio::select! {
+                        () = &mut duration_end => return Ok(true),
+                        result = api::emit_stream(&record, json) => result?,
+                    };
+                    if !emitted {
                         return Ok(true);
                     }
                 }

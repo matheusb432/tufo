@@ -228,3 +228,65 @@ async fn wait_for_full_pipe(
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
 }
+
+#[cfg(target_os = "linux")]
+#[tokio::test]
+async fn preview_duration_releases_playback_with_unread_update_records() -> anyhow::Result<()> {
+    use std::{num::NonZeroU32, os::fd::AsRawFd as _, process::Stdio};
+
+    use tokio::io::AsyncBufReadExt as _;
+    use tufo_client::song_loops::{PreviewId, UpdateSongLoopPreview};
+    use tufo_models::library::song_loop::{LoopMarkers, LoopRegion, SourceFrames, SourceTiming};
+    let mut fixture = PreviewFixture::new().await?;
+    let mut command = fixture.command();
+    command.args(["--duration-ms", "1800"]);
+    let mut child = tokio::process::Command::from(command)
+        .kill_on_drop(true)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    let stdout = child.stdout.take().context("preview stdout missing")?;
+    let descriptor = stdout.as_raw_fd();
+    // SAFETY: stdout owns the live pipe descriptor; only its capacity changes.
+    let capacity = unsafe { libc::fcntl(descriptor, libc::F_SETPIPE_SZ, 4096) };
+    anyhow::ensure!(capacity == 4096, "could not limit the pipe capacity");
+    let mut stdout = tokio::io::BufReader::new(stdout);
+    let mut line = String::new();
+    tokio::time::timeout(CANCELLATION_TIMEOUT, stdout.read_line(&mut line)).await??;
+    let started: serde_json::Value = serde_json::from_str(&line)?;
+    let preview_id = PreviewId(
+        started["preview_id"]
+            .as_u64()
+            .context("preview id missing")?,
+    );
+    let client = fixture.session.client()?;
+    for index in 0..25 {
+        let draft = LoopRegion::try_new(
+            SourceTiming {
+                sample_rate: NonZeroU32::new(8_000).unwrap(),
+                frame_count: SourceFrames(240_000),
+            },
+            LoopMarkers {
+                playback_start: SourceFrames(index % 2),
+                loop_start: SourceFrames(8_000),
+                loop_end: SourceFrames(160_000),
+                crossfade: SourceFrames::ZERO,
+            },
+        )?;
+        client
+            .update_song_loop_preview(UpdateSongLoopPreview { preview_id, draft })
+            .await?;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+    let status = tokio::time::timeout(CANCELLATION_TIMEOUT, child.wait())
+        .await
+        .context("preview duration did not stop the command with unread update records")??;
+    assert!(status.success());
+    fixture
+        .session
+        .wait_player(|state| state.music.as_ref().is_some_and(|music| !music.paused))
+        .await?;
+    drop(stdout);
+    fixture.session.stop_pulled().await?;
+    Ok(())
+}
