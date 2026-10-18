@@ -173,6 +173,28 @@ impl LoopRegion {
         SourceFrames(self.markers.loop_start.0 + into_loop)
     }
 
+    /// A preview from `start` wraps at the loop end, except one starting past it, which plays on
+    /// to the file's end.
+    #[must_use]
+    pub fn preview_frame_after(&self, start: SourceFrames, played: SourceFrames) -> SourceFrames {
+        if start < self.markers.loop_end {
+            self.source_frame_after(start, played)
+        } else {
+            start.saturating_add(played).min(self.timing.frame_count)
+        }
+    }
+
+    /// Where a preview at `frame` goes on once this draft replaces the one it played. A preview
+    /// that was wrapping and is now past the loop end goes to the loop start.
+    #[must_use]
+    pub fn preview_start_continuing(&self, frame: SourceFrames, wrapping: bool) -> SourceFrames {
+        if wrapping && frame >= self.markers.loop_end {
+            self.markers.loop_start
+        } else {
+            frame
+        }
+    }
+
     #[must_use]
     pub fn position_after(&self, start: Duration, played: Duration) -> Duration {
         let frame =
@@ -329,6 +351,28 @@ mod tests {
         assert_eq!(after(10, 390 + 299), SourceFrames(399));
         assert_eq!(after(10, 390 + 300 * 1_000), SourceFrames(100));
         assert_eq!(after(250, 150), SourceFrames(100));
+    }
+
+    #[test]
+    fn previews_past_the_loop_end_play_on_to_the_file_end() {
+        let region = region(10, 100, 400);
+        let after =
+            |start, played| region.preview_frame_after(SourceFrames(start), SourceFrames(played));
+
+        assert_eq!(after(250, 150), SourceFrames(100));
+        assert_eq!(after(400, 150), SourceFrames(550));
+        assert_eq!(after(900, 150), SourceFrames(1_000));
+    }
+
+    #[test]
+    fn a_wrapping_preview_past_a_new_loop_end_continues_at_the_loop_start() {
+        let region = region(10, 100, 400);
+        let continuing =
+            |frame, wrapping| region.preview_start_continuing(SourceFrames(frame), wrapping);
+
+        assert_eq!(continuing(399, true), SourceFrames(399));
+        assert_eq!(continuing(500, true), SourceFrames(100));
+        assert_eq!(continuing(500, false), SourceFrames(500));
     }
 
     #[test]

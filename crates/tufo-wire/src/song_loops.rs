@@ -113,9 +113,29 @@ pub enum PreviewMode {
     Seam(SeamPreviewSide),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PreviewId(pub u64);
+
+/// A draft a preview started playing, first the requested one and then each update.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PreviewStarted {
+    pub preview_id: PreviewId,
+    pub draft: LoopRegion,
     pub started_at: SystemTime,
+    pub playback: PreviewPlayback,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewPlayback {
+    /// The frame that played at `started_at`.
+    FromFrame(SourceFrames),
     /// One seam repetition, including the silence after it.
-    pub seam_cycle: Option<Duration>,
+    Seam { cycle: Duration },
+}
+
+/// A newer draft for a running preview from a frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UpdateSongLoopPreview {
+    pub preview_id: PreviewId,
+    pub draft: LoopRegion,
 }

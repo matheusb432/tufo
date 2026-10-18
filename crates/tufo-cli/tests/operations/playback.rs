@@ -274,6 +274,57 @@ async fn bounded_and_cancelled_loop_previews_release_their_mixer_and_resume_loca
     Ok(())
 }
 
+#[cfg(unix)]
+#[tokio::test]
+async fn a_preview_from_a_frame_plays_a_newer_draft_sent_by_its_preview_id() -> anyhow::Result<()> {
+    use super::{cancellation::PreviewFixture, streams::Watch};
+
+    let mut fixture = PreviewFixture::new().await?;
+    let mut preview = Watch::spawn_command(fixture.command())?;
+    let started = preview.next().await?;
+    let preview_id = started["preview_id"]
+        .as_u64()
+        .context("the started record has no preview_id")?
+        .to_string();
+    let mut draft = started["draft"].clone();
+    draft["loop_end_frame"] = json!(80_000);
+
+    let acknowledged = fixture
+        .session
+        .mutation(
+            &["loop", "update-preview", &preview_id],
+            json!({"draft": draft}),
+        )
+        .await?;
+    let updated = preview.next().await?;
+    fixture
+        .session
+        .failure(
+            &[
+                "loop",
+                "update-preview",
+                "18446744073709551615",
+                &json!({"draft": draft}).to_string(),
+            ],
+            1,
+        )
+        .await?;
+    preview.interrupt()?;
+    preview.next().await?;
+    preview.stopped().await?;
+    fixture.session.stop_pulled().await?;
+
+    assert_eq!(
+        acknowledged,
+        json!({"action": "updated", "resource": "loop_preview", "id": preview_id})
+    );
+    assert_eq!(updated["event"], "updated");
+    assert_eq!(updated["preview_id"], started["preview_id"]);
+    assert_eq!(updated["draft"], draft);
+    assert!(updated["start_frame"].is_u64(), "{updated}");
+    Ok(())
+}
+
 async fn exercise_queue_and_layer_controls(
     session: &Session,
     secondary_entry_id: &str,

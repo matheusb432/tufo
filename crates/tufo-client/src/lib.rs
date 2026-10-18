@@ -36,7 +36,7 @@ use tufo_wire::{
     proto::{self, InvalidMessage},
     song_loops::{
         ImportSongLoops, PreviewSongLoop, PreviewStarted, SongLoopImportResult, SongWaveform,
-        UpdateSongLoop,
+        UpdateSongLoop, UpdateSongLoopPreview,
     },
 };
 
@@ -677,6 +677,22 @@ impl TufoClient {
         })
     }
 
+    /// The preview's stream reports the draft once it plays.
+    pub async fn update_song_loop_preview(
+        &self,
+        request: UpdateSongLoopPreview,
+    ) -> Result<(), ClientError> {
+        let request = with_timeout(
+            proto::song_loop::update_song_loop_preview_message(request),
+            QUICK_REQUEST_TIMEOUT,
+        );
+        self.player
+            .clone()
+            .update_song_loop_preview(request)
+            .await?;
+        Ok(())
+    }
+
     pub async fn player_diagnostics(&self) -> Result<PlayerDiagnostics, ClientError> {
         let request = with_timeout(pb::GetPlayerDiagnosticsRequest {}, QUICK_REQUEST_TIMEOUT);
         let response = self.player.clone().get_player_diagnostics(request).await?;
@@ -732,6 +748,18 @@ pub struct SongLoopPreview {
 }
 
 impl SongLoopPreview {
+    /// Waits for an updated draft to play; `None` once the server ends the preview, as when a
+    /// newer one replaces it.
+    pub async fn next_started(&mut self) -> Option<Result<PreviewStarted, ClientError>> {
+        match self.stream.message().await {
+            Ok(Some(response)) => {
+                Some(proto::song_loop::preview_started(response).map_err(ClientError::from))
+            }
+            Ok(None) => None,
+            Err(status) => Some(Err(status.into())),
+        }
+    }
+
     /// Resolves when the server ends the preview, as when a newer one replaces it.
     pub async fn ended(&mut self) -> Result<(), ClientError> {
         while self.stream.message().await?.is_some() {}

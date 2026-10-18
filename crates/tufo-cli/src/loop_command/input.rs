@@ -1,7 +1,9 @@
 use std::{num::NonZeroU32, str::FromStr, time::Duration};
 
 use serde::{Deserialize, Deserializer};
-use tufo_client::song_loops::{PreviewMode, PreviewSongLoop, UpdateSongLoop};
+use tufo_client::song_loops::{
+    PreviewId, PreviewMode, PreviewSongLoop, UpdateSongLoop, UpdateSongLoopPreview,
+};
 use tufo_models::library::{
     AudioFileId, AudioFingerprint,
     song_loop::{LoopMarkers, LoopRegion, SeamPreviewSide, SourceFrames, SourceTiming},
@@ -158,24 +160,11 @@ impl FromStr for LoopPreview {
     fn from_str(text: &str) -> Result<Self, Self::Err> {
         let raw: LoopPreviewJson = crate::input::parse_json(text)?;
         let source_fingerprint = fingerprint(raw.source_fingerprint)?;
-        let timing = SourceTiming {
-            sample_rate: raw.draft.timing.sample_rate,
-            frame_count: SourceFrames(raw.draft.timing.frame_count),
-        };
-        let draft = LoopRegion::try_new(
-            timing,
-            LoopMarkers {
-                playback_start: SourceFrames(raw.draft.playback_start_frame),
-                loop_start: SourceFrames(raw.draft.loop_start_frame),
-                loop_end: SourceFrames(raw.draft.loop_end_frame),
-                crossfade: SourceFrames(raw.draft.crossfade_frames),
-            },
-        )
-        .map_err(|error| format!("invalid draft: {error}"))?;
+        let draft = raw.draft.parse()?;
         let mode = match raw.mode {
             PreviewModeJson::FromFrame { start_frame } => {
                 let start = SourceFrames(start_frame);
-                if start > timing.frame_count {
+                if start > draft.timing().frame_count {
                     return Err(
                         "start_frame must not exceed the source file's frame_count".to_owned()
                     );
@@ -202,6 +191,69 @@ impl LoopPreview {
             source_fingerprint: self.source_fingerprint,
             draft: self.draft,
             mode: self.mode,
+        }
+    }
+}
+
+impl LoopDraftJson {
+    fn parse(self) -> Result<LoopRegion, String> {
+        let timing = SourceTiming {
+            sample_rate: self.timing.sample_rate,
+            frame_count: SourceFrames(self.timing.frame_count),
+        };
+        LoopRegion::try_new(
+            timing,
+            LoopMarkers {
+                playback_start: SourceFrames(self.playback_start_frame),
+                loop_start: SourceFrames(self.loop_start_frame),
+                loop_end: SourceFrames(self.loop_end_frame),
+                crossfade: SourceFrames(self.crossfade_frames),
+            },
+        )
+        .map_err(|error| format!("invalid draft: {error}"))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PreviewIdArgument(pub(super) PreviewId);
+
+impl FromStr for PreviewIdArgument {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        text.parse()
+            .map(|id| Self(PreviewId(id)))
+            .map_err(|_| "preview ID must be the unsigned integer a preview reported".to_owned())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct LoopPreviewUpdate {
+    draft: LoopRegion,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct LoopPreviewUpdateJson {
+    draft: LoopDraftJson,
+}
+
+impl FromStr for LoopPreviewUpdate {
+    type Err = String;
+
+    fn from_str(text: &str) -> Result<Self, Self::Err> {
+        let raw: LoopPreviewUpdateJson = crate::input::parse_json(text)?;
+        Ok(Self {
+            draft: raw.draft.parse()?,
+        })
+    }
+}
+
+impl LoopPreviewUpdate {
+    pub(super) fn into_request(self, preview_id: PreviewId) -> UpdateSongLoopPreview {
+        UpdateSongLoopPreview {
+            preview_id,
+            draft: self.draft,
         }
     }
 }

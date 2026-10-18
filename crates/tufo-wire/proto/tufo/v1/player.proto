@@ -69,6 +69,11 @@ service PlayerService {
   // repeating both sides of its seam. Music playing on the local device pauses meanwhile and
   // resumes afterwards. A newer preview ends this one.
   rpc PreviewSongLoop(PreviewSongLoopRequest) returns (stream PreviewSongLoopResponse);
+  // Plays a newer draft in a running preview from a frame, going on from where it is; a preview
+  // that was wrapping and is past the new loop end goes to the loop start. The preview's stream
+  // reports the draft once it plays, skipping drafts a later update replaced. NOT_FOUND once the
+  // preview ended; FAILED_PRECONDITION for a seam preview or a draft of other audio.
+  rpc UpdateSongLoopPreview(UpdateSongLoopPreviewRequest) returns (UpdateSongLoopPreviewResponse);
   // Starts the browser, which restores the tabs it last had open; its status turns open once it
   // serves BrowserService. Opening a starting or open browser succeeds. UNAVAILABLE when this
   // installation has no browser or it cannot start.
@@ -434,12 +439,26 @@ message PreviewSeam {
   google.protobuf.Duration side = 1;
 }
 
-// Sent once, when the preview starts.
+// Sent when the preview starts and whenever an updated draft starts playing.
 message PreviewSongLoopResponse {
+  // When the seam clip started, or when start_frame played.
   google.protobuf.Timestamp started_at = 1;
-  // How long one seam repetition lasts, including the silence after it.
+  // How long one seam repetition lasts, including the silence after it. Only for seam previews.
   optional google.protobuf.Duration seam_cycle = 2;
+  // Only for previews from a frame.
+  optional uint64 start_frame = 3;
+  // The draft playing.
+  SongLoop draft = 4;
+  // Names this preview in UpdateSongLoopPreview.
+  uint64 preview_id = 5;
 }
+
+message UpdateSongLoopPreviewRequest {
+  uint64 preview_id = 1;
+  SongLoop draft = 2;
+}
+
+message UpdateSongLoopPreviewResponse {}
 
 message OpenBrowserRequest {}
 

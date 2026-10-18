@@ -8,11 +8,13 @@ use serde_json::{Value, json};
 use tufo_client::{
     TufoClient,
     library::LibrarySnapshot,
-    song_loops::{PreviewMode, SavedSongLoop},
+    song_loops::{PreviewMode, PreviewPlayback, PreviewStarted, SavedSongLoop},
 };
 use tufo_models::library::AudioFileId;
 
-use self::input::{AudioFileArgument, LoopPreview, LoopUpdate};
+use self::input::{
+    AudioFileArgument, LoopPreview, LoopPreviewUpdate, LoopUpdate, PreviewIdArgument,
+};
 use crate::{api, record};
 
 const PREVIEW_START_TIMEOUT: Duration = Duration::from_secs(150);
@@ -59,7 +61,9 @@ use `tufo loop delete AUDIO_FILE_ID` to clear the saved loop."#)]
 Source timing comes from `tufo loop waveform`. All markers and start_frame
 count frames at that sample_rate. side_ms is 1..10000 milliseconds.
 from_frame can start anywhere within the source file, including beyond the loop end.
-The command emits started and ended records and releases playback on exit.
+The command emits started and ended records and releases playback on exit. The started record's
+preview_id names the preview for `tufo loop update-preview`; an updated record follows each draft
+that starts playing.
 Preview uses the local device, including when music is routed to Discord."#)]
     Preview {
         #[arg(value_name = "AUDIO_FILE_ID")]
@@ -69,6 +73,19 @@ Preview uses the local device, including when music is routed to Discord."#)]
         /// End after this many milliseconds of preview playback (at most one day).
         #[arg(long, value_parser = clap::value_parser!(u64).range(1..=86_400_000))]
         duration_ms: Option<u64>,
+    },
+    /// Play a newer draft in a running preview from a frame, going on from where it plays.
+    #[command(after_long_help = r#"Example:
+  tufo loop update-preview PREVIEW_ID '{"draft":{"timing":{"sample_rate":48000,"frame_count":480000},"playback_start_frame":0,"loop_start_frame":96000,"loop_end_frame":192000,"crossfade_frames":2400}}'
+
+PREVIEW_ID is the preview_id of the started record `tufo loop preview` emits. The draft keeps the
+preview's timing. A preview that was wrapping and is past the new loop end goes to the loop start.
+The preview command emits an updated record once the draft plays; seam previews keep their draft."#)]
+    UpdatePreview {
+        #[arg(value_name = "PREVIEW_ID")]
+        preview_id: PreviewIdArgument,
+        #[arg(value_name = "JSON")]
+        payload: LoopPreviewUpdate,
     },
 }
 
@@ -114,6 +131,15 @@ pub(crate) async fn run_loop(command: LoopCommand, json: bool) -> anyhow::Result
             payload,
             duration_ms,
         } => return preview(&client, audio_file_id.0, payload, duration_ms, json).await,
+        LoopCommand::UpdatePreview {
+            preview_id,
+            payload,
+        } => {
+            client
+                .update_song_loop_preview(payload.into_request(preview_id.0))
+                .await?;
+            api::ack("updated", "loop_preview", preview_id.0.0, json).await?;
+        }
     }
     Ok(true)
 }
@@ -149,14 +175,11 @@ async fn preview(
         }
     };
     let elapsed = tokio::time::Instant::now();
-    let started_at_unix_ms = u64::try_from(
-        preview
-            .started
-            .started_at
-            .duration_since(std::time::UNIX_EPOCH)?
-            .as_millis(),
-    )?;
-    let seam_cycle_ms = preview.started.seam_cycle.map(|cycle| cycle.as_millis());
+    let started_at_unix_ms = unix_ms(preview.started.started_at)?;
+    let seam_cycle_ms = match preview.started.playback {
+        PreviewPlayback::Seam { cycle } => Some(cycle.as_millis()),
+        PreviewPlayback::FromFrame(_) => None,
+    };
     let mode = match request.mode {
         PreviewMode::FromFrame(start) => json!({"kind": "from_frame", "start_frame": start.0}),
         PreviewMode::Seam(side) => {
@@ -166,6 +189,7 @@ async fn preview(
     let started = json!({
         "event": "started",
         "resource": "loop_preview",
+        "preview_id": preview.started.preview_id.0,
         "audio_file_id": id.to_string(),
         "source_fingerprint": request.source_fingerprint.as_ref(),
         "draft": record::loop_region(&request.draft),
@@ -194,19 +218,28 @@ async fn preview(
             std::future::pending::<()>().await;
         }
     };
-    let reason = tokio::select! {
-        interrupted = &mut interrupt => {
-            interrupted?;
-            "cancelled"
-        }
-        () = duration_end => "duration",
-        result = api::stdout_closed() => {
-            result?;
-            return Ok(true);
-        }
-        result = preview.ended() => {
-            result?;
-            "server"
+    tokio::pin!(duration_end);
+    let stdout_closed = api::stdout_closed();
+    tokio::pin!(stdout_closed);
+    let reason = loop {
+        tokio::select! {
+            interrupted = &mut interrupt => {
+                interrupted?;
+                break "cancelled";
+            }
+            () = &mut duration_end => break "duration",
+            result = &mut stdout_closed => {
+                result?;
+                return Ok(true);
+            }
+            started = preview.next_started() => match started {
+                Some(started) => {
+                    if !api::emit_stream(&updated_record(id, &started?)?, json).await? {
+                        return Ok(true);
+                    }
+                }
+                None => break "server",
+            },
         }
     };
     drop(preview);
@@ -222,4 +255,26 @@ async fn preview(
     )
     .await?;
     Ok(true)
+}
+
+fn updated_record(id: AudioFileId, started: &PreviewStarted) -> anyhow::Result<Value> {
+    let start_frame = match started.playback {
+        PreviewPlayback::FromFrame(start) => Some(start.0),
+        PreviewPlayback::Seam { .. } => None,
+    };
+    Ok(json!({
+        "event": "updated",
+        "resource": "loop_preview",
+        "preview_id": started.preview_id.0,
+        "audio_file_id": id.to_string(),
+        "draft": record::loop_region(&started.draft),
+        "start_frame": start_frame,
+        "started_at_unix_ms": unix_ms(started.started_at)?,
+    }))
+}
+
+fn unix_ms(time: std::time::SystemTime) -> anyhow::Result<u64> {
+    Ok(u64::try_from(
+        time.duration_since(std::time::UNIX_EPOCH)?.as_millis(),
+    )?)
 }

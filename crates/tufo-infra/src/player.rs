@@ -46,9 +46,10 @@ use tufo_application::playback::{
     control_sounds::SoundsCommand,
     open_browser::OpenBrowserError,
     play_queue::PlayQueueError,
-    player::{PlayAudioError, Player, PreviewId, PreviewSession, SongLoops, SongPreview},
+    player::{PlayAudioError, Player, PreviewSession, SongLoops, SongPreview},
     recover_local_output::RecoverLocalOutputError,
     select_output::SelectOutputError,
+    update_song_loop_preview::UpdateSongLoopPreviewError,
 };
 use tufo_models::{
     library::{CollectionEntryId, SoundSettings, Volume, song_loop::LoopRegion},
@@ -68,6 +69,7 @@ use tufo_models::{
         },
     },
 };
+use tufo_wire::song_loops::PreviewId;
 
 use crate::{
     audio::{
@@ -772,6 +774,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             deck.drop_retired();
         }
         changed |= self.follow_deck(&mut engine);
+        self.replace_preview_track_if_due(&mut engine);
         self.arm_if_due(&mut engine);
         changed |= self.release_if_due(&mut engine).await;
         changed |= self.release_browser_if_due(&mut engine);
@@ -1292,6 +1295,14 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
 
     async fn start_preview(&self, preview: SongPreview) -> Result<PreviewSession, PlayAudioError> {
         self.begin_preview(preview).await
+    }
+
+    async fn update_preview(
+        &self,
+        id: PreviewId,
+        draft: LoopRegion,
+    ) -> Result<(), UpdateSongLoopPreviewError> {
+        self.queue_preview_draft(id, draft).await
     }
 
     async fn stop_preview(&self, id: PreviewId) {

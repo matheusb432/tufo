@@ -15,8 +15,9 @@ use super::{
 use crate::{
     pb,
     song_loops::{
-        ImportSongLoops, PreviewMode, PreviewSongLoop, PreviewStarted, SavedSongLoop,
-        SongLoopImportOutcome, SongLoopImportResult, SongWaveform, UpdateSongLoop,
+        ImportSongLoops, PreviewId, PreviewMode, PreviewPlayback, PreviewSongLoop, PreviewStarted,
+        SavedSongLoop, SongLoopImportOutcome, SongLoopImportResult, SongWaveform, UpdateSongLoop,
+        UpdateSongLoopPreview,
     },
 };
 
@@ -79,6 +80,16 @@ pub fn preview_song_loop_request(
     })
 }
 
+pub fn update_song_loop_preview_request(
+    request: pb::UpdateSongLoopPreviewRequest,
+) -> Result<UpdateSongLoopPreview, Status> {
+    Ok(UpdateSongLoopPreview {
+        preview_id: PreviewId(request.preview_id),
+        draft: loop_region(required("draft", request.draft)?)
+            .map_err(|reason| invalid("draft", reason))?,
+    })
+}
+
 // Responses the server builds.
 
 #[must_use]
@@ -108,9 +119,16 @@ pub fn import_song_loops_response(results: &[SongLoopImportResult]) -> pb::Impor
 
 #[must_use]
 pub fn preview_song_loop_response(started: PreviewStarted) -> pb::PreviewSongLoopResponse {
+    let (start_frame, seam_cycle) = match started.playback {
+        PreviewPlayback::FromFrame(start) => (Some(start.0), None),
+        PreviewPlayback::Seam { cycle } => (None, Some(duration_message(cycle))),
+    };
     pb::PreviewSongLoopResponse {
         started_at: Some(timestamp_message(started.started_at)),
-        seam_cycle: started.seam_cycle.map(duration_message),
+        seam_cycle,
+        start_frame,
+        draft: Some(song_loop_message(started.draft)),
+        preview_id: started.preview_id.0,
     }
 }
 
@@ -171,6 +189,16 @@ pub fn preview_song_loop_message(request: &PreviewSongLoop) -> pb::PreviewSongLo
     }
 }
 
+#[must_use]
+pub fn update_song_loop_preview_message(
+    request: UpdateSongLoopPreview,
+) -> pb::UpdateSongLoopPreviewRequest {
+    pb::UpdateSongLoopPreviewRequest {
+        preview_id: request.preview_id.0,
+        draft: Some(song_loop_message(request.draft)),
+    }
+}
+
 // Responses the client decodes.
 
 pub fn song_waveform(
@@ -217,15 +245,25 @@ pub fn preview_started(
     response: pb::PreviewSongLoopResponse,
 ) -> Result<PreviewStarted, InvalidMessage> {
     let invalid = |field| InvalidMessage { field };
+    let playback = match (response.start_frame, response.seam_cycle) {
+        (Some(start), None) => PreviewPlayback::FromFrame(SourceFrames(start)),
+        (None, Some(cycle)) => PreviewPlayback::Seam {
+            cycle: duration_value(cycle).ok_or(invalid("seam_cycle"))?,
+        },
+        _ => return Err(invalid("start_frame")),
+    };
     Ok(PreviewStarted {
+        preview_id: PreviewId(response.preview_id),
+        draft: response
+            .draft
+            .ok_or("is required")
+            .and_then(loop_region)
+            .map_err(|_| invalid("draft"))?,
         started_at: response
             .started_at
             .and_then(system_time)
             .ok_or(invalid("started_at"))?,
-        seam_cycle: response
-            .seam_cycle
-            .map(|cycle| duration_value(cycle).ok_or(invalid("seam_cycle")))
-            .transpose()?,
+        playback,
     })
 }
 

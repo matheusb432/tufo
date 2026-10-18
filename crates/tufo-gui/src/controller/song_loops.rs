@@ -6,13 +6,15 @@ use std::{
     time::{Duration, SystemTime},
 };
 
+use tokio::sync::watch;
 use tufo_client::{
     TufoClient,
     desktop::files,
     library::LibrarySnapshot,
     song_loops::{
-        ImportSongLoops, PreviewMode, PreviewSongLoop, SavedSongLoop, SongLoopImportOutcome,
-        SongLoopImportResult, SongWaveform, UpdateSongLoop,
+        ImportSongLoops, PreviewMode, PreviewPlayback, PreviewSongLoop, PreviewStarted,
+        SavedSongLoop, SongLoopImportOutcome, SongLoopImportResult, SongWaveform, UpdateSongLoop,
+        UpdateSongLoopPreview,
     },
 };
 use tufo_models::library::{
@@ -25,7 +27,7 @@ use crate::{
     i18n::{tr, tr_args, tr_count},
     loop_editor::{
         LoopDraft, LoopEditorFrame, LoopFieldError, LoopFieldTexts, Marker, PreviewKind,
-        WaveformView, format_milliseconds, format_time, preview_frame, seam_preview_frame,
+        WaveformView, format_milliseconds, format_time, seam_preview_frame,
     },
     presentation, render,
 };
@@ -68,13 +70,24 @@ struct LoadedSong {
 struct RunningPreview {
     generation: u64,
     kind: PreviewKind,
-    region: LoopRegion,
-    start: SourceFrames,
     /// Absent until the server starts playing.
-    started_at: Option<SystemTime>,
-    seam_cycle: Option<Duration>,
+    playing: Option<PreviewStarted>,
+    /// Carries marker edits to a preview from the playhead; seam previews keep their draft.
+    drafts: Option<watch::Sender<LoopRegion>>,
     /// Aborting it drops the stream, which stops the preview.
     task: tokio::task::JoinHandle<()>,
+}
+
+impl RunningPreview {
+    fn follow(&self, draft: LoopRegion) {
+        if let Some(drafts) = &self.drafts {
+            drafts.send_if_modified(|followed| {
+                let changed = *followed != draft;
+                *followed = draft;
+                changed
+            });
+        }
+    }
 }
 
 struct PendingImport {
@@ -464,6 +477,9 @@ impl Controller {
             if moves_view {
                 editor.waveform_revision += 1;
             }
+            if let (Some(preview), Ok(region)) = (editor.preview.as_ref(), song.draft.region()) {
+                preview.follow(region);
+            }
         }
         self.render_loop_editor();
     }
@@ -536,11 +552,17 @@ impl Controller {
                 draft: region,
                 mode,
             };
-            let start = song.playhead;
+            let (drafts, followed_drafts) = match kind {
+                PreviewKind::FromPlayhead => {
+                    let (sender, receiver) = watch::channel(region);
+                    (Some(sender), Some(receiver))
+                }
+                PreviewKind::Seam => (None, None),
+            };
             let controller = self.clone();
             let task = self.runtime.spawn(async move {
                 controller
-                    .run_loop_preview(generation, client, request)
+                    .run_loop_preview(generation, client, request, followed_drafts)
                     .await;
             });
             editor.stop_preview();
@@ -548,21 +570,22 @@ impl Controller {
             editor.preview = Some(RunningPreview {
                 generation,
                 kind,
-                region,
-                start,
-                started_at: None,
-                seam_cycle: None,
+                playing: None,
+                drafts,
                 task,
             });
         }
         self.render_loop_editor();
     }
 
+    /// Sends marker edits one at a time, so the server never gets an older draft after a newer
+    /// one, and skips edits a later one replaced meanwhile.
     async fn run_loop_preview(
         &self,
         generation: u64,
         client: TufoClient,
         request: PreviewSongLoop,
+        mut followed_drafts: Option<watch::Receiver<LoopRegion>>,
     ) {
         let mut preview = match client.preview_song_loop(&request).await {
             Ok(preview) => preview,
@@ -571,6 +594,26 @@ impl Controller {
                 return;
             }
         };
+        let preview_id = preview.started.preview_id;
+        self.loop_preview_played(generation, preview.started);
+        loop {
+            tokio::select! {
+                started = preview.next_started() => match started {
+                    Some(Ok(started)) => self.loop_preview_played(generation, started),
+                    Some(Err(_)) | None => break,
+                },
+                Some(draft) = next_draft(&mut followed_drafts) => {
+                    let update = UpdateSongLoopPreview { preview_id, draft };
+                    if let Err(error) = client.update_song_loop_preview(update).await {
+                        tracing::debug!(%error, "the preview cannot take the edited markers");
+                    }
+                }
+            }
+        }
+        self.end_loop_preview(generation, None);
+    }
+
+    fn loop_preview_played(&self, generation: u64, started: PreviewStarted) {
         if let Some(running) = self
             .lock()
             .song_loops
@@ -579,11 +622,8 @@ impl Controller {
             .and_then(|editor| editor.preview.as_mut())
             .filter(|running| running.generation == generation)
         {
-            running.started_at = Some(preview.started.started_at);
-            running.seam_cycle = preview.started.seam_cycle;
+            running.playing = Some(started);
         }
-        let _ = preview.ended().await;
-        self.end_loop_preview(generation, None);
     }
 
     fn end_loop_preview(&self, generation: u64, error: Option<String>) {
@@ -618,20 +658,23 @@ impl Controller {
             else {
                 return;
             };
-            let Some(started_at) = preview.started_at else {
+            let Some(playing) = preview.playing else {
                 return;
             };
             let elapsed = SystemTime::now()
-                .duration_since(started_at)
+                .duration_since(playing.started_at)
                 .unwrap_or_default();
-            song.playhead = match (preview.kind, preview.seam_cycle) {
-                (PreviewKind::Seam, Some(cycle)) => seam_preview_frame(
-                    preview.region,
-                    song.draft.timing().frames_in(SEAM_PREVIEW_SIDE),
+            let timing = playing.draft.timing();
+            song.playhead = match playing.playback {
+                PreviewPlayback::Seam { cycle } => seam_preview_frame(
+                    playing.draft,
+                    timing.frames_in(SEAM_PREVIEW_SIDE),
                     cycle,
                     elapsed,
                 ),
-                _ => preview_frame(preview.region, preview.start, elapsed),
+                PreviewPlayback::FromFrame(start) => playing
+                    .draft
+                    .preview_frame_after(start, timing.frames_in(elapsed)),
             };
             if preview.kind == PreviewKind::FromPlayhead && !song.view.contains(song.playhead) {
                 song.view.center_on(song.playhead);
@@ -944,6 +987,16 @@ impl Controller {
             })
         });
     }
+}
+
+/// Waits for the next edit; `None` without a receiver or once its sender drops.
+async fn next_draft(drafts: &mut Option<watch::Receiver<LoopRegion>>) -> Option<LoopRegion> {
+    let receiver = drafts.as_mut()?;
+    if receiver.changed().await.is_err() {
+        *drafts = None;
+        return None;
+    }
+    Some(*receiver.borrow_and_update())
 }
 
 fn read_document(path: PathBuf) -> std::io::Result<String> {

@@ -30,6 +30,7 @@ use tufo_application::{
         resume_saved_loops::{self, ResumeSavedLoopsOutcome},
         select_output::SelectOutputError,
         stop_sound,
+        update_song_loop_preview::UpdateSongLoopPreviewError,
     },
 };
 use tufo_infra::{
@@ -64,7 +65,7 @@ use tufo_models::{
 use tufo_wire::{
     browser_host::{AudioStreamId, HostEvent, write_host_event},
     library::{ImportPaths, UpdateCollectionEntry},
-    song_loops::PreviewMode,
+    song_loops::{PreviewMode, PreviewPlayback},
 };
 use uuid::Uuid;
 
@@ -1905,8 +1906,10 @@ async fn a_seam_preview_pauses_local_music_and_resumes_it_when_it_stops() -> any
     let after = rig.state();
 
     assert_eq!(
-        session.started.seam_cycle,
-        Some(Duration::from_millis(300 + 300 + 750))
+        session.started.borrow().playback,
+        PreviewPlayback::Seam {
+            cycle: Duration::from_millis(300 + 300 + 750)
+        }
     );
     assert!(during.music.as_ref().is_some_and(|music| music.paused));
     assert!(after.music.as_ref().is_some_and(|music| !music.paused));
@@ -1948,6 +1951,90 @@ async fn a_newer_preview_ends_the_previous_one_and_keeps_the_music_paused() -> a
             .as_ref()
             .is_some_and(|music| !music.paused)
     );
+    Ok(())
+}
+
+/// 5 ms at the local output's 44.1 kHz.
+const SWITCH_SLIP_FRAMES_MAX: usize = 220;
+
+fn ramp_draft(loop_start: u64, loop_end: u64) -> anyhow::Result<LoopRegion> {
+    let region = ramp_region()?;
+    Ok(LoopRegion::try_new(
+        region.timing(),
+        LoopMarkers {
+            loop_start: SourceFrames(loop_start),
+            loop_end: SourceFrames(loop_end),
+            ..region.markers()
+        },
+    )?)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_preview_from_a_frame_goes_on_from_where_it_plays_with_a_newer_draft()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let song = rig.file("boss.wav", &ramp(THREE_SECONDS))?;
+    let mut session = rig
+        .player
+        .start_preview(SongPreview {
+            path: song,
+            draft: ramp_region()?,
+            mode: PreviewMode::FromFrame(SourceFrames(9_600)),
+        })
+        .await?;
+    rig.wait_for_played_frames(0, 13_230).await?;
+    let shorter = ramp_draft(28_800, 57_600)?;
+    rig.player.update_preview(session.id, shorter).await?;
+    tokio::time::timeout(WAIT_TIMEOUT, session.started.changed()).await??;
+    let started = *session.started.borrow();
+    rig.wait_for_played_frames(0, 88_200).await?;
+    rig.player.stop_preview(session.id).await;
+
+    assert_eq!(started.draft, shorter);
+    let PreviewPlayback::FromFrame(start) = started.playback else {
+        anyhow::bail!("the preview became a seam preview");
+    };
+    assert!(
+        (24_000..38_400).contains(&start.0),
+        "from frame {}",
+        start.0
+    );
+    let captures = rig.sound_card.captures();
+    let played = &from_first_sound(&captures[0])[..88_200];
+    let wraps = ramp_wraps(played);
+    assert!(!wraps.is_empty(), "the newer loop never wrapped");
+    for &wrap in &wraps {
+        let landed = ramp_seconds_at(played, wrap + RESAMPLED_JUMP_FRAMES);
+        assert!((landed - 0.6).abs() < 0.01, "wrapped to {landed} s");
+    }
+    let latest = played
+        .iter()
+        .map(|sample| ramp_position_seconds(*sample))
+        .fold(0.0, f32::max);
+    assert!(latest < 1.21, "played the earlier loop to {latest} s");
+    // From 0.2 s, the newer loop end at 1.2 s comes 1 s in, as if the preview had always
+    // played the newer draft.
+    assert!(
+        wraps[0].abs_diff(44_100) <= SWITCH_SLIP_FRAMES_MAX,
+        "first wrapped at frame {}",
+        wraps[0]
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn seam_and_ended_previews_refuse_newer_drafts() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let song = rig.file("boss.wav", &ramp(THREE_SECONDS))?;
+    let session = rig.player.start_preview(seam_preview(song)?).await?;
+    let draft = ramp_draft(28_800, 57_600)?;
+
+    let seam = rig.player.update_preview(session.id, draft).await;
+    rig.player.stop_preview(session.id).await;
+    let ended = rig.player.update_preview(session.id, draft).await;
+
+    assert!(matches!(seam, Err(UpdateSongLoopPreviewError::Seam)));
+    assert!(matches!(ended, Err(UpdateSongLoopPreviewError::Ended)));
     Ok(())
 }
 

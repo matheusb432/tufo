@@ -25,5 +25,6 @@ pub mod stop_music_layer;
 pub mod stop_sound;
 pub mod update_music_layer;
 pub mod update_player_settings;
+pub mod update_song_loop_preview;
 pub mod update_sound;
 pub mod watch_player;

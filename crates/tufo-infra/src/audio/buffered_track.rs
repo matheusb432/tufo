@@ -235,6 +235,27 @@ impl TrackReader {
         copied
     }
 
+    /// Discards up to `frames` buffered frames as if they played, before the audio thread
+    /// reads, so a replacement lines up with the track it takes over from. Returns how many.
+    pub fn skip(&mut self, frames: u64) -> u64 {
+        let count = self
+            .consumer
+            .slots()
+            .min(usize::try_from(frames).unwrap_or(usize::MAX));
+        let skipped = match self.consumer.read_chunk(count) {
+            Ok(chunk) => {
+                chunk.commit_all();
+                frame_count(count)
+            }
+            Err(_) => 0,
+        };
+        self.frames_played += skipped;
+        self.shared
+            .frames_played
+            .store(self.frames_played, Ordering::Relaxed);
+        skipped
+    }
+
     /// Frames decoded and waiting to be read.
     #[must_use]
     pub fn buffered_frames(&self) -> usize {
@@ -324,10 +345,13 @@ impl TrackHandle {
     /// How much audio the reader has copied out, from the start position.
     #[must_use]
     pub fn played(&self) -> Duration {
-        duration_of_frames(
-            self.shared.frames_played.load(Ordering::Relaxed),
-            self.sample_rate,
-        )
+        duration_of_frames(self.played_frames(), self.sample_rate)
+    }
+
+    /// How many output frames the reader has copied out, from the start position.
+    #[must_use]
+    pub fn played_frames(&self) -> u64 {
+        self.shared.frames_played.load(Ordering::Relaxed)
     }
 
     /// Frames of silence played because the decoder fell behind.

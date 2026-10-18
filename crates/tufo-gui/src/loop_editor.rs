@@ -181,21 +181,6 @@ impl LoopDraft {
     }
 }
 
-/// A preview from `start` wraps at the loop end, except one starting past it.
-pub(crate) fn preview_frame(
-    region: LoopRegion,
-    start: SourceFrames,
-    elapsed: Duration,
-) -> SourceFrames {
-    let timing = region.timing();
-    let played = timing.frames_in(elapsed);
-    if start < region.markers().loop_end {
-        region.source_frame_after(start, played)
-    } else {
-        start.saturating_add(played).min(timing.frame_count)
-    }
-}
-
 /// The side before the loop end plays, then the side after the loop start, then silence; each
 /// side lasts at most one loop, as the server plays it.
 pub(crate) fn seam_preview_frame(
@@ -603,7 +588,7 @@ mod tests {
     }
 
     #[test]
-    fn previews_follow_the_loop_and_the_seam() {
+    fn seam_previews_repeat_both_sides_of_the_seam() {
         let region = LoopRegion::try_new(
             timing(480_000),
             LoopMarkers {
@@ -624,14 +609,6 @@ mod tests {
             )
         };
 
-        assert_eq!(
-            preview_frame(region, SourceFrames(144_000), Duration::from_secs(2)),
-            SourceFrames(144_000)
-        );
-        assert_eq!(
-            preview_frame(region, SourceFrames(300_000), Duration::from_secs(1)),
-            SourceFrames(348_000)
-        );
         assert_eq!(seam(0), SourceFrames(144_000));
         assert_eq!(seam(1_500), SourceFrames(120_000));
         assert_eq!(seam(2_400), SourceFrames(144_000));

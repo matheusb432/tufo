@@ -12,7 +12,7 @@ use tufo_models::{
         queue::{QueueStart, QueuedEntry},
     },
 };
-use tufo_wire::song_loops::{PreviewMode, PreviewStarted};
+use tufo_wire::song_loops::{PreviewId, PreviewMode, PreviewStarted};
 
 use super::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
@@ -24,6 +24,7 @@ use super::{
     play_queue::PlayQueueError,
     recover_local_output::RecoverLocalOutputError,
     select_output::SelectOutputError,
+    update_song_loop_preview::UpdateSongLoopPreviewError,
 };
 use crate::error::ErrorMeta;
 
@@ -123,6 +124,13 @@ pub trait Player: Send + Sync {
         preview: SongPreview,
     ) -> impl Future<Output = Result<PreviewSession, PlayAudioError>> + Send;
 
+    /// Plays `draft` in the running preview from a frame, going on from where it is.
+    fn update_preview(
+        &self,
+        id: PreviewId,
+        draft: LoopRegion,
+    ) -> impl Future<Output = Result<(), UpdateSongLoopPreviewError>> + Send;
+
     /// Resumes music the preview paused. Stopping an ended preview does nothing.
     fn stop_preview(&self, id: PreviewId) -> impl Future<Output = ()> + Send;
 
@@ -139,13 +147,11 @@ pub struct SongPreview {
     pub mode: PreviewMode,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PreviewId(pub u64);
-
 #[derive(Debug)]
 pub struct PreviewSession {
     pub id: PreviewId,
-    pub started: PreviewStarted,
+    /// The draft playing, first the requested one.
+    pub started: watch::Receiver<PreviewStarted>,
     /// Resolves once the preview ends without [`Player::stop_preview`], as when a newer one
     /// replaces it.
     pub ended: oneshot::Receiver<()>,

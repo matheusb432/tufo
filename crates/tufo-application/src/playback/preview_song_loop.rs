@@ -1,7 +1,7 @@
 //! Auditioning a draft loop before saving it.
 
 use tufo_models::library::AudioFile;
-use tufo_wire::song_loops::PreviewSongLoop;
+use tufo_wire::song_loops::{PreviewId, PreviewSongLoop};
 
 use super::player::{PlayAudioError, Player, PreviewSession, SongPreview};
 use crate::{
@@ -63,6 +63,6 @@ pub async fn execute<F: LibraryFiles>(
     Ok(player.start_preview(preview).await?)
 }
 
-pub async fn stop(id: super::player::PreviewId, player: &impl Player) {
+pub async fn stop(id: PreviewId, player: &impl Player) {
     player.stop_preview(id).await;
 }

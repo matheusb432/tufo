@@ -7,7 +7,7 @@ use tufo_application::playback::{
     control_sounds::{self, SoundsCommand},
     get_diagnostics, open_browser, play_collection, play_entry_sound, preview_song_loop,
     remove_from_queue, resume_saved_loops, select_output, stand_by, stop_music_layer, stop_sound,
-    update_music_layer, update_player_settings, watch_player,
+    update_music_layer, update_player_settings, update_song_loop_preview, watch_player,
 };
 use tufo_infra::player::outputs::{AudioOutputs, DeviceOutputs};
 use tufo_models::playback::player_state::PlayerState;
@@ -61,20 +61,40 @@ impl<O: AudioOutputs> PlayerService for PlayerGrpcService<O> {
                 .await
                 .into_grpc()?;
         let (sender, receiver) = mpsc::channel(1);
-        let started = proto::song_loop::preview_song_loop_response(session.started);
         let player = std::sync::Arc::clone(&self.state.player);
         let mut draining = self.draining.clone();
         tokio::spawn(async move {
-            if sender.send(Ok(started)).await.is_ok() {
+            let mut started = session.started;
+            let mut ended = session.ended;
+            loop {
+                let response =
+                    proto::song_loop::preview_song_loop_response(*started.borrow_and_update());
+                if sender.send(Ok(response)).await.is_err() {
+                    break;
+                }
                 tokio::select! {
-                    () = sender.closed() => {}
-                    _ = session.ended => {}
-                    _ = draining.wait_for(|draining| *draining) => {}
+                    () = sender.closed() => break,
+                    _ = &mut ended => break,
+                    _ = draining.wait_for(|draining| *draining) => break,
+                    changed = started.changed() => if changed.is_err() {
+                        break;
+                    },
                 }
             }
             preview_song_loop::stop(session.id, player.as_ref()).await;
         });
         Ok(Response::new(ReceiverStream::new(receiver)))
+    }
+
+    async fn update_song_loop_preview(
+        &self,
+        request: Request<pb::UpdateSongLoopPreviewRequest>,
+    ) -> Result<Response<pb::UpdateSongLoopPreviewResponse>, Status> {
+        let request = proto::song_loop::update_song_loop_preview_request(request.into_inner())?;
+        update_song_loop_preview::execute(request, self.state.player.as_ref())
+            .await
+            .into_grpc()?;
+        Ok(Response::new(pb::UpdateSongLoopPreviewResponse {}))
     }
 
     async fn watch_player(
