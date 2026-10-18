@@ -15,8 +15,9 @@ use std::slice;
 use std::sync::{mpsc, Mutex, OnceLock};
 use std::thread;
 
-use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::Foundation::{HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi;
+use windows_sys::Win32::UI::WindowsAndMessaging::GetClientRect;
 
 const ZERO_QUAD: Gdi::RGBQUAD = Gdi::RGBQUAD {
     rgbBlue: 0,
@@ -32,7 +33,9 @@ struct Buffer {
     pixels: NonNull<u32>,
     width: NonZeroI32,
     height: NonZeroI32,
-    presented: bool,
+    /// The last present covered the window's whole client area, so the window still shows this
+    /// buffer unless Windows has since resized or invalidated it.
+    presented_whole: bool,
 }
 
 unsafe impl Send for Buffer {}
@@ -110,8 +113,21 @@ impl Buffer {
             width,
             height,
             pixels,
-            presented: false,
+            presented_whole: false,
         }
+    }
+
+    fn matches_client_area_of(&self, window: HWND) -> bool {
+        let mut client_rect = RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        };
+        let client_rect_known = unsafe { GetClientRect(window, &mut client_rect) } != 0;
+        client_rect_known
+            && client_rect.right - client_rect.left == self.width.get()
+            && client_rect.bottom - client_rect.top == self.height.get()
     }
 
     #[inline]
@@ -165,6 +181,10 @@ impl<D: ?Sized, W> Drop for Win32Impl<D, W> {
     }
 }
 
+fn has_invalidated_area(window: HWND) -> bool {
+    unsafe { Gdi::GetUpdateRect(window, ptr::null_mut(), false.into()) != 0 }
+}
+
 /// The Win32-compatible bitmap information.
 #[repr(C)]
 struct BitmapInfo {
@@ -202,7 +222,7 @@ impl<D: HasDisplayHandle, W: HasWindowHandle> Win32Impl<D, W> {
             // Validate the window.
             Gdi::ValidateRect(self.window.0, ptr::null_mut());
         }
-        buffer.presented = true;
+        buffer.presented_whole = buffer.matches_client_area_of(self.window.0);
 
         Ok(())
     }
@@ -305,11 +325,17 @@ impl<D: HasDisplayHandle, W: HasWindowHandle> BufferInterface for BufferImpl<'_,
         self.0.buffer.as_mut().unwrap().pixels_mut()
     }
 
+    /// Windows keeps no pixels where a window grows or comes back on screen, and invalidates
+    /// them instead; a transparent window shows the desktop there. So the previous frame counts
+    /// only while the window still shows it whole.
     fn age(&self) -> u8 {
-        match self.0.buffer.as_ref() {
-            Some(buffer) if buffer.presented => 1,
-            _ => 0,
-        }
+        let window = self.0.window.0;
+        let shows_previous_frame = self.0.buffer.as_ref().is_some_and(|buffer| {
+            buffer.presented_whole
+                && buffer.matches_client_area_of(window)
+                && !has_invalidated_area(window)
+        });
+        u8::from(shows_previous_frame)
     }
 
     fn present(self) -> Result<(), SoftBufferError> {
