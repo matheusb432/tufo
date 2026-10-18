@@ -2,17 +2,23 @@
 
 use std::f32::consts::FRAC_PI_2;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum FadeCurve {
+    EqualPower,
+    Linear,
+}
+
 /// A gain that moves to a target over a whole number of frames.
 ///
-/// Rising ramps follow a quarter sine and falling ramps a quarter cosine, so a fade-out and a
-/// fade-in of the same length between silence and full level keep the combined power constant:
-/// a crossfade doesn't dip in the middle.
+/// Equal-power ramps follow a quarter sine or cosine to preserve power between different
+/// tracks. Linear ramps preserve the combined gain when crossfading aligned copies of a track.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Envelope {
     from: f32,
     to: f32,
     frames_total: u32,
     frames_done: u32,
+    curve: FadeCurve,
 }
 
 impl Envelope {
@@ -22,22 +28,32 @@ impl Envelope {
             to: gain,
             frames_total: 0,
             frames_done: 0,
+            curve: FadeCurve::EqualPower,
         }
     }
 
     /// Starts at `from` and reaches `to` after `frames`; zero frames jumps straight to `to`.
     pub(crate) fn ramp(from: f32, to: f32, frames: u32) -> Self {
+        Self::ramp_with_curve(from, to, frames, FadeCurve::EqualPower)
+    }
+
+    pub(super) fn ramp_with_curve(from: f32, to: f32, frames: u32, curve: FadeCurve) -> Self {
         Self {
             from,
             to,
             frames_total: frames,
             frames_done: 0,
+            curve,
         }
     }
 
     /// Ramps from the current gain to `to` over `frames`.
     pub(crate) fn ramp_to(&mut self, to: f32, frames: u32) {
         *self = Self::ramp(self.gain(), to, frames);
+    }
+
+    pub(super) fn ramp_to_with_curve(&mut self, to: f32, frames: u32, curve: FadeCurve) {
+        *self = Self::ramp_with_curve(self.gain(), to, frames, curve);
     }
 
     /// The gain for the next frame, advancing the ramp by one frame.
@@ -59,10 +75,10 @@ impl Envelope {
             reason = "ramps are far shorter than 2^24 frames"
         )]
         let progress = self.frames_done as f32 / self.frames_total as f32;
-        let shaped = if self.to >= self.from {
-            (progress * FRAC_PI_2).sin()
-        } else {
-            1.0 - (progress * FRAC_PI_2).cos()
+        let shaped = match self.curve {
+            FadeCurve::Linear => progress,
+            FadeCurve::EqualPower if self.to >= self.from => (progress * FRAC_PI_2).sin(),
+            FadeCurve::EqualPower => 1.0 - (progress * FRAC_PI_2).cos(),
         };
         self.from + (self.to - self.from) * shaped
     }

@@ -235,25 +235,32 @@ impl TrackReader {
         copied
     }
 
-    /// Discards up to `frames` buffered frames as if they played, before the audio thread
-    /// reads, so a replacement lines up with the track it takes over from. Returns how many.
-    pub fn skip(&mut self, frames: u64) -> u64 {
-        let count = self
-            .consumer
-            .slots()
-            .min(usize::try_from(frames).unwrap_or(usize::MAX));
-        let skipped = match self.consumer.read_chunk(count) {
-            Ok(chunk) => {
-                chunk.commit_all();
-                frame_count(count)
-            }
-            Err(_) => 0,
+    /// Aligns a replacement without consuming its playback headroom. A rejected skip leaves
+    /// the reader untouched; finished files may have less than the usual prefill remaining.
+    pub(crate) fn skip_with_prefill(&mut self, frames: u64, sample_rate: u32) -> bool {
+        let Ok(count) = usize::try_from(frames) else {
+            return false;
         };
-        self.frames_played += skipped;
+        let finished = self.decoding_finished();
+        let Some(remaining) = self.consumer.slots().checked_sub(count) else {
+            return false;
+        };
+        if remaining == 0 || (!finished && remaining < frames_in(PREFILL_DURATION, sample_rate)) {
+            return false;
+        }
+        let Ok(chunk) = self.consumer.read_chunk(count) else {
+            return false;
+        };
+        chunk.commit_all();
+        self.frames_played += frames;
         self.shared
             .frames_played
             .store(self.frames_played, Ordering::Relaxed);
-        skipped
+        true
+    }
+
+    pub(super) fn played_frames(&self) -> u64 {
+        self.frames_played
     }
 
     /// Frames decoded and waiting to be read.
@@ -504,6 +511,39 @@ pub(crate) fn frame_count(frames: usize) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn replacement_skips_require_exact_alignment_and_preserve_headroom() {
+        let (mut producer, consumer) = RingBuffer::new(8);
+        for sample in 0..8_u8 {
+            producer
+                .push(PackedFrame::new(f32::from(sample) / 8.0, 0.0))
+                .unwrap();
+        }
+        let shared = Arc::new(TrackShared::default());
+        let mut reader = TrackReader {
+            consumer,
+            shared: Arc::clone(&shared),
+            frames_played: 0,
+            declared_frames: None,
+            underrun_frames_total: None,
+        };
+
+        assert!(!reader.skip_with_prefill(9, 8));
+        assert!(!reader.skip_with_prefill(5, 8));
+        assert_eq!(reader.played_frames(), 0);
+        assert_eq!(reader.buffered_frames(), 8);
+        assert!(reader.skip_with_prefill(4, 8));
+        let mut out = [Frame::ZERO; 1];
+        assert_eq!(reader.read(&mut out), 1);
+        assert_eq!(out[0].left, 0.5);
+
+        shared.decoding_finished.store(true, Ordering::Release);
+        assert!(!reader.skip_with_prefill(3, 8));
+        assert!(reader.skip_with_prefill(2, 8));
+        assert_eq!(reader.read(&mut out), 1);
+        assert_eq!(out[0].left, 0.875);
+    }
 
     #[test]
     fn underrun_totals_outlive_readers_and_exclude_finished_decoders() {

@@ -6,6 +6,8 @@
 //! through a wait-free queue and reads two atomics. Tracks the deck lets go travel back through a
 //! second queue, so their buffers are freed off the audio thread.
 
+pub(crate) mod preview;
+
 use std::{
     convert::Infallible,
     num::NonZeroU64,
@@ -21,11 +23,12 @@ use kira::{
     info::Info,
     sound::{Sound, SoundData},
 };
+use preview::PreviewAlignment;
 use rtrb::{Consumer, Producer, RingBuffer};
 
 use super::{
     buffered_track::{TrackReader, frames_in},
-    envelope::Envelope,
+    envelope::{Envelope, FadeCurve},
 };
 
 const COMMAND_CAPACITY: usize = 64;
@@ -71,6 +74,7 @@ pub(crate) fn music_deck(sample_rate: u32) -> (MusicDeckSound, MusicDeckHandle) 
         pause: Envelope::constant(1.0),
         scratch: vec![Frame::ZERO; SCRATCH_FRAMES].into_boxed_slice(),
         commands_applied: 0,
+        sample_rate,
     };
     let handle = MusicDeckHandle {
         commands: command_producer,
@@ -92,6 +96,21 @@ pub struct MusicDeckHandle {
 }
 
 impl MusicDeckHandle {
+    /// Accepts an aligned, prefilled replacement on the audio thread. Once commands settle,
+    /// `state` names the new token on success or retains the previous token on rejection.
+    pub(crate) fn replace_preview(
+        &mut self,
+        track: DeckTrack,
+        alignment: PreviewAlignment,
+        fade: Duration,
+    ) -> Result<(), DeckBusyError> {
+        self.send(DeckCommand::ReplacePreview {
+            track,
+            alignment,
+            fade_frames: self.frames(fade),
+        })
+    }
+
     /// Makes `track` current at once: it fades in over `fade_in` while every other track fades
     /// out over `fade_out`, and the armed track is dropped.
     pub fn start(
@@ -189,6 +208,11 @@ struct DeckStatus {
 }
 
 enum DeckCommand {
+    ReplacePreview {
+        track: DeckTrack,
+        alignment: PreviewAlignment,
+        fade_frames: u32,
+    },
     Start {
         track: DeckTrack,
         fade_in_frames: u32,
@@ -230,17 +254,30 @@ struct MusicDeck {
     pause: Envelope,
     scratch: Box<[Frame]>,
     commands_applied: u64,
+    sample_rate: u32,
 }
 
 impl MusicDeck {
     fn apply_commands(&mut self) {
         while let Ok(command) = self.commands.pop() {
             match command {
+                DeckCommand::ReplacePreview {
+                    track,
+                    alignment,
+                    fade_frames,
+                } => {
+                    self.replace_preview(track, &alignment, fade_frames);
+                }
                 DeckCommand::Start {
                     track,
                     fade_in_frames,
                     fade_out_frames,
-                } => self.start(track, fade_in_frames, fade_out_frames),
+                } => self.start(
+                    track,
+                    fade_in_frames,
+                    fade_out_frames,
+                    FadeCurve::EqualPower,
+                ),
                 DeckCommand::Arm(track) => {
                     self.retire_armed();
                     self.armed = Some(track);
@@ -251,20 +288,46 @@ impl MusicDeck {
                 DeckCommand::Resume { fade_frames } => self.pause.ramp_to(1.0, fade_frames),
                 DeckCommand::Stop { fade_frames } => {
                     self.retire_armed();
-                    self.fade_out_all(fade_frames);
+                    self.fade_out_all(fade_frames, FadeCurve::EqualPower);
                 }
             }
             self.commands_applied += 1;
         }
     }
 
-    fn start(&mut self, track: DeckTrack, fade_in_frames: u32, fade_out_frames: u32) {
+    fn replace_preview(
+        &mut self,
+        mut track: DeckTrack,
+        alignment: &PreviewAlignment,
+        fade_frames: u32,
+    ) {
+        let skip = self
+            .current
+            .and_then(|slot| self.voices[slot].as_ref())
+            .filter(|voice| voice.track.token == alignment.token_previous)
+            .and_then(|voice| {
+                alignment.skip_frames(voice.track.reader.played_frames(), self.sample_rate)
+            });
+        if skip.is_some_and(|frames| track.reader.skip_with_prefill(frames, self.sample_rate)) {
+            self.start(track, fade_frames, fade_frames, FadeCurve::Linear);
+        } else {
+            self.retire_reader(track.reader);
+        }
+    }
+
+    fn start(
+        &mut self,
+        track: DeckTrack,
+        fade_in_frames: u32,
+        fade_out_frames: u32,
+        curve: FadeCurve,
+    ) {
         self.retire_armed();
-        self.fade_out_all(fade_out_frames);
+        self.fade_out_all(fade_out_frames, curve);
         let slot = self.free_slot();
         let envelope = match fade_in_frames {
             0 => Envelope::constant(1.0),
-            frames => Envelope::ramp(0.0, 1.0, frames),
+            frames => Envelope::ramp_with_curve(0.0, 1.0, frames, curve),
         };
         self.voices[slot] = Some(Voice {
             track,
@@ -274,13 +337,13 @@ impl MusicDeck {
         self.current = Some(slot);
     }
 
-    fn fade_out_all(&mut self, fade_frames: u32) {
+    fn fade_out_all(&mut self, fade_frames: u32, curve: FadeCurve) {
         for slot in 0..VOICES_MAX {
             if fade_frames == 0 {
                 self.retire(slot);
             } else if let Some(voice) = &mut self.voices[slot] {
                 voice.retiring = true;
-                voice.envelope.ramp_to(0.0, fade_frames);
+                voice.envelope.ramp_to_with_curve(0.0, fade_frames, curve);
             }
         }
         self.current = None;

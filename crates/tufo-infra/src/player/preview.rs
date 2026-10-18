@@ -26,9 +26,14 @@ use crate::audio::{
     Mixer, MixerVolumes,
     buffered_track::{AudioFile, BufferedTrack, DecodeOptions, OpenTrackError, TrackHandle},
     decibels,
-    music_deck::DeckTrack,
+    music_deck::{
+        DeckState, DeckTrack,
+        preview::{PreviewAlignment, PreviewPosition},
+    },
     seam::{SeamClip, render_seam_clip},
 };
+
+const REPLACEMENT_ATTEMPTS_MAX: u8 = 3;
 
 pub(super) struct Preview {
     id: PreviewId,
@@ -45,23 +50,73 @@ pub(super) struct Preview {
 /// A preview from a frame, which takes newer drafts while it plays.
 struct PreviewTrack {
     path: AudioFilePath,
+    position: PreviewPosition,
+    handle: TrackHandle,
+    token: NonZeroU64,
+    /// The latest draft no track plays yet.
+    pending_draft: Option<PreviewUpdate>,
+    replacement: Replacement,
+}
+
+#[derive(Clone, Copy)]
+struct PreviewUpdate {
     draft: LoopRegion,
+    attempts_left: u8,
+}
+
+enum Replacement {
+    Idle,
+    Decoding,
+    Queued(QueuedPreview),
+}
+
+struct QueuedPreview {
+    update: PreviewUpdate,
     start: SourceFrames,
     handle: TrackHandle,
-    /// The latest draft no track plays yet.
-    pending_draft: Option<LoopRegion>,
-    /// Set while a replacement decodes; drafts arriving meanwhile wait for it.
-    replacing: bool,
+    token: NonZeroU64,
 }
 
 impl PreviewTrack {
-    fn wraps(&self) -> bool {
-        self.start < self.draft.markers().loop_end
+    fn frame(&self) -> SourceFrames {
+        let played = self
+            .position
+            .region
+            .timing()
+            .frames_in(self.handle.played());
+        self.position
+            .region
+            .preview_frame_after(self.position.start, played)
     }
 
-    fn frame(&self) -> SourceFrames {
-        let played = self.draft.timing().frames_in(self.handle.played());
-        self.draft.preview_frame_after(self.start, played)
+    fn settle_replacement(&mut self, state: DeckState, started: &watch::Sender<PreviewStarted>) {
+        if state == DeckState::Pending || !matches!(self.replacement, Replacement::Queued(_)) {
+            return;
+        }
+        let Replacement::Queued(queued) =
+            std::mem::replace(&mut self.replacement, Replacement::Idle)
+        else {
+            return;
+        };
+        if state == DeckState::Playing(queued.token) {
+            self.position = PreviewPosition {
+                region: queued.update.draft,
+                start: queued.start,
+            };
+            self.handle = queued.handle;
+            self.token = queued.token;
+            started.send_modify(|started| {
+                started.draft = self.position.region;
+                started.playback = PreviewPlayback::FromFrame(self.frame());
+                started.started_at = SystemTime::now();
+            });
+        } else if queued.update.attempts_left > 0 {
+            self.pending_draft.get_or_insert(queued.update);
+        } else {
+            tracing::warn!(
+                "the preview kept its previous draft because the replacement could not align"
+            );
+        }
     }
 }
 
@@ -69,10 +124,8 @@ impl PreviewTrack {
 struct TrackReplacement {
     preview_id: PreviewId,
     path: AudioFilePath,
-    draft: LoopRegion,
+    update: PreviewUpdate,
     start: SourceFrames,
-    sampled_at: SystemTime,
-    played_frames_at_sample: u64,
     sample_rate: u32,
 }
 
@@ -154,11 +207,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 PreviewPlayback::FromFrame(start),
                 Some(PreviewTrack {
                     path,
-                    draft,
-                    start,
+                    position: PreviewPosition {
+                        region: draft,
+                        start,
+                    },
                     handle,
+                    token: NonZeroU64::MIN,
                     pending_draft: None,
-                    replacing: false,
+                    replacement: Replacement::Idle,
                 }),
             ),
             StartedAudio::SeamClip { cycle } => (PreviewPlayback::Seam { cycle }, None),
@@ -198,10 +254,13 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             .track
             .as_mut()
             .ok_or(UpdateSongLoopPreviewError::Seam)?;
-        if draft.timing() != track.draft.timing() {
+        if draft.timing() != track.position.region.timing() {
             return Err(UpdateSongLoopPreviewError::OtherAudio);
         }
-        track.pending_draft = Some(draft);
+        track.pending_draft = Some(PreviewUpdate {
+            draft,
+            attempts_left: REPLACEMENT_ATTEMPTS_MAX,
+        });
         Ok(())
     }
 
@@ -212,25 +271,30 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         };
         preview.output.mixer.music().drop_retired();
         let sample_rate = preview.output.mixer.sample_rate();
-        let Some(track) = preview.track.as_mut().filter(|track| !track.replacing) else {
+        let state = preview.output.mixer.music().state();
+        let Some(track) = preview.track.as_mut() else {
             return;
         };
-        let Some(draft) = track.pending_draft.take() else {
+        track.settle_replacement(state, &preview.started);
+        if !matches!(track.replacement, Replacement::Idle) {
+            return;
+        }
+        let Some(mut update) = track.pending_draft.take() else {
             return;
         };
-        if wraps_alike(draft.markers(), track.draft.markers()) {
-            track.draft = draft;
+        let draft = update.draft;
+        if wraps_alike(draft.markers(), track.position.region.markers()) {
+            track.position.region = draft;
             preview.started.send_modify(|started| started.draft = draft);
             return;
         }
-        track.replacing = true;
+        track.replacement = Replacement::Decoding;
+        update.attempts_left -= 1;
         let replacement = TrackReplacement {
             preview_id: preview.id,
             path: track.path.clone(),
-            draft,
-            start: draft.preview_start_continuing(track.frame(), track.wraps()),
-            sampled_at: SystemTime::now(),
-            played_frames_at_sample: track.handle.played_frames(),
+            update,
+            start: draft.preview_start_continuing(track.frame(), track.position.wraps()),
             sample_rate,
         };
         tokio::spawn(Arc::clone(self).replace_preview_track(replacement));
@@ -240,15 +304,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let TrackReplacement {
             preview_id,
             path,
-            draft,
+            update,
             start,
-            sampled_at,
-            played_frames_at_sample,
             sample_rate,
         } = replacement;
-        let decoded =
-            tokio::task::spawn_blocking(move || start_track_from(&path, draft, start, sample_rate))
-                .await;
+        let decoded = tokio::task::spawn_blocking(move || {
+            start_track_from(&path, update.draft, start, sample_rate)
+        })
+        .await;
         let mut engine = self.engine.lock().await;
         let Some(preview) = engine
             .preview
@@ -260,8 +323,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         let Some(track) = preview.track.as_mut() else {
             return;
         };
-        track.replacing = false;
-        let mut decoded = match decoded {
+        track.replacement = Replacement::Idle;
+        let decoded = match decoded {
             Ok(Ok(decoded)) => decoded,
             Ok(Err(error)) => {
                 tracing::warn!(%error, "the preview cannot play the updated draft");
@@ -272,33 +335,38 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 return;
             }
         };
-        let played_since_sample = track
-            .handle
-            .played_frames()
-            .saturating_sub(played_frames_at_sample);
-        decoded.reader.skip(played_since_sample);
+        let token = if track.token == NonZeroU64::MIN {
+            NonZeroU64::MIN.saturating_add(1)
+        } else {
+            NonZeroU64::MIN
+        };
         let deck_track = DeckTrack {
-            token: NonZeroU64::MIN,
+            token,
             reader: decoded.reader,
+        };
+        let alignment = PreviewAlignment {
+            token_previous: track.token,
+            previous: track.position,
+            replacement: PreviewPosition {
+                region: update.draft,
+                start,
+            },
         };
         if let Err(error) =
             preview
                 .output
                 .mixer
                 .music()
-                .start(deck_track, ANTI_CLICK_FADE, ANTI_CLICK_FADE)
+                .replace_preview(deck_track, alignment, ANTI_CLICK_FADE)
         {
             tracing::warn!(%error, "the preview cannot switch to the updated draft");
             return;
         }
-        track.draft = draft;
-        track.start = start;
-        track.handle = decoded.handle;
-        preview.started.send_replace(PreviewStarted {
-            preview_id,
-            draft,
-            started_at: sampled_at,
-            playback: PreviewPlayback::FromFrame(start),
+        track.replacement = Replacement::Queued(QueuedPreview {
+            update,
+            start,
+            handle: decoded.handle,
+            token,
         });
     }
 

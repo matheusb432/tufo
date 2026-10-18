@@ -2263,3 +2263,94 @@ async fn a_host_that_never_becomes_ready_stops_after_the_timeout() -> anyhow::Re
 
     rig.browser.host(0)?.wait_for_exit_request().await
 }
+
+#[test]
+fn a_delayed_preview_replacement_follows_the_old_loop_across_a_wrap() -> anyhow::Result<()> {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .max_blocking_threads(1)
+        .enable_all()
+        .build()?;
+    runtime.block_on(async {
+        // The longer loop cannot align within the 30 s ring after the old loop wraps;
+        // its rejected candidate must leave the old track playing until a retry can align.
+        for loop_end in [134_400, 1_920_000] {
+            let rig = Rig::start()?;
+            let frames = usize::try_from(loop_end)?.max(THREE_SECONDS);
+            let song = rig.file("preview-ramp.wav", &ramp(frames))?;
+            let original = ramp_region()?;
+            let timing = SourceTiming {
+                frame_count: SourceFrames(u64::try_from(frames)?),
+                ..original.timing()
+            };
+            let original = LoopRegion::try_new(timing, original.markers())?;
+            let mut session = rig
+                .player
+                .start_preview(SongPreview {
+                    path: song,
+                    draft: original,
+                    mode: PreviewMode::FromFrame(SourceFrames(76_800)),
+                })
+                .await?;
+            rig.wait_for_played_frames(0, 4_410).await?;
+            let (entered, waiting) = oneshot::channel();
+            let blocker = tokio::task::spawn_blocking(move || {
+                let _ = entered.send(());
+                std::thread::sleep(Duration::from_millis(700));
+            });
+            waiting.await?;
+            let longer = LoopRegion::try_new(
+                timing,
+                LoopMarkers {
+                    loop_end: SourceFrames(loop_end),
+                    ..original.markers()
+                },
+            )?;
+            rig.player.update_preview(session.id, longer).await?;
+            tokio::time::timeout(WAIT_TIMEOUT, session.started.changed()).await??;
+            blocker.await?;
+            let installed = rig.recorded_frames(0);
+            rig.wait_for_recorded_frames(0, installed + 4_410).await?;
+            rig.player.stop_preview(session.id).await;
+            let captures = rig.sound_card.captures();
+            let played = &captures[0];
+            let before = ramp_position_seconds(played[installed - 2_205]);
+            let after = ramp_position_seconds(played[installed + 2_205]);
+            let advance = after - before;
+            assert!(
+                (advance - 0.1).abs() < 0.03,
+                "loop end {loop_end}: replacement advanced {advance:.3} s in 100 ms"
+            );
+        }
+        Ok(())
+    })
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn editing_preview_markers_preserves_the_gain_of_unchanged_audio() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let song = rig.file("preview-constant.wav", &constant(0.2, THREE_SECONDS))?;
+    let mut session = rig
+        .player
+        .start_preview(SongPreview {
+            path: song,
+            draft: ramp_region()?,
+            mode: PreviewMode::FromFrame(SourceFrames(9_600)),
+        })
+        .await?;
+    rig.wait_for_recorded_frames(0, 8_820).await?;
+    rig.player
+        .update_preview(session.id, ramp_draft(48_000, 134_400)?)
+        .await?;
+    tokio::time::timeout(WAIT_TIMEOUT, session.started.changed()).await??;
+    let installed = rig.recorded_frames(0);
+    rig.wait_for_recorded_frames(0, installed + 4_410).await?;
+    rig.player.stop_preview(session.id).await;
+    let captures = rig.sound_card.captures();
+    let peak = captures[0][4_410..].iter().copied().fold(0.0_f32, f32::max);
+    assert!(
+        peak < 0.21,
+        "marker editing boosted unchanged audio to {peak:.6}"
+    );
+    Ok(())
+}
