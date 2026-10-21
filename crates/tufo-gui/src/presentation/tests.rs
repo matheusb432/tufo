@@ -639,10 +639,10 @@ fn outputs_list_this_computer_then_each_guilds_channels_by_position() {
         channel("Amber Keep", 3, "Great Hall", 31, 0),
         channel("Moonlit Vale", 2, "Watchtower", 22, 0),
     ];
-    let state = PlayerState {
-        output: OutputTarget::DiscordVoice(channels[0].target),
-        ..PlayerState::default()
-    };
+    let state = output_state(
+        OutputTarget::DiscordVoice(channels[0].target),
+        VoiceConnectionState::Connected,
+    );
 
     let (rows, targets) = output_rows(&state, &channels);
 
@@ -664,6 +664,25 @@ fn outputs_list_this_computer_then_each_guilds_channels_by_position() {
     let selected = rows.iter().find(|row| row.selected).unwrap();
     assert_eq!(targets[selected.index.unwrap()], state.output);
     assert_eq!(rows[1].initial, "A");
+}
+
+#[test]
+fn outputs_hide_the_channels_while_the_bot_cannot_join_them() {
+    let channels = [channel("Amber Keep", 3, "Great Hall", 31, 0)];
+
+    for voice in [
+        VoiceConnectionState::Disabled,
+        VoiceConnectionState::NotConfigured,
+    ] {
+        let (rows, targets) = output_rows(&output_state(OutputTarget::Local, voice), &channels);
+
+        let labels = rows
+            .iter()
+            .map(|row| row.label.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(labels, ["This Computer"]);
+        assert_eq!(targets, [OutputTarget::Local]);
+    }
 }
 
 #[test]

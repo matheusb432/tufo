@@ -1231,11 +1231,25 @@ pub(crate) fn drawer(
     (view, targets)
 }
 
-/// The drawer's output rows: this computer, then each guild's channels by position.
+/// Whether the bot can join a voice channel: Discord is configured and its connection enabled.
+pub(crate) fn discord_connection_enabled(voice: &VoiceConnectionState) -> bool {
+    !matches!(
+        voice,
+        VoiceConnectionState::NotConfigured | VoiceConnectionState::Disabled
+    )
+}
+
+/// The drawer's output rows: this computer, then each guild's channels by position while the bot
+/// can join them.
 fn output_rows(
     state: &PlayerState,
     voice_channels: &[VoiceChannel],
 ) -> (Vec<OutputRowView>, Vec<OutputTarget>) {
+    let voice_channels = if discord_connection_enabled(&state.voice) {
+        voice_channels
+    } else {
+        &[]
+    };
     let mut guilds = BTreeMap::<(&str, u64), Vec<&VoiceChannel>>::new();
     for channel in voice_channels {
         guilds

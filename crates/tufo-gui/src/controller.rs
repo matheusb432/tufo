@@ -243,15 +243,10 @@ impl Controller {
         let imports = self
             .runtime
             .spawn(self.clone().follow_kenku_import(client.clone()));
-        let voice_channels = self.runtime.spawn(self.clone().load_voice_channels(client));
+        let mut voice_channels: Option<tokio::task::JoinHandle<()>> = None;
         while let Some(result) = states.next().await {
             match result {
-                Ok(state) => {
-                    self.lock().player = state;
-                    self.render_library();
-                    self.render_player();
-                    self.sync_browser();
-                }
+                Ok(state) => self.show_player_state(state, &client, &mut voice_channels),
                 Err(error) => {
                     self.toast_error(presentation::error_text(&error));
                     break;
@@ -260,11 +255,14 @@ impl Controller {
         }
         library.abort();
         imports.abort();
-        voice_channels.abort();
+        if let Some(loading) = voice_channels {
+            loading.abort();
+        }
         {
             let mut shared = self.lock();
             shared.client = None;
             shared.player = PlayerState::default();
+            shared.voice_channels.clear();
         }
         self.render_player();
         self.sync_browser();
@@ -302,6 +300,48 @@ impl Controller {
                     return;
                 }
             }
+        }
+    }
+
+    fn show_player_state(
+        &self,
+        state: PlayerState,
+        client: &TufoClient,
+        voice_channels: &mut Option<tokio::task::JoinHandle<()>>,
+    ) {
+        // The bot's servers can change while it's logged out, so each login lists them again.
+        if self.keep_player_state(state) {
+            self.reload_voice_channels(client, voice_channels);
+        }
+        self.render_library();
+        self.render_player();
+        self.sync_browser();
+    }
+
+    /// Keeps the server's new state, forgetting the voice channels while the bot can't join them.
+    /// True when the bot just became able to.
+    fn keep_player_state(&self, state: PlayerState) -> bool {
+        let discord_enabled = presentation::discord_connection_enabled(&state.voice);
+        let mut shared = self.lock();
+        let discord_was_enabled = presentation::discord_connection_enabled(&shared.player.voice);
+        shared.player = state;
+        if !discord_enabled {
+            shared.voice_channels.clear();
+        }
+        discord_enabled && !discord_was_enabled
+    }
+
+    /// Lists the voice channels again, abandoning a listing still under way.
+    fn reload_voice_channels(
+        &self,
+        client: &TufoClient,
+        loading: &mut Option<tokio::task::JoinHandle<()>>,
+    ) {
+        let reloading = self
+            .runtime
+            .spawn(self.clone().load_voice_channels(client.clone()));
+        if let Some(previous) = loading.replace(reloading) {
+            previous.abort();
         }
     }
 
