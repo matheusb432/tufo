@@ -30,6 +30,9 @@ export global PageMetrics {
     out property <length> padding-top: 8px;
     // A card's painting is 4 wide to 3.3 high.
     out property <float> card-aspect: 3.3 / 4;
+    // A collection page's painting, at least as tall as the title and tools beside it.
+    out property <length> plate-width: 250px;
+    out property <length> plate-height: 176px;
 }
 
 component CardView inherits Rectangle {
@@ -712,8 +715,6 @@ component CollectionBar inherits Rectangle {
 
 // The collection's painting as a plate beside its title, size, folder, and actions.
 component CollectionHero inherits HorizontalLayout {
-    in property <length> plate-width;
-    in property <length> plate-height;
     callback edit();
     callback add-files();
     spacing: 22px;
@@ -722,8 +723,8 @@ component CollectionHero inherits HorizontalLayout {
         spacing: 8px;
         alignment: end;
         Rectangle {
-            width: root.plate-width;
-            height: root.plate-height;
+            width: PageMetrics.plate-width;
+            height: PageMetrics.plate-height;
             border-radius: Theme.radius-plate;
             Image {
                 width: parent.width;
@@ -1446,8 +1447,6 @@ export component PlaylistPage inherits Rectangle {
                 alignment: start;
                 if !root.compact: CollectionHero {
                     padding-bottom: 16px;
-                    plate-width: 250px;
-                    plate-height: 176px;
                     edit => {
                         root.edit-collection();
                     }
@@ -1767,8 +1766,6 @@ export component SoundboardPage inherits Rectangle {
                 alignment: start;
                 if !root.compact: CollectionHero {
                     padding-bottom: 16px;
-                    plate-width: 150px;
-                    plate-height: 104px;
                     edit => {
                         root.edit-collection();
                     }
