@@ -220,6 +220,9 @@ component FilterField inherits Rectangle {
                     Actions.filter-changed(self.text);
                 }
                 if self.text == "": Text {
+                    x: 0;
+                    width: parent.width;
+                    overflow: elide;
                     text: @tr("Filter this page");
                     color: Theme.text-faint;
                     font-size: Theme.body;
@@ -1352,6 +1355,9 @@ component SongSearch inherits VerticalLayout {
                     Actions.song-search-changed(self.text);
                 }
                 if self.text == "": Text {
+                    x: 0;
+                    width: parent.width;
+                    overflow: elide;
                     text: @tr("Search your songs by title or folder");
                     color: Theme.text-faint;
                     font-size: Theme.body;

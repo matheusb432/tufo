@@ -159,6 +159,9 @@ component AddressField inherits Rectangle {
                 }
             }
             if self.text == "": Text {
+                x: 0;
+                width: parent.width;
+                overflow: elide;
                 text: @tr("Type an address or words to search for");
                 color: Theme.text-faint;
                 font-size: Theme.body-small;
