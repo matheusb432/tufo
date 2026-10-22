@@ -7,7 +7,7 @@ import { GuidedTours } from "tours/state.slint";
 import { TourTarget } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import { Actions, Art, PlayerView, Session, SoundChip, WindowFrame, MusicLayer } from "state.slint";
-import { Button, ButtonKind, Icon, IconButton, Slider, TooltipBubble } from "widgets.slint";
+import { Button, ButtonKind, Icon, IconButton, PopupSurface, Slider, TooltipBubble } from "widgets.slint";
 import { WindowDragArea } from "frame.slint";
 
 component SoundChipView inherits Rectangle {
@@ -136,11 +136,8 @@ component MixButton inherits Button {
         width: 280px;
         height: layout.preferred-height;
         y: -self.height - 8px;
-        Rectangle {
-            background: Theme.raised;
-            border-radius: Theme.radius-row;
-            border-width: 1px;
-            border-color: Theme.raised-edge;
+        PopupSurface {
+            rises: true;
             layout := VerticalLayout {
                 padding: Session.mini-player ? 8px : 12px;
                 spacing: Session.mini-player ? 4px : 8px;
@@ -430,11 +427,8 @@ component EffectsVolumeButton inherits IconButton {
         height: layout.preferred-height;
         x: root.width - self.width;
         y: -self.height - 8px;
-        Rectangle {
-            background: Theme.raised;
-            border-radius: Theme.radius-row;
-            border-width: 1px;
-            border-color: Theme.raised-edge;
+        PopupSurface {
+            rises: true;
             layout := VerticalLayout {
                 padding: 12px;
                 spacing: 8px;
@@ -767,11 +761,7 @@ component SoundsButton inherits Rectangle {
         height: min(panel.preferred-height, Theme.mini-player-height-min - 2 * root.popover-margin);
         x: -self.width - root.popover-margin;
         y: root.popover-margin - root.absolute-position.y;
-        Rectangle {
-            background: Theme.raised;
-            border-radius: Theme.radius-row;
-            border-width: 1px;
-            border-color: Theme.raised-edge;
+        PopupSurface {
             panel := VerticalLayout {
                 padding: root.popover-padding;
                 spacing: 4px;

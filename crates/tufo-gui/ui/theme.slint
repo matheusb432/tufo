@@ -156,6 +156,9 @@ export global Motion {
     out property <duration> presence-exit: 120ms;
     out property <easing> presence-easing: cubic-bezier(0.2, 0, 0, 1);
     out property <length> presence-rise: 12px;
+    // A menu or popover settling out of its anchor as it opens.
+    out property <duration> popup-enter: 160ms;
+    out property <length> popup-travel: 6px;
     // How far below its resting place a surface at a `Presence`'s `progress` sits.
     public pure function presence-sink(progress: float) -> length {
         (1 - progress) * root.presence-rise

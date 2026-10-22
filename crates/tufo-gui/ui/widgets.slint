@@ -564,6 +564,7 @@ export component MenuItem inherits Rectangle {
     height: 38px;
     border-radius: Theme.radius-small;
     background: root.enabled && (touch.has-hover || root.highlighted) ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
     accessible-role: button;
     accessible-label: root.text;
     accessible-enabled: root.enabled;
@@ -593,14 +594,49 @@ export component MenuItem inherits Rectangle {
     }
 }
 
-export component MenuSurface inherits Rectangle {
-    background: Theme.raised;
-    border-radius: Theme.radius-row + 2px;
-    border-width: 1px;
-    border-color: Theme.raised-edge;
-    min-width: 160px;
-    VerticalLayout {
-        padding: 6px;
-        @children
+// A popup's raised surface, which fades in and settles out of its anchor as its `PopupWindow`
+// shows it. Slint mounts a popup's content on `show()` and removes it on `close()`, so only the
+// arrival can animate. The root stays still and transparent to keep the content's size: Slint
+// wraps an element given `opacity` in another, which a popup's root can't size around.
+export component PopupSurface inherits Rectangle {
+    // Opens above its anchor, so it settles downward.
+    in property <bool> rises;
+    in property <length> content-padding;
+    property <bool> arrived;
+    property <float> arrival: root.arrived ? 1 : 0;
+    animate arrival {
+        duration: Motion.popup-enter;
+        easing: Motion.presence-easing;
     }
+    init => {
+        // A change before `arrival` was ever read wouldn't animate, so read it first.
+        if root.arrival == 0 {
+            root.arrived = true;
+        }
+    }
+    min-width: content.min-width;
+    min-height: content.min-height;
+    preferred-width: content.preferred-width;
+    preferred-height: content.preferred-height;
+    border-radius: Theme.radius-row;
+    Rectangle {
+        y: (1 - root.arrival) * (root.rises ? Motion.popup-travel : -Motion.popup-travel);
+        width: parent.width;
+        height: parent.height;
+        opacity: root.arrival;
+        background: Theme.raised;
+        border-radius: root.border-radius;
+        border-width: 1px;
+        border-color: Theme.raised-edge;
+        content := VerticalLayout {
+            padding: root.content-padding;
+            @children
+        }
+    }
+}
+
+export component MenuSurface inherits PopupSurface {
+    border-radius: Theme.radius-row + 2px;
+    min-width: 160px;
+    content-padding: 6px;
 }
