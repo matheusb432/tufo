@@ -8,13 +8,26 @@ discord-bench mode="":
 stress voice="" minutes="10" music="" sounds="":
     #!/usr/bin/env bash
     set -euo pipefail
+    target="${CARGO_TARGET_DIR:-target}/release"
+    if [[ -z "{{ voice }}" ]]; then
+        [[ -z "{{ music }}{{ sounds }}" ]] || { echo "local stress uses generated fixtures; use just stress or the audio-stability harness" >&2; exit 1; }
+        if [[ -z "${TUFO_STRESS_BINARIES:-}" ]]; then
+            cargo build --release -j "${CARGO_BUILD_JOBS:-2}" -p tufo-server -p tufo-cli
+        fi
+        artifacts="${TUFO_STRESS_ARTIFACTS:-.artifacts/audio-stability/$(date -u +%Y%m%dT%H%M%S)-$$}"
+        baseline=()
+        if [[ -n "${TUFO_STRESS_BASELINE:-}" ]]; then baseline=(--baseline "$TUFO_STRESS_BASELINE"); fi
+        exec dbus-run-session -- python3 scripts/audio-stability/check.py \
+            --binaries "${TUFO_STRESS_BINARIES:-$target}" --duration-seconds "$(({{ minutes }} * 60))" \
+            --async-mode "${TUFO_STRESS_ASYNC:-false}" --cpus "${TUFO_STRESS_CPUS:-2,3}" \
+            --phase "${TUFO_STRESS_PHASE:-all}" --artifacts "$artifacts" "${baseline[@]}"
+    fi
     [[ -n "{{ music }}" ]] || { echo "pass a music folder: just stress <voice> <minutes> <music> [sounds]" >&2; exit 1; }
     command -v stress-ng >/dev/null || { echo "stress-ng is missing: sudo apt install stress-ng" >&2; exit 1; }
     command -v pw-cli >/dev/null || { echo "pw-cli is missing; the run plays into a PipeWire sink" >&2; exit 1; }
     command -v systemd-run >/dev/null || { echo "systemd-run is missing; it bounds the load's CPU, memory, and swap" >&2; exit 1; }
-    cargo build --release -p tufo-server
-    cargo build --release -p tufo-client --example stress_workload
-    target="${CARGO_TARGET_DIR:-target}/release"
+    cargo build --release -j "${CARGO_BUILD_JOBS:-2}" -p tufo-server
+    cargo build --release -j "${CARGO_BUILD_JOBS:-2}" -p tufo-client --example stress_workload
     run="$(mktemp -d)"
     sink="tufo-stress-$$"
     load_unit="tufo-stress-$$.scope"

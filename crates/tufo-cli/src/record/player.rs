@@ -5,7 +5,9 @@ use tufo_models::{
     playback::{
         OutputTarget,
         browser::{BrowserPlayback, BrowserStatus, BrowserStopReason},
-        diagnostics::{PlayerDiagnostics, VoicePacing},
+        diagnostics::{
+            AudioMemoryDiagnostics, LocalCallbackDiagnostics, PlayerDiagnostics, VoicePacing,
+        },
         local_output::{
             LocalOutputFailure, LocalOutputFailureReason, LocalOutputIdentity, LocalOutputState,
         },
@@ -182,6 +184,43 @@ pub(crate) fn diagnostics(value: &PlayerDiagnostics) -> Value {
         "browser_underrun_frames": value.browser_underrun_frames,
         "browser_dropped_frames": value.browser_dropped_frames,
         "voice_pacing": value.voice_pacing.as_ref().map(voice_pacing),
+        "local_callbacks": value.local_callbacks.as_ref().map(local_callbacks),
+        "audio_memory": value.audio_memory.as_ref().map(audio_memory),
+    })
+}
+
+fn local_callbacks(value: &LocalCallbackDiagnostics) -> Value {
+    let millis = |duration: std::time::Duration| duration.as_secs_f64() * 1_000.0;
+    json!({
+        "session_started_at_unix_ms": value.session_started_at_unix_ms,
+        "sampled_at_ms": millis(value.sampled_at),
+        "streams_created": value.streams_created,
+        "latest_stream_id": value.latest_stream_id,
+        "callbacks": value.callbacks,
+        "sample_rate": value.sample_rate,
+        "callback_frames_last": value.callback_frames_last,
+        "callback_frames_min": value.callback_frames_min,
+        "callback_frames_max": value.callback_frames_max,
+        "callback_gap_p99_ms": millis(value.callback_gap_p99),
+        "callback_gap_max_ms": millis(value.callback_gap_max),
+        "render_duration_p99_ms": millis(value.render_duration_p99),
+        "render_duration_max_ms": millis(value.render_duration_max),
+        "late_callbacks": value.late_callbacks,
+        "render_over_budget": value.render_over_budget,
+        "first_anomaly_at_ms": value.first_anomaly_at.map(millis),
+        "latest_anomaly_at_ms": value.latest_anomaly_at.map(millis),
+        "playback_lead_ms": value.playback_lead.map(millis),
+    })
+}
+
+fn audio_memory(value: &AudioMemoryDiagnostics) -> Value {
+    json!({
+        "bytes_used": value.bytes_used,
+        "bytes_max": value.bytes_max,
+        "locked_bytes": value.locked_bytes,
+        "lock_failures": value.lock_failures,
+        "lock_failed_bytes": value.lock_failed_bytes,
+        "locking_supported": value.locking_supported,
     })
 }
 
@@ -263,6 +302,32 @@ mod tests {
     };
 
     use super::*;
+
+    #[test]
+    fn callback_records_keep_precision_session_identity_and_optional_anomalies() {
+        let record = diagnostics(&PlayerDiagnostics {
+            local_callbacks: Some(LocalCallbackDiagnostics {
+                session_started_at_unix_ms: 1234,
+                render_duration_p99: Duration::from_micros(50),
+                latest_anomaly_at: Some(Duration::from_micros(1500)),
+                ..LocalCallbackDiagnostics::default()
+            }),
+            audio_memory: Some(AudioMemoryDiagnostics {
+                locked_bytes: 4096,
+                locking_supported: true,
+                ..AudioMemoryDiagnostics::default()
+            }),
+            ..PlayerDiagnostics::default()
+        });
+        assert_eq!(
+            record["local_callbacks"]["session_started_at_unix_ms"],
+            1234
+        );
+        assert_eq!(record["local_callbacks"]["render_duration_p99_ms"], 0.05);
+        assert_eq!(record["local_callbacks"]["latest_anomaly_at_ms"], 1.5);
+        assert!(record["local_callbacks"]["first_anomaly_at_ms"].is_null());
+        assert_eq!(record["audio_memory"]["locked_bytes"], 4096);
+    }
 
     #[test]
     fn diagnostics_keep_submillisecond_voice_lateness() -> anyhow::Result<()> {

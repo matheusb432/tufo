@@ -10,7 +10,7 @@ use tufo_application::playback::{
 use tufo_models::{
     library::{CollectionEntryId, Volume, song_loop::LoopRegion},
     playback::{
-        music_layers::{MUSIC_LAYERS_EXTRA_MAX, MusicLayerState},
+        music_layers::{MUSIC_LAYERS_EXTRA_MAX, MUSIC_LAYERS_MAX, MusicLayerState},
         player_state::{MusicState, PositionSample},
         queue::{MusicQueue, QueueStart},
     },
@@ -19,11 +19,12 @@ use tufo_wire::player::UpdateMusicLayer;
 
 use super::{
     ANTI_CLICK_FADE, Engine, EnginePlayer, MusicTrack, PAUSE_FADE, RESTORE_FADE_IN, STOP_FADE,
-    TrackSource, TrackStart, open_track, outputs::AudioOutputs, probe_track, shuffle_seed,
-    start_position,
+    TrackSource, TrackStart, open_track, open_track_cancellable, outputs::AudioOutputs,
+    probe_track, shuffle_seed, start_position,
 };
 use crate::audio::{
     buffered_track::DecodeOptions,
+    memory::PreparationCancellation,
     music_deck::{DeckState, DeckTrack, MusicDeckHandle},
 };
 
@@ -73,22 +74,26 @@ impl MusicLayer {
 
 impl<O: AudioOutputs> EnginePlayer<O> {
     pub(super) async fn add_layer(&self, cue: MusicLayerCue) -> Result<(), AddMusicLayerError> {
-        let file = probe_track(cue.entry.path.clone()).await?;
+        let cancellation = PreparationCancellation::default();
+        let _cancel_on_drop = super::sounds::CancelPreparation::new(cancellation.clone());
         let mut engine = self.engine.lock().await;
-        if engine
-            .music
-            .as_ref()
-            .is_some_and(|music| music.queue.current().entry_id == cue.entry.entry_id)
-            || engine
-                .music_layers
-                .iter()
-                .any(|(_, layer)| layer.entry_id() == cue.entry.entry_id)
-        {
+        if !engine.register_layer_preparation(&cue, cancellation.clone())? {
             return Ok(());
         }
-        if engine.music.is_some() && engine.music_layers.len() == MUSIC_LAYERS_EXTRA_MAX {
-            return Err(AddMusicLayerError::Full);
+        let entry_id = cue.entry.entry_id;
+        drop(engine);
+        let file = probe_track(cue.entry.path.clone(), cancellation.clone()).await;
+        let mut engine = self.engine.lock().await;
+        if cancellation.is_cancelled() {
+            return Ok(());
         }
+        let file = match file {
+            Ok(file) => file,
+            Err(error) => {
+                engine.layer_preparations.remove(&entry_id);
+                return Err(error.into());
+            }
+        };
         self.ensure_output(&mut engine).await?;
         let sample_rate = engine
             .output
@@ -97,16 +102,33 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             .mixer
             .sample_rate();
         let loop_region = self.song_loops.loop_region(cue.entry.audio_file_id);
-        let becomes_main_track = engine.music.is_none();
+        let becomes_main_track = engine.music.is_none() && engine.planned_queue.is_none();
         let looping = becomes_main_track && engine.main_track_loops(loop_region);
         let options = DecodeOptions {
             start_position: start_position(loop_region),
             looping,
             loop_region,
         };
-        // Keep admission and installation together; only decoder workers touch the file.
-        let opened = open_track(TrackSource::Open(file), sample_rate, options).await?;
-        if becomes_main_track {
+        let output_generation = engine.output_generation;
+        engine.prepare_track_memory(sample_rate);
+        drop(engine);
+        let opened = open_track_cancellable(
+            TrackSource::Open(file),
+            sample_rate,
+            options,
+            cancellation.clone(),
+        )
+        .await;
+        let mut engine = self.engine.lock().await;
+        if cancellation.is_cancelled() {
+            return Ok(());
+        }
+        engine.layer_preparations.remove(&entry_id);
+        if engine.output_generation != output_generation {
+            return Ok(());
+        }
+        let opened = opened?;
+        if engine.music.is_none() && engine.planned_queue.is_none() {
             let queue = MusicQueue::new(
                 QueueStart {
                     collection_id: cue.collection_id,
@@ -117,12 +139,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
                 shuffle_seed(),
             )
             .map_err(PlayQueueError::from)?;
-            let paused = engine
-                .music_layers
-                .iter()
-                .next()
-                .is_some_and(|(_, layer)| layer.paused);
-            engine.music_generation += 1;
+            let paused = engine.music_paused;
+            engine.invalidate_music_preparation();
             Self::install_music_track(
                 &mut engine,
                 queue,
@@ -225,6 +243,57 @@ fn start_deck(
 }
 
 impl Engine {
+    pub(super) fn reconcile_music_pause_intent(&mut self) {
+        if let Some(music) = &self.music {
+            self.music_paused = music.paused;
+        } else if let Some((_, layer)) = self.music_layers.iter().next() {
+            self.music_paused = layer.paused;
+        } else if !self
+            .layer_preparations
+            .values()
+            .any(|request| !request.is_cancelled())
+        {
+            self.music_paused = false;
+        }
+    }
+
+    fn register_layer_preparation(
+        &mut self,
+        cue: &MusicLayerCue,
+        cancellation: PreparationCancellation,
+    ) -> Result<bool, AddMusicLayerError> {
+        self.reap_cancelled_music_preparation();
+        self.layer_preparations
+            .retain(|_, request| !request.is_cancelled());
+        if self.music.is_none()
+            && self.music_layers.is_empty()
+            && self.planned_queue.is_none()
+            && self.layer_preparations.is_empty()
+        {
+            self.music_paused = false;
+        }
+        let entry_id = cue.entry.entry_id;
+        if self
+            .upcoming_queue()
+            .is_some_and(|queue| queue.current().entry_id == entry_id)
+            || self
+                .music_layers
+                .iter()
+                .any(|(_, layer)| layer.entry_id() == entry_id)
+            || self.layer_preparations.contains_key(&entry_id)
+        {
+            return Ok(false);
+        }
+        let main_reserved = self.music.is_some() || self.planned_queue.is_some();
+        if usize::from(main_reserved) + self.music_layers.len() + self.layer_preparations.len()
+            >= MUSIC_LAYERS_MAX
+        {
+            return Err(AddMusicLayerError::Full);
+        }
+        self.layer_preparations.insert(entry_id, cancellation);
+        Ok(true)
+    }
+
     fn layer_deck(
         &mut self,
         slot: usize,
@@ -233,6 +302,9 @@ impl Engine {
     }
 
     pub(super) fn stop_layer(&mut self, entry_id: CollectionEntryId) {
+        if let Some(preparation) = self.layer_preparations.remove(&entry_id) {
+            preparation.cancel();
+        }
         let slot = self
             .music_layers
             .iter()
@@ -267,7 +339,8 @@ impl Engine {
         opened: super::OpenedTrack,
         loop_region: Option<LoopRegion>,
     ) -> Result<(), AddMusicLayerError> {
-        let paused = self.music.as_ref().is_some_and(|music| music.paused);
+        let paused = self.music_paused;
+        opened.track.handle.set_looping(false);
         let token = self.next_token();
         let track = MusicTrack {
             token,
@@ -314,8 +387,15 @@ impl Engine {
     }
 
     pub(super) fn stop_layers(&mut self) {
+        self.cancel_layer_preparations();
         for slot in 0..MUSIC_LAYERS_EXTRA_MAX {
             self.remove_layer(slot);
+        }
+    }
+
+    pub(super) fn cancel_layer_preparations(&mut self) {
+        for preparation in std::mem::take(&mut self.layer_preparations).into_values() {
+            preparation.cancel();
         }
     }
 
@@ -366,6 +446,7 @@ impl Engine {
     }
 
     pub(super) fn suspend_layers(&mut self) {
+        self.cancel_layer_preparations();
         let mut retired = 0;
         for (_, layer) in self.music_layers.iter_mut() {
             layer.track.start_offset = layer.position();

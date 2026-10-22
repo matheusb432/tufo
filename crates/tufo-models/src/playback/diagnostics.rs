@@ -11,7 +11,7 @@ pub struct PlayerDiagnostics {
     pub sound_underrun_frames: u64,
     /// Local output stream errors reported by CPAL, across output changes.
     pub local_stream_errors: u64,
-    /// Local stream errors lost when CPAL or Kira's error queues filled.
+    /// Local stream errors lost when Tufo's bounded error queue filled.
     pub local_stream_errors_discarded: u64,
     /// Frames of silence browser audio inserted because a page's packets arrived late.
     pub browser_underrun_frames: u64,
@@ -20,6 +20,52 @@ pub struct PlayerDiagnostics {
     pub browser_dropped_frames: u64,
     /// How late songbird ran its 20 ms voice ticks, absent without Discord.
     pub voice_pacing: Option<VoicePacing>,
+    /// Callback observations across local output changes; these are not backend xrun counts.
+    pub local_callbacks: Option<LocalCallbackDiagnostics>,
+    pub audio_memory: Option<AudioMemoryDiagnostics>,
+}
+
+/// Process-wide prepared audio memory and best-effort residency protection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct AudioMemoryDiagnostics {
+    pub bytes_used: u64,
+    pub bytes_max: u64,
+    pub locked_bytes: u64,
+    pub lock_failures: u64,
+    pub lock_failed_bytes: u64,
+    pub locking_supported: bool,
+}
+
+/// Bounded measurements on the local rendering thread, retained across stream replacement.
+/// Percentiles are histogram bucket upper bounds, capped at the observed maximum.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct LocalCallbackDiagnostics {
+    pub session_started_at_unix_ms: u64,
+    pub sampled_at: Duration,
+    /// Includes a stream creation whose native open subsequently fails.
+    pub streams_created: u64,
+    /// The most recent stream to finish a callback, numbered from one.
+    pub latest_stream_id: u64,
+    /// Completed callbacks containing at least one audio frame.
+    pub callbacks: u64,
+    /// Rate of the most recent callback; frame bounds span all streams.
+    pub sample_rate: u32,
+    pub callback_frames_last: u32,
+    pub callback_frames_min: u32,
+    pub callback_frames_max: u32,
+    pub callback_gap_p99: Duration,
+    pub callback_gap_max: Duration,
+    pub render_duration_p99: Duration,
+    pub render_duration_max: Duration,
+    /// Gaps greater than 1.5 frame periods, excluding quantum changes and empty callbacks.
+    pub late_callbacks: u64,
+    /// Rendering took longer than the current callback's frame duration.
+    pub render_over_budget: u64,
+    /// Time since this diagnostics session began, absent until an anomaly is observed.
+    pub first_anomaly_at: Option<Duration>,
+    pub latest_anomaly_at: Option<Duration>,
+    /// Last nonnegative playback-minus-callback timestamp reported by CPAL.
+    pub playback_lead: Option<Duration>,
 }
 
 /// How late songbird's mixer thread ran its 20 ms ticks, against an ideal grid.

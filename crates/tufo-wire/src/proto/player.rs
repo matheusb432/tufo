@@ -10,7 +10,9 @@ use tufo_models::{
     playback::{
         AudioFilePath, OutputTarget,
         browser::{BrowserPlayback, BrowserStatus, BrowserStopReason},
-        diagnostics::{PlayerDiagnostics, VoicePacing},
+        diagnostics::{
+            AudioMemoryDiagnostics, LocalCallbackDiagnostics, PlayerDiagnostics, VoicePacing,
+        },
         music_layers::{MusicLayerState, MusicLayers},
         player_state::{
             ActiveSound, CrossfadeDuration, MusicState, PlayerState, PositionSample,
@@ -183,6 +185,17 @@ pub fn diagnostics_response(diagnostics: &PlayerDiagnostics) -> pb::GetPlayerDia
             local_stream_errors_discarded: diagnostics.local_stream_errors_discarded,
             browser_underrun_frames: diagnostics.browser_underrun_frames,
             browser_dropped_frames: diagnostics.browser_dropped_frames,
+            local_callbacks: diagnostics.local_callbacks.map(local_callbacks_message),
+            audio_memory: diagnostics
+                .audio_memory
+                .map(|memory| pb::AudioMemoryDiagnostics {
+                    bytes_used: memory.bytes_used,
+                    bytes_max: memory.bytes_max,
+                    locked_bytes: memory.locked_bytes,
+                    lock_failures: memory.lock_failures,
+                    lock_failed_bytes: memory.lock_failed_bytes,
+                    locking_supported: memory.locking_supported,
+                }),
             voice_pacing: diagnostics.voice_pacing.map(|pacing| pb::VoicePacing {
                 ticks: pacing.ticks,
                 late_ticks: pacing.late_ticks,
@@ -193,6 +206,29 @@ pub fn diagnostics_response(diagnostics: &PlayerDiagnostics) -> pb::GetPlayerDia
                 lateness_max: Some(duration_message(pacing.lateness_max)),
             }),
         }),
+    }
+}
+
+fn local_callbacks_message(callbacks: LocalCallbackDiagnostics) -> pb::LocalCallbackDiagnostics {
+    pb::LocalCallbackDiagnostics {
+        session_started_at_unix_ms: callbacks.session_started_at_unix_ms,
+        sampled_at: Some(duration_message(callbacks.sampled_at)),
+        streams_created: callbacks.streams_created,
+        latest_stream_id: callbacks.latest_stream_id,
+        callbacks: callbacks.callbacks,
+        sample_rate: callbacks.sample_rate,
+        callback_frames_last: callbacks.callback_frames_last,
+        callback_frames_min: callbacks.callback_frames_min,
+        callback_frames_max: callbacks.callback_frames_max,
+        callback_gap_p99: Some(duration_message(callbacks.callback_gap_p99)),
+        callback_gap_max: Some(duration_message(callbacks.callback_gap_max)),
+        render_duration_p99: Some(duration_message(callbacks.render_duration_p99)),
+        render_duration_max: Some(duration_message(callbacks.render_duration_max)),
+        late_callbacks: callbacks.late_callbacks,
+        render_over_budget: callbacks.render_over_budget,
+        first_anomaly_at: callbacks.first_anomaly_at.map(duration_message),
+        latest_anomaly_at: callbacks.latest_anomaly_at.map(duration_message),
+        playback_lead: callbacks.playback_lead.map(duration_message),
     }
 }
 
@@ -326,10 +362,13 @@ pub fn player_state(response: pb::WatchPlayerResponse) -> Result<PlayerState, In
 }
 
 pub fn player_diagnostics(
-    response: pb::GetPlayerDiagnosticsResponse,
+    response: &pb::GetPlayerDiagnosticsResponse,
 ) -> Result<PlayerDiagnostics, InvalidMessage> {
     let invalid = |field| InvalidMessage { field };
-    let diagnostics = response.diagnostics.ok_or(invalid("diagnostics"))?;
+    let diagnostics = response
+        .diagnostics
+        .as_ref()
+        .ok_or(invalid("diagnostics"))?;
     let lateness = |value: Option<prost_types::Duration>| {
         value
             .and_then(duration_value)
@@ -337,6 +376,7 @@ pub fn player_diagnostics(
     };
     let voice_pacing = diagnostics
         .voice_pacing
+        .as_ref()
         .map(|pacing| {
             Ok::<_, InvalidMessage>(VoicePacing {
                 ticks: pacing.ticks,
@@ -356,7 +396,59 @@ pub fn player_diagnostics(
         local_stream_errors_discarded: diagnostics.local_stream_errors_discarded,
         browser_underrun_frames: diagnostics.browser_underrun_frames,
         browser_dropped_frames: diagnostics.browser_dropped_frames,
+        local_callbacks: diagnostics
+            .local_callbacks
+            .as_ref()
+            .map(local_callbacks_value)
+            .transpose()?,
+        audio_memory: diagnostics
+            .audio_memory
+            .as_ref()
+            .map(|memory| AudioMemoryDiagnostics {
+                bytes_used: memory.bytes_used,
+                bytes_max: memory.bytes_max,
+                locked_bytes: memory.locked_bytes,
+                lock_failures: memory.lock_failures,
+                lock_failed_bytes: memory.lock_failed_bytes,
+                locking_supported: memory.locking_supported,
+            }),
         voice_pacing,
+    })
+}
+
+fn local_callbacks_value(
+    callbacks: &pb::LocalCallbackDiagnostics,
+) -> Result<LocalCallbackDiagnostics, InvalidMessage> {
+    let invalid = || InvalidMessage {
+        field: "local_callbacks",
+    };
+    let required = |duration: Option<prost_types::Duration>| {
+        duration.and_then(duration_value).ok_or_else(invalid)
+    };
+    let optional = |duration: Option<prost_types::Duration>| {
+        duration
+            .map(|duration| duration_value(duration).ok_or_else(invalid))
+            .transpose()
+    };
+    Ok(LocalCallbackDiagnostics {
+        session_started_at_unix_ms: callbacks.session_started_at_unix_ms,
+        sampled_at: required(callbacks.sampled_at)?,
+        streams_created: callbacks.streams_created,
+        latest_stream_id: callbacks.latest_stream_id,
+        callbacks: callbacks.callbacks,
+        sample_rate: callbacks.sample_rate,
+        callback_frames_last: callbacks.callback_frames_last,
+        callback_frames_min: callbacks.callback_frames_min,
+        callback_frames_max: callbacks.callback_frames_max,
+        callback_gap_p99: required(callbacks.callback_gap_p99)?,
+        callback_gap_max: required(callbacks.callback_gap_max)?,
+        render_duration_p99: required(callbacks.render_duration_p99)?,
+        render_duration_max: required(callbacks.render_duration_max)?,
+        late_callbacks: callbacks.late_callbacks,
+        render_over_budget: callbacks.render_over_budget,
+        first_anomaly_at: optional(callbacks.first_anomaly_at)?,
+        latest_anomaly_at: optional(callbacks.latest_anomaly_at)?,
+        playback_lead: optional(callbacks.playback_lead)?,
     })
 }
 
@@ -607,12 +699,65 @@ mod tests {
             browser_underrun_frames: 5,
             browser_dropped_frames: 6,
             voice_pacing: None,
+            local_callbacks: Some(LocalCallbackDiagnostics {
+                session_started_at_unix_ms: 123,
+                sampled_at: Duration::from_secs(2),
+                streams_created: 3,
+                latest_stream_id: 2,
+                callbacks: 4,
+                sample_rate: 48_000,
+                callback_frames_last: 512,
+                callback_frames_min: 256,
+                callback_frames_max: 1024,
+                callback_gap_p99: Duration::from_millis(12),
+                callback_gap_max: Duration::from_millis(20),
+                render_duration_p99: Duration::from_micros(50),
+                render_duration_max: Duration::from_micros(70),
+                late_callbacks: 1,
+                render_over_budget: 0,
+                first_anomaly_at: Some(Duration::from_millis(500)),
+                latest_anomaly_at: Some(Duration::from_secs(1)),
+                playback_lead: Some(Duration::from_millis(30)),
+            }),
+            audio_memory: Some(AudioMemoryDiagnostics {
+                bytes_used: 2048,
+                bytes_max: 4096,
+                locked_bytes: 1024,
+                lock_failures: 1,
+                lock_failed_bytes: 1024,
+                locking_supported: true,
+            }),
         };
 
         assert_eq!(
-            player_diagnostics(diagnostics_response(&diagnostics)).unwrap(),
+            player_diagnostics(&diagnostics_response(&diagnostics)).unwrap(),
             diagnostics
         );
+    }
+
+    #[test]
+    fn diagnostics_accept_older_servers_and_reject_malformed_callback_times() {
+        let default = PlayerDiagnostics::default();
+        assert_eq!(
+            player_diagnostics(&diagnostics_response(&default)).unwrap(),
+            default
+        );
+        let mut response = diagnostics_response(&PlayerDiagnostics {
+            local_callbacks: Some(LocalCallbackDiagnostics::default()),
+            ..PlayerDiagnostics::default()
+        });
+        response
+            .diagnostics
+            .as_mut()
+            .unwrap()
+            .local_callbacks
+            .as_mut()
+            .unwrap()
+            .first_anomaly_at = Some(prost_types::Duration {
+            seconds: -1,
+            nanos: 0,
+        });
+        assert!(player_diagnostics(&response).is_err());
     }
 
     #[test]

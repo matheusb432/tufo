@@ -396,13 +396,50 @@ message PlayerDiagnostics {
   uint64 sound_underrun_frames = 3;
   // Local output stream errors reported by CPAL, across output changes.
   uint64 local_stream_errors = 4;
-  // Local stream errors lost when CPAL or Kira's error queues filled.
+  // Local stream errors lost when Tufo's bounded error queue filled.
   uint64 local_stream_errors_discarded = 5;
   // Frames of silence browser audio inserted because a page's packets arrived late.
   uint64 browser_underrun_frames = 6;
   // Browser frames discarded because they arrived faster than the output played them, or while
   // the output changed.
   uint64 browser_dropped_frames = 7;
+  // Callback observations, distinct from backend xrun counts. Absent on older servers.
+  optional LocalCallbackDiagnostics local_callbacks = 8;
+  optional AudioMemoryDiagnostics audio_memory = 9;
+}
+
+// Local rendering-thread observations retained across stream replacements.
+message LocalCallbackDiagnostics {
+  uint64 session_started_at_unix_ms = 1;
+  google.protobuf.Duration sampled_at = 2;
+  uint64 streams_created = 3;
+  uint64 latest_stream_id = 4;
+  uint64 callbacks = 5;
+  uint32 sample_rate = 6;
+  uint32 callback_frames_last = 7;
+  uint32 callback_frames_min = 8;
+  uint32 callback_frames_max = 9;
+  google.protobuf.Duration callback_gap_p99 = 10;
+  google.protobuf.Duration callback_gap_max = 11;
+  google.protobuf.Duration render_duration_p99 = 12;
+  google.protobuf.Duration render_duration_max = 13;
+  // Start gaps exceeding 1.5 frame periods, excluding quantum changes and empty callbacks.
+  uint64 late_callbacks = 14;
+  // Rendering took longer than the current callback's frame duration.
+  uint64 render_over_budget = 15;
+  optional google.protobuf.Duration first_anomaly_at = 16;
+  optional google.protobuf.Duration latest_anomaly_at = 17;
+  optional google.protobuf.Duration playback_lead = 18;
+}
+
+// Prepared audio memory and best-effort residency protection.
+message AudioMemoryDiagnostics {
+  uint64 bytes_used = 1;
+  uint64 bytes_max = 2;
+  uint64 locked_bytes = 3;
+  uint64 lock_failures = 4;
+  uint64 lock_failed_bytes = 5;
+  bool locking_supported = 6;
 }
 
 // How late songbird ran its 20 ms voice ticks.

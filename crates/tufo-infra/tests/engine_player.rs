@@ -71,6 +71,280 @@ use uuid::Uuid;
 
 mod support;
 
+async fn hold_native_preparation() -> anyhow::Result<(mpsc::Sender<()>, tokio::task::JoinHandle<()>)>
+{
+    let (entered, waiting) = oneshot::channel();
+    let (release, released) = mpsc::channel();
+    let blocker = tokio::task::spawn_blocking(move || {
+        let _ = entered.send(());
+        let _ = released.recv_timeout(WAIT_TIMEOUT);
+    });
+    waiting.await?;
+    Ok((release, blocker))
+}
+
+async fn register_pending<F: Future>(mut request: std::pin::Pin<&mut F>) {
+    // The current-thread runtime holds its only blocking worker, so this poll registers intent
+    // before the native probe can complete.
+    std::future::poll_fn(|context| {
+        assert!(request.as_mut().poll(context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+}
+
+#[test]
+fn a_failed_or_cancelled_first_layer_does_not_pause_the_next_fresh_layer() -> anyhow::Result<()> {
+    tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(1)
+        .enable_all()
+        .build()?
+        .block_on(async {
+            for cancel in [false, true] {
+                let rig = Rig::start()?;
+                let (release, blocker) = hold_native_preparation().await?;
+                let missing =
+                    AudioFilePath::try_new(rig.directory.path().join("missing-layer.wav"))?;
+                let mut pending = Box::pin(rig.player.add_music_layer(layer(missing, "Missing")));
+                register_pending(pending.as_mut()).await;
+                rig.control(MusicCommand::Pause).await?;
+                if cancel {
+                    drop(pending);
+                    release.send(())?;
+                } else {
+                    release.send(())?;
+                    assert!(pending.await.is_err());
+                }
+                blocker.await?;
+                rig.player
+                    .add_music_layer(layer(
+                        rig.file("fresh.wav", &constant(0.1, THREE_SECONDS))?,
+                        "Fresh",
+                    ))
+                    .await?;
+                assert!(
+                    !rig.state()
+                        .music
+                        .context("the fresh layer becomes the main track")?
+                        .paused
+                );
+            }
+            Ok(())
+        })
+}
+
+async fn prepare_first_music(
+    player: &impl Player,
+    cue: MusicLayerCue,
+    main: bool,
+) -> anyhow::Result<()> {
+    if main {
+        player
+            .play_queue(QueueStart {
+                collection_id: cue.collection_id,
+                entries: vec![cue.entry],
+                start_index: 0,
+            })
+            .await?;
+    } else {
+        player.add_music_layer(cue).await?;
+    }
+    Ok(())
+}
+
+#[test]
+fn a_new_layer_preserves_pause_for_another_pending_main_or_layer() -> anyhow::Result<()> {
+    tokio::runtime::Builder::new_current_thread()
+        .max_blocking_threads(1)
+        .enable_all()
+        .build()?
+        .block_on(async {
+            for main in [false, true] {
+                let rig = Rig::start()?;
+                let (release, blocker) = hold_native_preparation().await?;
+                let first = layer(
+                    rig.file("first.wav", &constant(0.1, THREE_SECONDS))?,
+                    "First",
+                );
+                let second = layer(
+                    rig.file("second.wav", &constant(0.1, THREE_SECONDS))?,
+                    "Second",
+                );
+                let mut first = Box::pin(prepare_first_music(rig.player.as_ref(), first, main));
+                register_pending(first.as_mut()).await;
+                rig.control(MusicCommand::Pause).await?;
+                let mut second = Box::pin(rig.player.add_music_layer(second));
+                register_pending(second.as_mut()).await;
+                release.send(())?;
+                let (first, second) = tokio::join!(first, second);
+                first?;
+                second?;
+                blocker.await?;
+                let state = rig.state();
+                assert!(
+                    state
+                        .music
+                        .context("the first request becomes the main track")?
+                        .paused
+                );
+                assert_eq!(state.music_layers.len(), 1);
+                assert!(
+                    state
+                        .music_layers
+                        .iter()
+                        .all(|(_, layer)| layer.music.paused)
+                );
+            }
+            Ok(())
+        })
+}
+
+#[tokio::test]
+async fn concurrent_initial_layers_fill_the_main_and_two_extra_slots() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let first = layer(
+        rig.file("first.wav", &constant(0.1, THREE_SECONDS))?,
+        "First",
+    );
+    let second = layer(
+        rig.file("second.wav", &constant(0.1, THREE_SECONDS))?,
+        "Second",
+    );
+    let third = layer(
+        rig.file("third.wav", &constant(0.1, THREE_SECONDS))?,
+        "Third",
+    );
+    let fourth = layer(
+        rig.file("fourth.wav", &constant(0.1, THREE_SECONDS))?,
+        "Fourth",
+    );
+    let (first, second, third) = tokio::join!(
+        rig.player.add_music_layer(first),
+        rig.player.add_music_layer(second),
+        rig.player.add_music_layer(third),
+    );
+    first?;
+    second?;
+    third?;
+    assert!(rig.state().music.is_some());
+    assert_eq!(rig.state().music_layers.len(), 2);
+    assert!(matches!(
+        rig.player.add_music_layer(fourth).await,
+        Err(AddMusicLayerError::Full)
+    ));
+    Ok(())
+}
+
+#[tokio::test]
+async fn cancelling_the_first_music_open_clears_pending_controls_and_allows_another_play()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let opening = rig.controls.hold_local_open();
+    let start = QueueStart {
+        collection_id: CollectionId::from_uuid(Uuid::now_v7()),
+        entries: vec![entry(
+            rig.file("cancelled.wav", &constant(0.1, THREE_SECONDS))?,
+            "Cancelled",
+        )],
+        start_index: 0,
+    };
+    let player = Arc::clone(&rig.player);
+    let pending = tokio::spawn(async move { player.play_queue(start).await });
+    tokio::time::timeout(WAIT_TIMEOUT, async {
+        while rig.controls.local_opens.load(Ordering::Relaxed) == 0 {
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+    })
+    .await?;
+    pending.abort();
+    assert!(pending.await.unwrap_err().is_cancelled());
+    assert_eq!(rig.state().local_output, LocalOutputState::Released);
+    drop(opening);
+    tokio::time::timeout(WAIT_TIMEOUT, async {
+        while !matches!(
+            rig.player.control_music(MusicCommand::Pause).await,
+            Err(ControlMusicError::NothingPlaying)
+        ) {
+            tokio::time::sleep(POLL_INTERVAL).await;
+        }
+    })
+    .await?;
+    rig.play(vec![entry(
+        rig.file("replacement.wav", &constant(0.1, THREE_SECONDS))?,
+        "Replacement",
+    )])
+    .await?;
+    assert_eq!(playing_title(&rig.state()), Some("Replacement"));
+    assert!(!rig.state().music.unwrap().paused);
+    Ok(())
+}
+
+#[tokio::test]
+async fn pausing_during_first_music_preparation_starts_the_track_paused() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let start = QueueStart {
+        collection_id: CollectionId::from_uuid(Uuid::now_v7()),
+        entries: vec![entry(
+            rig.file("paused.wav", &constant(0.25, THREE_SECONDS))?,
+            "Paused",
+        )],
+        start_index: 0,
+    };
+    let (played, paused) = tokio::join!(
+        rig.player.play_queue(start),
+        rig.player.control_music(MusicCommand::Pause)
+    );
+    played?;
+    paused?;
+    assert!(rig.state().music.unwrap().paused);
+    rig.wait_for_recorded_frames(0, 6_000).await?;
+    assert!(
+        rig.sound_card.captures()[0]
+            .iter()
+            .all(|sample| *sample == 0.0)
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_failed_music_replacement_keeps_later_layers_paused_with_the_surviving_track()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    rig.play(vec![entry(
+        rig.file("main.wav", &constant(0.1, THREE_SECONDS))?,
+        "Main",
+    )])
+    .await?;
+    rig.control(MusicCommand::Pause).await?;
+    let missing = AudioFilePath::try_new(rig.directory.path().join("missing.wav"))?;
+    let rejected = rig
+        .player
+        .play_queue(QueueStart {
+            collection_id: CollectionId::from_uuid(Uuid::now_v7()),
+            entries: vec![entry(missing, "Missing")],
+            start_index: 0,
+        })
+        .await;
+    assert!(rejected.is_err());
+    assert_eq!(playing_title(&rig.state()), Some("Main"));
+    assert!(rig.state().music.unwrap().paused);
+    rig.player
+        .add_music_layer(layer(
+            rig.file("layer.wav", &constant(0.1, THREE_SECONDS))?,
+            "Layer",
+        ))
+        .await?;
+    let state = rig.state();
+    assert_eq!(state.music_layers.len(), 1);
+    assert!(
+        state
+            .music_layers
+            .iter()
+            .all(|(_, layer)| layer.music.paused)
+    );
+    Ok(())
+}
+
 use support::{SAMPLE_RATE, constant, ramp, ramp_position_seconds, write_wav};
 
 const WAIT_TIMEOUT: Duration = Duration::from_secs(5);
@@ -2272,9 +2546,9 @@ fn a_delayed_preview_replacement_follows_the_old_loop_across_a_wrap() -> anyhow:
         .enable_all()
         .build()?;
     runtime.block_on(async {
-        // The longer loop cannot align within the 30 s ring after the old loop wraps;
-        // its rejected candidate must leave the old track playing until a retry can align.
-        for loop_end in [134_400, 1_920_000] {
+        // After the old loop wraps, the longer candidate cannot align within its 60 s ring.
+        // Preparation waits for a reachable position; a rejected candidate keeps the old audio.
+        for loop_end in [134_400, 3_840_000] {
             let rig = Rig::start()?;
             let frames = usize::try_from(loop_end)?.max(THREE_SECONDS);
             let song = rig.file("preview-ramp.wav", &ramp(frames))?;

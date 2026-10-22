@@ -18,7 +18,7 @@ use tufo_models::playback::local_output::{
     LocalOutputFailure, LocalOutputFailureReason, LocalOutputIdentity,
 };
 
-use super::LocalStreamErrors;
+use super::{LocalStreamErrors, callback_diagnostics::LocalCallbackCounters};
 
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(2);
 const STREAM_ERRORS_MAX: usize = 64;
@@ -27,6 +27,7 @@ pub(super) struct LocalBackendSettings {
     pub(super) device: Device,
     pub(super) config: StreamConfig,
     pub(super) identity: LocalOutputIdentity,
+    pub(super) callback_counters: Arc<LocalCallbackCounters>,
 }
 
 pub(super) struct LocalBackend {
@@ -78,11 +79,21 @@ impl Backend for LocalBackend {
         let callbacks = Arc::clone(&self.callbacks);
         let error_callbacks = Arc::clone(&self.callbacks);
         let config = settings.config;
+        let mut observer = settings.callback_counters.stream(config.sample_rate);
         let stream = settings.device.build_output_stream(
             config,
-            move |data: &mut [f32], _| {
+            move |data: &mut [f32], info| {
+                let started = Instant::now();
                 renderer.on_start_processing();
                 renderer.process(data, config.channels);
+                let finished = Instant::now();
+                let timestamp = info.timestamp();
+                let playback_lead = timestamp
+                    .playback
+                    .checked_duration_since(timestamp.callback);
+                let frames =
+                    u32::try_from(data.len() / usize::from(config.channels)).unwrap_or(u32::MAX);
+                observer.record(started, finished, frames, playback_lead);
                 callbacks.fetch_add(1, Ordering::Relaxed);
             },
             move |error| {

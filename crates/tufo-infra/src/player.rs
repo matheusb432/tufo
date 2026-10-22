@@ -30,14 +30,14 @@ use std::{
 use browser::BrowserSession;
 pub use browser::BrowserTimings;
 use layers::MusicLayer;
-use local_output::LocalReopens;
+use local_output::{InitialLocalOpen, LocalReopens};
 use music::{
-    Music, MusicTrack, OpenedTrack, TrackSource, open_track, play_audio_error, probe_track,
-    start_position,
+    Music, MusicTrack, OpenedTrack, TrackSource, open_track, open_track_cancellable,
+    play_audio_error, probe_track, start_position,
 };
 use outputs::{AudioOutputs, DeviceOutputs, OpenedOutput};
-use sounds::{FiredSound, volume_gain};
-use tokio::sync::{Mutex, mpsc::UnboundedSender, oneshot, watch};
+use sounds::{FiredSound, SoundPreparation, fire_prepared_sound, prepare_sound, volume_gain};
+use tokio::sync::{Mutex, Semaphore, mpsc::UnboundedSender, oneshot, watch};
 use tufo_application::playback::{
     add_music_layer::{AddMusicLayerError, MusicLayerCue},
     add_to_queue::QueueSongError,
@@ -56,7 +56,7 @@ use tufo_models::{
     playback::{
         AudioFilePath, OutputTarget,
         browser::BrowserStatus,
-        diagnostics::PlayerDiagnostics,
+        diagnostics::{AudioMemoryDiagnostics, PlayerDiagnostics},
         local_output::LocalOutputState,
         music_layers::MusicLayers,
         player_state::{
@@ -75,8 +75,8 @@ use crate::{
     audio::{
         LocalStreamErrors, MixerVolumes,
         browser_input::BrowserAudioCounters,
-        buffered_track::{BufferedTrack, DecodeOptions},
-        effect_sound::{EffectSource, effect_sound},
+        buffered_track::DecodeOptions,
+        memory::{AudioMemory, PreparationCancellation},
         music_deck::{DeckState, DeckTrack, MusicDeckHandle},
         sound_cache::{LoadedSound, SoundCache, SoundKey, SoundLoadOptions, load_sound},
     },
@@ -86,7 +86,7 @@ use crate::{
 
 const TICK_INTERVAL: Duration = Duration::from_millis(50);
 /// How long before a track's crossfade point the next track starts decoding.
-const ARM_LEAD: Duration = Duration::from_secs(10);
+const ARM_LEAD: Duration = Duration::from_secs(60);
 /// Skipping fades over the crossfade, but never longer than this.
 const MANUAL_TRANSITION_MAX: Duration = Duration::from_secs(1);
 /// The shortest fade, which only keeps a cut from clicking.
@@ -150,6 +150,8 @@ pub struct EnginePlayer<O: AudioOutputs> {
     browser_lifecycle: Mutex<()>,
     browser_notices: UnboundedSender<BrowserNotice>,
     browser_counters: Arc<BrowserAudioCounters>,
+    sound_preparations: Arc<Semaphore>,
+    sound_loads: std::sync::Mutex<()>,
     engine: Mutex<Engine>,
     state: watch::Sender<PlayerState>,
     /// Updated by the tick, so diagnostics never wait for the engine lock.
@@ -196,8 +198,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             output_generation: 0,
             voice: idle_voice(outputs.voice_availability(), None),
             music: None,
+            music_paused: false,
             music_layers: MusicLayers::default(),
+            layer_preparations: BTreeMap::new(),
             music_generation: 0,
+            music_preparation: PreparationCancellation::default(),
             planned_queue: None,
             volume: Volume::default(),
             effects_volume: Volume::default(),
@@ -205,6 +210,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             modes: QueueModes::default(),
             crossfade: CrossfadeDuration::default(),
             sounds: BTreeMap::new(),
+            sound_preparations: BTreeMap::new(),
+            sounds_pause_generation: 0,
             sounds_paused_at: None,
             sound_cache: SoundCache::new(SOUND_CACHE_BYTES_MAX, SOUND_CACHE_IDLE_MAX),
             sound_underrun_frames: Arc::clone(&sound_underrun_frames),
@@ -226,6 +233,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             browser_lifecycle: Mutex::new(()),
             browser_notices,
             browser_counters: Arc::default(),
+            sound_preparations: Arc::new(Semaphore::new(2)),
+            sound_loads: std::sync::Mutex::new(()),
             engine: Mutex::new(engine),
             state,
             music_underrun_frames: AtomicU64::new(0),
@@ -248,7 +257,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         self.close_browser_host().await;
         let mut engine = self.engine.lock().await;
         self.discard_preview(&mut engine).await;
-        engine.music_generation += 1;
+        engine.cancel_sound_preparations();
+        engine.invalidate_music_preparation();
         if let Some(music) = engine.music.take() {
             engine.retire_music(&music);
         }
@@ -302,6 +312,8 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             previous_failure: None,
         };
         self.publish(engine);
+        let mut initial_open = InitialLocalOpen::new(engine, &self.state);
+        let engine = initial_open.engine();
         let opened = match self
             .outputs
             .open(
@@ -328,7 +340,13 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         // A release planned for the previous output, such as the idle one, must not close this one.
         engine.release_at = None;
         // Music changes planned for the previous mixer's sample rate must not apply here.
-        engine.music_generation += 1;
+        if engine
+            .planned_queue
+            .as_ref()
+            .is_none_or(|planned| !planned.probing)
+        {
+            engine.invalidate_music_preparation();
+        }
         if let Some(voice_lost) = opened.take_voice_lost() {
             self.watch_voice_loss(voice_lost, engine.output_generation);
         }
@@ -475,32 +493,39 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             .ok_or_else(|| {
                 PlayAudioError::OutputUnavailable(anyhow::anyhow!("no output is open"))
             })?;
-        engine.music_generation += 1;
+        engine.prepare_track_memory(sample_rate);
+        engine.invalidate_music_preparation();
+        engine.music_paused = change.start.paused;
         if let Some(music) = &mut engine.music {
             music.changing = true;
         }
         engine.planned_queue = Some(PlannedQueue {
             generation: engine.music_generation,
             queue,
+            probing: false,
         });
         Ok(MusicPlan {
             generation: engine.music_generation,
             change,
             sample_rate,
+            cancellation: engine.music_preparation.clone(),
         })
     }
 
     /// Opens the planned track and makes it current, unless a later change superseded it.
     async fn apply_music_plan(&self, plan: MusicPlan) -> Result<(), PlayAudioError> {
+        let cancel_on_drop = sounds::CancelPreparation::new(plan.cancellation.clone());
         let MusicChange { source, start } = plan.change;
         let options = DecodeOptions {
             start_position: start.start_offset,
             looping: start.looping,
             loop_region: start.loop_region,
         };
-        let opened = open_track(source, plan.sample_rate, options).await;
+        let opened =
+            open_track_cancellable(source, plan.sample_rate, options, plan.cancellation.clone())
+                .await;
         let mut engine = self.engine.lock().await;
-        if engine.music_generation != plan.generation {
+        if plan.cancellation.is_cancelled() || engine.music_generation != plan.generation {
             return Ok(());
         }
         let planned = engine.planned_queue.take().map(|planned| planned.queue);
@@ -514,6 +539,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             }
         };
         Self::install_music_track(&mut engine, queue, opened, start)?;
+        cancel_on_drop.complete();
         self.publish(&engine);
         Ok(())
     }
@@ -528,10 +554,11 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             start_offset,
             fade_in,
             fade_out,
-            paused,
+            paused: _,
             loop_region,
             looping,
         } = start;
+        let paused = engine.music_paused;
         engine.pause_layers(paused)?;
         let token = engine.next_token();
         let OpenedTrack {
@@ -543,7 +570,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             PlayAudioError::OutputUnavailable(anyhow::anyhow!("the output closed"))
         })?;
         let resumed = if paused {
-            Ok(())
+            deck.pause(Duration::ZERO)
         } else {
             deck.resume(ANTI_CLICK_FADE)
         };
@@ -715,6 +742,10 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 
     /// Decodes the queue's following track and hands it to the deck ahead of time.
     async fn arm_following(self: Arc<Self>, request: ArmRequest) {
+        self.engine
+            .lock()
+            .await
+            .prepare_track_memory(request.sample_rate);
         let options = DecodeOptions {
             start_position: start_position(request.loop_region),
             looping: request.looping,
@@ -767,7 +798,12 @@ impl<O: AudioOutputs> EnginePlayer<O> {
     async fn tick(self: &Arc<Self>) {
         let mut engine = self.engine.lock().await;
         let mut changed = self.poll_local_output(&mut engine);
+        changed |= engine.reap_cancelled_music_preparation();
         changed |= engine.reap_finished_sounds();
+        changed |= engine.reap_cancelled_sound_preparations();
+        engine
+            .layer_preparations
+            .retain(|_, preparation| !preparation.is_cancelled());
         engine.sound_cache.evict_idle(Instant::now());
         changed |= engine.reap_finished_layers();
         if let Some(deck) = engine.deck() {
@@ -1002,20 +1038,46 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
     }
 
     async fn play_queue(&self, start: QueueStart) -> Result<(), PlayQueueError> {
-        // Probing the start track first reports a bad file without opening the audio device.
-        let start_file = match start.entries.get(start.start_index) {
-            Some(entry) => Some(probe_track(entry.path.clone()).await?),
-            None => None,
+        let (generation, cancellation, path) = {
+            let mut engine = self.engine.lock().await;
+            let queue = MusicQueue::new(start, engine.modes, shuffle_seed())?;
+            let path = queue.current().path.clone();
+            engine.invalidate_music_preparation();
+            engine.music_paused = false;
+            if let Some(music) = &mut engine.music {
+                music.changing = true;
+            }
+            let generation = engine.music_generation;
+            engine.planned_queue = Some(PlannedQueue {
+                generation,
+                queue,
+                probing: true,
+            });
+            (generation, engine.music_preparation.clone(), path)
         };
+        let _cancel_on_drop = sounds::CancelPreparation::new(cancellation.clone());
+        // Intent is registered before probing, while bad files still avoid opening the device.
+        let start_file = probe_track(path, cancellation.clone()).await;
         let mut engine = self.engine.lock().await;
-        let queue = MusicQueue::new(start, engine.modes, shuffle_seed())?;
-        // Shuffling keeps the start track current, so the file probed above belongs to it.
+        if cancellation.is_cancelled() || engine.music_generation != generation {
+            return Ok(());
+        }
         let source = match start_file {
-            Some(file) => TrackSource::Open(file),
-            None => TrackSource::Path(queue.current().path.clone()),
+            Ok(file) => TrackSource::Open(file),
+            Err(error) => {
+                engine.reconcile_music_pause_intent();
+                engine.invalidate_music_preparation();
+                self.publish(&engine);
+                return Err(error.into());
+            }
         };
+        let Some(planned) = engine.planned_queue.take() else {
+            return Ok(());
+        };
+        let queue = planned.queue;
         let fade = engine.manual_fade();
-        let start = self.song_start(&engine, queue.current(), fade, false);
+        let paused = engine.music_paused;
+        let start = self.song_start(&engine, queue.current(), fade, paused);
         self.ensure_output(&mut engine).await?;
         let plan = Self::plan_music(&mut engine, queue, MusicChange { source, start })?;
         drop(engine);
@@ -1104,43 +1166,15 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
     }
 
     async fn play_sound(&self, cue: SoundCue) -> Result<(), PlayAudioError> {
-        let key = read_sound_key(&cue.path).await?;
-        let cached = self
-            .engine
-            .lock()
-            .await
-            .sound_cache
-            .get(&key, Instant::now());
-        let loaded = match cached {
-            Some(sound) => LoadedSound::Decoded(sound),
-            None => load_sound_blocking(&cue.path, cue.settings.looping).await?,
-        };
-        let mut engine = self.engine.lock().await;
-        if let LoadedSound::Decoded(sound) = &loaded {
-            engine
-                .sound_cache
-                .insert(key, sound.clone(), Instant::now());
-        }
-        self.ensure_output(&mut engine).await?;
-        if let Some(mut previous) = engine.sounds.remove(&cue.entry_id)
-            && let Some(playback) = &mut previous.playback
-        {
-            playback.stop(engine.sound_stop_fade(ANTI_CLICK_FADE));
-        }
-        engine.set_sounds_paused(false);
-        let entry_id = cue.entry_id;
-        let fired = fire_sound(&mut engine, cue, loaded).await?;
-        engine.sounds.insert(entry_id, fired);
-        self.publish(&engine);
-        Ok(())
+        self.prepare_and_play_sound(cue).await
     }
 
     async fn stop_sound(&self, entry_id: CollectionEntryId) {
         let mut engine = self.engine.lock().await;
-        let Some(mut sound) = engine.sounds.remove(&entry_id) else {
-            return;
-        };
-        if let Some(playback) = &mut sound.playback {
+        engine.cancel_sound_preparation(entry_id);
+        if let Some(mut sound) = engine.sounds.remove(&entry_id)
+            && let Some(playback) = &mut sound.playback
+        {
             playback.stop(engine.sound_stop_fade(sound.cue.settings.fade_out.into_inner()));
         }
         engine.unpause_when_no_sounds_left();
@@ -1149,8 +1183,15 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
 
     async fn control_sounds(&self, command: SoundsCommand) {
         let mut engine = self.engine.lock().await;
+        if matches!(command, SoundsCommand::Pause | SoundsCommand::Resume) {
+            engine.sounds_pause_generation += 1;
+        }
         match command {
-            SoundsCommand::Pause if !engine.sounds.is_empty() => engine.set_sounds_paused(true),
+            SoundsCommand::Pause
+                if !engine.sounds.is_empty() || !engine.sound_preparations.is_empty() =>
+            {
+                engine.set_sounds_paused(true);
+            }
             SoundsCommand::Pause => {}
             SoundsCommand::Resume => engine.set_sounds_paused(false),
             SoundsCommand::SetVolume(volume) => {
@@ -1196,6 +1237,8 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             }
         }
         // Ends reconnection attempts to the previous voice channel.
+        engine.invalidate_music_preparation();
+        engine.cancel_layer_preparations();
         engine.output_generation += 1;
         if let LocalOutputState::Recovering { previous_failure } = &engine.local_output {
             engine.local_output = previous_failure
@@ -1259,6 +1302,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
 
     async fn stand_by(&self) {
         let mut engine = self.engine.lock().await;
+        engine.cancel_sound_preparations();
         self.discard_preview(&mut engine).await;
         // Ends reconnection attempts, which would otherwise rejoin a voice channel meanwhile.
         engine.output_generation += 1;
@@ -1314,6 +1358,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
     }
 
     fn diagnostics(&self) -> PlayerDiagnostics {
+        let memory = AudioMemory::shared().snapshot();
         PlayerDiagnostics {
             music_underrun_frames: self.music_underrun_frames.load(Ordering::Relaxed),
             sound_underrun_frames: self.sound_underrun_frames.load(Ordering::Relaxed),
@@ -1327,6 +1372,15 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
                 .load(Ordering::Relaxed),
             browser_dropped_frames: self.browser_counters.dropped_frames.load(Ordering::Relaxed),
             voice_pacing: self.outputs.voice_pacing(),
+            local_callbacks: self.outputs.local_callbacks(),
+            audio_memory: Some(AudioMemoryDiagnostics {
+                bytes_used: memory.bytes_used as u64,
+                bytes_max: memory.bytes_max as u64,
+                locked_bytes: memory.locked_bytes as u64,
+                lock_failures: memory.lock_failures,
+                lock_failed_bytes: memory.lock_failed_bytes as u64,
+                locking_supported: memory.locking_supported,
+            }),
         }
     }
 }
@@ -1381,9 +1435,12 @@ struct Engine {
     output_generation: u64,
     voice: VoiceConnectionState,
     music: Option<Music>,
+    music_paused: bool,
     music_layers: MusicLayers<MusicLayer>,
+    layer_preparations: BTreeMap<CollectionEntryId, PreparationCancellation>,
     /// Advances whenever the current track changes, so superseded changes don't apply.
     music_generation: u64,
+    music_preparation: PreparationCancellation,
     planned_queue: Option<PlannedQueue>,
     volume: Volume,
     effects_volume: Volume,
@@ -1391,6 +1448,8 @@ struct Engine {
     modes: QueueModes,
     crossfade: CrossfadeDuration,
     sounds: BTreeMap<CollectionEntryId, FiredSound>,
+    sound_preparations: BTreeMap<CollectionEntryId, SoundPreparation>,
+    sounds_pause_generation: u64,
     sounds_paused_at: Option<SystemTime>,
     sound_cache: SoundCache,
     sound_underrun_frames: Arc<AtomicU64>,
@@ -1405,6 +1464,34 @@ struct Engine {
 }
 
 impl Engine {
+    fn prepare_track_memory(&mut self, sample_rate: u32) {
+        self.sound_cache.evict_unused_for(
+            crate::audio::buffered_track::BufferedTrack::preferred_buffer_bytes(sample_rate),
+            &AudioMemory::shared(),
+        );
+    }
+
+    fn invalidate_music_preparation(&mut self) {
+        if self.music_preparation.is_cancelled() {
+            self.reconcile_music_pause_intent();
+        }
+        self.music_preparation.cancel();
+        self.music_preparation = PreparationCancellation::default();
+        self.music_generation += 1;
+        self.planned_queue = None;
+        if let Some(music) = &mut self.music {
+            music.changing = false;
+        }
+    }
+
+    fn reap_cancelled_music_preparation(&mut self) -> bool {
+        if !self.music_preparation.is_cancelled() {
+            return false;
+        }
+        self.invalidate_music_preparation();
+        true
+    }
+
     fn take_output(&mut self) -> Option<OpenedOutput> {
         let mut output = self.output.take()?;
         let errors = output.mixer.poll_local_stream_errors();
@@ -1458,8 +1545,11 @@ impl Engine {
 
     fn has_audio(&self) -> bool {
         self.music.is_some()
+            || self.planned_queue.is_some()
             || !self.music_layers.is_empty()
+            || !self.layer_preparations.is_empty()
             || !self.sounds.is_empty()
+            || !self.sound_preparations.is_empty()
             || self.browser.is_audible()
     }
 
@@ -1476,9 +1566,14 @@ impl Engine {
     }
 
     fn set_paused(&mut self, paused: bool) -> Result<(), ControlMusicError> {
-        if self.music.is_none() && self.music_layers.is_empty() {
+        if self.music.is_none()
+            && self.music_layers.is_empty()
+            && self.planned_queue.is_none()
+            && self.layer_preparations.is_empty()
+        {
             return Err(ControlMusicError::NothingPlaying);
         }
+        self.music_paused = paused;
         self.pause_layers(paused)?;
         let Some(music) = &mut self.music else {
             return Ok(());
@@ -1499,7 +1594,9 @@ impl Engine {
     }
 
     fn stop_music(&mut self) {
-        self.music_generation += 1;
+        self.invalidate_music_preparation();
+        self.music_paused = false;
+        self.planned_queue = None;
         let Some(music) = self.music.take() else {
             return;
         };
@@ -1596,7 +1693,7 @@ impl Engine {
         let now = SystemTime::now();
         match self.sounds_paused_at.take() {
             Some(paused_at) => {
-                self.delay_sound_starts(now.duration_since(paused_at).unwrap_or_default());
+                self.delay_sound_starts(paused_at, now);
             }
             None => self.sounds_paused_at = Some(now),
         }
@@ -1609,14 +1706,16 @@ impl Engine {
         }
     }
 
-    fn delay_sound_starts(&mut self, delay: Duration) {
+    fn delay_sound_starts(&mut self, paused_at: SystemTime, resumed_at: SystemTime) {
         for sound in self.sounds.values_mut() {
-            sound.started_at += delay;
+            sound.started_at += resumed_at
+                .duration_since(paused_at.max(sound.started_at))
+                .unwrap_or_default();
         }
     }
 
     fn unpause_when_no_sounds_left(&mut self) {
-        if self.sounds.is_empty() {
+        if self.sounds.is_empty() && self.sound_preparations.is_empty() {
             self.set_sounds_paused(false);
         }
     }
@@ -1705,12 +1804,15 @@ struct TrackStart {
 struct PlannedQueue {
     generation: u64,
     queue: MusicQueue,
+    /// The file probe has no output sample rate yet.
+    probing: bool,
 }
 
 struct MusicPlan {
     generation: u64,
     change: MusicChange,
     sample_rate: u32,
+    cancellation: PreparationCancellation,
 }
 
 struct ArmRequest {
@@ -1733,38 +1835,18 @@ async fn fire_sound(
         .as_mut()
         .ok_or_else(|| PlayAudioError::OutputUnavailable(anyhow::anyhow!("no output is open")))?;
     let sample_rate = output.mixer.sample_rate();
-    let (duration, source) = match loaded {
-        LoadedSound::Decoded(sound) => (sound.duration(), EffectSource::Decoded(sound)),
-        LoadedSound::Streamed(file) => {
-            let duration = file.duration().unwrap_or_default();
-            let options = DecodeOptions {
-                start_position: Duration::ZERO,
-                looping: cue.settings.looping,
-                loop_region: None,
-            };
-            let mut track = tokio::task::spawn_blocking(move || {
-                BufferedTrack::start(file, sample_rate, options)
-            })
-            .await
-            .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?
-            .map_err(play_audio_error)?;
-            track
-                .reader
-                .count_underruns_in(Arc::clone(&engine.sound_underrun_frames));
-            (duration, EffectSource::Streamed(track))
-        }
-    };
-    let (sound, handle) = effect_sound(source, cue.settings, sample_rate);
-    output
-        .mixer
-        .play_effect(sound)
-        .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?;
-    Ok(FiredSound {
-        cue,
-        started_at: SystemTime::now(),
-        duration,
-        playback: Some(handle),
+    let looping = cue.settings.looping;
+    let prepared = tokio::task::spawn_blocking(move || {
+        prepare_sound(
+            loaded,
+            looping,
+            sample_rate,
+            &PreparationCancellation::default(),
+        )
     })
+    .await
+    .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))??;
+    fire_prepared_sound(engine, cue, prepared)
 }
 
 async fn read_sound_key(path: &AudioFilePath) -> Result<SoundKey, PlayAudioError> {

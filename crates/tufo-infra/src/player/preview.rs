@@ -3,7 +3,8 @@
 use std::{
     num::NonZeroU64,
     sync::Arc,
-    time::{Duration, SystemTime},
+    thread,
+    time::{Duration, Instant, SystemTime},
 };
 
 use tokio::sync::{oneshot, watch};
@@ -34,6 +35,10 @@ use crate::audio::{
 };
 
 const REPLACEMENT_ATTEMPTS_MAX: u8 = 3;
+const REPLACEMENT_READY_TIMEOUT: Duration = Duration::from_secs(2);
+const REPLACEMENT_READY_POLL: Duration = Duration::from_millis(2);
+/// Room beyond the callback's minimum while the prepared replacement reaches the audio thread.
+const REPLACEMENT_DISPATCH_CUSHION: Duration = Duration::from_millis(100);
 
 pub(super) struct Preview {
     id: PreviewId,
@@ -127,6 +132,9 @@ struct TrackReplacement {
     update: PreviewUpdate,
     start: SourceFrames,
     sample_rate: u32,
+    previous: PreviewPosition,
+    previous_handle: TrackHandle,
+    token_previous: NonZeroU64,
 }
 
 enum PreviewAudio {
@@ -296,6 +304,9 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             update,
             start: draft.preview_start_continuing(track.frame(), track.position.wraps()),
             sample_rate,
+            previous: track.position,
+            previous_handle: track.handle.clone(),
+            token_previous: track.token,
         };
         tokio::spawn(Arc::clone(self).replace_preview_track(replacement));
     }
@@ -307,9 +318,20 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             update,
             start,
             sample_rate,
+            previous,
+            previous_handle,
+            token_previous,
         } = replacement;
+        let alignment = PreviewAlignment {
+            token_previous,
+            previous,
+            replacement: PreviewPosition {
+                region: update.draft,
+                start,
+            },
+        };
         let decoded = tokio::task::spawn_blocking(move || {
-            start_track_from(&path, update.draft, start, sample_rate)
+            prepare_replacement(&path, &alignment, &previous_handle, sample_rate)
         })
         .await;
         let mut engine = self.engine.lock().await;
@@ -398,6 +420,40 @@ impl<O: AudioOutputs> EnginePlayer<O> {
         }
         self.publish(&engine);
     }
+}
+
+fn prepare_replacement(
+    path: &AudioFilePath,
+    alignment: &PreviewAlignment,
+    previous_handle: &TrackHandle,
+    sample_rate: u32,
+) -> Result<BufferedTrack, OpenTrackError> {
+    let deadline = Instant::now() + REPLACEMENT_READY_TIMEOUT;
+    let decoded = start_track_from(
+        path,
+        alignment.replacement.region,
+        alignment.replacement.start,
+        sample_rate,
+    )?;
+    while Instant::now() < deadline {
+        if previous_handle.reader_dropped() {
+            return Err(OpenTrackError::PreparationCancelled);
+        }
+        let ready = alignment
+            .skip_frames(previous_handle.played_frames(), sample_rate)
+            .is_some_and(|frames| {
+                decoded.reader.can_skip_with_prefill(
+                    frames,
+                    sample_rate,
+                    REPLACEMENT_DISPATCH_CUSHION,
+                )
+            });
+        if ready {
+            break;
+        }
+        thread::sleep(REPLACEMENT_READY_POLL);
+    }
+    Ok(decoded)
 }
 
 impl Engine {

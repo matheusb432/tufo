@@ -2,9 +2,42 @@ use kira::Frame;
 use tufo_infra::audio::{
     Mixer, MixerVolumes,
     effect_sound::{EffectSource, effect_sound},
+    memory::{AudioMemory, PreparationCancellation},
     packed_frame::PackedFrame,
-    sound_cache::{LoadedSound, SoundLoadOptions, load_sound},
+    sound_cache::{
+        LoadedSound, SoundCache, SoundKey, SoundLoadOptions, load_sound, load_sound_with_memory,
+    },
 };
+
+#[test]
+fn cache_pressure_keeps_playing_allocations_until_their_last_owner_releases() -> anyhow::Result<()>
+{
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("ambience.wav");
+    write_wav(&path, 8_000, &constant(0.25, 16_000))?;
+    let memory = AudioMemory::new(128 * 1024);
+    let LoadedSound::Decoded(sound) = load_sound_with_memory(
+        &path,
+        LOAD_OPTIONS,
+        &memory,
+        &PreparationCancellation::default(),
+    )?
+    else {
+        anyhow::bail!("the sound fits the memory budget");
+    };
+    let playing = sound.clone();
+    let key = SoundKey::read(&path)?;
+    let mut cache = SoundCache::new(128 * 1024, std::time::Duration::from_secs(60));
+    cache.insert(key.clone(), sound, std::time::Instant::now());
+    cache.evict_unused_for(128 * 1024, &memory);
+    assert!(cache.get(&key, std::time::Instant::now()).is_some());
+    assert!(memory.snapshot().bytes_used > 0);
+    drop(playing);
+    cache.evict_unused_for(128 * 1024, &memory);
+    assert!(cache.get(&key, std::time::Instant::now()).is_none());
+    assert_eq!(memory.snapshot().bytes_used, 0);
+    Ok(())
+}
 use tufo_models::library::SoundSettings;
 
 mod support;

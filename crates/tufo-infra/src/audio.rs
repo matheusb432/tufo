@@ -6,11 +6,13 @@
 
 pub mod browser_input;
 pub mod buffered_track;
+pub(crate) mod callback_diagnostics;
 pub(crate) mod codecs;
 pub mod effect_sound;
 mod envelope;
 pub mod limiter;
 mod local_backend;
+pub mod memory;
 pub mod music_deck;
 pub mod packed_frame;
 pub mod pull_backend;
@@ -26,6 +28,7 @@ use std::{
 };
 
 use browser_input::{BrowserAudioCounters, BrowserInputHandle};
+use callback_diagnostics::LocalCallbackCounters;
 use cpal::{
     BufferSize, StreamConfig,
     traits::{DeviceTrait as _, HostTrait as _},
@@ -171,6 +174,13 @@ pub(crate) struct LocalStreamErrors {
 impl Mixer {
     /// Opens the default audio device at its preferred rate and channel count.
     pub fn open_local(volumes: MixerVolumes) -> Result<Self, OpenLocalMixerError> {
+        Self::open_local_observed(volumes, Arc::new(LocalCallbackCounters::default()))
+    }
+
+    pub(crate) fn open_local_observed(
+        volumes: MixerVolumes,
+        callback_counters: Arc<LocalCallbackCounters>,
+    ) -> Result<Self, OpenLocalMixerError> {
         #[cfg(target_os = "linux")]
         let pipewire = pipewire_output_device()?;
         #[cfg(target_os = "linux")]
@@ -204,6 +214,7 @@ impl Mixer {
                 device,
                 config,
                 identity: identity.clone(),
+                callback_counters,
             },
             main_track_builder: limited_main_track(),
             capacities: kira::Capacities::default(),

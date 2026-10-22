@@ -8,6 +8,7 @@ use anyhow::Context as _;
 use kira::Frame;
 use tufo_infra::audio::{
     buffered_track::{AudioFile, BufferedTrack, DecodeOptions, TrackReader},
+    memory::{AudioMemory, PreparationCancellation},
     packed_frame::PACKED_SAMPLE_STEP,
 };
 use tufo_models::library::song_loop::{LoopMarkers, LoopRegion, SourceFrames, SourceTiming};
@@ -30,28 +31,92 @@ fn wait_for_buffered(reader: &TrackReader, frames: usize) {
 }
 
 #[test]
-fn a_started_stream_fills_thirty_seconds_ahead_of_playback() -> anyhow::Result<()> {
+fn a_started_stream_fills_sixty_seconds_ahead_of_playback() -> anyhow::Result<()> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("ambience.wav");
-    write_wav(
-        &path,
-        SAMPLE_RATE,
-        &constant(0.25, 40 * SAMPLE_RATE as usize),
-    )?;
-    let mut track = BufferedTrack::start(
-        AudioFile::open(&path)?,
-        SAMPLE_RATE,
-        DecodeOptions::default(),
-    )?;
-    let mut frames = vec![Frame::ZERO; 30 * SAMPLE_RATE as usize];
+    write_wav(&path, 8_000, &constant(0.25, 70 * 8_000))?;
+    let mut track = BufferedTrack::start(AudioFile::open(&path)?, 8_000, DecodeOptions::default())?;
+    let mut frames = vec![Frame::ZERO; 60 * 8_000];
+    assert!(track.handle.startup_headroom() >= Duration::from_secs(1));
 
     wait_for_buffered(&track.reader, frames.len());
     let copied = track.reader.read(&mut frames);
 
     assert_eq!(copied, frames.len());
     assert!(frames.iter().all(|frame| *frame == Frame::new(0.25, 0.25)));
-    assert_eq!(track.handle.played(), Duration::from_secs(30));
+    assert_eq!(track.handle.played(), Duration::from_secs(60));
     assert_eq!(track.handle.underrun_frames(), 0);
+    Ok(())
+}
+
+#[test]
+fn a_short_finished_file_starts_with_its_actual_headroom() -> anyhow::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("short.wav");
+    write_wav(&path, 8_000, &constant(0.25, 2_000))?;
+    let track = BufferedTrack::start_with_memory(
+        AudioFile::open(&path)?,
+        8_000,
+        DecodeOptions::default(),
+        &AudioMemory::new(2 * 1024 * 1024),
+        &PreparationCancellation::default(),
+    )?;
+    assert_eq!(track.handle.startup_headroom(), Duration::from_millis(250));
+    assert_eq!(track.reader.buffered_frames(), 2_000);
+    Ok(())
+}
+
+#[test]
+fn pressure_falls_back_to_thirty_seconds_and_releases_only_after_the_reader() -> anyhow::Result<()>
+{
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("ambience.wav");
+    write_wav(&path, 8_000, &constant(0.25, 40 * 8_000))?;
+    let memory = AudioMemory::new(30 * 8_000 * 4 + 8_192);
+    let track = BufferedTrack::start_with_memory(
+        AudioFile::open(&path)?,
+        8_000,
+        DecodeOptions::default(),
+        &memory,
+        &PreparationCancellation::default(),
+    )?;
+    wait_for_buffered(&track.reader, 30 * 8_000);
+    assert_eq!(track.reader.buffered_frames(), 30 * 8_000);
+    assert!(memory.snapshot().bytes_used <= memory.snapshot().bytes_max);
+    drop(track.handle);
+    assert!(memory.snapshot().bytes_used > 0);
+    drop(track.reader);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    while memory.snapshot().bytes_used != 0 {
+        assert!(
+            Instant::now() < deadline,
+            "the worker did not release its ring"
+        );
+        thread::sleep(Duration::from_millis(2));
+    }
+    Ok(())
+}
+
+#[test]
+fn cancelled_preparation_does_not_admit_a_ring() -> anyhow::Result<()> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("ambience.wav");
+    write_wav(&path, 8_000, &constant(0.25, 8_000))?;
+    let memory = AudioMemory::new(2 * 1024 * 1024);
+    let cancellation = PreparationCancellation::default();
+    cancellation.cancel();
+    let result = BufferedTrack::start_with_memory(
+        AudioFile::open(&path)?,
+        8_000,
+        DecodeOptions::default(),
+        &memory,
+        &cancellation,
+    );
+    assert!(matches!(
+        result,
+        Err(tufo_infra::audio::buffered_track::OpenTrackError::PreparationCancelled)
+    ));
+    assert_eq!(memory.snapshot().bytes_used, 0);
     Ok(())
 }
 

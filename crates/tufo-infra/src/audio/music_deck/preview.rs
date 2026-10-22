@@ -52,7 +52,7 @@ pub(crate) struct PreviewAlignment {
 }
 
 impl PreviewAlignment {
-    pub(super) fn skip_frames(&self, played: u64, sample_rate: u32) -> Option<u64> {
+    pub(crate) fn skip_frames(&self, played: u64, sample_rate: u32) -> Option<u64> {
         let frame = self.replacement.region.preview_start_continuing(
             self.previous.frame_after(played, sample_rate),
             self.previous.wraps(),

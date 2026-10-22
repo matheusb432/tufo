@@ -11,12 +11,12 @@ use tokio::sync::{Semaphore, oneshot};
 use tufo_application::playback::select_output::SelectOutputError;
 use tufo_models::playback::{
     OutputTarget,
-    diagnostics::VoicePacing,
+    diagnostics::{LocalCallbackDiagnostics, VoicePacing},
     local_output::{LocalOutputFailureReason, LocalOutputIdentity},
 };
 
 use crate::{
-    audio::{Mixer, MixerVolumes},
+    audio::{Mixer, MixerVolumes, callback_diagnostics::LocalCallbackCounters},
     discord::{
         DISCORD_SAMPLE_RATE, JoinVoiceError, SongbirdDiscordClient, VoiceAvailability, VoiceSession,
     },
@@ -39,6 +39,11 @@ pub trait AudioOutputs: Send + Sync + 'static {
 
     /// Voice tick lateness since the server started, when voice is configured.
     fn voice_pacing(&self) -> Option<VoicePacing>;
+
+    /// Local callback observations across stream replacements, absent for synthetic outputs.
+    fn local_callbacks(&self) -> Option<LocalCallbackDiagnostics> {
+        None
+    }
 }
 
 /// A mixer bound to an output, with the signal that its voice connection dropped.
@@ -68,6 +73,7 @@ impl OpenedOutput {
 pub struct DeviceOutputs {
     discord: SongbirdDiscordClient,
     local_open: Arc<Semaphore>,
+    local_callbacks: Arc<LocalCallbackCounters>,
 }
 
 impl DeviceOutputs {
@@ -76,6 +82,7 @@ impl DeviceOutputs {
         Self {
             discord,
             local_open: Arc::new(Semaphore::new(1)),
+            local_callbacks: Arc::new(LocalCallbackCounters::default()),
         }
     }
 
@@ -89,10 +96,11 @@ impl DeviceOutputs {
                 source: error.into(),
             })?;
         let worker_identity = identity.clone();
+        let callback_counters = Arc::clone(&self.local_callbacks);
         let worker = tokio::task::spawn_blocking(move || {
             // A native call can outlive its deadline. Keep admission closed until it returns.
             let _permit = permit;
-            open_local_mixer(volumes, worker_identity)
+            open_local_mixer(volumes, worker_identity, callback_counters)
         });
         match tokio::time::timeout(Duration::from_secs(6), worker).await {
             Ok(Ok(result)) => result,
@@ -113,11 +121,14 @@ impl DeviceOutputs {
 fn open_local_mixer(
     volumes: MixerVolumes,
     identity: Option<LocalOutputIdentity>,
+    callback_counters: Arc<LocalCallbackCounters>,
 ) -> Result<OpenedOutput, SelectOutputError> {
-    let mut mixer = Mixer::open_local(volumes).map_err(|error| SelectOutputError::LocalDevice {
-        reason: error.reason(),
-        identity: error.identity().cloned().or(identity),
-        source: error.into(),
+    let mut mixer = Mixer::open_local_observed(volumes, callback_counters).map_err(|error| {
+        SelectOutputError::LocalDevice {
+            reason: error.reason(),
+            identity: error.identity().cloned().or(identity),
+            source: error.into(),
+        }
     })?;
     let deadline = Instant::now() + Duration::from_secs(2);
     while !mixer.local_has_callback() {
@@ -205,5 +216,9 @@ impl AudioOutputs for DeviceOutputs {
 
     fn voice_pacing(&self) -> Option<VoicePacing> {
         self.discord.voice_pacing()
+    }
+
+    fn local_callbacks(&self) -> Option<LocalCallbackDiagnostics> {
+        Some(self.local_callbacks.snapshot())
     }
 }

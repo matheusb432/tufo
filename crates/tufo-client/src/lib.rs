@@ -696,7 +696,7 @@ impl TufoClient {
     pub async fn player_diagnostics(&self) -> Result<PlayerDiagnostics, ClientError> {
         let request = with_timeout(pb::GetPlayerDiagnosticsRequest {}, QUICK_REQUEST_TIMEOUT);
         let response = self.player.clone().get_player_diagnostics(request).await?;
-        Ok(proto::player::player_diagnostics(response.into_inner())?)
+        Ok(proto::player::player_diagnostics(response.get_ref())?)
     }
 
     /// Asks the server to drain and exit. It stops all audio.

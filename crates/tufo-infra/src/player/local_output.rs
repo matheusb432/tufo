@@ -4,12 +4,14 @@ use std::{
     time::{Duration, Instant},
 };
 
+use tokio::sync::watch;
 use tufo_application::playback::{
     recover_local_output::RecoverLocalOutputError, select_output::SelectOutputError,
 };
 use tufo_models::playback::{
     OutputTarget,
     local_output::{LocalOutputFailure, LocalOutputFailureReason, LocalOutputState},
+    player_state::PlayerState,
 };
 
 use super::{AudioOutputs, Engine, EnginePlayer, OpenedOutput};
@@ -19,6 +21,37 @@ use crate::audio::MixerVolumes;
 /// [`LOCAL_REOPENS_WINDOW`]; past that, the output waits for the user's recovery.
 const LOCAL_REOPENS_MAX: usize = 3;
 const LOCAL_REOPENS_WINDOW: Duration = Duration::from_mins(1);
+
+pub(super) struct InitialLocalOpen<'a> {
+    engine: &'a mut Engine,
+    state: &'a watch::Sender<PlayerState>,
+}
+
+impl<'a> InitialLocalOpen<'a> {
+    pub(super) fn new(engine: &'a mut Engine, state: &'a watch::Sender<PlayerState>) -> Self {
+        Self { engine, state }
+    }
+
+    pub(super) fn engine(&mut self) -> &mut Engine {
+        self.engine
+    }
+}
+
+impl Drop for InitialLocalOpen<'_> {
+    fn drop(&mut self) {
+        if self.engine.output.is_none()
+            && matches!(
+                self.engine.local_output,
+                LocalOutputState::Recovering {
+                    previous_failure: None
+                }
+            )
+        {
+            self.engine.local_output = LocalOutputState::Released;
+            self.state.send_replace(self.engine.snapshot());
+        }
+    }
+}
 
 /// When the engine recently reopened the local output on its own.
 #[derive(Debug, Default)]
@@ -134,12 +167,14 @@ impl<O: AudioOutputs> EnginePlayer<O> {
 
 impl Engine {
     pub(super) fn detach_output(&mut self) -> Option<OpenedOutput> {
+        self.invalidate_music_preparation();
+        self.cancel_layer_preparations();
+        self.cancel_sound_preparations();
         let output = self.take_output()?;
         if let Some(host) = self.browser.host() {
             host.detach();
         }
         self.output_generation += 1;
-        self.music_generation += 1;
         let mut retired_underruns = 0;
         if let Some(music) = &mut self.music {
             music.current.start_offset = music.current.position();

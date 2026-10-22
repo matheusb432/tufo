@@ -22,10 +22,13 @@ pub(super) fn analyze_audio(path: &Path) -> Result<SongWaveform, InspectAudioErr
         OpenTrackError::NotFound => {
             InspectAudioError::Unreadable(io::Error::from(io::ErrorKind::NotFound))
         }
-        OpenTrackError::Unreadable(source) | OpenTrackError::DecoderThread(source) => {
-            InspectAudioError::Unreadable(source)
-        }
+        OpenTrackError::Unreadable(source)
+        | OpenTrackError::DecoderThread(source)
+        | OpenTrackError::MemoryWorker(source) => InspectAudioError::Unreadable(source),
         OpenTrackError::Unsupported(source) => InspectAudioError::Unsupported(source),
+        error @ (OpenTrackError::MemoryBudget
+        | OpenTrackError::PreparationCancelled
+        | OpenTrackError::PrefillTimeout) => InspectAudioError::Unreadable(io::Error::other(error)),
     })?;
     let sample_rate = std::num::NonZeroU32::new(file.source_sample_rate())
         .context("the audio track has no sample rate")

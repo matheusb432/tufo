@@ -1,15 +1,23 @@
 //! The engine's record of the music queue and the tracks it handed to the deck.
 
-use std::{num::NonZeroU64, time::Duration};
+use std::{
+    num::NonZeroU64,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tufo_application::playback::player::PlayAudioError;
 use tufo_models::{
     library::song_loop::LoopRegion,
     playback::{AudioFilePath, queue::MusicQueue},
 };
 
-use crate::audio::buffered_track::{
-    AudioFile, BufferedTrack, DecodeOptions, OpenTrackError, TrackFile, TrackHandle,
+use crate::audio::{
+    buffered_track::{
+        AudioFile, BufferedTrack, DecodeOptions, OpenTrackError, TrackFile, TrackHandle,
+    },
+    memory::{AudioMemory, PreparationCancellation},
 };
 
 /// The music the engine plays: its queue and the deck tracks behind it.
@@ -89,13 +97,31 @@ pub(super) struct OpenedTrack {
 }
 
 /// Opens and probes a track on a blocking thread, returning its file for [`open_track`].
-pub(super) async fn probe_track(path: AudioFilePath) -> Result<TrackFile, PlayAudioError> {
-    tokio::task::spawn_blocking(move || {
+pub(super) async fn probe_track(
+    path: AudioFilePath,
+    cancellation: PreparationCancellation,
+) -> Result<TrackFile, PlayAudioError> {
+    let permit = preparation_permit()?;
+    let cancel_on_drop = super::sounds::CancelPreparation::new(cancellation.clone());
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        if cancellation.is_cancelled() {
+            return Err(OpenTrackError::PreparationCancelled);
+        }
         AudioFile::open(path.as_ref()).map(|file| file.file().clone())
     })
     .await
     .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?
-    .map_err(play_audio_error)
+    .map_err(play_audio_error);
+    cancel_on_drop.complete();
+    result
+}
+
+fn preparation_permit() -> Result<OwnedSemaphorePermit, PlayAudioError> {
+    static PREPARATIONS: OnceLock<Arc<Semaphore>> = OnceLock::new();
+    Arc::clone(PREPARATIONS.get_or_init(|| Arc::new(Semaphore::new(4))))
+        .try_acquire_owned()
+        .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))
 }
 
 /// Opens, probes, and starts decoding a track on a blocking thread.
@@ -104,14 +130,41 @@ pub(super) async fn open_track(
     sample_rate: u32,
     options: DecodeOptions,
 ) -> Result<OpenedTrack, PlayAudioError> {
-    tokio::task::spawn_blocking(move || {
+    open_track_cancellable(
+        source,
+        sample_rate,
+        options,
+        PreparationCancellation::default(),
+    )
+    .await
+}
+
+pub(super) async fn open_track_cancellable(
+    source: TrackSource,
+    sample_rate: u32,
+    options: DecodeOptions,
+    cancellation: PreparationCancellation,
+) -> Result<OpenedTrack, PlayAudioError> {
+    let permit = preparation_permit()?;
+    let cancel_on_drop = super::sounds::CancelPreparation::new(cancellation.clone());
+    let result = tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        if cancellation.is_cancelled() {
+            return Err(OpenTrackError::PreparationCancelled);
+        }
         let file = match source {
             TrackSource::Path(path) => AudioFile::open(path.as_ref())?,
             TrackSource::Open(file) => AudioFile::reopen(file)?,
         };
         let track_file = file.file().clone();
         let duration = file.duration();
-        let track = BufferedTrack::start(file, sample_rate, options)?;
+        let track = BufferedTrack::start_with_memory(
+            file,
+            sample_rate,
+            options,
+            &AudioMemory::shared(),
+            &cancellation,
+        )?;
         Ok(OpenedTrack {
             track,
             file: track_file,
@@ -120,7 +173,9 @@ pub(super) async fn open_track(
     })
     .await
     .map_err(|error| PlayAudioError::OutputUnavailable(error.into()))?
-    .map_err(play_audio_error)
+    .map_err(play_audio_error);
+    cancel_on_drop.complete();
+    result
 }
 
 pub(super) fn play_audio_error(error: OpenTrackError) -> PlayAudioError {
@@ -129,5 +184,9 @@ pub(super) fn play_audio_error(error: OpenTrackError) -> PlayAudioError {
         OpenTrackError::Unreadable(source) => PlayAudioError::Unreadable(source),
         OpenTrackError::Unsupported(source) => PlayAudioError::Unsupported(source),
         OpenTrackError::DecoderThread(source) => PlayAudioError::OutputUnavailable(source.into()),
+        error @ (OpenTrackError::MemoryBudget
+        | OpenTrackError::PreparationCancelled
+        | OpenTrackError::PrefillTimeout
+        | OpenTrackError::MemoryWorker(_)) => PlayAudioError::OutputUnavailable(error.into()),
     }
 }

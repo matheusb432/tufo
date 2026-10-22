@@ -1,6 +1,12 @@
 //! Decodes one file into stereo frames at the output rate on the decoder thread.
 
-use std::{io, ops::ControlFlow, sync::atomic::Ordering, thread, time::Duration};
+use std::{
+    io,
+    ops::ControlFlow,
+    sync::{Arc, atomic::Ordering},
+    thread,
+    time::Duration,
+};
 
 use anyhow::Context as _;
 use rtrb::Producer;
@@ -24,11 +30,60 @@ use super::{
     TrackShared, duration_of_frames, frame_count, frames_in,
     track_file::{TrackFile, TrackFileReader},
 };
-use crate::audio::{codecs, packed_frame::PackedFrame, seam};
+use crate::audio::{
+    codecs,
+    memory::{AudioMemory, MemoryReservation, PreparationCancellation, ResidentMemory},
+    packed_frame::PackedFrame,
+    seam,
+};
 
 const STEREO: usize = 2;
 const RESAMPLER_CHUNK_FRAMES: usize = 1024;
 const FULL_BUFFER_WAIT: Duration = Duration::from_millis(50);
+
+struct ReservedFrames {
+    // Release the allocation before its admission reservation.
+    frames: Vec<PackedFrame>,
+    reservation: MemoryReservation,
+}
+
+impl ReservedFrames {
+    fn new(capacity: usize, memory: &AudioMemory) -> Option<Self> {
+        let reservation = memory.reserve(capacity.saturating_mul(size_of::<PackedFrame>()))?;
+        Some(Self {
+            frames: Vec::with_capacity(capacity),
+            reservation,
+        })
+    }
+
+    fn extend(&mut self, stereo: &[f32], frames_max: usize, memory: &AudioMemory) -> bool {
+        let frames_next = self.frames.len().saturating_add(stereo.len() / STEREO);
+        if frames_next > frames_max {
+            return false;
+        }
+        if frames_next > self.frames.capacity() {
+            let capacity = self
+                .frames
+                .capacity()
+                .saturating_mul(2)
+                .max(frames_next)
+                .min(frames_max);
+            let Some(mut next) = Self::new(capacity, memory) else {
+                return false;
+            };
+            next.frames.extend_from_slice(&self.frames);
+            *self = next;
+        }
+        self.frames.extend(
+            stereo
+                .as_chunks::<STEREO>()
+                .0
+                .iter()
+                .map(|&[left, right]| PackedFrame::new(left, right)),
+        );
+        true
+    }
+}
 
 /// A container probed by content, since file extensions lie (MP4 files named `.mp3`).
 pub(crate) struct ProbedTrack {
@@ -137,41 +192,32 @@ impl ProbedTrack {
     }
 
     /// Decodes the file into stereo frames at its own rate, or returns `None` once it runs past
-    /// `frames_max`. The frames' allocation fits them exactly. Blocks the calling thread.
+    /// `frames_max`, reserving every live allocation before growing. Blocks the calling thread.
     pub(crate) fn decode_whole(
         mut self,
         frames_max: usize,
-    ) -> anyhow::Result<Option<Vec<PackedFrame>>> {
+        memory: &AudioMemory,
+        cancellation: &PreparationCancellation,
+    ) -> anyhow::Result<Option<(Vec<PackedFrame>, MemoryReservation)>> {
         let mut decoded = Vec::new();
         let mut stereo = Vec::new();
-        let frames_expected = self
-            .duration
-            .map_or(0, |duration| frames_in(duration, self.source_sample_rate))
-            .min(frames_max);
-        let mut frames = Vec::with_capacity(frames_expected);
+        let frames_expected = self.duration.map_or(frames_max, |duration| {
+            frames_in(duration, self.source_sample_rate)
+                .saturating_add(1)
+                .min(frames_max)
+        });
+        let Some(mut frames) = ReservedFrames::new(frames_expected, memory) else {
+            return Ok(None);
+        };
         while self.decode_next_packet(&mut decoded, &mut stereo)? {
-            let frames_next = frames.len().saturating_add(stereo.len() / STEREO);
-            if frames_next > frames_max {
+            if cancellation.is_cancelled() {
                 return Ok(None);
             }
-            if frames_next > frames.capacity() {
-                let capacity = frames
-                    .capacity()
-                    .saturating_mul(2)
-                    .max(frames_next)
-                    .min(frames_max);
-                frames.reserve_exact(capacity - frames.len());
+            if !frames.extend(&stereo, frames_max, memory) {
+                return Ok(None);
             }
-            frames.extend(
-                stereo
-                    .as_chunks::<STEREO>()
-                    .0
-                    .iter()
-                    .map(|&[left, right]| PackedFrame::new(left, right)),
-            );
         }
-        frames.shrink_to_fit();
-        Ok(Some(frames))
+        Ok(Some((frames.frames, frames.reservation)))
     }
 
     /// Decodes up to `frames_max` frames from `start` into interleaved stereo at the file's own
@@ -382,7 +428,13 @@ impl RegionCursor {
 }
 
 impl TrackDecoder {
-    pub(super) fn run(mut self, mut producer: Producer<PackedFrame>, shared: &TrackShared) {
+    pub(super) fn run(
+        mut self,
+        mut producer: Producer<PackedFrame>,
+        shared: &TrackShared,
+        resident: [ResidentMemory; 2],
+        reservation: Arc<MemoryReservation>,
+    ) {
         let mut writer = FrameWriter {
             producer: &mut producer,
             shared,
@@ -392,6 +444,12 @@ impl TrackDecoder {
         }
         shared.decoding_finished.store(true, Ordering::Release);
         shared.decoder_stopped.store(true, Ordering::Release);
+        while !producer.is_abandoned() {
+            thread::park_timeout(FULL_BUFFER_WAIT);
+        }
+        drop(resident);
+        drop(producer);
+        drop(reservation);
     }
 
     fn decode_until_stopped(&mut self, writer: &mut FrameWriter<'_>) -> anyhow::Result<()> {
@@ -547,6 +605,10 @@ impl FrameWriter<'_> {
                 continue;
             };
             remaining -= chunk.fill_from_iter(frames.by_ref());
+            self.shared.buffered_frames.store(
+                frame_count(self.producer.buffer().capacity() - self.producer.slots()),
+                Ordering::Relaxed,
+            );
         }
         ControlFlow::Continue(())
     }

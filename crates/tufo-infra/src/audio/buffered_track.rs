@@ -21,14 +21,18 @@ use std::{
 };
 
 use kira::Frame;
-use rtrb::{Consumer, RingBuffer};
+use rtrb::{Consumer, Producer, RingBuffer};
 pub use track_file::TrackFile;
 use tufo_models::library::song_loop::{LoopRegion, SourceFrames, nearest_frames};
 
-use super::packed_frame::{PackedFrame, unpack_into};
+use super::{
+    memory::{AudioMemory, MemoryReservation, PreparationCancellation, ResidentMemory},
+    packed_frame::{PackedFrame, unpack_into},
+};
 
-const BUFFER_DURATION: Duration = Duration::from_secs(30);
-const PREFILL_DURATION: Duration = Duration::from_millis(500);
+const BUFFER_DURATION: Duration = Duration::from_secs(60);
+const BUFFER_DURATION_MIN: Duration = Duration::from_secs(30);
+const PREFILL_DURATION: Duration = Duration::from_secs(1);
 const PREFILL_TIMEOUT: Duration = Duration::from_secs(2);
 const PREFILL_POLL_INTERVAL: Duration = Duration::from_millis(2);
 
@@ -42,6 +46,14 @@ pub enum OpenTrackError {
     Unsupported(#[source] anyhow::Error),
     #[error("the decoder thread cannot start")]
     DecoderThread(#[source] io::Error),
+    #[error("the audio memory budget cannot hold another track")]
+    MemoryBudget,
+    #[error("audio preparation was cancelled")]
+    PreparationCancelled,
+    #[error("the decoder did not prepare enough audio before its deadline")]
+    PrefillTimeout,
+    #[error("the audio memory worker cannot retain the decoded sound")]
+    MemoryWorker(#[source] io::Error),
 }
 
 /// An open audio file, probed and ready to decode at any output rate and position.
@@ -105,7 +117,56 @@ pub struct BufferedTrack {
     pub handle: TrackHandle,
 }
 
+struct PreparedRing {
+    // Unlock before either endpoint can release the allocation.
+    resident: [ResidentMemory; 2],
+    producer: Producer<PackedFrame>,
+    consumer: Consumer<PackedFrame>,
+    reservation: MemoryReservation,
+}
+
+impl PreparedRing {
+    fn new(output_sample_rate: u32, memory: &AudioMemory) -> Result<Self, OpenTrackError> {
+        let preferred_frames = frames_in(BUFFER_DURATION, output_sample_rate);
+        let minimum_frames = frames_in(BUFFER_DURATION_MIN, output_sample_rate);
+        let (capacity, reservation) = memory
+            .reserve(preferred_frames.saturating_mul(size_of::<PackedFrame>()))
+            .map(|reservation| (preferred_frames, reservation))
+            .or_else(|| {
+                memory
+                    .reserve(minimum_frames.saturating_mul(size_of::<PackedFrame>()))
+                    .map(|reservation| (minimum_frames, reservation))
+            })
+            .ok_or(OpenTrackError::MemoryBudget)?;
+        let (mut producer, consumer) = RingBuffer::new(capacity);
+        let resident = {
+            let mut chunk = producer
+                .write_chunk(capacity)
+                .map_err(|error| OpenTrackError::Unsupported(error.into()))?;
+            let (first, second) = chunk.as_mut_slices();
+            // SAFETY: the decoder retains its Producer and these guards until the Consumer
+            // is abandoned, then unlocks before releasing the ring's final owner.
+            unsafe {
+                [
+                    ResidentMemory::prepare(first, memory),
+                    ResidentMemory::prepare(second, memory),
+                ]
+            }
+        };
+        Ok(Self {
+            resident,
+            producer,
+            consumer,
+            reservation,
+        })
+    }
+}
+
 impl BufferedTrack {
+    pub(crate) fn preferred_buffer_bytes(sample_rate: u32) -> usize {
+        frames_in(BUFFER_DURATION, sample_rate) * size_of::<PackedFrame>()
+    }
+
     /// Starts decoding `file` at `output_sample_rate` and returns once [`PREFILL_DURATION`] is
     /// buffered, while the decoder goes on to fill [`BUFFER_DURATION`]. Short files return at EOF;
     /// a slow decoder gets at most [`PREFILL_TIMEOUT`] to prefill. Blocks the calling thread.
@@ -114,6 +175,25 @@ impl BufferedTrack {
         output_sample_rate: u32,
         options: DecodeOptions,
     ) -> Result<Self, OpenTrackError> {
+        Self::start_with_memory(
+            file,
+            output_sample_rate,
+            options,
+            &AudioMemory::shared(),
+            &PreparationCancellation::default(),
+        )
+    }
+
+    pub fn start_with_memory(
+        file: AudioFile,
+        output_sample_rate: u32,
+        options: DecodeOptions,
+        memory: &AudioMemory,
+        cancellation: &PreparationCancellation,
+    ) -> Result<Self, OpenTrackError> {
+        if cancellation.is_cancelled() {
+            return Err(OpenTrackError::PreparationCancelled);
+        }
         let duration = file.duration();
         let source_sample_rate = file.source_sample_rate();
         let loop_region = options.loop_region.filter(|region| {
@@ -156,27 +236,34 @@ impl BufferedTrack {
                 loop_region.map(|region| region.markers()),
             )
             .map_err(OpenTrackError::Unsupported)?;
-        let (producer, consumer) = RingBuffer::new(frames_in(BUFFER_DURATION, output_sample_rate));
+        let PreparedRing {
+            resident,
+            producer,
+            consumer,
+            reservation,
+        } = PreparedRing::new(output_sample_rate, memory)?;
         let shared = Arc::new(TrackShared {
             looping: AtomicBool::new(options.looping),
             ..TrackShared::default()
         });
-        let decoder_thread = thread::Builder::new()
-            .name("tufo-track-decoder".to_owned())
-            .spawn({
-                let shared = Arc::clone(&shared);
-                move || decoder.run(producer, &shared)
-            })
-            .map_err(OpenTrackError::DecoderThread)?;
-
+        let reservation = Arc::new(reservation);
         let reader = TrackReader {
             consumer,
             shared: Arc::clone(&shared),
             frames_played: 0,
             declared_frames: pass_ends.first(),
             underrun_frames_total: None,
+            _reservation: Arc::clone(&reservation),
         };
-        reader.wait_for_prefill(frames_in(PREFILL_DURATION, output_sample_rate));
+        let decoder_thread = thread::Builder::new()
+            .name("tufo-track-decoder".to_owned())
+            .spawn({
+                let shared = Arc::clone(&shared);
+                move || decoder.run(producer, &shared, resident, reservation)
+            })
+            .map_err(OpenTrackError::DecoderThread)?;
+
+        reader.prepare_start(output_sample_rate, cancellation)?;
         Ok(Self {
             reader,
             handle: TrackHandle {
@@ -197,9 +284,37 @@ pub struct TrackReader {
     /// The frames left in the first pass, as the container or loop region declares its length.
     declared_frames: Option<u64>,
     underrun_frames_total: Option<Arc<AtomicU64>>,
+    // A failed worker spawn can drop the Producer first; keep admission until this Consumer drops.
+    _reservation: Arc<MemoryReservation>,
 }
 
 impl TrackReader {
+    fn prepare_start(
+        &self,
+        output_sample_rate: u32,
+        cancellation: &PreparationCancellation,
+    ) -> Result<(), OpenTrackError> {
+        self.wait_for_prefill(
+            frames_in(PREFILL_DURATION, output_sample_rate),
+            cancellation,
+            Instant::now() + PREFILL_TIMEOUT,
+        )?;
+        let startup_frames = frame_count(self.buffered_frames());
+        self.shared
+            .startup_frames
+            .store(startup_frames, Ordering::Relaxed);
+        self.shared
+            .low_water_frames
+            .store(startup_frames, Ordering::Relaxed);
+        tracing::debug!(
+            buffered_frames = self.buffered_frames(),
+            capacity_frames = self.consumer.buffer().capacity(),
+            output_sample_rate,
+            "prepared streamed audio headroom"
+        );
+        Ok(())
+    }
+
     /// Copies up to `out.len()` frames into the start of `out` and returns how many it copied.
     /// A short read while the decoder still runs counts as an underrun.
     pub fn read(&mut self, out: &mut [Frame]) -> usize {
@@ -223,6 +338,15 @@ impl TrackReader {
         self.shared
             .frames_played
             .store(self.frames_played, Ordering::Relaxed);
+        let buffered_frames = frame_count(self.consumer.slots());
+        self.shared
+            .buffered_frames
+            .store(buffered_frames, Ordering::Relaxed);
+        if !decoding_finished && wanted > 0 {
+            self.shared
+                .low_water_frames
+                .fetch_min(buffered_frames, Ordering::Relaxed);
+        }
         if copied < wanted && !decoding_finished {
             let missing = frame_count(wanted - copied);
             self.shared
@@ -238,16 +362,12 @@ impl TrackReader {
     /// Aligns a replacement without consuming its playback headroom. A rejected skip leaves
     /// the reader untouched; finished files may have less than the usual prefill remaining.
     pub(crate) fn skip_with_prefill(&mut self, frames: u64, sample_rate: u32) -> bool {
+        if !self.can_skip_with_prefill(frames, sample_rate, Duration::ZERO) {
+            return false;
+        }
         let Ok(count) = usize::try_from(frames) else {
             return false;
         };
-        let finished = self.decoding_finished();
-        let Some(remaining) = self.consumer.slots().checked_sub(count) else {
-            return false;
-        };
-        if remaining == 0 || (!finished && remaining < frames_in(PREFILL_DURATION, sample_rate)) {
-            return false;
-        }
         let Ok(chunk) = self.consumer.read_chunk(count) else {
             return false;
         };
@@ -257,6 +377,25 @@ impl TrackReader {
             .frames_played
             .store(self.frames_played, Ordering::Relaxed);
         true
+    }
+
+    pub(crate) fn can_skip_with_prefill(
+        &self,
+        frames: u64,
+        sample_rate: u32,
+        cushion: Duration,
+    ) -> bool {
+        let Ok(count) = usize::try_from(frames) else {
+            return false;
+        };
+        self.consumer
+            .slots()
+            .checked_sub(count)
+            .is_some_and(|remaining| {
+                remaining > 0
+                    && (self.decoding_finished()
+                        || remaining >= frames_in(PREFILL_DURATION + cushion, sample_rate))
+            })
     }
 
     pub(super) fn played_frames(&self) -> u64 {
@@ -312,23 +451,38 @@ impl TrackReader {
                 || self.shared.decoder_stopped.load(Ordering::Acquire))
     }
 
-    fn wait_for_prefill(&self, prefill_frames: usize) {
-        let deadline = Instant::now() + PREFILL_TIMEOUT;
+    fn wait_for_prefill(
+        &self,
+        prefill_frames: usize,
+        cancellation: &PreparationCancellation,
+        deadline: Instant,
+    ) -> Result<(), OpenTrackError> {
         while self.consumer.slots() < prefill_frames
-            && !self.shared.decoding_finished.load(Ordering::Acquire)
+            && !self.decoding_finished()
             && Instant::now() < deadline
         {
+            if cancellation.is_cancelled() {
+                return Err(OpenTrackError::PreparationCancelled);
+            }
             thread::sleep(PREFILL_POLL_INTERVAL);
         }
-        if self.consumer.slots() < prefill_frames
-            && !self.shared.decoding_finished.load(Ordering::Acquire)
-        {
+        if cancellation.is_cancelled() {
+            return Err(OpenTrackError::PreparationCancelled);
+        }
+        if self.consumer.slots() < prefill_frames && !self.decoding_finished() {
             tracing::warn!(
                 buffered_frames = self.consumer.slots(),
                 prefill_frames,
-                "starting playback before the decoder filled its headroom"
+                "decoder preparation did not fill its headroom"
             );
+            return Err(OpenTrackError::PrefillTimeout);
         }
+        if self.consumer.is_empty() {
+            return Err(OpenTrackError::Unsupported(anyhow::anyhow!(
+                "the file has no decoded audio frames"
+            )));
+        }
+        Ok(())
     }
 }
 
@@ -349,6 +503,34 @@ pub struct TrackHandle {
 }
 
 impl TrackHandle {
+    pub(crate) fn reader_dropped(&self) -> bool {
+        self.shared.stop_requested.load(Ordering::Relaxed)
+    }
+
+    #[must_use]
+    pub fn startup_headroom(&self) -> Duration {
+        duration_of_frames(
+            self.shared.startup_frames.load(Ordering::Relaxed),
+            self.sample_rate,
+        )
+    }
+
+    #[must_use]
+    pub fn buffered_headroom(&self) -> Duration {
+        duration_of_frames(
+            self.shared.buffered_frames.load(Ordering::Relaxed),
+            self.sample_rate,
+        )
+    }
+
+    #[must_use]
+    pub fn headroom_low_water(&self) -> Duration {
+        duration_of_frames(
+            self.shared.low_water_frames.load(Ordering::Relaxed),
+            self.sample_rate,
+        )
+    }
+
     /// How much audio the reader has copied out, from the start position.
     #[must_use]
     pub fn played(&self) -> Duration {
@@ -473,6 +655,9 @@ struct TrackShared {
     decoder_stopped: AtomicBool,
     frames_played: AtomicU64,
     underrun_frames: AtomicU64,
+    startup_frames: AtomicU64,
+    buffered_frames: AtomicU64,
+    low_water_frames: AtomicU64,
     playback_frames_end: AtomicU64,
 }
 
@@ -485,6 +670,9 @@ impl Default for TrackShared {
             decoder_stopped: AtomicBool::new(false),
             frames_played: AtomicU64::new(0),
             underrun_frames: AtomicU64::new(0),
+            startup_frames: AtomicU64::new(0),
+            buffered_frames: AtomicU64::new(0),
+            low_water_frames: AtomicU64::new(u64::MAX),
             playback_frames_end: AtomicU64::new(u64::MAX),
         }
     }
@@ -512,6 +700,75 @@ pub(crate) fn frame_count(frames: usize) -> u64 {
 mod tests {
     use super::*;
 
+    fn test_reservation() -> Arc<MemoryReservation> {
+        Arc::new(
+            AudioMemory::new(128 * 1024)
+                .reserve(8 * size_of::<PackedFrame>())
+                .unwrap(),
+        )
+    }
+
+    #[test]
+    fn expired_prefill_rejects_empty_and_partially_prepared_streams() {
+        for prepared in [0, 2] {
+            let (mut producer, consumer) = RingBuffer::new(8);
+            for _ in 0..prepared {
+                producer.push(PackedFrame::default()).unwrap();
+            }
+            let reader = TrackReader {
+                consumer,
+                shared: Arc::new(TrackShared::default()),
+                frames_played: 0,
+                declared_frames: None,
+                underrun_frames_total: None,
+                _reservation: test_reservation(),
+            };
+            let result =
+                reader.wait_for_prefill(4, &PreparationCancellation::default(), Instant::now());
+            assert!(matches!(result, Err(OpenTrackError::PrefillTimeout)));
+            assert_eq!(reader.buffered_frames(), prepared);
+        }
+    }
+
+    #[test]
+    fn only_a_finished_decoder_can_waive_short_file_prefill() {
+        for (looping, stopped, ready) in [
+            (false, false, true),
+            (true, false, false),
+            (true, true, true),
+        ] {
+            let (mut producer, consumer) = RingBuffer::new(8);
+            for _ in 0..2 {
+                producer.push(PackedFrame::default()).unwrap();
+            }
+            let shared = Arc::new(TrackShared::default());
+            shared.looping.store(looping, Ordering::Relaxed);
+            shared.decoder_stopped.store(stopped, Ordering::Release);
+            shared.decoding_finished.store(true, Ordering::Release);
+            let reader = TrackReader {
+                consumer,
+                shared,
+                frames_played: 0,
+                declared_frames: Some(2),
+                underrun_frames_total: None,
+                _reservation: test_reservation(),
+            };
+
+            let result =
+                reader.wait_for_prefill(4, &PreparationCancellation::default(), Instant::now());
+
+            if ready {
+                assert!(result.is_ok(), "a finished short file should start");
+            } else {
+                assert!(
+                    matches!(result, Err(OpenTrackError::PrefillTimeout)),
+                    "an intermediate loop EOF must not waive headroom"
+                );
+            }
+            assert_eq!(reader.buffered_frames(), 2);
+        }
+    }
+
     #[test]
     fn replacement_skips_require_exact_alignment_and_preserve_headroom() {
         let (mut producer, consumer) = RingBuffer::new(8);
@@ -527,20 +784,24 @@ mod tests {
             frames_played: 0,
             declared_frames: None,
             underrun_frames_total: None,
+            _reservation: test_reservation(),
         };
 
-        assert!(!reader.skip_with_prefill(9, 8));
-        assert!(!reader.skip_with_prefill(5, 8));
+        assert!(reader.can_skip_with_prefill(4, 4, Duration::ZERO));
+        assert!(!reader.can_skip_with_prefill(4, 4, Duration::from_millis(500)));
+        assert!(reader.can_skip_with_prefill(2, 4, Duration::from_millis(500)));
+        assert!(!reader.skip_with_prefill(9, 4));
+        assert!(!reader.skip_with_prefill(5, 4));
         assert_eq!(reader.played_frames(), 0);
         assert_eq!(reader.buffered_frames(), 8);
-        assert!(reader.skip_with_prefill(4, 8));
+        assert!(reader.skip_with_prefill(4, 4));
         let mut out = [Frame::ZERO; 1];
         assert_eq!(reader.read(&mut out), 1);
         assert_eq!(out[0].left, 0.5);
 
         shared.decoding_finished.store(true, Ordering::Release);
-        assert!(!reader.skip_with_prefill(3, 8));
-        assert!(reader.skip_with_prefill(2, 8));
+        assert!(!reader.skip_with_prefill(3, 4));
+        assert!(reader.skip_with_prefill(2, 4));
         assert_eq!(reader.read(&mut out), 1);
         assert_eq!(out[0].left, 0.875);
     }
@@ -558,6 +819,7 @@ mod tests {
                 frames_played: 0,
                 declared_frames: None,
                 underrun_frames_total: None,
+                _reservation: test_reservation(),
             };
             reader.count_underruns_in(Arc::clone(&total));
             let mut out = [Frame::ZERO; 4];

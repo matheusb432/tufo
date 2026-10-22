@@ -13,6 +13,10 @@ use std::{
 
 use super::{
     buffered_track::{AudioFile, OpenTrackError, duration_of_frames, frame_count, frames_in},
+    memory::{
+        AudioMemory, MemoryReservation, PreparationCancellation, ResidentMemory, allocation_bytes,
+        reclaim_unused, retain_allocation,
+    },
     packed_frame::PackedFrame,
 };
 
@@ -49,16 +53,53 @@ impl SoundKey {
 #[derive(Debug, Clone)]
 pub struct DecodedSound {
     sample_rate: u32,
-    frames: Arc<Vec<PackedFrame>>,
+    frames: Arc<DecodedFrames>,
+}
+
+struct DecodedFrames {
+    // Unlock before freeing the allocation; the housekeeping owner is always last.
+    _resident: ResidentMemory,
+    frames: Vec<PackedFrame>,
+    _reservation: MemoryReservation,
+}
+
+impl std::fmt::Debug for DecodedFrames {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("DecodedFrames")
+            .field("frames", &self.frames.len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl DecodedSound {
-    #[must_use]
-    pub fn new(sample_rate: u32, frames: Vec<PackedFrame>) -> Self {
-        Self {
+    #[cfg(test)]
+    pub(crate) fn new(sample_rate: u32, frames: Vec<PackedFrame>) -> Self {
+        let memory = AudioMemory::shared();
+        let reservation = memory
+            .reserve(frames.capacity() * size_of::<PackedFrame>())
+            .unwrap();
+        Self::prepared(sample_rate, frames, reservation, &memory).unwrap()
+    }
+
+    fn prepared(
+        sample_rate: u32,
+        frames: Vec<PackedFrame>,
+        reservation: MemoryReservation,
+        memory: &AudioMemory,
+    ) -> Result<Self, OpenTrackError> {
+        // SAFETY: the Vec is never resized, and the guard drops before its allocation.
+        let resident = unsafe { ResidentMemory::prepare(&frames, memory) };
+        let frames = Arc::new(DecodedFrames {
+            _resident: resident,
+            frames,
+            _reservation: reservation,
+        });
+        retain_allocation(Arc::clone(&frames)).map_err(OpenTrackError::MemoryWorker)?;
+        Ok(Self {
             sample_rate,
-            frames: Arc::new(frames),
-        }
+            frames,
+        })
     }
 
     #[must_use]
@@ -68,21 +109,21 @@ impl DecodedSound {
 
     #[must_use]
     pub fn frames(&self) -> &[PackedFrame] {
-        &self.frames
+        &self.frames.frames
     }
 
     #[must_use]
     pub fn duration(&self) -> Duration {
-        duration_of_frames(frame_count(self.frames.len()), self.sample_rate)
+        duration_of_frames(frame_count(self.frames().len()), self.sample_rate)
     }
 
     fn bytes(&self) -> usize {
-        size_of_val(self.frames())
+        self.frames.frames.capacity() * size_of::<PackedFrame>()
     }
 
     /// Whether a clone, such as a playing sound's, holds the frames too.
     fn is_shared(&self) -> bool {
-        Arc::strong_count(&self.frames) > 1
+        Arc::strong_count(&self.frames) > 2
     }
 }
 
@@ -95,6 +136,23 @@ pub enum LoadedSound {
 /// Decodes at most `options.bytes_max` bytes of stereo frames. Loops may exceed
 /// [`STATIC_SOUND_DURATION_MAX`]; one-shots may not. Blocks the calling thread.
 pub fn load_sound(path: &Path, options: SoundLoadOptions) -> Result<LoadedSound, OpenTrackError> {
+    load_sound_with_memory(
+        path,
+        options,
+        &AudioMemory::shared(),
+        &PreparationCancellation::default(),
+    )
+}
+
+pub fn load_sound_with_memory(
+    path: &Path,
+    options: SoundLoadOptions,
+    memory: &AudioMemory,
+    cancellation: &PreparationCancellation,
+) -> Result<LoadedSound, OpenTrackError> {
+    if cancellation.is_cancelled() {
+        return Err(OpenTrackError::PreparationCancelled);
+    }
     let file = AudioFile::open(path)?;
     let sample_rate = file.source_sample_rate();
     let frames_max = if options.looping {
@@ -112,10 +170,23 @@ pub fn load_sound(path: &Path, options: SoundLoadOptions) -> Result<LoadedSound,
     let reopened = file.file().clone();
     match file
         .into_probed()
-        .decode_whole(frames_max)
+        .decode_whole(frames_max, memory, cancellation)
         .map_err(OpenTrackError::Unsupported)?
     {
-        Some(frames) => Ok(LoadedSound::Decoded(DecodedSound::new(sample_rate, frames))),
+        Some((frames, reservation)) => {
+            if cancellation.is_cancelled() {
+                drop(frames);
+                drop(reservation);
+                return Err(OpenTrackError::PreparationCancelled);
+            }
+            Ok(LoadedSound::Decoded(DecodedSound::prepared(
+                sample_rate,
+                frames,
+                reservation,
+                memory,
+            )?))
+        }
+        None if cancellation.is_cancelled() => Err(OpenTrackError::PreparationCancelled),
         None => AudioFile::reopen(reopened).map(LoadedSound::Streamed),
     }
 }
@@ -182,6 +253,29 @@ impl SoundCache {
         self.bytes_used = 0;
     }
 
+    /// Releases only allocations without a playing owner; keeper reclamation runs off the mixer.
+    pub fn evict_unused_for(&mut self, bytes_needed: usize, memory: &AudioMemory) {
+        let bytes_needed = allocation_bytes(bytes_needed).unwrap_or(usize::MAX);
+        reclaim_unused();
+        while memory.available_bytes() < bytes_needed {
+            let Some(key) = self
+                .sounds
+                .iter()
+                .filter(|(_, cached)| !cached.sound.is_shared())
+                .min_by_key(|(_, cached)| cached.last_use)
+                .map(|(key, _)| key.clone())
+            else {
+                break;
+            };
+            if let Some(cached) = self.sounds.remove(&key) {
+                let bytes = cached.sound.bytes();
+                self.bytes_used -= bytes;
+                drop(cached);
+                reclaim_unused();
+            }
+        }
+    }
+
     /// Keeps `sound` unless it alone exceeds the budget.
     pub fn insert(&mut self, key: SoundKey, sound: DecodedSound, now: Instant) {
         let bytes = sound.bytes();
@@ -195,10 +289,11 @@ impl SoundCache {
             let Some(oldest) = self
                 .sounds
                 .iter()
+                .filter(|(_, cached)| !cached.sound.is_shared())
                 .min_by_key(|(_, sound)| sound.last_use)
                 .map(|(key, _)| key.clone())
             else {
-                break;
+                return;
             };
             if let Some(evicted) = self.sounds.remove(&oldest) {
                 self.bytes_used -= evicted.sound.bytes();
