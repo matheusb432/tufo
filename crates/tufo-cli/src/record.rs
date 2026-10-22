@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime};
 
+use jiff::Timestamp;
 use serde_json::{Value, json};
 use tufo_client::library::{
     Background, CollectionSource, CollectionView, EntryView, LibraryFolderView, LibrarySnapshot,
@@ -59,6 +60,7 @@ pub(crate) fn entry(value: &EntryView) -> Value {
         "sound": sound_settings(value.sound),
         "icon": sound_icon(value.icon),
         "saved_loop": value.saved_loop.as_ref().map(saved_loop),
+        "last_played_at_unix_ms": value.last_played_at.map(Timestamp::as_millisecond),
     })
 }
 

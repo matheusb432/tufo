@@ -670,6 +670,7 @@ fn entry_message(entry: &EntryView) -> pb::CollectionEntry {
         sound: Some(sound_settings_message(entry.sound)),
         icon: sound_icon_message(entry.icon).into(),
         saved_loop: entry.saved_loop.map(saved_song_loop_message),
+        last_played_at: entry.last_played_at.map(timestamp_message),
     }
 }
 
@@ -737,6 +738,11 @@ fn entry_view(message: pb::CollectionEntry) -> Result<EntryView, InvalidMessage>
             .map_err(|_| invalid("sound"))?,
         icon: sound_icon(message.icon).map_err(|_| invalid("icon"))?,
         saved_loop: message.saved_loop.map(saved_song_loop).transpose()?,
+        last_played_at: message
+            .last_played_at
+            .map(|played_at| Timestamp::new(played_at.seconds, played_at.nanos))
+            .transpose()
+            .map_err(|_| invalid("last_played_at"))?,
     })
 }
 
@@ -1219,6 +1225,7 @@ mod tests {
                     },
                     icon: SoundIcon::CloudLightning,
                     saved_loop: None,
+                    last_played_at: Some(Timestamp::from_second(1_790_000_300).unwrap()),
                 }],
                 pinned: true,
             }],

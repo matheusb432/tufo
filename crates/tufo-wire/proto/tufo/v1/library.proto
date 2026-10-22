@@ -246,6 +246,8 @@ message CollectionEntry {
   SoundIcon icon = 9;
   optional BuiltinTitle builtin_title = 10;
   optional SavedSongLoop saved_loop = 11;
+  // When the entry last started as the main music track; absent if it never has.
+  optional google.protobuf.Timestamp last_played_at = 12;
 }
 
 // How an entry plays as a sound effect.

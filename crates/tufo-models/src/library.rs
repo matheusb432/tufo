@@ -576,6 +576,8 @@ pub struct CollectionEntry {
     pub fade_in: FadeDuration,
     pub fade_out: FadeDuration,
     pub icon: SoundIcon,
+    /// When the entry last started as the main music track.
+    pub last_played_at: Option<Timestamp>,
 }
 
 impl CollectionEntry {

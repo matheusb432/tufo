@@ -784,6 +784,7 @@ mod tests {
             sound: SoundSettings::default(),
             icon: SoundIcon::default(),
             saved_loop: None,
+            last_played_at: None,
         })
     }
 

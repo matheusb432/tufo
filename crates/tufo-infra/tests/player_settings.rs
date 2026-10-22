@@ -97,10 +97,12 @@ async fn existing_player_settings_default_effects_and_browser_to_full_volume() -
          ALTER TABLE player_settings DROP COLUMN browser_muted;
          ALTER TABLE collections DROP COLUMN pinned;
          ALTER TABLE collection_entries DROP COLUMN position;
+         ALTER TABLE collection_entries DROP COLUMN last_played_at;
          DELETE FROM __toasty_migrations
          WHERE name IN (
              '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql',
-             '0012_pinned_collections.sql', '0013_custom_entry_order.sql'
+             '0012_pinned_collections.sql', '0013_custom_entry_order.sql',
+             '0014_record_entry_last_played.sql'
          );",
     )?;
     drop(legacy);

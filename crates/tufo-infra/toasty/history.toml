@@ -69,3 +69,8 @@ snapshot_name = "0012_snapshot.toml"
 id = 1140161648973583005
 name = "0013_custom_entry_order.sql"
 snapshot_name = "0013_snapshot.toml"
+
+[[migrations]]
+id = 8127749961547068351
+name = "0014_record_entry_last_played.sql"
+snapshot_name = "0014_snapshot.toml"

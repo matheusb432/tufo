@@ -237,8 +237,9 @@ mod tests {
              ALTER TABLE audio_files DROP COLUMN builtin_title;
              ALTER TABLE audio_files DROP COLUMN song_source;
              ALTER TABLE collection_entries DROP COLUMN position;
+             ALTER TABLE collection_entries DROP COLUMN last_played_at;
              DELETE FROM __toasty_migrations
-             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql', '0013_custom_entry_order.sql');",
+             WHERE name IN ('0006_builtin_titles.sql', '0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql', '0013_custom_entry_order.sql', '0014_record_entry_last_played.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -302,7 +303,8 @@ mod tests {
              ALTER TABLE audio_files DROP COLUMN song_source;
              ALTER TABLE collections DROP COLUMN pinned;
              ALTER TABLE collection_entries DROP COLUMN position;
-             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql', '0013_custom_entry_order.sql');",
+             ALTER TABLE collection_entries DROP COLUMN last_played_at;
+             DELETE FROM __toasty_migrations WHERE name IN ('0007_song_sources.sql', '0008_kenku_import_jobs.sql', '0009_effects_volume.sql', '0010_song_loops.sql', '0011_browser_settings.sql', '0012_pinned_collections.sql', '0013_custom_entry_order.sql', '0014_record_entry_last_played.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -388,8 +390,9 @@ mod tests {
             .execute_batch(
                 "ALTER TABLE collections DROP COLUMN pinned;
              ALTER TABLE collection_entries DROP COLUMN position;
+             ALTER TABLE collection_entries DROP COLUMN last_played_at;
              DELETE FROM __toasty_migrations
-             WHERE name IN ('0012_pinned_collections.sql', '0013_custom_entry_order.sql');",
+             WHERE name IN ('0012_pinned_collections.sql', '0013_custom_entry_order.sql', '0014_record_entry_last_played.sql');",
             )
             .unwrap();
         drop(legacy);
@@ -519,7 +522,8 @@ mod tests {
         legacy
             .execute_batch(
                 "ALTER TABLE collection_entries DROP COLUMN position;
-             DELETE FROM __toasty_migrations WHERE name = '0013_custom_entry_order.sql';",
+             ALTER TABLE collection_entries DROP COLUMN last_played_at;
+             DELETE FROM __toasty_migrations WHERE name IN ('0013_custom_entry_order.sql', '0014_record_entry_last_played.sql');",
             )
             .unwrap();
         drop(legacy);

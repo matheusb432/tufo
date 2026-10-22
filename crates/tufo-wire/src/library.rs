@@ -122,6 +122,8 @@ pub struct EntryView {
     pub sound: SoundSettings,
     pub icon: SoundIcon,
     pub saved_loop: Option<SavedSongLoop>,
+    /// When the entry last started as the main music track.
+    pub last_played_at: Option<Timestamp>,
 }
 
 /// An audio file a song source keeps in the library, whether or not a playlist lists it.

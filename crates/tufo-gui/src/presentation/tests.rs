@@ -37,6 +37,7 @@ fn entry(seed: u128, title: &str, seconds: u64) -> EntryView {
         sound: SoundSettings::default(),
         icon: SoundIcon::default(),
         saved_loop: None,
+        last_played_at: None,
     }
 }
 

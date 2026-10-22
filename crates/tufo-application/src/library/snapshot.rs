@@ -183,6 +183,7 @@ fn entry_view(
         sound: entry.sound_settings(),
         icon: entry.icon,
         saved_loop,
+        last_played_at: entry.last_played_at,
     }
 }
 
@@ -274,6 +275,7 @@ mod tests {
             sound: SoundSettings::default(),
             icon: SoundIcon::default(),
             saved_loop: None,
+            last_played_at: None,
         };
         PositionedEntry { position, view }
     }
