@@ -1,6 +1,11 @@
 //! The library operations over a real SQLite database and real folders.
 
-use std::{collections::BTreeSet, fs, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeSet,
+    fs,
+    sync::Arc,
+    time::{Duration, SystemTime},
+};
 
 use support::wav_bytes;
 use tufo_application::library::{
@@ -9,7 +14,7 @@ use tufo_application::library::{
     add_songs_to_playlist::{self, AddSongsToPlaylistError},
     create_collection, delete_collection, delete_library_folder,
     delete_song::{self, DeleteSongError},
-    folder_watcher, import_paths,
+    folder_watcher, import_paths, record_last_played,
     seed_default_effects::{self, DefaultEffectFile, SeedDefaultEffectsOutcome},
     sync_library, update_collection,
 };
@@ -22,11 +27,16 @@ use tufo_models::{
         default_effects::DefaultEffect,
     },
     path::{ImageFilePath, LocalPath},
-    playback::AudioFilePath,
+    playback::{
+        AudioFilePath,
+        player_state::{MusicState, PlayerState, PositionSample},
+        queue::QueueEntry,
+    },
 };
 use tufo_wire::library::{
     AddFilesToCollection, AddSongsToPlaylist, Background, CollectionSource, CollectionView,
-    CreateCollection, ImportPaths, LibrarySnapshot, SongSource, SongView, UpdateCollection,
+    CreateCollection, EntryView, ImportPaths, LibrarySnapshot, SongSource, SongView,
+    UpdateCollection,
 };
 
 mod support;
@@ -628,6 +638,92 @@ async fn the_watcher_adds_a_copied_file_without_a_manual_sync() {
     });
 
     assert_eq!(copied, Ok(true));
+}
+
+fn playing(collection: &CollectionView, entry: &EntryView, paused: bool) -> PlayerState {
+    PlayerState {
+        music: Some(MusicState {
+            collection_id: collection.id,
+            entry: QueueEntry {
+                entry_id: entry.id,
+                audio_file_id: entry.audio_file_id,
+                path: entry.path.clone(),
+                title: entry.title.as_str().to_owned(),
+                duration: Some(entry.duration),
+            },
+            position: PositionSample {
+                position: Duration::ZERO,
+                sampled_at: SystemTime::now(),
+            },
+            duration: Some(entry.duration),
+            paused,
+            loop_region: None,
+        }),
+        ..PlayerState::default()
+    }
+}
+
+#[tokio::test]
+async fn each_new_main_track_records_when_it_last_played_once() {
+    let fixture = Fixture::new().await.unwrap();
+    fixture.write_track("rpg/ambush.wav", 440.0).unwrap();
+    fixture.write_track("rpg/tavern.wav", 450.0).unwrap();
+    fixture
+        .import(CollectionKind::Playlist, &["rpg"])
+        .await
+        .unwrap();
+    let playlist = titled(&fixture.snapshot(), "rpg").unwrap().clone();
+    let [ambush, tavern] = [&playlist.entries[0], &playlist.entries[1]];
+    let last_played = |snapshot: &LibrarySnapshot, entry: &EntryView| {
+        titled(snapshot, "rpg")
+            .and_then(|playlist| playlist.entries.iter().find(|found| found.id == entry.id))
+            .and_then(|found| found.last_played_at)
+    };
+    let (player, player_states) = tokio::sync::watch::channel(PlayerState::default());
+    let mut snapshots = fixture.library.watch();
+    let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+    let record = record_last_played::run(&fixture.library, player_states, async {
+        let _ = stopped.await;
+    });
+    let play_then_wait = async {
+        player.send_replace(playing(&playlist, ambush, false));
+        let ambush_recorded = tokio::time::timeout(
+            Duration::from_secs(5),
+            snapshots.wait_for(|snapshot| last_played(snapshot, ambush).is_some()),
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .clone();
+        // Pausing the same track is not a start; give the recorder time to see it.
+        player.send_replace(playing(&playlist, ambush, true));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        player.send_replace(playing(&playlist, tavern, false));
+        let tavern_recorded = tokio::time::timeout(
+            Duration::from_secs(5),
+            snapshots.wait_for(|snapshot| last_played(snapshot, tavern).is_some()),
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .clone();
+        let _ = stop.send(());
+        (ambush_recorded, tavern_recorded)
+    };
+
+    let ((), (ambush_recorded, tavern_recorded)) = tokio::join!(record, play_then_wait);
+
+    assert_eq!(last_played(&ambush_recorded, tavern), None);
+    assert_eq!(tavern_recorded.revision, ambush_recorded.revision + 1);
+    assert_eq!(
+        last_played(&tavern_recorded, ambush),
+        last_played(&ambush_recorded, ambush)
+    );
+    assert!(last_played(&tavern_recorded, tavern) >= last_played(&ambush_recorded, ambush));
+    assert_eq!(
+        last_played(&fixture.snapshot(), tavern),
+        last_played(&tavern_recorded, tavern)
+    );
 }
 
 #[tokio::test]

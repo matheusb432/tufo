@@ -22,6 +22,7 @@ pub mod import_song_loops;
 pub mod library_files;
 mod manual_files;
 pub mod reconcile;
+pub mod record_last_played;
 pub mod saved_song_loops;
 pub mod seed_default_effects;
 mod snapshot;

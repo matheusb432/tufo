@@ -16,10 +16,10 @@ pub use server::serve;
 pub use state::AppState;
 use tufo_application::{
     library::{
-        Library, folder_watcher,
+        Library, folder_watcher, record_last_played,
         seed_default_effects::{self, DefaultEffectFile, SeedDefaultEffectsOutcome},
     },
-    playback::update_player_settings,
+    playback::{update_player_settings, watch_player},
 };
 use tufo_infra::{
     browser::ProcessBrowserLauncher,
@@ -78,6 +78,17 @@ pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
             .await;
         }
     });
+    let (stop_recording, recording_stopped) = tokio::sync::oneshot::channel::<()>();
+    let record_plays = tokio::spawn({
+        let library = Arc::clone(&library);
+        let player_states = watch_player::execute(player.as_ref());
+        async move {
+            record_last_played::run(&library, player_states, async {
+                let _ = recording_stopped.await;
+            })
+            .await;
+        }
+    });
 
     tracing::info!(path = %endpoint.path().display(), "tufo-server listening");
     let result = serve(
@@ -97,8 +108,12 @@ pub async fn run(discord_credentials: Option<PathBuf>) -> anyhow::Result<()> {
     )
     .await;
     let _ = stop_following.send(());
+    let _ = stop_recording.send(());
     if let Err(error) = follow_library.await {
         tracing::error!(%error, "the library follower stopped abnormally");
+    }
+    if let Err(error) = record_plays.await {
+        tracing::error!(%error, "the last-played recorder stopped abnormally");
     }
     player.shut_down().await;
     tracing::info!("tufo-server stopped");
