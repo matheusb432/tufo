@@ -90,6 +90,7 @@ impl TourVisibility {
 pub enum SidebarPage {
     Home,
     Songs,
+    Recent,
     Browser,
     Playlists,
     Soundboards,
@@ -97,9 +98,10 @@ pub enum SidebarPage {
 
 impl SidebarPage {
     /// In the sidebar's order.
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Home,
         Self::Songs,
+        Self::Recent,
         Self::Browser,
         Self::Playlists,
         Self::Soundboards,
@@ -110,6 +112,7 @@ impl SidebarPage {
         match self {
             Self::Home => "home",
             Self::Songs => "songs",
+            Self::Recent => "recent",
             Self::Browser => "browser",
             Self::Playlists => "playlists",
             Self::Soundboards => "soundboards",

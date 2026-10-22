@@ -365,6 +365,10 @@ msgstr ""
 msgid "Drums"
 msgstr ""
 
+#: ui/tours/recent.slint
+msgid "Each song a playlist plays lands here, newest first, under the playlist it played from. Double-click a song or use its play button to play that playlist again from the song."
+msgstr ""
+
 #: ui/dialogs.slint ui/pages.slint
 msgid "Edit"
 msgstr ""
@@ -573,6 +577,14 @@ msgstr ""
 msgid "Joining the voice channel…"
 msgstr ""
 
+#: ui/tours/home.slint
+msgid "Jump back in"
+msgstr ""
+
+#: src/presentation.rs
+msgid "Just now"
+msgstr ""
+
 #: ui/dock.slint
 msgid "Keep on top"
 msgstr ""
@@ -667,6 +679,10 @@ msgstr ""
 msgid "More"
 msgstr ""
 
+#: ui/tours/recent.slint
+msgid "More from a song"
+msgstr ""
+
 #: src/presentation.rs
 msgid "Mountain"
 msgstr ""
@@ -716,6 +732,10 @@ msgid "No music is playing."
 msgstr ""
 
 #: ui/pages.slint
+msgid "No recently played song matches the filter."
+msgstr ""
+
+#: ui/pages.slint
 msgid "No sound matches the filter."
 msgstr ""
 
@@ -747,8 +767,16 @@ msgstr ""
 msgid "Oldest first"
 msgstr ""
 
+#: ui/tours/home.slint
+msgid "Once your playlists play, Recently played keeps their latest songs here. Click one to play its playlist again from that song; See all opens the full list."
+msgstr ""
+
 #: src/tray/linux.rs src/tray/icon_menu.rs
 msgid "Open"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Open its playlist"
 msgstr ""
 
 #: src/controller.rs
@@ -811,6 +839,10 @@ msgstr ""
 msgid "Piano"
 msgstr ""
 
+#: ui/tours/recent.slint
+msgid "Pick up where you left off"
+msgstr ""
+
 #: src/presentation.rs
 msgid "Pierre-Jacques Volaire, 1771"
 msgstr ""
@@ -829,6 +861,10 @@ msgstr ""
 
 #: ui/output.slint
 msgid "Play into"
+msgstr ""
+
+#: ui/pages.slint
+msgid "Played"
 msgstr ""
 
 #: src/search.rs
@@ -857,6 +893,14 @@ msgstr ""
 
 #: src/controller.rs
 msgid "Reading the audio files…"
+msgstr ""
+
+#: ui/sidebar.slint
+msgid "Recent"
+msgstr ""
+
+#: ui/pages.slint ui/sidebar.slint
+msgid "Recently played"
 msgstr ""
 
 #: ui/output.slint
@@ -889,6 +933,10 @@ msgstr ""
 
 #: ui/dock.slint
 msgid "Resume sounds"
+msgstr ""
+
+#: ui/tours/recent.slint
+msgid "Right-click a song to add it to the mix, open its playlist, or add it to another playlist. Ctrl+F filters by song or playlist."
 msgstr ""
 
 #: ui/dialogs.slint
@@ -983,6 +1031,10 @@ msgstr ""
 
 #: src/presentation.rs
 msgid "Some values are invalid. Check them and try again."
+msgstr ""
+
+#: ui/pages.slint
+msgid "Songs you play from a playlist show here, newest first, so you can pick them up again."
 msgstr ""
 
 #: ui/pages.slint
@@ -2587,3 +2639,19 @@ msgstr ""
 #: crates/tufo-gui/ui/dock.slint
 msgid "Retry local audio (Ctrl+Shift+R)"
 msgstr ""
+
+#: ui/pages.slint
+msgid "{0} · {1}"
+msgstr ""
+
+#: src/presentation.rs
+msgid "{n} hour ago"
+msgid_plural "{n} hours ago"
+msgstr[0] ""
+msgstr[1] ""
+
+#: src/presentation.rs
+msgid "{n} minute ago"
+msgid_plural "{n} minutes ago"
+msgstr[0] ""
+msgstr[1] ""

@@ -10,6 +10,7 @@ use crate::ui::TourId;
 const TOURS: &[TourId] = &[
     TourId::Home,
     TourId::Songs,
+    TourId::Recent,
     TourId::Playlists,
     TourId::Soundboards,
     TourId::Playlist,
@@ -30,6 +31,7 @@ fn stable_id(tour: TourId) -> &'static str {
     match tour {
         TourId::Home => "home",
         TourId::Songs => "songs",
+        TourId::Recent => "recent",
         TourId::Playlists => "playlists",
         TourId::Soundboards => "soundboards",
         TourId::Playlist => "playlist",

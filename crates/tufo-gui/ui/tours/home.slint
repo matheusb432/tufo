@@ -2,10 +2,16 @@ import { Tour, TourId } from "state.slint";
 import { PlaybackTour } from "playback.slint";
 
 export global HomeTour {
+    out property <string> home-recent: "home.home-recent";
     out property <string> home-playlists: "home.home-playlists";
     out property <string> home-soundboards: "home.home-soundboards";
     out property <string> navigation: "home.navigation";
     out property <Tour> guide: { id: TourId.home, steps: [
+        {
+            anchor: HomeTour.home-recent,
+            title: @tr("Jump back in"),
+            body: @tr("Once your playlists play, Recently played keeps their latest songs here. Click one to play its playlist again from that song; See all opens the full list."),
+        },
         {
             anchor: HomeTour.home-playlists,
             title: @tr("Music for your session"),

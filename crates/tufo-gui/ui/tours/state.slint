@@ -1,5 +1,5 @@
 export enum TourId {
-    home, songs, playlists, soundboards, playlist, soundboard, new-collection, add-to-playlist, edit-collection, edit-track, edit-sound,
+    home, songs, recent, playlists, soundboards, playlist, soundboard, new-collection, add-to-playlist, edit-collection, edit-track, edit-sound,
     artwork, search, settings, kenku, loop-editor,
 }
 
@@ -12,7 +12,7 @@ export struct TourStep {
 }
 export struct Tour { id: TourId, steps: [TourStep] }
 
-export enum TourScroll { none, home, grid, songs, collection, dialog, artwork, search }
+export enum TourScroll { none, home, grid, songs, recent, collection, dialog, artwork, search }
 export struct TourRect { x: length, y: length, width: length, height: length }
 export struct TourLayout { card: TourRect, spotlight: TourRect, spotlight-visible: bool }
 

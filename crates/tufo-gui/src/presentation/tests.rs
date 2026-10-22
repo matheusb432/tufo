@@ -153,7 +153,7 @@ fn tracks_name_their_song_source_and_the_date_in_the_local_timezone() {
         ]
     );
     assert_eq!(
-        date_added(
+        short_date(
             dragon.added_at,
             jiff::tz::TimeZone::fixed(jiff::tz::Offset::constant(-3))
         ),
@@ -1005,4 +1005,70 @@ fn an_arranged_entry_lands_on_its_place_and_the_collection_turns_custom() {
         0
     ));
     assert_eq!(titles(&playlist), ["Tavern", "Chase", "Dragon", "Ambush"]);
+}
+
+fn played(mut entry: EntryView, at: &str) -> EntryView {
+    entry.last_played_at = Some(at.parse().unwrap());
+    entry
+}
+
+#[test]
+fn recently_played_lists_each_song_once_under_its_latest_playlist_newest_first() {
+    let mut lute_in_boss_fights = played(entry(14, "Lute", 60), "2026-10-21T20:00:00Z");
+    lute_in_boss_fights.audio_file_id = AudioFileId::from_uuid(uuid(12));
+    let snapshot = LibrarySnapshot {
+        collections: vec![
+            collection(
+                1,
+                CollectionKind::Playlist,
+                "Boss fights",
+                vec![
+                    played(entry(10, "Ancient Dragon", 241), "2026-10-21T21:00:00Z"),
+                    entry(11, "Lich King", 3_725),
+                    lute_in_boss_fights,
+                ],
+            ),
+            collection(
+                2,
+                CollectionKind::Playlist,
+                "Tavern",
+                vec![played(entry(12, "Lute", 60), "2026-10-21T21:30:00Z")],
+            ),
+            collection(
+                3,
+                CollectionKind::Soundboard,
+                "Storm",
+                vec![played(entry(13, "Thunder", 4), "2026-10-21T21:59:00Z")],
+            ),
+        ],
+        ..LibrarySnapshot::default()
+    };
+    let now = SystemTime::from("2026-10-21T22:00:00Z".parse::<jiff::Timestamp>().unwrap());
+
+    let rows = recent_tracks(&snapshot, &PlayerState::default(), "", now);
+
+    let listed = rows
+        .iter()
+        .map(|row| (row.title.as_str(), row.playlist_title.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        listed,
+        [("Lute", "Tavern"), ("Ancient Dragon", "Boss fights")]
+    );
+    assert_eq!(rows[0].id, CollectionEntryId::from_uuid(uuid(12)));
+    let tavern_only = recent_tracks(&snapshot, &PlayerState::default(), "tavern", now);
+    assert_eq!(tavern_only.len(), 1);
+    assert_eq!(tavern_only[0].title, "Lute");
+}
+
+#[test]
+fn a_recent_song_says_minutes_or_hours_within_a_day_then_its_date() {
+    let now = SystemTime::from("2026-10-21T22:00:00Z".parse::<jiff::Timestamp>().unwrap());
+    let ago = |at: &str| played_ago(at.parse().unwrap(), now, &jiff::tz::TimeZone::UTC);
+
+    assert_eq!(ago("2026-10-21T21:59:30Z"), "Just now");
+    assert_eq!(ago("2026-10-21T21:59:00Z"), "1 minute ago");
+    assert_eq!(ago("2026-10-21T21:01:00Z"), "59 minutes ago");
+    assert_eq!(ago("2026-10-21T19:30:00Z"), "2 hours ago");
+    assert_eq!(ago("2026-10-20T21:00:00Z"), "Oct 20, 2026");
 }

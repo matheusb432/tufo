@@ -365,6 +365,10 @@ msgstr "Solte os arquivos aqui…"
 msgid "Drums"
 msgstr "Tambores"
 
+#: ui/tours/recent.slint
+msgid "Each song a playlist plays lands here, newest first, under the playlist it played from. Double-click a song or use its play button to play that playlist again from the song."
+msgstr "Cada música que uma playlist toca aparece aqui, das mais recentes às mais antigas, com a playlist de onde tocou. Clique duas vezes numa música ou use o botão de reprodução para tocar essa playlist de novo a partir dela."
+
 #: ui/dialogs.slint ui/pages.slint
 msgid "Edit"
 msgstr "Editar"
@@ -573,6 +577,14 @@ msgstr "John Martin, 1841"
 msgid "Joining the voice channel…"
 msgstr "Entrando no canal de voz…"
 
+#: ui/tours/home.slint
+msgid "Jump back in"
+msgstr "Volte ao que tocou"
+
+#: src/presentation.rs
+msgid "Just now"
+msgstr "Agora mesmo"
+
 #: ui/dock.slint
 msgid "Keep on top"
 msgstr "Manter no topo"
@@ -667,6 +679,10 @@ msgstr "Não encontrado"
 msgid "More"
 msgstr "Mais"
 
+#: ui/tours/recent.slint
+msgid "More from a song"
+msgstr "Mais opções de uma música"
+
 #: src/presentation.rs
 msgid "Mountain"
 msgstr "Montanha"
@@ -716,6 +732,10 @@ msgid "No music is playing."
 msgstr "Nenhuma música está tocando."
 
 #: ui/pages.slint
+msgid "No recently played song matches the filter."
+msgstr "Nenhuma música tocada recentemente corresponde ao filtro."
+
+#: ui/pages.slint
 msgid "No sound matches the filter."
 msgstr "Nenhum som corresponde ao filtro."
 
@@ -747,9 +767,17 @@ msgstr "Nada tocando"
 msgid "Oldest first"
 msgstr "Mais antigas"
 
+#: ui/tours/home.slint
+msgid "Once your playlists play, Recently played keeps their latest songs here. Click one to play its playlist again from that song; See all opens the full list."
+msgstr "Quando suas playlists tocam, Tocadas recentemente guarda aqui as últimas músicas. Clique numa para tocar a playlist de novo a partir dela; Ver tudo abre a lista completa."
+
 #: src/tray/linux.rs src/tray/icon_menu.rs
 msgid "Open"
 msgstr "Abrir"
+
+#: ui/pages.slint
+msgid "Open its playlist"
+msgstr "Abrir a playlist"
 
 #: src/controller.rs
 msgid "Open Playlists or Soundboards to drop folders"
@@ -811,6 +839,10 @@ msgstr "Perigos"
 msgid "Piano"
 msgstr "Piano"
 
+#: ui/tours/recent.slint
+msgid "Pick up where you left off"
+msgstr "Continue de onde parou"
+
 #: src/presentation.rs
 msgid "Pierre-Jacques Volaire, 1771"
 msgstr "Pierre-Jacques Volaire, 1771"
@@ -830,6 +862,10 @@ msgstr "Reproduzir"
 #: ui/output.slint
 msgid "Play into"
 msgstr "Tocar em"
+
+#: ui/pages.slint
+msgid "Played"
+msgstr "Tocada"
 
 #: src/search.rs
 msgid "Playlist"
@@ -858,6 +894,14 @@ msgstr "Ratos"
 #: src/controller.rs
 msgid "Reading the audio files…"
 msgstr "Lendo os arquivos de áudio…"
+
+#: ui/sidebar.slint
+msgid "Recent"
+msgstr "Recentes"
+
+#: ui/pages.slint ui/sidebar.slint
+msgid "Recently played"
+msgstr "Tocadas recentemente"
 
 #: ui/output.slint
 msgid "Refresh the voice channels"
@@ -890,6 +934,10 @@ msgstr "Retomar sons"
 #: ui/dock.slint
 msgid "Resume sounds"
 msgstr "Retomar sons"
+
+#: ui/tours/recent.slint
+msgid "Right-click a song to add it to the mix, open its playlist, or add it to another playlist. Ctrl+F filters by song or playlist."
+msgstr "Clique com o botão direito numa música para adicioná-la à mixagem, abrir a playlist dela ou adicioná-la a outra playlist. Ctrl+F filtra por música ou playlist."
 
 #: ui/dialogs.slint
 msgid "Run at startup"
@@ -984,6 +1032,10 @@ msgstr "Neve"
 #: src/presentation.rs
 msgid "Some values are invalid. Check them and try again."
 msgstr "Alguns valores são inválidos. Confira e tente novamente."
+
+#: ui/pages.slint
+msgid "Songs you play from a playlist show here, newest first, so you can pick them up again."
+msgstr "As músicas que você toca de uma playlist aparecem aqui, das mais recentes às mais antigas, para você retomá-las."
 
 #: ui/pages.slint
 msgid "Sort: {0}"
@@ -2587,3 +2639,19 @@ msgstr "Tentar novamente"
 #: crates/tufo-gui/ui/dock.slint
 msgid "Retry local audio (Ctrl+Shift+R)"
 msgstr "Tentar o áudio local novamente (Ctrl+Shift+R)"
+
+#: ui/pages.slint
+msgid "{0} · {1}"
+msgstr "{0} · {1}"
+
+#: src/presentation.rs
+msgid "{n} hour ago"
+msgid_plural "{n} hours ago"
+msgstr[0] "Há {n} hora"
+msgstr[1] "Há {n} horas"
+
+#: src/presentation.rs
+msgid "{n} minute ago"
+msgid_plural "{n} minutes ago"
+msgstr[0] "Há {n} minuto"
+msgstr[1] "Há {n} minutos"

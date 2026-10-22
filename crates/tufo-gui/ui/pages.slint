@@ -2,6 +2,7 @@
 
 import { HomeTour } from "tours/home.slint";
 import { SongsTour } from "tours/songs.slint";
+import { RecentTour } from "tours/recent.slint";
 import { ShelfTour } from "tours/shelves.slint";
 import { CollectionTour } from "tours/collection.slint";
 import { GuidedTours, TourId, TourScroll } from "tours/state.slint";
@@ -10,7 +11,7 @@ import { TourTarget, TourScrollArea } from "tours/target.slint";
 import { Motion, Theme } from "theme.slint";
 import {
     Actions, Art, CollectionCard, CollectionKind, LibraryView, LoopBadge, Navigation, OrderKey, Page,
-    PlayerView, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
+    PlayerView, RecentTrack, Search, Session, SongFolder, SongRow, SoundIcons, SoundTile, TrackRow,
 } from "state.slint";
 import {
     Button, ButtonKind, Equalizer, Icon, IconButton, MenuItem as MenuAction, MenuSurface, ScrollThumb, Slider,
@@ -409,8 +410,378 @@ component HomeShelf inherits VerticalLayout {
     }
 }
 
+// A row's right-click menu: a primary action, then optionally a second action, Add to playlist,
+// Edit, Edit loop, and a red Remove. Slint's built-in menu items cannot color destructive
+// actions.
+component RowMenu inherits TouchArea {
+    in property <string> primary-action-title;
+    in property <bool> primary-action-enabled: true;
+    in property <bool> secondary-action-shown;
+    in property <string> secondary-action-title;
+    in property <bool> secondary-action-enabled: true;
+    in property <bool> add-to-playlist-shown;
+    in property <bool> edit-shown: true;
+    in property <bool> loop-shown;
+    in property <bool> remove-shown;
+    in property <string> remove-title: @tr("Remove");
+    callback primary-action();
+    callback secondary-action();
+    callback add-to-playlist();
+    callback edit();
+    callback edit-loop();
+    callback remove();
+    // Pressing and moving lifts the row to a new place; pointers are in window coordinates.
+    in property <bool> arrangeable;
+    out property <bool> arranging;
+    callback arrange-started(Point);
+    callback arrange-moved(Point);
+    callback arrange-ended();
+    callback arrange-cancelled();
+    property <Point> menu-position;
+    // Where each optional action sits when it shows.
+    property <int> playlist-index: root.secondary-action-shown ? 2 : 1;
+    property <int> edit-index: root.playlist-index + (root.add-to-playlist-shown ? 1 : 0);
+    property <int> loop-index: root.edit-index + (root.edit-shown ? 1 : 0);
+    property <int> remove-index: root.loop-index + (root.loop-shown ? 1 : 0);
+    property <int> action-count: root.remove-index + (root.remove-shown ? 1 : 0);
+    mouse-cursor: root.arranging ? MouseCursor.grabbing : MouseCursor.pointer;
+
+    public function show-menu(position: Point) {
+        root.menu-position = {
+            x: position.x - root.absolute-position.x,
+            y: position.y - root.absolute-position.y,
+        };
+        menu.show();
+    }
+
+    function enabled-at(index: int) -> bool {
+        if index == 0 {
+            return root.primary-action-enabled;
+        }
+        if index == 1 && root.secondary-action-shown {
+            return root.secondary-action-enabled;
+        }
+        return true;
+    }
+
+    function step(index: int, down: bool) -> int {
+        Math.mod(index + (down ? 1 : -1) + root.action-count, root.action-count)
+    }
+
+    function activate(index: int) {
+        if !root.enabled-at(index) {
+            return;
+        }
+        menu.close();
+        if index == 0 {
+            root.primary-action();
+        } else if index == 1 && root.secondary-action-shown {
+            root.secondary-action();
+        } else if root.add-to-playlist-shown && index == root.playlist-index {
+            root.add-to-playlist();
+        } else if root.edit-shown && index == root.edit-index {
+            root.edit();
+        } else if root.loop-shown && index == root.loop-index {
+            root.edit-loop();
+        } else if root.remove-shown && index == root.remove-index {
+            root.remove();
+        }
+    }
+
+    moved => {
+        if root.arrangeable && root.pressed && !root.arranging
+            && max(abs(root.mouse-x - root.pressed-x), abs(root.mouse-y - root.pressed-y)) > Theme.arrange-threshold {
+            root.arranging = true;
+            root.arrange-started({
+                x: root.absolute-position.x + root.pressed-x,
+                y: root.absolute-position.y + root.pressed-y,
+            });
+        }
+        if root.arranging {
+            root.arrange-moved({
+                x: root.absolute-position.x + root.mouse-x,
+                y: root.absolute-position.y + root.mouse-y,
+            });
+        }
+    }
+
+    pointer-event(event) => {
+        if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+            root.show-menu({
+                x: root.absolute-position.x + root.mouse-x,
+                y: root.absolute-position.y + root.mouse-y,
+            });
+        }
+        if root.arranging && event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+            root.arranging = false;
+            root.arrange-ended();
+        }
+        if root.arranging && event.kind == PointerEventKind.cancel {
+            root.arranging = false;
+            root.arrange-cancelled();
+        }
+    }
+
+    menu := PopupWindow {
+        x: root.menu-position.x;
+        y: root.menu-position.y;
+        close-policy: close-on-click-outside;
+        keys := FocusScope {
+            property <int> selected: -1;
+            init => { self.focus(); }
+            key-pressed(event) => {
+                if event.text == Key.Escape {
+                    menu.close();
+                    return accept;
+                }
+                if event.text == Key.DownArrow || event.text == Key.UpArrow {
+                    let down = event.text == Key.DownArrow;
+                    self.selected = self.selected < 0 ? (down ? 0 : root.action-count - 1) : root.step(self.selected, down);
+                    // Only the first two actions can be disabled, and an enabled one follows
+                    // them, so skipping twice suffices.
+                    if !root.enabled-at(self.selected) {
+                        self.selected = root.step(self.selected, down);
+                    }
+                    if !root.enabled-at(self.selected) {
+                        self.selected = root.step(self.selected, down);
+                    }
+                    return accept;
+                }
+                if event.text == Key.Return || event.text == " " {
+                    root.activate(self.selected);
+                    return accept;
+                }
+                reject
+            }
+            MenuSurface {
+                MenuAction {
+                    text: root.primary-action-title;
+                    enabled: root.primary-action-enabled;
+                    highlighted: keys.selected == 0;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = 0; }
+                    }
+                    activated => { root.activate(0); }
+                }
+                if root.secondary-action-shown: MenuAction {
+                    text: root.secondary-action-title;
+                    enabled: root.secondary-action-enabled;
+                    highlighted: keys.selected == 1;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = 1; }
+                    }
+                    activated => { root.activate(1); }
+                }
+                if root.add-to-playlist-shown: MenuAction {
+                    text: @tr("Add to playlist…");
+                    highlighted: keys.selected == root.playlist-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.playlist-index; }
+                    }
+                    activated => { root.activate(root.playlist-index); }
+                }
+                if root.edit-shown: MenuAction {
+                    text: @tr("Edit");
+                    highlighted: keys.selected == root.edit-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.edit-index; }
+                    }
+                    activated => { root.activate(root.edit-index); }
+                }
+                if root.loop-shown: MenuAction {
+                    text: @tr("Edit loop…");
+                    highlighted: keys.selected == root.loop-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.loop-index; }
+                    }
+                    activated => { root.activate(root.loop-index); }
+                }
+                if root.remove-shown: MenuAction {
+                    text: root.remove-title;
+                    destructive: true;
+                    highlighted: keys.selected == root.remove-index;
+                    changed has-hover => {
+                        if self.has-hover { keys.selected = root.remove-index; }
+                    }
+                    activated => { root.activate(root.remove-index); }
+                }
+            }
+        }
+    }
+}
+
+// The menu a recently played song opens on a right-click.
+component RecentMenu inherits RowMenu {
+    in property <RecentTrack> track;
+    callback add-to-playlist-requested();
+    primary-action-title: PlayerView.can-add-layer ? @tr("Add to mix") : @tr("Mix full (3 songs)");
+    primary-action-enabled: PlayerView.can-add-layer && !root.track.missing && !root.track.current;
+    primary-action => {
+        Actions.add-music-layer(root.track.id);
+    }
+    secondary-action-shown: true;
+    secondary-action-title: @tr("Open its playlist");
+    secondary-action => {
+        Actions.open-page(Page.playlist, root.track.playlist-id);
+    }
+    add-to-playlist-shown: true;
+    add-to-playlist => {
+        root.add-to-playlist-requested();
+    }
+    edit-shown: false;
+    loop-shown: !root.track.missing;
+    edit-loop => {
+        Actions.edit-song-loop(root.track.song-id);
+    }
+}
+
+// A song that played lately, as Home shows it: its playlist's painting, its title, and where and
+// when it played. Clicking it plays the song in its playlist again, or pauses it.
+component RecentTile inherits Rectangle {
+    in property <RecentTrack> track;
+    callback add-to-playlist();
+    property <length> thumbnail-size: 44px;
+    border-radius: Theme.radius-row;
+    background: touch.has-hover ? Theme.panel-hover : Theme.panel;
+    animate background { duration: Motion.hover; }
+    border-width: 1px;
+    border-color: root.track.current ? Theme.lit.with-alpha(0.5) : Theme.panel-edge;
+    opacity: root.track.missing ? 0.55 : 1;
+    accessible-role: button;
+    accessible-label: root.track.title;
+    accessible-description: @tr("{0} · {1}", root.track.playlist-title, root.track.played);
+    accessible-action-default => {
+        if !root.track.missing {
+            Actions.play-track(root.track.id);
+        }
+    }
+    touch := RecentMenu {
+        track: root.track;
+        add-to-playlist-requested => {
+            root.add-to-playlist();
+        }
+        clicked => {
+            if !root.track.missing {
+                Actions.play-track(root.track.id);
+            }
+        }
+    }
+
+    HorizontalLayout {
+        padding: 8px;
+        padding-right: 10px;
+        spacing: 12px;
+        Rectangle {
+            y: (parent.height - self.height) / 2;
+            width: root.thumbnail-size;
+            height: root.thumbnail-size;
+            Image {
+                width: parent.width;
+                height: parent.height;
+                source: Art.painting(root.track.playlist-id, root.track.background, self.width, self.height, Theme.radius-small, Art.pictures-revision);
+                image-fit: fill;
+            }
+
+            if root.track.playing: Rectangle {
+                border-radius: Theme.radius-small;
+                background: Theme.badge;
+                Equalizer { }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            Text {
+                text: root.track.title;
+                overflow: elide;
+                font-size: Theme.body-small;
+                font-weight: 800;
+                color: root.track.current ? Theme.lit-bright : Theme.text;
+            }
+
+            Text {
+                text: root.track.missing ? @tr("Missing") : @tr("{0} · {1}", root.track.playlist-title, root.track.played);
+                overflow: elide;
+                font-size: Theme.caption;
+                color: root.track.missing ? Theme.error : Theme.text-faint;
+            }
+        }
+
+        IconButton {
+            y: (parent.height - self.height) / 2;
+            size: 32px;
+            icon-size: 16px;
+            icon: root.track.playing ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+            tint: root.track.current ? Theme.lit : Theme.text-secondary;
+            opacity: touch.has-hover || self.has-hover || root.track.current ? 1 : 0;
+            tooltip: root.track.playing ? @tr("Pause") : @tr("Play");
+            enabled: !root.track.missing;
+            clicked => {
+                Actions.play-track(root.track.id);
+            }
+            context-menu-requested(position) => {
+                touch.show-menu(position);
+            }
+        }
+    }
+}
+
+// The songs that played last, in 1, 2, or 3 columns by width and at most two rows.
+component RecentShelf inherits VerticalLayout {
+    TourTarget {
+        anchor: HomeTour.home-recent;
+        scroll: TourScroll.home;
+        available: LibraryView.recent-tracks.length > 0;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
+    // The song's id and title.
+    callback add-to-playlist(string, string);
+    property <int> columns: root.width < 520px ? 1 : root.width < 820px ? 2 : 3;
+    property <int> count: min(2 * root.columns, LibraryView.recent-tracks.length);
+    property <length> tile-width: (root.width - (root.columns - 1) * PageMetrics.gap / 2) / root.columns;
+    property <length> tile-height: 62px;
+    property <int> rows: Math.ceil(root.count / root.columns);
+    spacing: 14px;
+    HorizontalLayout {
+        spacing: 12px;
+        alignment: start;
+        Heading {
+            text: @tr("Recently played");
+        }
+
+        TextLink {
+            text: @tr("See all {0}", LibraryView.recent-tracks.length);
+            vertical-alignment: center;
+            clicked => {
+                Actions.open-page(Page.recent, "");
+            }
+        }
+    }
+
+    Rectangle {
+        height: root.rows * root.tile-height + max(0, root.rows - 1) * PageMetrics.gap / 2;
+        for track[index] in LibraryView.recent-tracks: RecentTile {
+            visible: index < root.count;
+            x: Math.mod(index, root.columns) * (root.tile-width + PageMetrics.gap / 2);
+            y: Math.floor(index / root.columns) * (root.tile-height + PageMetrics.gap / 2);
+            width: root.tile-width;
+            height: root.tile-height;
+            track: track;
+            add-to-playlist => {
+                root.add-to-playlist(track.song-id, track.title);
+            }
+        }
+    }
+}
+
 export component HomePage inherits Rectangle {
     callback add(CollectionKind);
+    // The song's id and title.
+    callback add-to-playlist(string, string);
     HorizontalLayout {
         y: 0;
         height: Theme.title-row-height;
@@ -432,6 +803,13 @@ export component HomePage inherits Rectangle {
             alignment: start;
             FilterField {
                 space-below: 24px;
+            }
+
+            if LibraryView.recent-tracks.length > 0: RecentShelf {
+                padding-bottom: 24px;
+                add-to-playlist(id, title) => {
+                    root.add-to-playlist(id, title);
+                }
             }
 
             HomeShelf {
@@ -778,206 +1156,6 @@ component CollectionHero inherits HorizontalLayout {
                 }
                 add-files => {
                     root.add-files();
-                }
-            }
-        }
-    }
-}
-
-// A row's right-click menu: a primary action, then optionally a second action, Add to playlist,
-// Edit, Edit loop, and a red Remove. Slint's built-in menu items cannot color destructive
-// actions.
-component RowMenu inherits TouchArea {
-    in property <string> primary-action-title;
-    in property <bool> primary-action-enabled: true;
-    in property <bool> secondary-action-shown;
-    in property <string> secondary-action-title;
-    in property <bool> secondary-action-enabled: true;
-    in property <bool> add-to-playlist-shown;
-    in property <bool> edit-shown: true;
-    in property <bool> loop-shown;
-    in property <bool> remove-shown;
-    in property <string> remove-title: @tr("Remove");
-    callback primary-action();
-    callback secondary-action();
-    callback add-to-playlist();
-    callback edit();
-    callback edit-loop();
-    callback remove();
-    // Pressing and moving lifts the row to a new place; pointers are in window coordinates.
-    in property <bool> arrangeable;
-    out property <bool> arranging;
-    callback arrange-started(Point);
-    callback arrange-moved(Point);
-    callback arrange-ended();
-    callback arrange-cancelled();
-    property <Point> menu-position;
-    // Where each optional action sits when it shows.
-    property <int> playlist-index: root.secondary-action-shown ? 2 : 1;
-    property <int> edit-index: root.playlist-index + (root.add-to-playlist-shown ? 1 : 0);
-    property <int> loop-index: root.edit-index + (root.edit-shown ? 1 : 0);
-    property <int> remove-index: root.loop-index + (root.loop-shown ? 1 : 0);
-    property <int> action-count: root.remove-index + (root.remove-shown ? 1 : 0);
-    mouse-cursor: root.arranging ? MouseCursor.grabbing : MouseCursor.pointer;
-
-    public function show-menu(position: Point) {
-        root.menu-position = {
-            x: position.x - root.absolute-position.x,
-            y: position.y - root.absolute-position.y,
-        };
-        menu.show();
-    }
-
-    function enabled-at(index: int) -> bool {
-        if index == 0 {
-            return root.primary-action-enabled;
-        }
-        if index == 1 && root.secondary-action-shown {
-            return root.secondary-action-enabled;
-        }
-        return true;
-    }
-
-    function step(index: int, down: bool) -> int {
-        Math.mod(index + (down ? 1 : -1) + root.action-count, root.action-count)
-    }
-
-    function activate(index: int) {
-        if !root.enabled-at(index) {
-            return;
-        }
-        menu.close();
-        if index == 0 {
-            root.primary-action();
-        } else if index == 1 && root.secondary-action-shown {
-            root.secondary-action();
-        } else if root.add-to-playlist-shown && index == root.playlist-index {
-            root.add-to-playlist();
-        } else if root.edit-shown && index == root.edit-index {
-            root.edit();
-        } else if root.loop-shown && index == root.loop-index {
-            root.edit-loop();
-        } else if root.remove-shown && index == root.remove-index {
-            root.remove();
-        }
-    }
-
-    moved => {
-        if root.arrangeable && root.pressed && !root.arranging
-            && max(abs(root.mouse-x - root.pressed-x), abs(root.mouse-y - root.pressed-y)) > Theme.arrange-threshold {
-            root.arranging = true;
-            root.arrange-started({
-                x: root.absolute-position.x + root.pressed-x,
-                y: root.absolute-position.y + root.pressed-y,
-            });
-        }
-        if root.arranging {
-            root.arrange-moved({
-                x: root.absolute-position.x + root.mouse-x,
-                y: root.absolute-position.y + root.mouse-y,
-            });
-        }
-    }
-
-    pointer-event(event) => {
-        if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
-            root.show-menu({
-                x: root.absolute-position.x + root.mouse-x,
-                y: root.absolute-position.y + root.mouse-y,
-            });
-        }
-        if root.arranging && event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
-            root.arranging = false;
-            root.arrange-ended();
-        }
-        if root.arranging && event.kind == PointerEventKind.cancel {
-            root.arranging = false;
-            root.arrange-cancelled();
-        }
-    }
-
-    menu := PopupWindow {
-        x: root.menu-position.x;
-        y: root.menu-position.y;
-        close-policy: close-on-click-outside;
-        keys := FocusScope {
-            property <int> selected: -1;
-            init => { self.focus(); }
-            key-pressed(event) => {
-                if event.text == Key.Escape {
-                    menu.close();
-                    return accept;
-                }
-                if event.text == Key.DownArrow || event.text == Key.UpArrow {
-                    let down = event.text == Key.DownArrow;
-                    self.selected = self.selected < 0 ? (down ? 0 : root.action-count - 1) : root.step(self.selected, down);
-                    // Only the first two actions can be disabled, and an enabled one follows
-                    // them, so skipping twice suffices.
-                    if !root.enabled-at(self.selected) {
-                        self.selected = root.step(self.selected, down);
-                    }
-                    if !root.enabled-at(self.selected) {
-                        self.selected = root.step(self.selected, down);
-                    }
-                    return accept;
-                }
-                if event.text == Key.Return || event.text == " " {
-                    root.activate(self.selected);
-                    return accept;
-                }
-                reject
-            }
-            MenuSurface {
-                MenuAction {
-                    text: root.primary-action-title;
-                    enabled: root.primary-action-enabled;
-                    highlighted: keys.selected == 0;
-                    changed has-hover => {
-                        if self.has-hover { keys.selected = 0; }
-                    }
-                    activated => { root.activate(0); }
-                }
-                if root.secondary-action-shown: MenuAction {
-                    text: root.secondary-action-title;
-                    enabled: root.secondary-action-enabled;
-                    highlighted: keys.selected == 1;
-                    changed has-hover => {
-                        if self.has-hover { keys.selected = 1; }
-                    }
-                    activated => { root.activate(1); }
-                }
-                if root.add-to-playlist-shown: MenuAction {
-                    text: @tr("Add to playlist…");
-                    highlighted: keys.selected == root.playlist-index;
-                    changed has-hover => {
-                        if self.has-hover { keys.selected = root.playlist-index; }
-                    }
-                    activated => { root.activate(root.playlist-index); }
-                }
-                if root.edit-shown: MenuAction {
-                    text: @tr("Edit");
-                    highlighted: keys.selected == root.edit-index;
-                    changed has-hover => {
-                        if self.has-hover { keys.selected = root.edit-index; }
-                    }
-                    activated => { root.activate(root.edit-index); }
-                }
-                if root.loop-shown: MenuAction {
-                    text: @tr("Edit loop…");
-                    highlighted: keys.selected == root.loop-index;
-                    changed has-hover => {
-                        if self.has-hover { keys.selected = root.loop-index; }
-                    }
-                    activated => { root.activate(root.loop-index); }
-                }
-                if root.remove-shown: MenuAction {
-                    text: root.remove-title;
-                    destructive: true;
-                    highlighted: keys.selected == root.remove-index;
-                    changed has-hover => {
-                        if self.has-hover { keys.selected = root.remove-index; }
-                    }
-                    activated => { root.activate(root.remove-index); }
                 }
             }
         }
@@ -1985,6 +2163,226 @@ export component SongsPage inherits Rectangle {
                     text: LibraryView.songs-overflow;
                     color: Theme.text-faint;
                     font-size: Theme.body-small;
+                }
+            }
+        }
+    }
+
+    BarShadow {
+        shown: scroll.scrolled;
+    }
+}
+
+// The columns of a recently played song: its number, painting, title and playlist, then when it
+// played where there's room, and its length.
+component RecentColumns inherits HorizontalLayout {
+    in property <length> available-width;
+    out property <length> played-width: root.available-width >= 640px ? 150px : 0px;
+    padding-left: 6px;
+    padding-right: 16px;
+    spacing: 16px;
+    @children
+}
+
+component RecentHeader inherits Rectangle {
+    in property <length> available-width;
+    height: 36px;
+    columns := RecentColumns {
+        available-width: root.available-width;
+        TrackCell {
+            width: 32px;
+            text: "#";
+            horizontal-alignment: center;
+        }
+        TrackCell {
+            text: @tr("Title");
+            min-width: 0px;
+            preferred-width: 0px;
+            horizontal-stretch: 1;
+        }
+        if columns.played-width > 0px: TrackCell {
+            width: columns.played-width;
+            text: @tr("Played");
+        }
+        TrackCell {
+            width: 72px;
+            text: @tr("Duration");
+            horizontal-alignment: right;
+        }
+    }
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        background: Theme.divider;
+    }
+}
+
+// A recently played song as a row: double-click or its play button plays it in its playlist.
+component RecentItem inherits Rectangle {
+    TourTarget {
+        anchor: RecentTour.tracks;
+        scroll: TourScroll.recent;
+        bounds: GuidedTours.bounds(root.absolute-position, root.width, root.height);
+    }
+    in property <RecentTrack> track;
+    in property <int> number;
+    in property <length> available-width;
+    callback add-to-playlist();
+    height: 56px;
+    border-radius: Theme.radius-row;
+    background: root.track.current ? Theme.current-row : touch.has-hover ? Theme.hover : transparent;
+    animate background { duration: Motion.hover; }
+    opacity: root.track.missing ? 0.55 : 1;
+    touch := RecentMenu {
+        track: root.track;
+        add-to-playlist-requested => {
+            root.add-to-playlist();
+        }
+        double-clicked => {
+            if !root.track.missing {
+                Actions.play-track(root.track.id);
+            }
+        }
+    }
+
+    columns := RecentColumns {
+        available-width: root.available-width;
+        Rectangle {
+            width: 32px;
+            if root.track.playing && !touch.has-hover: Equalizer { }
+            if !root.track.playing: Text {
+                text: "\{root.number}";
+                color: Theme.text-faint;
+                font-size: Theme.body-small;
+                opacity: touch.has-hover ? 0 : 1;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+            if touch.has-hover || !root.track.playing: IconButton {
+                size: 32px;
+                icon-size: 16px;
+                icon: root.track.playing ? @image-url("icons/pause.svg") : @image-url("icons/play.svg");
+                tint: root.track.current ? Theme.lit : Theme.text-faint;
+                opacity: touch.has-hover || self.has-hover ? 1 : 0;
+                tooltip: root.track.playing ? @tr("Pause") : @tr("Play");
+                enabled: !root.track.missing;
+                clicked => {
+                    Actions.play-track(root.track.id);
+                }
+                context-menu-requested(position) => {
+                    touch.show-menu(position);
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 12px;
+            horizontal-stretch: 1;
+            min-width: 0px;
+            preferred-width: 0px;
+            Image {
+                y: (parent.height - self.height) / 2;
+                width: 36px;
+                height: 36px;
+                source: Art.painting(root.track.playlist-id, root.track.background, self.width, self.height, Theme.radius-small, Art.pictures-revision);
+                image-fit: fill;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 1px;
+                horizontal-stretch: 1;
+                min-width: 0px;
+                preferred-width: 0px;
+                Text {
+                    text: root.track.title;
+                    overflow: elide;
+                    font-size: Theme.body;
+                    font-weight: root.track.current ? 800 : 500;
+                    color: root.track.current ? Theme.lit-bright : Theme.text;
+                }
+
+                Text {
+                    text: root.track.playlist-title;
+                    overflow: elide;
+                    font-size: Theme.caption;
+                    color: Theme.text-faint;
+                }
+            }
+        }
+
+        if root.track.loop-badge != LoopBadge.none: LoopBadgeIcon {
+            y: (parent.height - self.height) / 2;
+            badge: root.track.loop-badge;
+        }
+
+        if root.track.missing: Text {
+            text: @tr("Missing");
+            font-size: Theme.caption;
+            color: Theme.error;
+            vertical-alignment: center;
+        }
+        if columns.played-width > 0px: TrackCell {
+            width: columns.played-width;
+            text: root.track.played;
+        }
+        TrackCell {
+            width: 72px;
+            text: root.track.duration;
+            horizontal-alignment: right;
+        }
+    }
+}
+
+// The songs the playlists played last, newest first, each under the playlist it played from.
+export component RecentPage inherits Rectangle {
+    // The song's id and title.
+    callback add-to-playlist(string, string);
+    HorizontalLayout {
+        y: 0;
+        height: Theme.title-row-height;
+        padding-left: PageMetrics.padding;
+        padding-right: 8px;
+        spacing: 8px;
+        Heading {
+            text: @tr("Recently played");
+            horizontal-stretch: 0;
+            overflow: elide;
+        }
+        TourButton { y: (parent.height - self.height) / 2; guide: RecentTour.guide; label: @tr("Recently played"); }
+        Rectangle { horizontal-stretch: 1; }
+    }
+
+    scroll := PageScroll {
+        tour-scroll: TourScroll.recent;
+        y: Theme.title-row-height;
+        height: parent.height - self.y;
+        content-height: column.preferred-height;
+        column := VerticalLayout {
+            padding: PageMetrics.padding;
+            padding-top: PageMetrics.padding-top;
+            alignment: start;
+            FilterField {
+                space-below: 16px;
+            }
+
+            VerticalLayout {
+                spacing: 2px;
+                if LibraryView.recent-tracks.length > 0: RecentHeader {
+                    available-width: root.width - 2 * PageMetrics.padding;
+                }
+                if LibraryView.recent-tracks.length == 0: Text {
+                    text: Search.filter-text != "" ? @tr("No recently played song matches the filter.") : @tr("Songs you play from a playlist show here, newest first, so you can pick them up again.");
+                    color: Theme.text-secondary;
+                    wrap: word-wrap;
+                }
+                for track[index] in LibraryView.recent-tracks: RecentItem {
+                    track: track;
+                    number: index + 1;
+                    available-width: root.width - 2 * PageMetrics.padding;
+                    add-to-playlist => {
+                        root.add-to-playlist(track.song-id, track.title);
+                    }
                 }
             }
         }

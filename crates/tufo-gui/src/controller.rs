@@ -828,7 +828,7 @@ impl Controller {
                 tr("This collection follows its folder; add files there").to_owned()
             }
             PageKind::Playlist | PageKind::Soundboard => tr("Drop the files here…").to_owned(),
-            PageKind::Home | PageKind::Browser => {
+            PageKind::Home | PageKind::Recent | PageKind::Browser => {
                 tr("Open Playlists or Soundboards to drop folders").to_owned()
             }
         };
@@ -1472,6 +1472,7 @@ impl Controller {
         let page = match page {
             ui::SidebarPage::Home => SidebarPage::Home,
             ui::SidebarPage::Songs => SidebarPage::Songs,
+            ui::SidebarPage::Recent => SidebarPage::Recent,
             ui::SidebarPage::Browser => SidebarPage::Browser,
             ui::SidebarPage::Playlists => SidebarPage::Playlists,
             ui::SidebarPage::Soundboards => SidebarPage::Soundboards,

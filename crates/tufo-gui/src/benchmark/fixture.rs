@@ -109,6 +109,7 @@ pub(super) fn page(page: PageKind) -> LibraryPageView {
         soundboards,
         collection,
         songs: None,
+        recent_tracks: Vec::new(),
         playlist_choices: Vec::new(),
     }
 }

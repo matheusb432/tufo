@@ -44,6 +44,8 @@ const SOUND_END_GRACE: Duration = Duration::from_millis(250);
 pub(crate) const SONG_ROWS_MAX: usize = 200;
 /// A playlist's song search shows at most this many songs.
 pub(crate) const SONG_SEARCH_RESULTS_MAX: usize = 20;
+/// Recently played lists at most this many songs.
+pub(crate) const RECENT_TRACKS_MAX: usize = 50;
 
 /// Which page is open, mirroring the window's `Page`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -51,6 +53,7 @@ pub(crate) enum PageKind {
     #[default]
     Home,
     Songs,
+    Recent,
     Playlists,
     Playlist,
     Soundboards,
@@ -115,6 +118,27 @@ pub(crate) struct TrackRowView {
     pub(crate) playing: bool,
     /// Its place in the queue, from 1.
     pub(crate) queue_number: Option<usize>,
+    pub(crate) loop_badge: LoopBadgeView,
+}
+
+/// A song a playlist played lately, under the playlist it last played from.
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct RecentTrackView {
+    /// The playlist entry that played.
+    pub(crate) id: CollectionEntryId,
+    pub(crate) song_id: AudioFileId,
+    pub(crate) title: String,
+    pub(crate) playlist_id: CollectionId,
+    pub(crate) playlist_title: String,
+    /// The playlist's, for the song's thumbnail.
+    pub(crate) background: Background,
+    /// When it last started, such as "5 minutes ago".
+    pub(crate) played: String,
+    pub(crate) duration: String,
+    pub(crate) missing: bool,
+    /// The entry is in the mix, playing or paused.
+    pub(crate) current: bool,
+    pub(crate) playing: bool,
     pub(crate) loop_badge: LoopBadgeView,
 }
 
@@ -302,6 +326,8 @@ pub(crate) struct LibraryPageView {
     pub(crate) nav_soundboards: Vec<NavItemView>,
     pub(crate) collection: Option<CollectionPageView>,
     pub(crate) songs: Option<SongsPageView>,
+    /// Home's shelf and the Recently played page; empty on other pages.
+    pub(crate) recent_tracks: Vec<RecentTrackView>,
     /// Empty unless the Add to playlist dialog adds a song.
     pub(crate) playlist_choices: Vec<PlaylistChoiceView>,
 }
@@ -315,7 +341,11 @@ pub(crate) fn library_page(
 ) -> LibraryPageView {
     let card_filter = match navigation.page {
         PageKind::Home | PageKind::Playlists | PageKind::Soundboards => queries.filter,
-        PageKind::Songs | PageKind::Playlist | PageKind::Soundboard | PageKind::Browser => "",
+        PageKind::Songs
+        | PageKind::Recent
+        | PageKind::Playlist
+        | PageKind::Soundboard
+        | PageKind::Browser => "",
     };
     let songs = SongIndex::new(snapshot);
     let cards = |kind| {
@@ -355,6 +385,7 @@ pub(crate) fn library_page(
             .map(|collection| collection_page(collection, player, &songs, queries, now)),
         PageKind::Home
         | PageKind::Songs
+        | PageKind::Recent
         | PageKind::Playlists
         | PageKind::Soundboards
         | PageKind::Browser => None,
@@ -368,6 +399,11 @@ pub(crate) fn library_page(
         nav_soundboards: nav_items(CollectionKind::Soundboard),
         collection,
         songs: (navigation.page == PageKind::Songs).then(|| songs_page(&songs, queries.filter)),
+        recent_tracks: if matches!(navigation.page, PageKind::Home | PageKind::Recent) {
+            recent_tracks(snapshot, player, queries.filter, now)
+        } else {
+            Vec::new()
+        },
         playlist_choices: queries
             .adding_song
             .map(|song_id| playlist_choices(snapshot, song_id))
@@ -420,7 +456,7 @@ impl<'a> SongIndex<'a> {
             id: song.audio_file_id,
             title: song.title.as_str().to_owned(),
             duration: clock(song.duration),
-            date_added: date_added(song.added_at, jiff::tz::TimeZone::system()),
+            date_added: short_date(song.added_at, jiff::tz::TimeZone::system()),
             source: self.source_label(song.audio_file_id),
             missing: song.missing,
             removable: song.source == SongSource::File,
@@ -654,6 +690,8 @@ fn collection_summary(collection: &CollectionView, player: &PlayerState) -> Stri
 }
 
 const SECONDS_PER_MINUTE: u64 = 60;
+const MINUTES_PER_HOUR: u64 = 60;
+const MINUTES_PER_DAY: u64 = 24 * MINUTES_PER_HOUR;
 
 fn collection_page(
     collection: &CollectionView,
@@ -716,7 +754,7 @@ fn track_row(entry: &EntryView, player: &PlayerState, songs: &SongIndex<'_>) -> 
         song_id: entry.audio_file_id,
         title: entry.title.as_str().to_owned(),
         duration: clock(entry.duration),
-        date_added: date_added(entry.added_at, jiff::tz::TimeZone::system()),
+        date_added: short_date(entry.added_at, jiff::tz::TimeZone::system()),
         source: songs.source_label(entry.audio_file_id),
         missing: entry.missing,
         current: current.is_some(),
@@ -730,11 +768,88 @@ fn track_row(entry: &EntryView, player: &PlayerState, songs: &SongIndex<'_>) -> 
     }
 }
 
-fn date_added(timestamp: jiff::Timestamp, timezone: jiff::tz::TimeZone) -> String {
+fn short_date(timestamp: jiff::Timestamp, timezone: jiff::tz::TimeZone) -> String {
     timestamp
         .to_zoned(timezone)
         .strftime("%b %-d, %Y")
         .to_string()
+}
+
+/// The songs that started last from any playlist, each once under its latest start, newest first:
+/// at most [`RECENT_TRACKS_MAX`] of those whose title or playlist matches `filter`.
+fn recent_tracks(
+    snapshot: &LibrarySnapshot,
+    player: &PlayerState,
+    filter: &str,
+    now: SystemTime,
+) -> Vec<RecentTrackView> {
+    let mut starts = snapshot
+        .collections
+        .iter()
+        .filter(|collection| collection.kind == CollectionKind::Playlist)
+        .flat_map(|playlist| {
+            playlist
+                .entries
+                .iter()
+                .filter_map(move |entry| Some((entry.last_played_at?, playlist, entry)))
+        })
+        .collect::<Vec<_>>();
+    starts.sort_by(|(left_at, _, left), (right_at, _, right)| {
+        right_at.cmp(left_at).then_with(|| left.id.cmp(&right.id))
+    });
+    let mut listed_songs = HashSet::new();
+    starts
+        .into_iter()
+        .filter(|(_, _, entry)| listed_songs.insert(entry.audio_file_id))
+        .filter(|(_, playlist, entry)| {
+            matches_filter(entry.title.as_str(), filter)
+                || matches_filter(playlist.title.as_str(), filter)
+        })
+        .take(RECENT_TRACKS_MAX)
+        .map(|(played_at, playlist, entry)| {
+            let current = player
+                .music_tracks()
+                .find(|music| music.entry.entry_id == entry.id);
+            RecentTrackView {
+                id: entry.id,
+                song_id: entry.audio_file_id,
+                title: entry.title.as_str().to_owned(),
+                playlist_id: playlist.id,
+                playlist_title: playlist.title.as_str().to_owned(),
+                background: playlist.background.clone(),
+                played: played_ago(played_at, now, &jiff::tz::TimeZone::system()),
+                duration: clock(entry.duration),
+                missing: entry.missing,
+                current: current.is_some(),
+                playing: current.is_some_and(|music| !music.paused),
+                loop_badge: LoopBadgeView::of(entry.saved_loop),
+            }
+        })
+        .collect()
+}
+
+/// How long before `now` a song started: in minutes or hours within a day, otherwise its date.
+fn played_ago(
+    played_at: jiff::Timestamp,
+    now: SystemTime,
+    timezone: &jiff::tz::TimeZone,
+) -> String {
+    let minutes = now
+        .duration_since(SystemTime::from(played_at))
+        .unwrap_or_default()
+        .as_secs()
+        / SECONDS_PER_MINUTE;
+    let count = |amount: u64| usize::try_from(amount).unwrap_or(usize::MAX);
+    match minutes {
+        0 => tr("Just now").to_owned(),
+        1..MINUTES_PER_HOUR => tr_count("{n} minute ago", "{n} minutes ago", count(minutes)),
+        MINUTES_PER_HOUR..MINUTES_PER_DAY => tr_count(
+            "{n} hour ago",
+            "{n} hours ago",
+            count(minutes / MINUTES_PER_HOUR),
+        ),
+        _ => short_date(played_at, timezone.clone()),
+    }
 }
 
 fn sound_tile(entry: &EntryView, player: &PlayerState, now: SystemTime) -> SoundTileView {

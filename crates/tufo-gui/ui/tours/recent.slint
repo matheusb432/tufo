@@ -1,0 +1,21 @@
+import { Tour, TourId } from "state.slint";
+import { PlaybackTour } from "playback.slint";
+
+export global RecentTour {
+    out property <string> tracks: "recent.tracks";
+    out property <Tour> guide: { id: TourId.recent, steps: [
+        {
+            anchor: RecentTour.tracks,
+            title: @tr("Pick up where you left off"),
+            body: @tr("Each song a playlist plays lands here, newest first, under the playlist it played from. Double-click a song or use its play button to play that playlist again from the song."),
+        },
+        {
+            anchor: RecentTour.tracks,
+            title: @tr("More from a song"),
+            body: @tr("Right-click a song to add it to the mix, open its playlist, or add it to another playlist. Ctrl+F filters by song or playlist."),
+        },
+        PlaybackTour.transport-step,
+        PlaybackTour.volume-step,
+        PlaybackTour.output-step,
+    ] };
+}

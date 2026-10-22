@@ -477,6 +477,7 @@ fn page(page: ui::Page) -> PageKind {
     match page {
         ui::Page::Home => PageKind::Home,
         ui::Page::Songs => PageKind::Songs,
+        ui::Page::Recent => PageKind::Recent,
         ui::Page::Playlists => PageKind::Playlists,
         ui::Page::Playlist => PageKind::Playlist,
         ui::Page::Soundboards => PageKind::Soundboards,

@@ -3,16 +3,17 @@
 import { Theme } from "theme.slint";
 import { TourVisibility } from "tours/state.slint";
 
-export enum Page { home, songs, playlists, playlist, soundboards, soundboard, browser }
+export enum Page { home, songs, recent, playlists, playlist, soundboards, soundboard, browser }
 
 // A hideable sidebar row. Search and Settings always show.
-export enum SidebarPage { home, songs, browser, playlists, soundboards }
+export enum SidebarPage { home, songs, recent, browser, playlists, soundboards }
 
 // The hidden sidebar rows. A hidden row's page still opens from elsewhere and stays open
 // when its row hides. Hiding Playlists or Soundboards hides their pinned collections too.
 export struct SidebarHiddenPages {
     home: bool,
     songs: bool,
+    recent: bool,
     browser: bool,
     playlists: bool,
     soundboards: bool,
@@ -124,6 +125,27 @@ export struct SongRow {
     missing: bool,
     // Added by its own path, so it can leave the songs; a followed folder keeps the others.
     removable: bool,
+    loop-badge: LoopBadge,
+}
+
+// A song a playlist played lately, under the playlist it last played from.
+export struct RecentTrack {
+    // The playlist entry that played.
+    id: string,
+    // The audio file's id, which Add to playlist adds.
+    song-id: string,
+    title: string,
+    playlist-id: string,
+    playlist-title: string,
+    // The playlist's, for the song's thumbnail.
+    background: CollectionBackground,
+    // When it last started, such as "5 minutes ago".
+    played: string,
+    duration: string,
+    missing: bool,
+    // In the mix, playing or paused.
+    current: bool,
+    playing: bool,
     loop-badge: LoopBadge,
 }
 
@@ -315,6 +337,8 @@ export global LibraryView {
     in property <[SongRow]> songs;
     // Says how many matching songs the rows leave out; empty when none.
     in property <string> songs-overflow;
+    // The songs that played last, newest first, for Home and the Recently played page.
+    in property <[RecentTrack]> recent-tracks;
     // The hand-picked playlists for the song the Add to playlist dialog adds.
     in property <[PlaylistChoice]> playlist-choices;
 }

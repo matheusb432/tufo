@@ -361,6 +361,18 @@ component FullSidebar inherits SidebarForm {
                     }
                 }
 
+                if !root.hidden.recent: NavRow {
+                    icon: @image-url("icons/history.svg");
+                    text: @tr("Recent");
+                    active: root.page == Page.recent;
+                    clicked => {
+                        root.open-page(Page.recent, "");
+                    }
+                    context-menu(position) => {
+                        root.show-page-menu(SidebarPage.recent, position);
+                    }
+                }
+
                 if !root.hidden.browser && BrowserView.available: NavRow {
                     icon: @image-url("icons/globe.svg");
                     text: @tr("Browser");
@@ -659,6 +671,18 @@ component Rail inherits SidebarForm {
                         active: root.page == Page.songs;
                         clicked => {
                             root.open-page(Page.songs, "");
+                        }
+                    }
+                }
+                if !root.hidden.recent: HorizontalLayout {
+                    alignment: center;
+                    RailButton {
+                        icon: @image-url("icons/history.svg");
+                        tooltip: @tr("Recently played");
+                        tooltip-enabled: root.shown;
+                        active: root.page == Page.recent;
+                        clicked => {
+                            root.open-page(Page.recent, "");
                         }
                     }
                 }

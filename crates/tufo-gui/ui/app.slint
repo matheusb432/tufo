@@ -16,7 +16,7 @@ import {
     WindowFrame,
 } from "state.slint";
 import { Sidebar } from "sidebar.slint";
-import { ConnectingPage, GridPage, HomePage, PlaylistPage, SongsPage, SoundboardPage } from "pages.slint";
+import { ConnectingPage, GridPage, HomePage, PlaylistPage, RecentPage, SongsPage, SoundboardPage } from "pages.slint";
 import { BrowserPage } from "browser.slint";
 import { Dock, MiniPlayer } from "dock.slint";
 import {
@@ -407,8 +407,16 @@ export component AppWindow inherits Window {
                                     add(kind) => {
                                         root.open-add(kind);
                                     }
+                                    add-to-playlist(id, title) => {
+                                        root.open-add-to-playlist(id, title);
+                                    }
                                 }
                                 if LibraryView.loaded && Navigation.page == Page.songs: SongsPage {
+                                    add-to-playlist(id, title) => {
+                                        root.open-add-to-playlist(id, title);
+                                    }
+                                }
+                                if LibraryView.loaded && Navigation.page == Page.recent: RecentPage {
                                     add-to-playlist(id, title) => {
                                         root.open-add-to-playlist(id, title);
                                     }

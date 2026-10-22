@@ -18,7 +18,8 @@ use crate::{
     loop_editor::{LoopEditorFrame, PreviewKind},
     presentation::{
         self, CardView, CollectionPageView, CurrentOutputView, DrawerView, LibraryPageView,
-        NavItemView, OutputRowView, PageKind, PlayerBarView, SongRowView, SongsPageView,
+        NavItemView, OutputRowView, PageKind, PlayerBarView, RecentTrackView, SongRowView,
+        SongsPageView,
     },
     search::{PaletteResult, PaletteTarget},
     settings::{DesktopSettings, QuitBehavior},
@@ -28,9 +29,10 @@ use crate::{
         BrowserPointer, BrowserState, BrowserTabView, BrowserView, CollectionBackground,
         CollectionCard, CurrentOutput, KenkuConflictRow, KenkuImportView, LibraryView, LoopBadge,
         LoopEditorView, LoopPreview, MusicLayer, NavItem, Navigation, OrderKey, OutputRow,
-        OutputRowKind, Page, PlayerView, PlaylistChoice, Search, SearchResult, SearchResultKind,
-        Session, SidebarHiddenPages, SongFolder, SongLoopImportRow, SongLoopImportRowState,
-        SongLoopImportView, SongRow, SoundChip, SoundIcons, SoundTile, TrackRow, VoiceBadge,
+        OutputRowKind, Page, PlayerView, PlaylistChoice, RecentTrack, Search, SearchResult,
+        SearchResultKind, Session, SidebarHiddenPages, SongFolder, SongLoopImportRow,
+        SongLoopImportRowState, SongLoopImportView, SongRow, SoundChip, SoundIcons, SoundTile,
+        TrackRow, VoiceBadge,
     },
 };
 
@@ -313,9 +315,15 @@ pub(crate) fn library_now(
     if let Some(songs) = view.songs {
         songs_page(&library, songs);
     }
+    show_rows(
+        &library.get_recent_tracks(),
+        view.recent_tracks.into_iter().map(recent_track).collect(),
+        |tracks| library.set_recent_tracks(tracks),
+    );
     let page = match navigation.page {
         PageKind::Home => Page::Home,
         PageKind::Songs => Page::Songs,
+        PageKind::Recent => Page::Recent,
         PageKind::Playlists => Page::Playlists,
         PageKind::Playlist => Page::Playlist,
         PageKind::Soundboards => Page::Soundboards,
@@ -339,6 +347,23 @@ pub(crate) fn library_now(
     pages.set_page(page);
     if let Some(collection) = view.collection {
         collection_page(&library, collection);
+    }
+}
+
+fn recent_track(track: RecentTrackView) -> RecentTrack {
+    RecentTrack {
+        id: track.id.to_string().into(),
+        song_id: track.song_id.to_string().into(),
+        title: track.title.into(),
+        playlist_id: track.playlist_id.to_string().into(),
+        playlist_title: track.playlist_title.into(),
+        background: collection_background(&track.background),
+        played: track.played.into(),
+        duration: track.duration.into(),
+        missing: track.missing,
+        current: track.current,
+        playing: track.playing,
+        loop_badge: loop_badge(track.loop_badge),
     }
 }
 
@@ -652,6 +677,7 @@ pub(crate) fn desktop_settings(window: &slint::Weak<AppWindow>, settings: Deskto
             .set_hidden_pages(SidebarHiddenPages {
                 home: hidden.contains(SidebarPage::Home),
                 songs: hidden.contains(SidebarPage::Songs),
+                recent: hidden.contains(SidebarPage::Recent),
                 browser: hidden.contains(SidebarPage::Browser),
                 playlists: hidden.contains(SidebarPage::Playlists),
                 soundboards: hidden.contains(SidebarPage::Soundboards),

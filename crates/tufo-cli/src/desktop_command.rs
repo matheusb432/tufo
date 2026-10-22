@@ -24,7 +24,7 @@ pub(crate) enum DesktopCommand {
 
 Omitted fields keep their current values. Languages: system, en, pt-BR.
 Tours: always-show, show-unseen (default), always-hide.
-sidebar_hidden_pages replaces the hidden set; pages: home, songs, browser, playlists, soundboards.
+sidebar_hidden_pages replaces the hidden set; pages: home, songs, recent, browser, playlists, soundboards.
 Use "system" to restore system locale selection, false to disable a boolean setting, and []
 to show every sidebar page.
 Null values and unknown fields are errors.
