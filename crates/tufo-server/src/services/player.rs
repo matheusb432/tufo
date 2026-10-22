@@ -10,13 +10,12 @@ use tufo_application::playback::{
     update_music_layer, update_player_settings, update_song_loop_preview, watch_player,
 };
 use tufo_infra::player::outputs::{AudioOutputs, DeviceOutputs};
-use tufo_models::playback::player_state::PlayerState;
 use tufo_wire::{
     pb::{self, player_service_server::PlayerService},
     proto,
 };
 
-use super::GrpcResultExt as _;
+use super::{GrpcResultExt as _, snapshot_stream::spawn_snapshot_stream};
 use crate::AppState;
 
 pub(crate) struct PlayerGrpcService<O: AudioOutputs = DeviceOutputs> {
@@ -102,11 +101,10 @@ impl<O: AudioOutputs> PlayerService for PlayerGrpcService<O> {
         _request: Request<pb::WatchPlayerRequest>,
     ) -> Result<Response<Self::WatchPlayerStream>, Status> {
         let states = watch_player::execute(self.state.player.as_ref());
-        // One slot keeps backpressure: a slow reader holds the forwarder, which then sends the
-        // latest state instead of queueing every intermediate one.
-        let (sender, receiver) = mpsc::channel(1);
-        tokio::spawn(forward_player_states(states, self.draining.clone(), sender));
-        Ok(Response::new(ReceiverStream::new(receiver)))
+        let stream = spawn_snapshot_stream(states, self.draining.clone(), |state| {
+            proto::player::watch_player_response(&state)
+        });
+        Ok(Response::new(stream))
     }
 
     async fn play_collection(
@@ -344,32 +342,5 @@ impl<O: AudioOutputs> PlayerService for PlayerGrpcService<O> {
         Ok(Response::new(proto::player::diagnostics_response(
             &diagnostics,
         )))
-    }
-}
-
-async fn forward_player_states(
-    mut states: watch::Receiver<PlayerState>,
-    mut draining: watch::Receiver<bool>,
-    sender: mpsc::Sender<Result<pb::WatchPlayerResponse, Status>>,
-) {
-    loop {
-        let message = proto::player::watch_player_response(&states.borrow_and_update());
-        tokio::select! {
-            sent = sender.send(Ok(message)) => {
-                if sent.is_err() {
-                    return;
-                }
-            }
-            _ = draining.wait_for(|draining| *draining) => return,
-        }
-        tokio::select! {
-            changed = states.changed() => {
-                if changed.is_err() {
-                    return;
-                }
-            }
-            _ = draining.wait_for(|draining| *draining) => return,
-            () = sender.closed() => return,
-        }
     }
 }

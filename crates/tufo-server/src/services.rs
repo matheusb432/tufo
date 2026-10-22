@@ -1,6 +1,7 @@
 mod library;
 mod player;
 mod server_control;
+mod snapshot_stream;
 mod voice_channel;
 
 pub(crate) use library::LibraryGrpcService;

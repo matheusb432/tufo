@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use tokio::sync::{mpsc, watch};
+use tokio::sync::watch;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tufo_application::library::{
@@ -14,12 +14,11 @@ use tufo_infra::{
     player::outputs::{AudioOutputs, DeviceOutputs},
 };
 use tufo_wire::{
-    library::LibrarySnapshot,
     pb::{self, library_service_server::LibraryService},
     proto,
 };
 
-use super::GrpcResultExt as _;
+use super::{GrpcResultExt as _, snapshot_stream::spawn_snapshot_stream};
 use crate::AppState;
 
 pub(crate) struct LibraryGrpcService<O: AudioOutputs = DeviceOutputs> {
@@ -44,9 +43,13 @@ impl<O: AudioOutputs> LibraryService for LibraryGrpcService<O> {
         _request: Request<pb::WatchKenkuImportRequest>,
     ) -> Result<Response<Self::WatchKenkuImportStream>, Status> {
         let updates = self.state.library.watch_kenku_import();
-        let (sender, receiver) = mpsc::channel(1);
-        tokio::spawn(forward_kenku_import(updates, self.draining.clone(), sender));
-        Ok(Response::new(ReceiverStream::new(receiver)))
+        let stream = spawn_snapshot_stream(updates, self.draining.clone(), |update| {
+            let status = update
+                .as_deref()
+                .map(proto::library::kenku_import_status_message);
+            pb::WatchKenkuImportResponse { status }
+        });
+        Ok(Response::new(stream))
     }
 
     async fn watch_library(
@@ -54,11 +57,13 @@ impl<O: AudioOutputs> LibraryService for LibraryGrpcService<O> {
         _request: Request<pb::WatchLibraryRequest>,
     ) -> Result<Response<Self::WatchLibraryStream>, Status> {
         let snapshots = self.state.library.watch();
-        // One slot keeps backpressure: a slow reader holds the forwarder, which then sends the
-        // latest snapshot instead of queueing every intermediate one.
-        let (sender, receiver) = mpsc::channel(1);
-        tokio::spawn(forward_snapshots(snapshots, self.draining.clone(), sender));
-        Ok(Response::new(ReceiverStream::new(receiver)))
+        let stream = spawn_snapshot_stream(snapshots, self.draining.clone(), |current| {
+            let snapshot = Arc::clone(&current);
+            // Encoding a large library must not hold the watch lock and block publishers.
+            drop(current);
+            proto::library::watch_library_response(&snapshot)
+        });
+        Ok(Response::new(stream))
     }
 
     async fn import_paths(
@@ -280,55 +285,5 @@ impl<O: AudioOutputs> LibraryService for LibraryGrpcService<O> {
         Ok(Response::new(proto::song_loop::import_song_loops_response(
             &results,
         )))
-    }
-}
-
-async fn forward_kenku_import(
-    mut updates: watch::Receiver<Option<Arc<tufo_wire::library::KenkuImportStatus>>>,
-    mut draining: watch::Receiver<bool>,
-    sender: mpsc::Sender<Result<pb::WatchKenkuImportResponse, Status>>,
-) {
-    loop {
-        let status = updates
-            .borrow_and_update()
-            .as_deref()
-            .map(proto::library::kenku_import_status_message);
-        tokio::select! {
-            sent = sender.send(Ok(pb::WatchKenkuImportResponse { status })) => { if sent.is_err() { return; } }
-            _ = draining.wait_for(|draining| *draining) => return,
-        }
-        tokio::select! {
-            changed = updates.changed() => { if changed.is_err() { return; } }
-            _ = draining.wait_for(|draining| *draining) => return,
-            () = sender.closed() => return,
-        }
-    }
-}
-
-async fn forward_snapshots(
-    mut snapshots: watch::Receiver<Arc<LibrarySnapshot>>,
-    mut draining: watch::Receiver<bool>,
-    sender: mpsc::Sender<Result<pb::WatchLibraryResponse, Status>>,
-) {
-    loop {
-        let snapshot = Arc::clone(&snapshots.borrow_and_update());
-        let message = proto::library::watch_library_response(&snapshot);
-        tokio::select! {
-            sent = sender.send(Ok(message)) => {
-                if sent.is_err() {
-                    return;
-                }
-            }
-            _ = draining.wait_for(|draining| *draining) => return,
-        }
-        tokio::select! {
-            changed = snapshots.changed() => {
-                if changed.is_err() {
-                    return;
-                }
-            }
-            _ = draining.wait_for(|draining| *draining) => return,
-            () = sender.closed() => return,
-        }
     }
 }
