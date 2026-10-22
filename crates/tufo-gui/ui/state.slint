@@ -380,9 +380,9 @@ export global Art {
     // Holds existing artwork through the sidebar's slide; ending it requests settled sizes.
     callback layout-moving(bool);
     in property <int> backdrop-revision;
-    // The felt at its size: its still gradient, shaded by the rim's recess reaching the given depth
-    // in from its edges, with corners of the given radius left transparent.
-    pure callback backdrop(length, length, length, length, color, color, color, int) -> image;
+    // The felt at its size: its light glowing into its canopy, shaded by the rim's recess reaching
+    // the given depth in from its edges, with corners of the given radius left transparent.
+    pure callback backdrop(length, length, length, length, color, color, int) -> image;
     // Rises whenever the worker delivers a picture, or pictures that failed may decode now.
     in property <int> pictures-revision;
     // A collection's background with rounded corners, at the given size: its preset or image,

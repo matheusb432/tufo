@@ -351,7 +351,7 @@ fn bind_art(window: &ui::AppWindow) {
     art.on_painting(background_art(window, Shade::None));
     art.on_backdrop({
         let window = window.as_weak();
-        move |width, height, corner_radius, recess_depth, light, canopy, shade, _revision| {
+        move |width, height, corner_radius, recess_depth, light, canopy, _revision| {
             let scale = window
                 .upgrade()
                 .map_or(1.0, |window| window.window().scale_factor());
@@ -360,7 +360,7 @@ fn bind_art(window: &ui::AppWindow) {
                 physical_pixels(height, scale),
                 physical_pixels_or_none(corner_radius, scale),
                 physical_pixels_or_none(recess_depth, scale),
-                [light, canopy, shade],
+                [light, canopy],
             )
         }
     });

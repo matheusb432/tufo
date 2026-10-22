@@ -382,14 +382,14 @@ export component AppWindow inherits Window {
                             height: parent.height;
                             preferred-width: 0px;
                             preferred-height: 0px;
-                            source: Art.backdrop(self.width, self.height, Theme.radius-felt, Theme.felt-recess-depth, Theme.still-light, Theme.still-canopy, Theme.still-shade, Art.backdrop-revision);
+                            source: Art.backdrop(self.width, self.height, Theme.radius-felt, Theme.felt-recess-depth, Theme.still-light, Theme.still-canopy, Art.backdrop-revision);
                             image-fit: fill;
                         }
 
-                        // The software renderer can't round a gradient, so the felt waits on its plain shade.
+                        // The software renderer can't round a gradient, so the felt waits on its plain canopy.
                         if felt-backdrop.source.width == 0: Rectangle {
                             border-radius: Theme.radius-felt;
-                            background: Theme.still-shade;
+                            background: Theme.still-canopy;
                         }
 
                         main := Rectangle {

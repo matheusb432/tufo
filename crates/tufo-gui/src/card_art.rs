@@ -79,16 +79,14 @@ pub(crate) fn card(base: &Base<'_>, shade: Shade, width: u32, height: u32, radiu
     }
 }
 
-/// The rim's shadow on the felt set into it, as one inset shadow would cast it from above: heaviest
-/// along the top, with a dark hairline at the edge.
+/// The rim's shadow on the felt set into it: one even inset shadow along every edge, with a dark
+/// hairline at the edge.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Recess {
     /// The shadow's blur in pixels. Zero casts no shadow.
     pub(crate) depth: f32,
 }
 
-/// The shadow's drop into the felt, as a fraction of the recess's depth.
-const RECESS_SHADOW_OFFSET_Y: f32 = 0.25;
 const RECESS_SHADOW_OPACITY: f32 = 0.4;
 const RECESS_HAIRLINE_OPACITY: f32 = 0.35;
 /// Past this many depths from the edge, the shadow has faded out.
@@ -106,14 +104,7 @@ impl Recess {
             return 0.0;
         }
         let hairline = RECESS_HAIRLINE_OPACITY * (1.0 - inside).clamp(0.0, 1.0);
-        let shadow_distance = inside_distance(
-            center_x,
-            center_y - RECESS_SHADOW_OFFSET_Y * self.depth,
-            width,
-            height,
-            corner_radius,
-        );
-        let shadow = RECESS_SHADOW_OPACITY * blurred_edge(shadow_distance / (self.depth / 2.0));
+        let shadow = RECESS_SHADOW_OPACITY * blurred_edge(inside / (self.depth / 2.0));
         1.0 - (1.0 - hairline) * (1.0 - shadow)
     }
 }
@@ -134,34 +125,28 @@ fn blurred_edge(deviations: f32) -> f32 {
     1.0 / (1.0 + (1.702 * deviations).exp())
 }
 
-/// The felt's radial gradient, with its glow at the top right and the middle stop at 38%, shaded by
-/// `recess`, and corners of `corner_radius` pixels, transparent outside the curve.
+/// The felt: its light glowing at the top right and settling into an even canopy, shaded by
+/// `recess`, with corners of `corner_radius` pixels, transparent outside the curve.
 pub(crate) fn backdrop(
-    colors: [Rgb; 3],
+    [glow, canopy]: [Rgb; 2],
     width: u32,
     height: u32,
     corner_radius: f32,
     recess: Recess,
 ) -> Pixels {
-    let radius = width.max(height) as f32 * 1.15;
+    let glow_radius = width.max(height) as f32 * 0.44;
     let center_x = width as f32 * 0.92;
     let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
     for y in 0..height {
         for x in 0..width {
-            let position = (((x as f32 - center_x).powi(2) + (y as f32).powi(2)).sqrt() / radius)
-                .clamp(0.0, 1.0);
-            let (start, end, blend) = if position <= 0.38 {
-                (colors[0], colors[1], position / 0.38)
-            } else {
-                (colors[1], colors[2], (position - 0.38) / 0.62)
-            };
+            let blend = ((x as f32 - center_x).hypot(y as f32) / glow_radius).min(1.0);
             let light = 1.0 - recess.shade(x, y, width, height, corner_radius);
             let channel =
                 |start, end| light * ((1.0 - blend) * f32::from(start) + blend * f32::from(end));
             rgba.extend_from_slice(&[
-                to_byte(channel(start.0, end.0)),
-                to_byte(channel(start.1, end.1)),
-                to_byte(channel(start.2, end.2)),
+                to_byte(channel(glow.0, canopy.0)),
+                to_byte(channel(glow.1, canopy.1)),
+                to_byte(channel(glow.2, canopy.2)),
                 to_byte(corner_coverage(x, y, width, height, corner_radius) * 255.0),
             ]);
         }
@@ -315,7 +300,7 @@ mod tests {
 
     #[test]
     fn the_backdrop_rounds_its_corners_only_with_a_radius() {
-        let colors = [Rgb(67, 80, 44), Rgb(23, 61, 39), Rgb(11, 30, 21)];
+        let colors = [Rgb(67, 80, 44), Rgb(23, 61, 39)];
 
         let rounded = backdrop(colors, 80, 50, 12.0, Recess { depth: 0.0 });
         for (x, y) in [(0, 0), (79, 0), (0, 49), (79, 49)] {
@@ -330,18 +315,37 @@ mod tests {
     }
 
     #[test]
-    fn the_recess_shades_the_top_most_and_leaves_the_middle() {
+    fn the_recess_shades_every_edge_alike_and_leaves_the_middle() {
         let grey = Rgb(200, 200, 200);
-        let pixels = backdrop([grey; 3], 200, 160, 14.0, Recess { depth: 14.0 });
+        let pixels = backdrop([grey; 2], 200, 160, 14.0, Recess { depth: 14.0 });
         let red_at = |x: u32, y: u32| pixels.rgba[(y as usize * 200 + x as usize) * 4];
 
         assert_eq!(red_at(100, 80), 200);
-        assert!(
-            red_at(100, 3) < red_at(3, 80),
-            "the top darker than the sides"
+        assert!(red_at(100, 3) < 200, "the edge shaded");
+        assert_eq!(
+            [red_at(100, 156), red_at(3, 80), red_at(196, 80)],
+            [red_at(100, 3); 3],
+            "every edge alike"
         );
-        assert_eq!(red_at(3, 80), red_at(196, 80), "both sides alike");
-        assert!(red_at(100, 159) < 200, "every edge shaded");
+    }
+
+    #[test]
+    fn the_felt_settles_into_the_same_canopy_away_from_its_glow_at_any_size() {
+        let (glow, canopy) = (Rgb(200, 180, 120), Rgb(20, 60, 40));
+        for (width, height) in [(400, 300), (1600, 500), (500, 1200)] {
+            let pixels = backdrop([glow, canopy], width, height, 0.0, Recess { depth: 0.0 });
+            let rgb_at = |x: u32, y: u32| {
+                let start = (y as usize * width as usize + x as usize) * 4;
+                Rgb(
+                    pixels.rgba[start],
+                    pixels.rgba[start + 1],
+                    pixels.rgba[start + 2],
+                )
+            };
+
+            assert_eq!(rgb_at(0, height - 1), canopy, "{width} × {height}");
+            assert_ne!(rgb_at(width * 92 / 100, 0), canopy, "{width} × {height}");
+        }
     }
 
     #[test]
