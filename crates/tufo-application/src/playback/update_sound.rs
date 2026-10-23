@@ -11,10 +11,5 @@ pub async fn execute(
     mut database: Db,
 ) {
     player.update_sound(entry_id, settings).await;
-    if settings.looping {
-        let state = player.watch_player().borrow().clone();
-        saved_loops::remember_if_looping_locally(&mut database, entry_id, &state).await;
-    } else {
-        saved_loops::forget(&mut database, entry_id).await;
-    }
+    saved_loops::remember(&mut database, player).await;
 }

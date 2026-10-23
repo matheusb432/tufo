@@ -67,6 +67,7 @@ use tufo_models::{
             EnqueueError, MusicQueue, QueueEntry, QueueModes, QueueStart, QueuedEntry, RepeatMode,
             SetRepeatError,
         },
+        saved_loops::SoundResumeState,
     },
 };
 use tufo_wire::song_loops::PreviewId;
@@ -210,6 +211,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             modes: QueueModes::default(),
             crossfade: CrossfadeDuration::default(),
             sounds: BTreeMap::new(),
+            sound_resume: SoundResumeState::default(),
             sound_preparations: BTreeMap::new(),
             sounds_pause_generation: 0,
             sounds_paused_at: None,
@@ -1178,6 +1180,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
             playback.stop(engine.sound_stop_fade(sound.cue.settings.fade_out.into_inner()));
         }
         engine.unpause_when_no_sounds_left();
+        engine.sound_resume.entry_ids.remove(&entry_id);
         self.publish(&engine);
     }
 
@@ -1201,11 +1204,17 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
                 }
             }
         }
+        if !matches!(command, SoundsCommand::SetVolume(_)) {
+            engine.sound_resume.paused = engine.sounds_paused_at.is_some();
+        }
         self.publish(&engine);
     }
 
     async fn update_sound(&self, entry_id: CollectionEntryId, settings: SoundSettings) {
         let mut engine = self.engine.lock().await;
+        if !settings.looping {
+            engine.sound_resume.entry_ids.remove(&entry_id);
+        }
         let Some(sound) = engine.sounds.get_mut(&entry_id) else {
             return;
         };
@@ -1213,6 +1222,7 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         if let Some(playback) = &mut sound.playback {
             playback.apply(settings);
         }
+        engine.remember_local_sounds();
         self.publish(&engine);
     }
 
@@ -1357,6 +1367,10 @@ impl<O: AudioOutputs> Player for EnginePlayer<O> {
         self.state.subscribe()
     }
 
+    async fn sounds_to_resume(&self) -> SoundResumeState {
+        self.engine.lock().await.sound_resume.clone()
+    }
+
     fn diagnostics(&self) -> PlayerDiagnostics {
         let memory = AudioMemory::shared().snapshot();
         PlayerDiagnostics {
@@ -1448,6 +1462,7 @@ struct Engine {
     modes: QueueModes,
     crossfade: CrossfadeDuration,
     sounds: BTreeMap<CollectionEntryId, FiredSound>,
+    sound_resume: SoundResumeState,
     sound_preparations: BTreeMap<CollectionEntryId, SoundPreparation>,
     sounds_pause_generation: u64,
     sounds_paused_at: Option<SystemTime>,

@@ -1792,6 +1792,156 @@ async fn rain_and_door_library(
     Ok((library, rain, door))
 }
 
+async fn two_loop_library(
+    rig: &Rig,
+) -> anyhow::Result<(
+    Library<DiskLibraryFiles>,
+    CollectionEntryId,
+    CollectionEntryId,
+)> {
+    let (library, rain, door) = rain_and_door_library(rig).await?;
+    update_collection_entry::execute(
+        door,
+        UpdateCollectionEntry {
+            sound_patch: Some(tufo_wire::library::SoundSettingsPatch {
+                looping: Some(true),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        &library,
+        rig.player.as_ref(),
+    )
+    .await?;
+    Ok((library, rain, door))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_login_resumes_only_the_latest_effect_session() -> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let (library, rain, door) = two_loop_library(&rig).await?;
+    let player = rig.player.as_ref();
+
+    play_entry_sound::execute(rain, &library, player).await?;
+    player.stand_by().await;
+    play_entry_sound::execute(door, &library, player).await?;
+    player.stand_by().await;
+    player.shut_down().await;
+    drop(library);
+
+    let restarted = Rig::start()?;
+    let player = restarted.player.as_ref();
+    let database = open_database(&rig.directory.path().join("tufo.sqlite3")).await?;
+    let library = Library::open(database, DiskLibraryFiles).await?;
+    let resumed = resume_saved_loops::execute(&library, player).await?;
+
+    assert_eq!(resumed, ResumeSavedLoopsOutcome::Resumed { loops: 1 });
+    assert_eq!(restarted.state().sounds[0].entry_id, door);
+    stop_sound::execute(door, player, library.database()).await;
+    player.stand_by().await;
+    assert_eq!(
+        resume_saved_loops::execute(&library, player).await?,
+        ResumeSavedLoopsOutcome::NothingSaved
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_login_preserves_multiple_loops_and_forgets_only_stopped_or_unlooped_sounds()
+-> anyhow::Result<()> {
+    let rig = Rig::start()?;
+    let (library, rain, door) = two_loop_library(&rig).await?;
+    let player = rig.player.as_ref();
+    play_entry_sound::execute(rain, &library, player).await?;
+    play_entry_sound::execute(door, &library, player).await?;
+    player.stand_by().await;
+    assert_eq!(
+        resume_saved_loops::execute(&library, player).await?,
+        ResumeSavedLoopsOutcome::Resumed { loops: 2 }
+    );
+    assert_eq!(rig.state().sounds.len(), 2);
+
+    stop_sound::execute(rain, player, library.database()).await;
+    player.stand_by().await;
+    assert_eq!(
+        resume_saved_loops::execute(&library, player).await?,
+        ResumeSavedLoopsOutcome::Resumed { loops: 1 }
+    );
+    assert_eq!(rig.state().sounds[0].entry_id, door);
+
+    update_collection_entry::execute(
+        door,
+        UpdateCollectionEntry {
+            sound_patch: Some(tufo_wire::library::SoundSettingsPatch {
+                looping: Some(false),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        &library,
+        player,
+    )
+    .await?;
+    player.stand_by().await;
+    assert_eq!(
+        resume_saved_loops::execute(&library, player).await?,
+        ResumeSavedLoopsOutcome::NothingSaved
+    );
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_delayed_effect_save_preserves_standby_but_cannot_undo_a_stop() -> anyhow::Result<()> {
+    for stop in [false, true] {
+        let rig = Rig::start()?;
+        let (library, rain, _) = rain_and_door_library(&rig).await?;
+        let player = rig.player.as_ref();
+        let mut states = player.watch_player();
+        let mut database = library.database();
+        let transaction = database
+            .transaction_builder()
+            .mode(toasty_core::driver::operation::TransactionMode::Immediate)
+            .begin()
+            .await?;
+        let play = play_entry_sound::execute(rain, &library, player);
+        tokio::pin!(play);
+        tokio::select! {
+            result = &mut play => anyhow::bail!("play saved while the database was locked: {result:?}"),
+            result = tokio::time::timeout(WAIT_TIMEOUT, states.wait_for(|state| !state.sounds.is_empty())) => {
+                result??;
+            }
+        }
+        if stop {
+            let stop = stop_sound::execute(rain, player, library.database());
+            tokio::pin!(stop);
+            tokio::select! {
+                () = &mut stop => anyhow::bail!("stop saved while the database was locked"),
+                result = tokio::time::timeout(WAIT_TIMEOUT, states.wait_for(|state| state.sounds.is_empty())) => {
+                    result??;
+                }
+            }
+            player.stand_by().await;
+            transaction.commit().await?;
+            let (result, ()) = tokio::join!(play, stop);
+            result?;
+        } else {
+            player.stand_by().await;
+            transaction.commit().await?;
+            play.await?;
+        }
+        let resumed = resume_saved_loops::execute(&library, player).await?;
+        assert_eq!(
+            resumed,
+            if stop {
+                ResumeSavedLoopsOutcome::NothingSaved
+            } else {
+                ResumeSavedLoopsOutcome::Resumed { loops: 1 }
+            }
+        );
+    }
+    Ok(())
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn a_login_resumes_the_loops_left_playing_unless_they_were_paused() -> anyhow::Result<()> {
     let rig = Rig::start()?;

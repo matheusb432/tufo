@@ -9,7 +9,10 @@ use std::{
 use tufo_application::playback::player::PlayAudioError;
 use tufo_models::{
     library::Volume,
-    playback::player_state::{ActiveSound, SoundCue},
+    playback::{
+        OutputTarget,
+        player_state::{ActiveSound, SoundCue},
+    },
 };
 
 use super::{ANTI_CLICK_FADE, Engine, EnginePlayer, SOUND_CACHE_BYTES_MAX, outputs::AudioOutputs};
@@ -149,6 +152,7 @@ impl<O: AudioOutputs> EnginePlayer<O> {
             }
         };
         engine.sounds.insert(entry_id, fired);
+        engine.remember_local_sounds();
         self.publish(&engine);
         Ok(())
     }
@@ -223,6 +227,18 @@ fn read_sound_key(path: &std::path::Path) -> Result<SoundKey, PlayAudioError> {
 }
 
 impl Engine {
+    pub(super) fn remember_local_sounds(&mut self) {
+        if self.target == OutputTarget::Local {
+            self.sound_resume.entry_ids = self
+                .sounds
+                .iter()
+                .filter(|(_, sound)| sound.cue.settings.looping)
+                .map(|(&entry_id, _)| entry_id)
+                .collect();
+        }
+        self.sound_resume.paused = self.sounds_paused_at.is_some();
+    }
+
     pub(super) fn reap_cancelled_sound_preparations(&mut self) -> bool {
         let before = self.sound_preparations.len();
         self.sound_preparations

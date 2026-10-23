@@ -54,9 +54,7 @@ pub async fn execute<F: LibraryFiles>(
         }
     };
     play_sound::execute(cue, player).await?;
-    let state = player.watch_player().borrow().clone();
     let mut database = library.database();
-    saved_loops::remember_if_looping_locally(&mut database, entry_id, &state).await;
-    saved_loops::remember_paused(&mut database, state.sounds_paused).await;
+    saved_loops::remember(&mut database, player).await;
     Ok(())
 }

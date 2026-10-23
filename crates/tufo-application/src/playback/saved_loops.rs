@@ -2,30 +2,17 @@
 //! already changed.
 
 use toasty::Db;
+use toasty_core::driver::operation::TransactionMode;
 use tufo_models::{
-    library::CollectionEntryId,
-    playback::{OutputTarget, player_state::PlayerState, saved_loops::SavedLoop},
+    library::{CollectionEntry, CollectionEntryId},
+    playback::saved_loops::SavedLoop,
 };
 
+use super::player::Player;
 use crate::library::LibraryStorageError;
 
-const PAUSE_ALL: &str = "UPDATE saved_loops SET paused = 1";
-const UNPAUSE_ALL: &str = "UPDATE saved_loops SET paused = 0";
-
-pub(super) async fn remember_if_looping_locally(
-    database: &mut Db,
-    entry_id: CollectionEntryId,
-    state: &PlayerState,
-) {
-    let looping_locally = state.output == OutputTarget::Local
-        && state
-            .sounds
-            .iter()
-            .any(|sound| sound.entry_id == entry_id && sound.looping);
-    if looping_locally {
-        let saved = replace(database, entry_id, state.sounds_paused).await;
-        warn_unless_saved(saved);
-    }
+pub(super) async fn remember(database: &mut Db, player: &impl Player) {
+    warn_unless_saved(replace(database, player).await);
 }
 
 pub(super) async fn forget(database: &mut Db, entry_id: CollectionEntryId) {
@@ -36,27 +23,33 @@ pub(super) async fn forget(database: &mut Db, entry_id: CollectionEntryId) {
     warn_unless_saved(deleted.map_err(LibraryStorageError::from));
 }
 
-pub(super) async fn remember_paused(database: &mut Db, paused: bool) {
-    let statement = if paused { PAUSE_ALL } else { UNPAUSE_ALL };
-    let updated = toasty::sql::statement(statement).exec(database).await;
-    warn_unless_saved(updated.map(drop).map_err(LibraryStorageError::from));
-}
-
-async fn replace(
-    database: &mut Db,
-    entry_id: CollectionEntryId,
-    paused: bool,
-) -> Result<(), LibraryStorageError> {
-    SavedLoop::filter_by_collection_entry_id(entry_id)
-        .delete()
-        .exec(database)
+async fn replace(database: &mut Db, player: &impl Player) -> Result<(), LibraryStorageError> {
+    let mut transaction = database
+        .transaction_builder()
+        .mode(TransactionMode::Immediate)
+        .begin()
         .await?;
-    toasty::create!(SavedLoop {
-        collection_entry_id: entry_id,
-        paused,
-    })
-    .exec(database)
-    .await?;
+    // Read after acquiring the write lock, so a delayed request cannot save an older session.
+    let state = player.sounds_to_resume().await;
+    SavedLoop::all().delete().exec(&mut transaction).await?;
+    for entry_id in state.entry_ids {
+        // Library deletion may have removed an entry while its sound was still playing.
+        if CollectionEntry::filter_by_id(entry_id)
+            .first()
+            .exec(&mut transaction)
+            .await?
+            .is_none()
+        {
+            continue;
+        }
+        toasty::create!(SavedLoop {
+            collection_entry_id: entry_id,
+            paused: state.paused,
+        })
+        .exec(&mut transaction)
+        .await?;
+    }
+    transaction.commit().await?;
     Ok(())
 }
 

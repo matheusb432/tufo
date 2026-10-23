@@ -10,6 +10,7 @@ use tufo_models::{
         diagnostics::PlayerDiagnostics,
         player_state::{PlayerState, SoundCue},
         queue::{QueueStart, QueuedEntry},
+        saved_loops::SoundResumeState,
     },
 };
 use tufo_wire::song_loops::{PreviewId, PreviewMode, PreviewStarted};
@@ -136,6 +137,9 @@ pub trait Player: Send + Sync {
 
     /// Observes the current state and every later change.
     fn watch_player(&self) -> watch::Receiver<PlayerState>;
+
+    /// The latest local looping sounds and pause state. Stand-by and shutdown preserve them.
+    fn sounds_to_resume(&self) -> impl Future<Output = SoundResumeState> + Send;
 
     fn diagnostics(&self) -> PlayerDiagnostics;
 }
