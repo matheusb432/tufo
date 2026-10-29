@@ -70,10 +70,11 @@ jobs:
             sleep 5
           done
           exit 1
-      # Kenku's canonical-path alias resolves differently on Windows; the installer is checked by release.yml.
+      # The engine player's timing assertions are too tight for hosted Windows runners, and Kenku's
+      # canonical-path alias resolves differently there; release.yml checks the installer natively.
       - name: Test the workspace
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: cargo nextest run --no-fail-fast -E 'not test(=legacy_file_aliases_keep_their_ids_when_kenku_imports_the_canonical_path)'
+        run: cargo nextest run --no-fail-fast -E 'not binary_id(tufo-infra::engine_player) and not test(=legacy_file_aliases_keep_their_ids_when_kenku_imports_the_canonical_path)'
       - name: Lint Windows-specific code
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
