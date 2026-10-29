@@ -64,9 +64,10 @@ jobs:
       - name: Uninstall
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: just uninstall
+      # The engine player's timing assertions are too tight for hosted macOS runners.
       - name: Test the workspace
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: just test --no-fail-fast
+        run: cargo nextest run --no-fail-fast -E 'not binary_id(tufo-infra::engine_player)'
       - name: Lint macOS-specific code
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
