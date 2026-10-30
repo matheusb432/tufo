@@ -1,0 +1,88 @@
+name: Set up a build
+description: >-
+  Installs the pinned tools and restores, then saves, the Rust build, CEF, cargo-xwin, and
+  cargo-about caches.
+  The caches workflow repeats each job's inputs to keep its entries from expiring.
+
+inputs:
+  tools:
+    description: The mise tools to install, as mise-action's install_args.
+    required: true
+  cache-name:
+    description: The Rust build cache's name, unique to the job.
+    required: true
+  cef-target:
+    description: The Rust target whose CEF build to cache under CEF_PATH; empty skips CEF.
+    default: ""
+  cargo-xwin:
+    description: Cache the MSVC CRT and Windows SDK that cargo-xwin downloads.
+    default: "false"
+  dependency-licenses:
+    description: Cache cargo-about's output, which packaging ships.
+    default: "false"
+  save:
+    description: Save the caches at the end of the job; restoring alone keeps them from expiring.
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: jdx/mise-action@v4
+      with:
+        version: 2026.8.8
+        install_args: ${{ inputs.tools }}
+        cache_save: ${{ inputs.save }}
+    - uses: Swatinem/rust-cache@v2
+      with:
+        shared-key: ${{ inputs.cache-name }}
+        cache-on-failure: true
+        save-if: ${{ inputs.save }}
+    # actions/cache rejects paths with `..`, and rust-cache keeps only Cargo's own output, so CEF
+    # lives beside the checkout. Its downloaded archive is not needed once unpacked.
+    - id: cef
+      if: inputs.cef-target != ''
+      shell: bash
+      run: |
+        version=$(tr -d '\r' < Cargo.lock | sed -n '/^name = "cef-dll-sys"$/{n;s/^version = ".*+\(.*\)"$/\1/p;}')
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+        echo "CEF_PATH=$RUNNER_WORKSPACE/cef" >> "$GITHUB_ENV"
+    # After a miss, a job that builds nothing leaves no folder, so saving only warns; the same
+    # holds for cargo-about's cache.
+    - if: inputs.cef-target != ''
+      uses: actions/cache@v6
+      with:
+        path: |
+          ${{ env.CEF_PATH }}
+          !${{ env.CEF_PATH }}/*/*.tar.bz2
+        key: cef-${{ runner.os }}-${{ inputs.cef-target }}-${{ steps.cef.outputs.version }}
+    # A new cargo-xwin may reuse most of the previous download. Restoring alone never files an
+    # older version's download under the newer key.
+    - id: xwin
+      if: inputs.cargo-xwin == 'true'
+      shell: bash
+      run: |
+        version=$(tr -d '\r' < mise.toml | sed -n 's/^"cargo:cargo-xwin" = { version = "\([^"]*\)".*/\1/p')
+        test -n "$version"
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+    - if: inputs.cargo-xwin == 'true' && inputs.save == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ~/.cache/cargo-xwin
+        key: cargo-xwin-${{ runner.os }}-${{ steps.xwin.outputs.version }}
+        restore-keys: cargo-xwin-${{ runner.os }}-
+    - if: inputs.cargo-xwin == 'true' && inputs.save != 'true'
+      uses: actions/cache/restore@v6
+      with:
+        path: ~/.cache/cargo-xwin
+        key: cargo-xwin-${{ runner.os }}-${{ steps.xwin.outputs.version }}
+    # xtask files cargo-about's output under a digest of everything it reads, and rust-cache
+    # keeps only Cargo's own output under target.
+    - if: inputs.dependency-licenses == 'true'
+      shell: bash
+      run: echo "TUFO_DEPENDENCY_LICENSES_CACHE=$RUNNER_WORKSPACE/dependency-licenses" >> "$GITHUB_ENV"
+    - if: inputs.dependency-licenses == 'true'
+      uses: actions/cache@v6
+      with:
+        path: ${{ env.TUFO_DEPENDENCY_LICENSES_CACHE }}
+        key: dependency-licenses-${{ runner.os }}-${{ hashFiles('Cargo.lock', '**/Cargo.toml', 'about.toml', 'packaging/licenses.hbs', 'mise.toml') }}

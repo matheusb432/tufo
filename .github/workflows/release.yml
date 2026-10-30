@@ -19,25 +19,17 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-    # rust-cache keeps only Cargo's own output, so CEF's download lives outside target.
-    env:
-      CEF_PATH: ${{ github.workspace }}/../cef
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      - uses: jdx/mise-action@v4
+      - uses: ./.github/actions/setup-build
         with:
-          version: 2026.8.8
-          install_args: rust just buf cargo-binstall cargo:cargo-about
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - uses: actions/cache@v6
-        with:
-          path: ${{ env.CEF_PATH }}
-          key: cef-${{ github.job }}-${{ hashFiles('Cargo.toml') }}
+          tools: rust just buf cargo-binstall cargo:cargo-about
+          cache-name: release-linux
+          cef-target: x86_64-unknown-linux-gnu
+          dependency-licenses: true
       - name: Install the native build dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config cmake clang dpkg-dev libasound2-dev libpipewire-0.3-dev libfontconfig-dev libdbus-1-dev
       - name: Package
@@ -70,29 +62,18 @@ jobs:
   windows-installer:
     runs-on: ubuntu-24.04
     timeout-minutes: 120
-    # rust-cache keeps only Cargo's own output, so CEF's download lives outside target.
-    env:
-      CEF_PATH: ${{ github.workspace }}/../cef
     steps:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      - uses: jdx/mise-action@v4
+      - uses: ./.github/actions/setup-build
         with:
-          version: 2026.8.8
-          install_args: rust just buf ninja cargo-binstall cargo:cargo-xwin cargo:cargo-about
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
-      - uses: actions/cache@v6
-        with:
-          path: ${{ env.CEF_PATH }}
-          key: cef-${{ github.job }}-${{ hashFiles('Cargo.toml') }}
-      - uses: actions/cache@v6
-        with:
-          path: ~/.cache/cargo-xwin
-          key: cargo-xwin-${{ runner.os }}-${{ hashFiles('mise.toml') }}
+          tools: rust just buf ninja cargo-binstall cargo:cargo-xwin cargo:cargo-about
+          cache-name: release-windows-installer
+          cef-target: x86_64-pc-windows-msvc
+          cargo-xwin: true
+          dependency-licenses: true
       - name: Install the cross-build dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y clang llvm nsis cmake
@@ -161,13 +142,11 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: false
-      - uses: jdx/mise-action@v4
+      - uses: ./.github/actions/setup-build
         with:
-          version: 2026.8.8
-          install_args: rust just buf cargo-binstall cargo:cargo-about
-      - uses: Swatinem/rust-cache@v2
-        with:
-          cache-on-failure: true
+          tools: rust just buf cargo-binstall cargo:cargo-about
+          cache-name: release-macos
+          dependency-licenses: true
       - name: Package
         run: just package-macos
       - name: Install, reinstall, check, and remove the package
