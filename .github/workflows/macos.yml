@@ -18,27 +18,19 @@ concurrency:
   group: macos-${{ github.ref }}-${{ inputs.runner }}
   cancel-in-progress: false
 
+# `just macos-lint` covers Clippy, so these jobs build each profile once, in parallel.
 jobs:
   install:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: 120
-    defaults:
-      run:
-        working-directory: tools/tufo
     steps:
       - uses: actions/checkout@v7
         with:
-          path: tools/tufo
           persist-credentials: false
-      - uses: jdx/mise-action@v4
+      - uses: ./.github/actions/setup-build
         with:
-          version: 2026.8.8
-          working_directory: tools/tufo
-          install_args: rust just buf cargo-binstall cargo:cargo-nextest
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: tools/tufo
-          cache-on-failure: true
+          tools: rust just buf cargo-binstall
+          cache-name: macos-install-${{ inputs.runner }}
       - name: Build and install Tufo.app
         id: install
         run: just install
@@ -55,7 +47,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: tufo-${{ inputs.runner }}-${{ github.sha }}
-          path: tools/tufo/.artifacts/Tufo.app.zip
+          path: .artifacts/Tufo.app.zip
           if-no-files-found: error
           retention-days: 7
       - name: Stop the installed server
@@ -64,10 +56,18 @@ jobs:
       - name: Uninstall
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: just uninstall
+
+  test:
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          tools: rust buf cargo-binstall cargo:cargo-nextest
+          cache-name: macos-test-${{ inputs.runner }}
       # The engine player's timing assertions are too tight for hosted macOS runners.
       - name: Test the workspace
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: cargo nextest run --no-fail-fast -E 'not binary_id(tufo-infra::engine_player)'
-      - name: Lint macOS-specific code
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: cargo clippy --locked --workspace --all-targets -- -D warnings
