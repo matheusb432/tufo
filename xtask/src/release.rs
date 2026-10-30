@@ -37,6 +37,9 @@ const NOTICE_PATHS: [&str; 16] = [
 ];
 const DEPENDENCY_LICENSES_FILE: &str = "DEPENDENCY-LICENSES.txt";
 const DEPENDENCY_LICENSES_TEMPLATE: &str = "packaging/licenses.hbs";
+/// Overrides where cargo-about's output is kept, `target/dependency-licenses` by default.
+const DEPENDENCY_LICENSES_CACHE_VARIABLE: &str = "TUFO_DEPENDENCY_LICENSES_CACHE";
+const ABOUT_CONFIG: &str = "about.toml";
 const SLINT_LICENSE_ID: &str = "LicenseRef-Slint-Royalty-free-2.0";
 const SLINT_LICENSE_FILE: &str = "SLINT-LICENSE.md";
 #[cfg(target_os = "linux")]
@@ -125,20 +128,126 @@ pub(crate) fn stage_notices(workspace_root: &Path, destination: &Path) -> Result
         fs::create_dir_all(target.parent().context("a notice has no parent folder")?)?;
         fs::copy(&source, &target).with_context(|| format!("copy {}", source.display()))?;
     }
-    let status = Command::new("cargo")
-        .current_dir(workspace_root)
-        .args(["about", "generate", "--locked", "--fail", "--workspace"])
-        .arg("--output-file")
-        .arg(destination.join(DEPENDENCY_LICENSES_FILE))
-        .arg(DEPENDENCY_LICENSES_TEMPLATE)
-        .status()
-        .context("run cargo-about; `just bootstrap` installs it")?;
-    ensure!(status.success(), "cargo-about failed: {status}");
+    let licenses = dependency_licenses(workspace_root)?;
+    fs::copy(&licenses, destination.join(DEPENDENCY_LICENSES_FILE))
+        .with_context(|| format!("copy {}", licenses.display()))?;
     fs::write(
         destination.join(SLINT_LICENSE_FILE),
         slint_license_text(workspace_root)?,
     )
     .context("write Slint's license")
+}
+
+/// cargo-about's output, kept under its inputs' digest because scanning every dependency's
+/// license files takes minutes of CPU.
+fn dependency_licenses(workspace_root: &Path) -> Result<PathBuf> {
+    let cache_dir = std::env::var_os(DEPENDENCY_LICENSES_CACHE_VARIABLE).map_or_else(
+        || workspace_root.join("target/dependency-licenses"),
+        PathBuf::from,
+    );
+    let cached = cache_dir.join(format!(
+        "{}.txt",
+        dependency_licenses_digest(workspace_root)?
+    ));
+    if cached.is_file() {
+        return Ok(cached);
+    }
+    fs::create_dir_all(&cache_dir).with_context(|| format!("create {}", cache_dir.display()))?;
+    // An interrupted run leaves no file under the digest.
+    let partial = cached.with_extension("partial");
+    let status = Command::new("cargo")
+        .current_dir(workspace_root)
+        .args(["about", "generate", "--locked", "--fail", "--workspace"])
+        .arg("--output-file")
+        .arg(&partial)
+        .arg(DEPENDENCY_LICENSES_TEMPLATE)
+        .status()
+        .context("run cargo-about; `just bootstrap` installs it")?;
+    ensure!(status.success(), "cargo-about failed: {status}");
+    for entry in
+        fs::read_dir(&cache_dir).with_context(|| format!("list {}", cache_dir.display()))?
+    {
+        let path = entry?.path();
+        if path.extension().is_some_and(|extension| extension == "txt") {
+            fs::remove_file(&path).with_context(|| format!("remove {}", path.display()))?;
+        }
+    }
+    fs::rename(&partial, &cached).with_context(|| format!("write {}", cached.display()))?;
+    Ok(cached)
+}
+
+/// Covers cargo-about's version, the locked dependency graph with every package's license,
+/// the license files of packages without a registry or git source, and cargo-about's
+/// configuration and template.
+fn dependency_licenses_digest(workspace_root: &Path) -> Result<String> {
+    let mut hash = Sha256::new();
+    let mut add = |bytes: &[u8]| {
+        hash.update(bytes.len().to_le_bytes());
+        hash.update(bytes);
+    };
+    add(&output(
+        Command::new("cargo")
+            .current_dir(workspace_root)
+            .args(["about", "--version"]),
+        "cargo-about",
+    )?);
+    let metadata = output(
+        Command::new("cargo").current_dir(workspace_root).args([
+            "metadata",
+            "--format-version",
+            "1",
+            "--locked",
+        ]),
+        "cargo metadata",
+    )?;
+    add(&metadata);
+    let metadata = MetadataCommand::parse(
+        std::str::from_utf8(&metadata).context("cargo metadata wrote no UTF-8")?,
+    )
+    .context("read cargo metadata's output")?;
+    let mut inputs = vec![
+        workspace_root.join(ABOUT_CONFIG),
+        workspace_root.join(DEPENDENCY_LICENSES_TEMPLATE),
+    ];
+    for package in metadata
+        .packages
+        .iter()
+        .filter(|package| package.source.is_none())
+    {
+        inputs.extend(local_license_files(package)?);
+    }
+    for path in inputs {
+        add(path.as_os_str().as_encoded_bytes());
+        add(&fs::read(&path).with_context(|| format!("read {}", path.display()))?);
+    }
+    Ok(hex(&hash.finalize()))
+}
+
+/// The files beside a local package's manifest that cargo-about may read as its license, sorted.
+fn local_license_files(package: &cargo_metadata::Package) -> Result<Vec<PathBuf>> {
+    const LICENSE_NAME_PARTS: [&str; 4] = ["license", "licence", "copying", "notice"];
+    let root = package
+        .manifest_path
+        .parent()
+        .context("a package manifest has no parent folder")?
+        .as_std_path();
+    let mut files = Vec::new();
+    for entry in fs::read_dir(root).with_context(|| format!("list {}", root.display()))? {
+        let path = entry?.path();
+        let name = path
+            .file_name()
+            .map(|name| name.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if path.is_file() && LICENSE_NAME_PARTS.iter().any(|part| name.contains(part)) {
+            files.push(path);
+        }
+    }
+    if let Some(license_file) = &package.license_file {
+        files.push(root.join(license_file));
+    }
+    files.sort();
+    files.dedup();
+    Ok(files)
 }
 
 /// cargo-about leaves out license texts that only a `LicenseRef` names, such as Slint's.
@@ -182,17 +291,22 @@ pub(crate) fn write_checksum(installer: &Path) -> Result<PathBuf> {
         .file_name()
         .context("the installer has no file name")?
         .to_string_lossy();
-    let hex = hash
-        .finalize()
+    let checksum = installer.with_file_name(format!("{file_name}.sha256"));
+    fs::write(
+        &checksum,
+        format!("{}  {file_name}\n", hex(&hash.finalize())),
+    )
+    .with_context(|| format!("write {}", checksum.display()))?;
+    Ok(checksum)
+}
+
+fn hex(bytes: &[u8]) -> String {
+    bytes
         .iter()
-        .fold(String::with_capacity(64), |mut hex, byte| {
+        .fold(String::with_capacity(bytes.len() * 2), |mut hex, byte| {
             let _ = write!(hex, "{byte:02x}");
             hex
-        });
-    let checksum = installer.with_file_name(format!("{file_name}.sha256"));
-    fs::write(&checksum, format!("{hex}  {file_name}\n"))
-        .with_context(|| format!("write {}", checksum.display()))?;
-    Ok(checksum)
+        })
 }
 
 #[cfg(target_os = "linux")]
@@ -441,6 +555,17 @@ fn run(command: &mut Command, program: &str) -> Result<()> {
     let status = command.status().with_context(|| format!("run {program}"))?;
     ensure!(status.success(), "{program} failed: {status}");
     Ok(())
+}
+
+fn output(command: &mut Command, program: &str) -> Result<Vec<u8>> {
+    let output = command.output().with_context(|| format!("run {program}"))?;
+    ensure!(
+        output.status.success(),
+        "{program} failed: {}\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    Ok(output.stdout)
 }
 
 #[cfg(test)]
