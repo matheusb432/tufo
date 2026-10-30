@@ -18,8 +18,8 @@ const BOOTSTRAP_NAME: &str = "bootstrap.exe";
 const HOST_EXECUTABLE_NAME: &str = "tufo-browser.exe";
 /// The bootstrap loads the library named like itself.
 const HOST_LIBRARY_NAME: &str = "tufo-browser.dll";
-/// Cargo names the library after the crate.
-const BUILT_LIBRARY_NAME: &str = "tufo_browser.dll";
+/// Cargo names the library after tufo-browser's library target.
+const BUILT_LIBRARY_NAME: &str = "tufo_browser_host.dll";
 const LOCALES_FOLDER_NAME: &str = "locales";
 /// The runtime files other than the libraries, packs, and snapshots.
 const RUNTIME_FILE_NAMES: [&str; 3] = ["icudtl.dat", "vk_swiftshader_icd.json", "CREDITS.html"];

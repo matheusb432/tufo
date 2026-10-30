@@ -17,18 +17,10 @@ setup *args:
     cargo fetch {{ args }}
     mise exec -- buf build >/dev/null
 
-# Build the GUI, server, tufo command, and browser host.
+# Build the GUI, server, tufo command, and browser host, which Windows loads as a DLL.
 [group('build')]
-[unix]
 build:
     cargo build --release -p tufo-gui -p tufo-server -p tufo-cli -p tufo-browser
-
-# Build the GUI, server, tufo command, and the browser host's DLL, which CEF's bootstrap loads.
-[group('build')]
-[windows]
-build:
-    cargo build --release -p tufo-gui -p tufo-server -p tufo-cli
-    cargo rustc --release -p tufo-browser --lib --crate-type cdylib
 
 # Install all binaries and the desktop launcher, then start the installed server.
 [group('build')]

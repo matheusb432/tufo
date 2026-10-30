@@ -13,8 +13,8 @@ use cargo_metadata::{Metadata, semver::Version};
 use crate::{install::BINARY_NAMES, release, windows_browser};
 
 const TARGET: &str = "x86_64-pc-windows-msvc";
-const PACKAGES: [&str; 3] = ["tufo-gui", "tufo-server", "tufo-cli"];
-const BROWSER_PACKAGE: &str = "tufo-browser";
+/// The browser package builds the host's DLL, which CEF's bootstrap executable loads.
+const PACKAGES: [&str; 4] = ["tufo-gui", "tufo-server", "tufo-cli", "tufo-browser"];
 const INSTALLER_VERSION_PACKAGE: &str = "tufo-gui";
 const INSTALLER_SCRIPT: &str = "packaging/windows/tufo.nsi";
 const LICENSES_FOLDER_NAME: &str = "licenses";
@@ -208,13 +208,9 @@ fn cross_build(workspace_root: &Path, target_dir: &Path) -> Result<()> {
             );
         Ok(command)
     };
-    let mut executables = cross_cargo(&["build"])?;
-    executables.args(PACKAGES.into_iter().flat_map(|package| ["-p", package]));
-    run(&mut executables, "cargo-xwin")?;
-    // CEF's bootstrap executable loads the host as a DLL.
-    let mut browser = cross_cargo(&["rustc"])?;
-    browser.args(["-p", BROWSER_PACKAGE, "--lib", "--crate-type", "cdylib"]);
-    run(&mut browser, "cargo-xwin")
+    let mut build = cross_cargo(&["build"])?;
+    build.args(PACKAGES.into_iter().flat_map(|package| ["-p", package]));
+    run(&mut build, "cargo-xwin")
 }
 
 fn cross_cflags() -> Result<String> {

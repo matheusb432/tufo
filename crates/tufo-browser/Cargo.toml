@@ -8,10 +8,13 @@ repository.workspace = true
 publish.workspace = true
 build = "build.rs"
 
-# Windows loads the host as a DLL, which `cargo rustc --lib --crate-type cdylib` builds; the
-# library is empty elsewhere.
+# Windows loads the host as a DLL, which builds with the executables; the library is empty
+# elsewhere. Its own name keeps its debug symbols apart from the executable's.
 [lib]
+name = "tufo_browser_host"
 path = "src/lib.rs"
+crate-type = ["cdylib"]
+doctest = false
 
 [dependencies]
 anyhow = { workspace = true }
