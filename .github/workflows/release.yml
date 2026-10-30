@@ -7,16 +7,26 @@ on:
         description: Tag or commit to package
         required: true
         default: main
+      platform:
+        description: Platform to package; only all collects the release
+        type: choice
+        default: all
+        options:
+          - all
+          - linux
+          - windows
+          - macos
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.ref }}
+  group: release-${{ inputs.ref }}-${{ inputs.platform }}
   cancel-in-progress: false
 
 jobs:
   linux:
+    if: inputs.platform == 'all' || inputs.platform == 'linux'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -60,6 +70,7 @@ jobs:
           retention-days: 14
 
   windows-installer:
+    if: inputs.platform == 'all' || inputs.platform == 'windows'
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -135,6 +146,7 @@ jobs:
         run: cat "$LOCALAPPDATA/tufo/data/tufo-server.log" || true
 
   macos:
+    if: inputs.platform == 'all' || inputs.platform == 'macos'
     runs-on: macos-15
     timeout-minutes: 120
     steps:
