@@ -1,0 +1,81 @@
+name: caches
+
+# GitHub evicts cache entries unused for 7 days, and releases come about two weeks apart.
+on:
+  schedule:
+    - cron: "17 5 */3 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  touch:
+    # Private runs cost minutes, so only the public repository refreshes on a schedule.
+    if: github.event_name == 'workflow_dispatch' || github.repository == 'matheusb432/tufo'
+    strategy:
+      fail-fast: false
+      # Each entry repeats a job's setup-build inputs, so it restores that job's entries.
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            tools: rust just buf cargo-binstall cargo:cargo-about
+            cache-name: release-linux
+            cef-target: x86_64-unknown-linux-gnu
+            cargo-xwin: false
+            dependency-licenses: true
+          - runner: ubuntu-24.04
+            tools: rust just buf ninja cargo-binstall cargo:cargo-xwin cargo:cargo-about
+            cache-name: release-windows-installer
+            cef-target: x86_64-pc-windows-msvc
+            cargo-xwin: true
+            dependency-licenses: true
+          - runner: macos-15
+            tools: rust just buf cargo-binstall cargo:cargo-about
+            cache-name: release-macos
+            cef-target: ""
+            cargo-xwin: false
+            dependency-licenses: true
+          # macos.yml's Intel runner is rare enough to rebuild cold.
+          - runner: macos-15
+            tools: rust just buf cargo-binstall
+            cache-name: macos-install-macos-15
+            cef-target: ""
+            cargo-xwin: false
+            dependency-licenses: false
+          - runner: macos-15
+            tools: rust buf cargo-binstall cargo:cargo-nextest
+            cache-name: macos-test-macos-15
+            cef-target: ""
+            cargo-xwin: false
+            dependency-licenses: false
+          - runner: windows-2025
+            tools: rust just buf ninja cargo-binstall
+            cache-name: windows-install
+            cef-target: x86_64-pc-windows-msvc
+            cargo-xwin: false
+            dependency-licenses: false
+          - runner: windows-2025
+            tools: rust buf ninja cargo-binstall cargo:cargo-nextest
+            cache-name: windows-test
+            cef-target: x86_64-pc-windows-msvc
+            cargo-xwin: false
+            dependency-licenses: false
+    name: touch ${{ matrix.cache-name }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-build
+        with:
+          tools: ${{ matrix.tools }}
+          cache-name: ${{ matrix.cache-name }}
+          cef-target: ${{ matrix.cef-target }}
+          cargo-xwin: ${{ matrix.cargo-xwin }}
+          dependency-licenses: ${{ matrix.dependency-licenses }}
+          save: false
