@@ -1,7 +1,11 @@
 //! Cross-builds the Windows executables and the browser host's library, and packs them with
 //! Chromium's runtime into an unsigned NSIS installer.
 
-use std::{fs, io, path::Path, process::Command};
+use std::{
+    fs, io,
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 use anyhow::{Context as _, Result, bail, ensure};
 use cargo_metadata::{Metadata, semver::Version};
@@ -16,8 +20,10 @@ const INSTALLER_SCRIPT: &str = "packaging/windows/tufo.nsi";
 const LICENSES_FOLDER_NAME: &str = "licenses";
 const CMAKE_TOOLCHAIN: &str = "packaging/windows/cross-toolchain.cmake";
 const OPUS_CMAKE_FILES: [&str; 2] = [CMAKE_TOOLCHAIN, "packaging/windows/opus-clang-cl.cmake"];
-/// A copy of the files and C flags that configured the cross-built Opus.
+/// A copy of the files and C flags that configured the cross-built Opus, in each of
+/// `libopus_sys`'s build folders, which CI caches keep along with the build.
 const OPUS_CMAKE_STAMP: &str = "xwin-opus-cmake.stamp";
+const OPUS_PACKAGE: &str = "libopus_sys";
 /// `libopus_sys` links libm whenever its build script runs on Unix, whatever the target.
 const LIBM_STUB_DIR: &str = "xwin-link-stubs";
 const EMPTY_ARCHIVE: &[u8] = b"!<arch>\n";
@@ -37,8 +43,17 @@ pub(crate) fn build(workspace_root: &Path, metadata: &Metadata) -> Result<()> {
         .with_context(|| format!("the workspace has no {INSTALLER_VERSION_PACKAGE} package"))?
         .version;
     let target_dir = metadata.target_directory.as_std_path();
-    clean_opus_after_cmake_changes(workspace_root, target_dir)?;
+    let opus_builds = metadata
+        .build_directory
+        .as_ref()
+        .unwrap_or(&metadata.target_directory)
+        .as_std_path()
+        .join(TARGET)
+        .join("release/build");
+    let opus_configuration = opus_cmake_configuration(workspace_root)?;
+    clean_opus_after_cmake_changes(workspace_root, &opus_builds, &opus_configuration)?;
     cross_build(workspace_root, target_dir)?;
+    stamp_opus_builds(&opus_builds, &opus_configuration)?;
 
     let binaries = target_dir.join(TARGET).join("release");
     for name in BINARY_NAMES {
@@ -78,16 +93,28 @@ pub(crate) fn build(workspace_root: &Path, metadata: &Metadata) -> Result<()> {
     Ok(())
 }
 
-/// `libopus_sys` builds again only when its own sources change.
-fn clean_opus_after_cmake_changes(workspace_root: &Path, target_dir: &Path) -> Result<()> {
-    let mut cmake_files = Vec::new();
+fn opus_cmake_configuration(workspace_root: &Path) -> Result<Vec<u8>> {
+    let mut configuration = Vec::new();
     for file in OPUS_CMAKE_FILES {
         let path = workspace_root.join(file);
-        cmake_files.extend(fs::read(&path).with_context(|| format!("read {}", path.display()))?);
+        configuration.extend(fs::read(&path).with_context(|| format!("read {}", path.display()))?);
     }
-    cmake_files.extend(cross_cflags()?.as_bytes());
-    let stamp = target_dir.join(OPUS_CMAKE_STAMP);
-    if fs::read(&stamp).is_ok_and(|built_from| built_from == cmake_files) {
+    configuration.extend(cross_cflags()?.as_bytes());
+    Ok(configuration)
+}
+
+/// `libopus_sys` builds again only when its own sources change.
+fn clean_opus_after_cmake_changes(
+    workspace_root: &Path,
+    opus_builds: &Path,
+    configuration: &[u8],
+) -> Result<()> {
+    let mut configured = true;
+    for folder in opus_build_folders(opus_builds)? {
+        configured &= fs::read(folder.join(OPUS_CMAKE_STAMP))
+            .is_ok_and(|built_from| built_from == configuration);
+    }
+    if configured {
         return Ok(());
     }
     run(
@@ -97,11 +124,48 @@ fn clean_opus_after_cmake_changes(workspace_root: &Path, target_dir: &Path) -> R
             "--target",
             TARGET,
             "-p",
-            "libopus_sys",
+            OPUS_PACKAGE,
         ]),
         "cargo clean",
-    )?;
-    fs::write(&stamp, cmake_files).with_context(|| format!("write {}", stamp.display()))
+    )
+}
+
+fn stamp_opus_builds(opus_builds: &Path, configuration: &[u8]) -> Result<()> {
+    let folders = opus_build_folders(opus_builds)?;
+    ensure!(
+        !folders.is_empty(),
+        "the cross-build left no {OPUS_PACKAGE} build folder in {}",
+        opus_builds.display()
+    );
+    for folder in folders {
+        let stamp = folder.join(OPUS_CMAKE_STAMP);
+        fs::write(&stamp, configuration).with_context(|| format!("write {}", stamp.display()))?;
+    }
+    Ok(())
+}
+
+/// Cargo names each build script run's folder after the package and a hash.
+fn opus_build_folders(opus_builds: &Path) -> Result<Vec<PathBuf>> {
+    let entries = match fs::read_dir(opus_builds) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(error).with_context(|| format!("list {}", opus_builds.display()));
+        }
+    };
+    let prefix = format!("{OPUS_PACKAGE}-");
+    let mut folders = Vec::new();
+    for entry in entries {
+        let path = entry?.path();
+        if path.is_dir()
+            && path
+                .file_name()
+                .is_some_and(|name| name.to_string_lossy().starts_with(&prefix))
+        {
+            folders.push(path);
+        }
+    }
+    Ok(folders)
 }
 
 fn cross_build(workspace_root: &Path, target_dir: &Path) -> Result<()> {
