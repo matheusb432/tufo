@@ -15,7 +15,7 @@ bootstrap *args:
 [group('build')]
 setup *args:
     cargo fetch {{ args }}
-    mise exec -- buf build >/dev/null
+    buf build >/dev/null
 
 # Build the GUI, server, tufo command, and browser host, which Windows loads as a DLL.
 [group('build')]
@@ -40,7 +40,7 @@ uninstall:
 # Cross-build the Windows executables and pack them into an unsigned installer in `dist/`.
 [group('build')]
 windows-installer:
-    mise exec -- cargo run --quiet -p xtask -- windows-installer
+    cargo run --quiet -p xtask -- windows-installer
 
 # Render both Windows ICO files from the app, small, and tray SVG sources.
 [group('build')]

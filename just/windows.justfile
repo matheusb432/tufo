@@ -11,7 +11,7 @@ windows-lint:
     # an older clang-cl compile CEF's C++ wrapper against cargo-xwin's MSVC standard library.
     LIBOPUS_LIB_DIR="${CARGO_TARGET_DIR:-target}/windows-lint" CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}/windows-lint" \
         CL=/D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH \
-        mise exec -- cargo xwin clippy --locked --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings
+        cargo xwin clippy --locked --target x86_64-pc-windows-msvc --workspace --all-targets -- -D warnings
 
 # Build the workspace on the winvm-rs Windows VM and run its portable tests there.
 [group('quality')]

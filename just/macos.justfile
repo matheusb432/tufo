@@ -3,4 +3,4 @@
 macos-lint:
     # Clippy never links, so pointing libopus_sys at a library folder skips building Opus.
     LIBOPUS_LIB_DIR="${CARGO_TARGET_DIR:-target}/macos-lint" CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target}/macos-lint" \
-        mise exec -- cargo-zigbuild clippy --locked --target aarch64-apple-darwin --workspace --all-targets -- -D warnings
+        cargo-zigbuild clippy --locked --target aarch64-apple-darwin --workspace --all-targets -- -D warnings
