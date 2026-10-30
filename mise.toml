@@ -10,17 +10,17 @@ ast-grep = "0.44.1"
 buf = "1.72.0"
 protoc = "35.1"
 "cargo-binstall" = "1.21.1"
-"cargo:cargo-nextest" = { version = "0.9.143", depends = ["rust", "cargo-binstall"] }
+"cargo:cargo-nextest" = { version = "0.9.150", depends = ["rust", "cargo-binstall"] }
 "cargo:slint-viewer" = { version = "1.18.1", depends = ["rust", "cargo-binstall"] }
 # Collects the dependency licenses that release packages ship.
-"cargo:cargo-about" = { version = "0.9.2", depends = ["rust", "cargo-binstall"] }
+"cargo:cargo-about" = { version = "0.9.3", depends = ["rust", "cargo-binstall"] }
 # Cross-build the Windows executables for the installer; cargo-xwin builds Opus and CEF's C++
 # wrapper with CMake and Ninja.
-"cargo:cargo-xwin" = { version = "0.22.0", depends = ["rust", "cargo-binstall"] }
+"cargo:cargo-xwin" = { version = "0.23.1", depends = ["rust", "cargo-binstall"] }
 ninja = "1.13.2"
 # Lint the macOS code from Linux; zig supplies the C compiler and headers the C dependencies need.
-"cargo:cargo-zigbuild" = { version = "0.23.4", depends = ["rust", "cargo-binstall"] }
-zig = "0.16.0"
+"cargo:cargo-zigbuild" = { version = "0.24.0", depends = ["rust", "cargo-binstall"] }
+zig = "0.17.0"
 
 # Compiles the Windows installer.
 [bootstrap.packages]
